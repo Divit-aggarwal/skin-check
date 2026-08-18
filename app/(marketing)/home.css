@@ -1,0 +1,41 @@
+/* Scoped brand tokens for The Project SKIN marketing page.
+   Deliberately isolated from tailwind.config.ts / globals.css so the rest
+   of the app (dashboard, Echo) is untouched. Forces light mode
+   regardless of the shared next-themes state — this page has no dark variant. */
+.skin-home {
+  --brand-magenta: #e02d79;
+  --brand-blush: #f7e3e3;
+  --brand-rosewood: #98415a;
+  --home-bg: #ffffff;
+  --home-bg-cream: #faf6f1;
+  --home-ink: #1a1a1a;
+
+  color-scheme: light;
+  background: var(--home-bg);
+  color: var(--home-ink);
+  font-family: var(--font-home-body), system-ui, sans-serif;
+
+  /* Type scale — one size per role, applied consistently across all 14
+     sections. See CLAUDE.md-adjacent spec: style/type-and-spacing-system. */
+  --home-text-h1: clamp(3rem, 5vw, 4.5rem);
+  --home-text-h2: clamp(2.25rem, 3.5vw, 2.75rem);
+  --home-text-h3: 1.375rem;
+  --home-text-h3-compact: 1.125rem;
+  --home-text-lede: 1.1875rem;
+  --home-text-label: 0.8125rem;
+  --home-text-meta: 0.8125rem;
+}
+
+.skin-home h1,
+.skin-home h2,
+.skin-home h3 {
+  font-family: var(--font-home-display), sans-serif;
+}
+
+.skin-home h1 { letter-spacing: -0.03em; }
+.skin-home h2 { letter-spacing: -0.02em; }
+.skin-home h3 { letter-spacing: -0.01em; }
+
+.skin-home em {
+  font-style: italic;
+}
