@@ -60,7 +60,7 @@ export function EchoTwin({ photo, overlays, scores, regionScores, score, confide
           // eslint-disable-next-line @next/next/no-img-element -- transient object URL, not a static asset
           <img src={photoUrl} alt="Your captured photo" className="absolute inset-0 h-full w-full object-cover" />
         )}
-        {overlays && (
+        {overlays?.[activeCategory] && (
           // eslint-disable-next-line @next/next/no-img-element -- base64 data URI from the scan service, not a static asset
           <img
             src={overlays[activeCategory]}

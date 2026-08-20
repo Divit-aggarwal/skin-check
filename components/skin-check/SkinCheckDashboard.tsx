@@ -124,12 +124,14 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
         <div className="grid grid-cols-2 gap-3">
           {keys.map((key) => (
             <div key={key} className="flex flex-col gap-2 rounded-2xl border border-[#1A1A1A]/10 bg-[#FAF4EF] p-3">
-              {/* eslint-disable-next-line @next/next/no-img-element -- base64 data URI from the scan service, not a static asset */}
-              <img
-                src={overlays[key]}
-                alt={`${MAP_LABELS[key]} heatmap`}
-                className="aspect-square w-full rounded-xl object-cover"
-              />
+              {overlays[key] && (
+                // eslint-disable-next-line @next/next/no-img-element -- base64 data URI from the scan service, not a static asset
+                <img
+                  src={overlays[key]}
+                  alt={`${MAP_LABELS[key]} heatmap`}
+                  className="aspect-square w-full rounded-xl object-cover"
+                />
+              )}
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[#1A1A1A]/80">{MAP_LABELS[key]}</span>
                 <span className="text-sm font-medium text-[#98415A]">
