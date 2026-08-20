@@ -87,11 +87,26 @@ export type SkinScanScores = z.infer<typeof SkinScanScoresSchema>;
 export type SkinScanOverlays = z.infer<typeof SkinScanOverlaysSchema>;
 export type SkinScanResult = z.infer<typeof SkinScanResultSchema>;
 
+// How the capture flow obtained `original`: "native" when the device file
+// picker/camera (<input capture>) returned the actual camera file verbatim
+// (EXIF intact, full sensor res); "canvas" when getUserMedia+canvas produced
+// it (desktop fallback — EXIF-free by construction, capped by the video
+// stream's negotiated resolution). Carried through so a future persistence
+// layer (Step 5) can fold it into scans.capture_state and rows can be
+// stratified by whether real EXIF exists.
+export type CaptureMethod = "native" | "canvas";
+
 // Held in useSkinCheckFlow, alongside quiz answers — not persisted (Step 5).
 // `photo` on the success variant is the dashboard hero's base layer (Step
 // 3.7) — the same captured blob carried through, not refetched or re-derived.
+// `original` is the bytes that will eventually populate scan_images.original_path:
+// on native capture it is the actual camera file (`photo` is a ~1280px
+// downscale of it, for the CV call only); on canvas capture `original` and
+// `photo` are the SAME blob — canvas has nothing higher-fidelity to fall back
+// to. The CV service only ever sees `photo`, never `original` directly, but
+// on the canvas path they happen to be identical bytes.
 export type SkinScanState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "success"; result: SkinScanResult; photo: Blob }
-  | { status: "error"; message: string; photo: Blob };
+  | { status: "success"; result: SkinScanResult; photo: Blob; original: Blob; captureMethod: CaptureMethod }
+  | { status: "error"; message: string; photo: Blob; original: Blob; captureMethod: CaptureMethod };

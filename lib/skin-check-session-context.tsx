@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, type ReactNode } from "react";
 import type { SkinCheckAnswers } from "@/types/skin-check";
-import type { SkinScanResult } from "@/types/skin-scan";
+import type { CaptureMethod, SkinScanResult } from "@/types/skin-scan";
 import type { CompositeScore } from "@/lib/skin-check-score";
 import type { EchoRegion } from "@/lib/echo-regions";
 
@@ -17,6 +17,8 @@ export interface SkinCheckSession {
   result: SkinScanResult;
   composite: CompositeScore;
   photo: Blob;
+  original: Blob;
+  captureMethod: CaptureMethod;
 }
 
 type EchoThreads = Record<EchoRegion, EchoThreadMessage[]>;

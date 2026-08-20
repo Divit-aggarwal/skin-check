@@ -59,7 +59,15 @@ export function useSkinCheckFlow() {
   const [direction, setDirection] = useState<1 | -1>(1);
   const [answers, setAnswers] = useState<SkinCheckAnswers>(() => session?.answers ?? {});
   const [scan, setScan] = useState<SkinScanState>(() =>
-    session ? { status: "success", result: session.result, photo: session.photo } : { status: "idle" }
+    session
+      ? {
+          status: "success",
+          result: session.result,
+          photo: session.photo,
+          original: session.original,
+          captureMethod: session.captureMethod,
+        }
+      : { status: "idle" }
   );
   const [complete, setComplete] = useState(() => session !== null);
   // Stopgap for the under-18 age bucket, gated at the "About You" boundary —

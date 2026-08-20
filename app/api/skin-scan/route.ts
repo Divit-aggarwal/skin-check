@@ -5,6 +5,13 @@ import { SkinScanResultSchema } from "@/types/skin-scan";
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 30_000;
 
+// Matches SkinScanScoresSchema's 7 categories (types/skin-scan.ts) — the service
+// only fills in `overlays` for the categories named here; omitting this param
+// entirely (as before) makes it return `overlays: {}` and EchoTwin has nothing to
+// render (components/skin-check/EchoTwin.tsx:63 gates the heatmap `<img>` on
+// `overlays[activeCategory]`).
+const OVERLAY_CATEGORIES = "redness,oiliness,texture,pores,blemishes,hydration,pigment";
+
 // Pre-login, unauthenticated by design — same as the rest of the /skin-check
 // route (CLAUDE.md). Proxies to the self-hosted skin-scan service (OpenCV +
 // MediaPipe FastAPI, DurtyDhiana/skin-scan) so the client never talks to it
@@ -52,7 +59,7 @@ export async function POST(request: NextRequest) {
 
   let upstreamResponse: Response;
   try {
-    upstreamResponse = await fetch(`${SKIN_SCAN_API_URL}/scan`, {
+    upstreamResponse = await fetch(`${SKIN_SCAN_API_URL}/scan?overlays=${OVERLAY_CATEGORIES}`, {
       method: "POST",
       headers: { "X-Scan-Secret": scanApiSecret },
       body: upstreamForm,

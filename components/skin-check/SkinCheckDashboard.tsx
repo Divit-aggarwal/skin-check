@@ -45,6 +45,8 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
       result: scan.result,
       composite: computeCompositeScore(scan.result.scores),
       photo: scan.photo,
+      original: scan.original,
+      captureMethod: scan.captureMethod,
     });
   }, [scan, answers, setSession]);
 
@@ -64,15 +66,15 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
   }
 
   if (scan.status === "error") {
-    const { message, photo } = scan;
+    const { message, photo, original, captureMethod } = scan;
     const handleRetry = async () => {
       onScanChange({ status: "loading" });
       try {
         const result = await getSkinScanResult(photo);
-        onScanChange({ status: "success", result, photo });
+        onScanChange({ status: "success", result, photo, original, captureMethod });
       } catch (err) {
         console.error("Skin scan retry failed:", err);
-        onScanChange({ status: "error", message, photo });
+        onScanChange({ status: "error", message, photo, original, captureMethod });
       }
     };
 
