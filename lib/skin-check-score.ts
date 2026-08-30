@@ -1,15 +1,10 @@
 import type { SkinScanScores } from "@/types/skin-scan";
+import type { Band, BandableMetric } from "@/lib/skin-check-rules";
 
-// hydration is the one skin-scan map that's framed positively (higher =
-// more hydrated = healthier). The other 6 are concern-framed — higher means
-// more of that concern (more redness, more oiliness, etc.) — so they invert
-// before averaging. Equal weighting across all 7 for now; there's no
-// evidence-based weighting model yet, revisit with real product input
-// rather than guessing at weights.
-// Exported so ScoreRadar.tsx uses the identical convention — a chart where
-// "further out = healthier" but the axis used raw scores would plot high
-// redness as a strength, contradicting this same score's own
-// higher-is-healthier reading directly above it.
+// hydration is the one skin-scan map framed positively (higher = more
+// hydrated = healthier). The other 6 are concern-framed, so they invert
+// before any comparison. Kept exported because skin-check-rules.ts derives
+// concern space from it — one definition of direction, not two.
 export const POSITIVE_TRAITS: (keyof SkinScanScores)[] = ["hydration"];
 
 export function healthValue(scores: SkinScanScores, key: keyof SkinScanScores): number {
@@ -17,36 +12,77 @@ export function healthValue(scores: SkinScanScores, key: keyof SkinScanScores): 
   return POSITIVE_TRAITS.includes(key) ? raw : 1 - raw;
 }
 
-export interface CompositeScore {
-  score: number; // 0-100, higher = healthier
-  confidence: "high" | "medium" | "low";
+// ============================================================================
+// WHAT WAS REMOVED HERE, AND WHY IT IS NOT COMING BACK
+//
+// This file used to export computeCompositeScore(), returning a 0-100 number
+// plus a confidence level, both of which the dashboard rendered — the number
+// at 3rem, directly over the user's face.
+//
+// Three separate problems, any one of which is disqualifying:
+//
+//   1. It contradicted the project's own locked decision: results are shown
+//      as BANDS, never numbers. A two-digit score next to a face is
+//      fabricated precision that reads as a clinical claim.
+//
+//   2. It was arithmetically wrong. The mean ran over all 7 keys including
+//      `pores`, which returns exactly 0.0 on every real photo. healthValue()
+//      inverts that to a perfect 1.0, so a metric that measures nothing
+//      contributed a guaranteed ~14.3 points to every user's score. The
+//      scale had a floor of 14 and a systematic upward bias.
+//
+//   3. `confidence: "high"` was a hardcoded literal. Every successful scan
+//      claimed high confidence, on heuristics that CALIBRATION.md says are
+//      not comparable across users or across repeat scans of the same user.
+//      That badge was the most legally exposed element on the page and it
+//      was a constant.
+//
+// What replaces it is a summary of which concerns actually banded highest —
+// derived from the same rule engine that drives the display and the SKU
+// selection, so the sentence and the tiles can never disagree.
+// ============================================================================
+
+export interface ConcernSummary {
+  /** Metrics that banded Elevated, then Moderate, ordered by concern desc. */
+  topConcerns: BandableMetric[];
+  /** One line, derived from topConcerns. Never contains a number. */
   summaryLine: string;
 }
 
-// Deterministic, local — no LLM call. computeSkinAssessment() in lib/gemini.ts
-// is a real Gemini synthesis call keyed to the old QuizAnswers/VisionResult
-// shapes and would burn quota needlessly for a value derivable directly from
-// the 7 numbers the skin-scan service already returns.
-export function computeCompositeScore(scores: SkinScanScores): CompositeScore {
-  const keys = Object.keys(scores) as (keyof SkinScanScores)[];
+// Kept as an alias so the deferred /echo surface, the chat route schema and
+// the session context keep compiling. Those consumers only ever read
+// summaryLine; the score and confidence fields they used are gone.
+export type CompositeScore = ConcernSummary;
 
-  const healthSum = keys.reduce((sum, key) => sum + healthValue(scores, key), 0);
+const CONCERN_NOUNS: Record<BandableMetric, string> = {
+  redness: "redness",
+  oiliness: "oiliness",
+  texture: "texture",
+  blemishes: "breakouts",
+  hydration: "dryness",
+  pigment: "dark marks",
+};
 
-  const score = Math.round((healthSum / keys.length) * 100);
+export function summarizeConcerns(
+  scores: SkinScanScores,
+  bands: Record<BandableMetric, Band>
+): ConcernSummary {
+  const ranked = (Object.keys(bands) as BandableMetric[])
+    .filter((m) => bands[m] !== "Low")
+    .sort((a, b) => (1 - healthValue(scores, b)) - (1 - healthValue(scores, a)));
 
-  return {
-    score,
-    // A real photo was measured across all 7 maps — this is the
-    // photo-inclusive, higher-confidence path (see CLAUDE.md's confidence
-    // rule). The scan-failure path never reaches this function at all.
-    confidence: "high",
-    summaryLine: summaryLineFor(score),
-  };
+  return { topConcerns: ranked, summaryLine: summaryLineFor(ranked) };
 }
 
-function summaryLineFor(score: number): string {
-  if (score >= 80) return "Your skin looks calm today — keep this up.";
-  if (score >= 60) return "Mostly steady, with a couple of things worth watching.";
-  if (score >= 40) return "A few areas may be asking for a little more attention.";
-  return "Your skin may be going through a rough patch right now.";
+function summaryLineFor(ranked: BandableMetric[]): string {
+  if (ranked.length === 0) {
+    return "Nothing stood out in this photo. Keep doing what you're doing.";
+  }
+  if (ranked.length === 1) {
+    return `${cap(CONCERN_NOUNS[ranked[0]!])} is the one thing worth attention right now.`;
+  }
+  const [first, second] = ranked;
+  return `${cap(CONCERN_NOUNS[first!])} and ${CONCERN_NOUNS[second!]} came through strongest.`;
 }
+
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);

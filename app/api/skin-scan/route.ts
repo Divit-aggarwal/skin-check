@@ -5,12 +5,12 @@ import { SkinScanResultSchema } from "@/types/skin-scan";
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 30_000;
 
-// Matches SkinScanScoresSchema's 7 categories (types/skin-scan.ts) — the service
-// only fills in `overlays` for the categories named here; omitting this param
-// entirely (as before) makes it return `overlays: {}` and EchoTwin has nothing to
-// render (components/skin-check/EchoTwin.tsx:63 gates the heatmap `<img>` on
-// `overlays[activeCategory]`).
-const OVERLAY_CATEGORIES = "redness,oiliness,texture,pores,blemishes,hydration,pigment";
+// Matches SkinScanScoresSchema's 7 categories (types/skin-scan.ts). Allowlist,
+// not passthrough — the value lands in an upstream query string, and
+// validating against the known 7 keeps a malformed client from shaping it.
+const VALID_OVERLAYS = new Set([
+  "redness", "oiliness", "texture", "pores", "blemishes", "hydration", "pigment",
+]);
 
 // Pre-login, unauthenticated by design — same as the rest of the /skin-check
 // route (CLAUDE.md). Proxies to the self-hosted skin-scan service (OpenCV +
@@ -44,6 +44,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No image provided." }, { status: 400 });
   }
 
+  const requested = formData.get("overlay");
+  const overlay =
+    typeof requested === "string" && VALID_OVERLAYS.has(requested) ? requested : null;
+
   if (image.size > MAX_IMAGE_BYTES) {
     return NextResponse.json({ error: "Image too large. Maximum 5MB." }, { status: 400 });
   }
@@ -57,9 +61,15 @@ export async function POST(request: NextRequest) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
+  // No overlay requested means no overlay returned — the cheapest path, not
+  // the most expensive one.
+  const scanUrl = overlay
+    ? `${SKIN_SCAN_API_URL}/scan?overlays=${overlay}`
+    : `${SKIN_SCAN_API_URL}/scan`;
+
   let upstreamResponse: Response;
   try {
-    upstreamResponse = await fetch(`${SKIN_SCAN_API_URL}/scan?overlays=${OVERLAY_CATEGORIES}`, {
+    upstreamResponse = await fetch(scanUrl, {
       method: "POST",
       headers: { "X-Scan-Secret": scanApiSecret },
       body: upstreamForm,

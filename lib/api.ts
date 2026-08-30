@@ -126,9 +126,13 @@ const SkinScanResponseSchema = z.object({
   result: SkinScanResultSchema,
 });
 
-export async function getSkinScanResult(photo: Blob): Promise<SkinScanResult> {
+export async function getSkinScanResult(
+  photo: Blob,
+  overlay?: string | null
+): Promise<SkinScanResult> {
   const formData = new FormData();
   formData.append("image", photo, "scan.jpg");
+  if (overlay) formData.append("overlay", overlay);
 
   const response = await fetch("/api/skin-scan", {
     method: "POST",

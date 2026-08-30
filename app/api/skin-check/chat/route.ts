@@ -11,9 +11,14 @@ const ChatMessageSchema = z.object({
   text: z.string(),
 });
 
+// Matches BandableMetric (lib/skin-check-rules.ts) exactly — z.string() would
+// widen topConcerns to string[], which doesn't assign back to ConcernSummary.
+const BandableMetricSchema = z.enum([
+  "redness", "oiliness", "texture", "blemishes", "hydration", "pigment",
+]);
+
 const CompositeScoreSchema = z.object({
-  score: z.number(),
-  confidence: z.enum(["high", "medium", "low"]),
+  topConcerns: z.array(BandableMetricSchema),
   summaryLine: z.string(),
 });
 

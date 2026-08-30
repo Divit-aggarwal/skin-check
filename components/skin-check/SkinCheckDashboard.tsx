@@ -4,26 +4,40 @@ import { useEffect } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { getSkinScanResult } from "@/lib/api";
-import { computeCompositeScore } from "@/lib/skin-check-score";
-import { runSkinCheckRules } from "@/lib/skin-check-rules";
+import { summarizeConcerns } from "@/lib/skin-check-score";
+import { runSkinCheckRules, type Band, type BandableMetric } from "@/lib/skin-check-rules";
+import { SKU_DISPLAY, METRIC_LABELS } from "@/lib/skin-check-skus";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
-import type { SkinScanScores, SkinScanState } from "@/types/skin-scan";
+import type { SkinScanState } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import { EchoTwin } from "./EchoTwin";
 
-// hydration is labeled "Dryness", not "Hydration" - bands mean concern-level
-// uniformly (lib/skin-check-rules.ts), and hydration is the one metric where
-// the concern is the inverse of the trait itself (low hydration = high
-// dryness concern). Relabeling to the concern keeps "Low"/"Elevated" meaning
-// the same thing in every row instead of flipping for this one.
-const MAP_LABELS: Record<keyof SkinScanScores, string> = {
-  redness: "Redness",
-  oiliness: "Oiliness",
-  texture: "Texture",
-  pores: "Pores",
-  blemishes: "Blemishes",
-  hydration: "Dryness",
-  pigment: "Pigment",
+// The metric whose overlay we requested at scan time — the user's own stated
+// primary concern from the quiz. `pores` is excluded from banding (it returns
+// exactly 0.0 on every real photo), so if that's what they picked we fall
+// through to whatever actually banded highest rather than showing them an
+// overlay of a metric that never measured anything.
+function resolveFocus(
+  answers: SkinCheckAnswers,
+  bands: Record<BandableMetric, Band>
+): BandableMetric | null {
+  const stated = answers.primary_concern;
+  if (typeof stated === "string" && stated !== "pores" && stated in METRIC_LABELS) {
+    return stated as BandableMetric;
+  }
+  const elevated = (Object.keys(bands) as BandableMetric[]).find((m) => bands[m] === "Elevated");
+  return elevated ?? null;
+}
+
+// Bands ride a WEIGHT ramp, not a colour ramp. The Purity theme ships no
+// success/warning/error palette, and a red/amber/green traffic light next to
+// someone's face is exactly the clinical claim this product has spent its
+// whole design refusing to make. Elevated earns the rose rule; nothing
+// earns red.
+const BAND_STYLE: Record<Band, string> = {
+  Low: "text-muted",
+  Moderate: "text-text",
+  Elevated: "text-text font-medium",
 };
 
 interface SkinCheckDashboardProps {
@@ -32,24 +46,16 @@ interface SkinCheckDashboardProps {
   answers: SkinCheckAnswers;
 }
 
-// The payoff screen after /skin-check completes — Echo first, the composite
-// score docked beneath it as the twin's own readout, then the 7 real
-// sub-scores + heatmaps, then a light next-steps note. Rendered in place of
-// the old "complete" screen, straight from the same scan state Step 2 already
-// holds.
 export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDashboardProps) {
   const { setSession } = useSkinCheckSession();
 
-  // Mirrors the completed scan into the shared (marketing)-layout session
-  // (Step 4b) so /echo can ground region-scoped chat without prop-drilling
-  // across a route change — in-memory only, per that session's own
-  // refresh-loses-it contract.
   useEffect(() => {
     if (scan.status !== "success") return;
+    const { bands } = runSkinCheckRules(scan.result);
     setSession({
       answers,
       result: scan.result,
-      composite: computeCompositeScore(scan.result.scores),
+      composite: summarizeConcerns(scan.result.scores, bands),
       photo: scan.photo,
       original: scan.original,
       captureMethod: scan.captureMethod,
@@ -61,10 +67,15 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
   if (scan.status === "loading") {
     return (
       <div className="flex flex-col gap-4">
-        <Skeleton className="aspect-square w-full max-w-[340px] self-center rounded-[28px]" />
-        <div className="grid grid-cols-2 gap-3">
-          {Array.from({ length: 7 }).map((_, i) => (
-            <Skeleton key={i} className="h-24 w-full rounded-2xl" />
+        <Skeleton className="aspect-[3/4] w-full max-w-[340px] self-center rounded-media" />
+        {/* Copy, not a bare spinner. The upstream timeout is 30s and the
+            previous version showed nothing at all for the duration. */}
+        <p className="text-center text-body text-muted">
+          Reading your photo. This takes a few seconds.
+        </p>
+        <div className="flex flex-col gap-2">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full rounded" />
           ))}
         </div>
       </div>
@@ -76,7 +87,7 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
     const handleRetry = async () => {
       onScanChange({ status: "loading" });
       try {
-        const result = await getSkinScanResult(photo);
+        const result = await getSkinScanResult(photo, resolveFocus(answers, {} as never));
         onScanChange({ status: "success", result, photo, original, captureMethod });
       } catch (err) {
         console.error("Skin scan retry failed:", err);
@@ -86,22 +97,19 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
 
     return (
       <div className="flex flex-col gap-4">
-        {/* No fabricated score here — a scan failure means there's no real
-            measurement to synthesize a number from, so Echo shows without one
-            rather than displaying a fake/zero composite score. The captured
-            photo still renders — it's real, the scan just failed to read it. */}
+        {/* Nothing synthesised here. A failed scan has no measurement, so
+            there is no summary to write — the photo still renders because
+            it's real; the reading isn't. */}
         <EchoTwin
           photo={photo}
           overlays={null}
-          scores={null}
-          score={null}
-          confidence={null}
-          summary="Echo's still here — we just couldn't read your photo this time."
+          focus={null}
+          summary="We couldn't read this photo."
         />
-        <div className="flex flex-col gap-3 rounded-2xl border border-[#1A1A1A]/10 bg-white p-4">
-          <p className="text-sm text-[#1A1A1A]/70">{message}</p>
+        <div className="flex flex-col gap-3 rounded border border-border bg-canvas p-4">
+          <p className="text-body text-text/70">{message}</p>
           <Button type="button" variant="outlineLight" size="sm" onClick={handleRetry} className="self-start">
-            Try analyzing again
+            Take another photo
           </Button>
         </div>
       </div>
@@ -109,56 +117,81 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
   }
 
   const { scores, overlays } = scan.result;
-  const composite = computeCompositeScore(scores);
-  const rules = runSkinCheckRules(scan.result);
-  const keys = Object.keys(MAP_LABELS) as (keyof typeof MAP_LABELS)[];
+  const { bands, skus, rule_trace } = runSkinCheckRules(scan.result);
+  const { summaryLine } = summarizeConcerns(scores, bands);
+  const focus = resolveFocus(answers, bands);
+
+  // Concern-ranked, so the thing that matters is at the top of the list
+  // rather than wherever it happened to sit in the type definition.
+  const ranked = (Object.keys(METRIC_LABELS) as BandableMetric[]).sort((a, b) => {
+    const order: Record<Band, number> = { Elevated: 0, Moderate: 1, Low: 2 };
+    return order[bands[a]] - order[bands[b]];
+  });
+
+  // The trace entry that made each SKU fire — this is what turns "buy this"
+  // into "buy this BECAUSE pigment banded Elevated", which is the entire
+  // differentiated pitch of a brand positioned on measurability.
+  const reasonFor = (sku: string) =>
+    rule_trace.find((t) => t.rule === `sku:${sku}` && t.fired)?.detail ?? null;
 
   return (
-    <div className="flex flex-col gap-6">
-      <EchoTwin
-        photo={scan.photo}
-        overlays={overlays}
-        scores={scores}
-        score={composite.score}
-        confidence={composite.confidence}
-        summary={composite.summaryLine}
-      />
+    <div className="flex flex-col gap-10">
+      <EchoTwin photo={scan.photo} overlays={overlays} focus={focus} summary={summaryLine} />
 
-      <div className="flex flex-col gap-3">
-        <p className="text-[length:var(--home-text-label,0.8125rem)] font-semibold uppercase tracking-[0.12em] text-[#98415A]/70">
-          Your seven signals
-        </p>
-        <div className="grid grid-cols-2 gap-3">
-          {keys.map((key) => (
-            <div key={key} className="flex flex-col gap-2 rounded-2xl border border-[#1A1A1A]/10 bg-[#FAF4EF] p-3">
-              {overlays[key] && (
-                // eslint-disable-next-line @next/next/no-img-element -- base64 data URI from the scan service, not a static asset
-                <img
-                  src={overlays[key]}
-                  alt={`${MAP_LABELS[key]} heatmap`}
-                  className="aspect-square w-full rounded-xl object-cover"
-                />
-              )}
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-[#1A1A1A]/80">{MAP_LABELS[key]}</span>
-                <span className="text-sm font-medium text-[#98415A]">
-                  {key === "pores" ? "Not measured yet" : rules.bands[key]}
-                </span>
-              </div>
-            </div>
+      <section className="flex flex-col gap-3">
+        <h2 className="text-label uppercase text-muted">What we read</h2>
+        <ul className="flex flex-col">
+          {ranked.map((key) => (
+            <li
+              key={key}
+              className={
+                bands[key] === "Elevated"
+                  ? "flex items-center justify-between border-l-2 border-accent py-3 pl-3"
+                  : "flex items-center justify-between border-l-2 border-transparent py-3 pl-3"
+              }
+            >
+              <span className="text-body text-text">{METRIC_LABELS[key]}</span>
+              <span className={`text-body ${BAND_STYLE[bands[key]]}`}>{bands[key]}</span>
+            </li>
           ))}
-        </div>
-      </div>
+        </ul>
+        {/* `pores` is deliberately absent from this list. It returns exactly
+            0.0 on every real photo, so it is excluded from banding upstream.
+            The previous version gave it 1/7 of the payoff screen to say
+            "Not measured yet". */}
+        <p className="text-label uppercase tracking-label text-muted">
+          Bands compare signals within this photo, not against other people
+        </p>
+      </section>
 
-      <div className="flex flex-col gap-2 rounded-2xl bg-[#FAF4EF] p-4">
-        <p className="text-[length:var(--home-text-label,0.8125rem)] font-semibold uppercase tracking-[0.12em] text-[#98415A]/70">
-          Next steps
-        </p>
-        <p className="text-sm leading-relaxed text-[#1A1A1A]/75">
-          Based on your answers and photo, a simple routine may help more than a
-          complicated one right now. Echo can walk through specifics whenever you&apos;re ready.
-        </p>
-      </div>
+      <section className="flex flex-col gap-3">
+        <h2 className="text-label uppercase text-muted">What we&apos;d use</h2>
+        <ul className="flex flex-col gap-2">
+          {skus.map((sku) => {
+            const product = SKU_DISPLAY[sku];
+            if (!product) return null;
+            const reason = reasonFor(sku);
+            return (
+              <li key={sku} className="flex gap-3 rounded border border-border p-4">
+                <span
+                  aria-hidden
+                  className={`mt-1 h-8 w-1 shrink-0 rounded-pill bg-${product.accent}`}
+                />
+                <div className="flex flex-col gap-1">
+                  <a
+                    href={`/products/${product.handle}`}
+                    className="text-body font-medium text-text underline underline-offset-4"
+                  >
+                    {product.name}
+                  </a>
+                  <p className="text-body text-text/70">{product.blurb}</p>
+                  {reason && <p className="text-label text-muted">Why: {reason}</p>}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
     </div>
   );
 }

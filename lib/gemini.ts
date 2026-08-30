@@ -433,7 +433,7 @@ function buildSkinCheckEchoSystemInstruction(
 ): string {
   const scanSection =
     scores && composite
-      ? `composite skin score: ${composite.score}/100 (confidence: ${composite.confidence})
+      ? `concerns: ${composite.topConcerns.join(", ")}
 summary already shown to the user: "${composite.summaryLine}"
 
 per-category scores:

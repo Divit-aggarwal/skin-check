@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
-import { ConfidenceBadge } from "@/components/primitives/ConfidenceBadge";
 import { TypingIndicator } from "@/components/primitives/TypingIndicator";
 import { EchoBubble } from "./EchoBubble";
 import { EchoMark } from "./EchoMark";
@@ -156,7 +155,6 @@ export function EchoPage() {
             <p className="text-[length:var(--home-text-label,0.8125rem)] font-semibold uppercase tracking-[0.12em] text-[#98415A]/70">
               {ECHO_REGION_LABELS[activeRegion]} readings
             </p>
-            <ConfidenceBadge level={session.composite.confidence} />
           </div>
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
             {CATEGORY_KEYS.map((key) => (
