@@ -10,10 +10,12 @@ relationships and can hire annotators once data exists.
 
 ## Two repos
 
-**skin-check (frontend)** — Next.js 14 App Router, working dir `_extract`,
-extracted from an older messy repo. Quiz → camera → quality gate → CV service →
-local scoring → results. No GitHub remote yet. No persistence — 
-`lib/skin-check-session-context.tsx` is in-memory and dies on refresh.
+**skin-check (frontend)** — Next.js 14 App Router, working dir `skin-check`
+(originally extracted from an older messy repo into `_extract`, since
+renamed). Quiz → camera → quality gate → CV service → local scoring →
+results. GitHub remote: `Divit-aggarwal/skin-check` (private). No
+persistence — `lib/skin-check-session-context.tsx` is in-memory and dies on
+refresh.
 
 **skin-scan (CV service)** — FastAPI + MediaPipe + OpenCV, branch
 `prod-hardening`. `mediapipe==0.10.21` EXACT (0.10.35+ deleted `mp.solutions`
