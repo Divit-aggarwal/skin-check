@@ -1,4 +1,5 @@
 import { SECTIONS } from "@/lib/skin-check-steps";
+import { bandScores } from "@/lib/skin-check-rules";
 import type { SkinCheckAnswers, StepAnswerValue, StepConfig } from "@/types/skin-check";
 import type { SkinScanScores } from "@/types/skin-scan";
 
@@ -59,20 +60,28 @@ export function summarizeSkinCheckAnswers(answers: SkinCheckAnswers): string {
   return lines.length > 0 ? lines.join("\n") : "No quiz answers provided.";
 }
 
+// hydration is labeled "Dryness" - see SkinCheckDashboard.tsx's MAP_LABELS
+// comment. Same reasoning, same relabel, kept in sync across every site
+// (this one feeds Echo's prompt context, not a screen, but Echo should
+// narrate the same label a user already saw).
 const SKIN_SCAN_CATEGORY_LABELS: Record<keyof SkinScanScores, string> = {
   redness: "Redness",
   oiliness: "Oiliness",
   texture: "Texture irregularity",
   pores: "Pore visibility",
   blemishes: "Blemishes",
-  hydration: "Hydration",
+  hydration: "Dryness",
   pigment: "Pigmentation",
 };
 
-// Matches the raw 0-100 numbers already shown on the dashboard (Step 3) —
-// concern-framed for every category except hydration, see lib/skin-check-score.ts.
+// Matches the bands now shown on the dashboard (Step 3) — Low/Moderate/
+// Elevated, not raw numbers (bands-not-numbers is a locked decision, see
+// lib/skin-check-rules.ts). Pores has no band (see that file's exclusion
+// comment) and is left out here rather than printed with a fake one.
 export function summarizeSkinScanScores(scores: SkinScanScores): string {
+  const { bands } = bandScores(scores);
   return (Object.keys(SKIN_SCAN_CATEGORY_LABELS) as (keyof SkinScanScores)[])
-    .map((key) => `${SKIN_SCAN_CATEGORY_LABELS[key]}: ${Math.round(scores[key] * 100)}/100`)
+    .filter((key) => key !== "pores")
+    .map((key) => `${SKIN_SCAN_CATEGORY_LABELS[key]}: ${bands[key]}`)
     .join("\n");
 }

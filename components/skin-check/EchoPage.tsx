@@ -11,16 +11,19 @@ import { EchoBubble } from "./EchoBubble";
 import { EchoMark } from "./EchoMark";
 import { useSkinCheckSession, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getSkinCheckChatReply } from "@/lib/api";
+import { bandScores } from "@/lib/skin-check-rules";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import type { SkinScanScores } from "@/types/skin-scan";
 
+// hydration is labeled "Dryness" - see SkinCheckDashboard.tsx's MAP_LABELS
+// comment. Same reasoning, same relabel, kept in sync across both sites.
 const CATEGORY_LABELS: Record<keyof SkinScanScores, string> = {
   redness: "Redness",
   oiliness: "Oiliness",
   texture: "Texture",
   pores: "Pores",
   blemishes: "Blemishes",
-  hydration: "Hydration",
+  hydration: "Dryness",
   pigment: "Pigment",
 };
 const CATEGORY_KEYS = Object.keys(CATEGORY_LABELS) as (keyof SkinScanScores)[];
@@ -79,6 +82,7 @@ export function EchoPage() {
   }
 
   const regionScores = session.result.region_scores[activeRegion];
+  const regionBands = regionScores ? bandScores(regionScores).bands : null;
   const activeSession = session; // fresh const so the closure below keeps the non-null narrowing
 
   async function handleSend() {
@@ -146,7 +150,7 @@ export function EchoPage() {
         })}
       </div>
 
-      {regionScores && (
+      {regionBands && (
         <div className="mt-4 shrink-0 rounded-2xl bg-[#FAF4EF] p-4">
           <div className="flex items-center justify-between">
             <p className="text-[length:var(--home-text-label,0.8125rem)] font-semibold uppercase tracking-[0.12em] text-[#98415A]/70">
@@ -158,7 +162,9 @@ export function EchoPage() {
             {CATEGORY_KEYS.map((key) => (
               <div key={key} className="flex items-center justify-between">
                 <span className="text-xs text-[#1A1A1A]/60">{CATEGORY_LABELS[key]}</span>
-                <span className="text-xs font-medium text-[#98415A]">{Math.round(regionScores[key] * 100)}</span>
+                <span className="text-xs font-medium text-[#98415A]">
+                  {key === "pores" ? "Not measured yet" : regionBands[key]}
+                </span>
               </div>
             ))}
           </div>

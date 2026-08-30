@@ -1,12 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { ConfidenceBadge } from "@/components/primitives/ConfidenceBadge";
-import { EchoRegionDiagram } from "./EchoRegionDiagram";
 import { ScoreRadar } from "./ScoreRadar";
 import type { SkinScanOverlays, SkinScanScores } from "@/types/skin-scan";
-import type { EchoRegion } from "@/lib/echo-regions";
 
 const CATEGORY_LABELS: Record<keyof SkinScanScores, string> = {
   redness: "Redness",
@@ -28,8 +25,6 @@ interface EchoTwinProps {
   overlays: SkinScanOverlays | null;
   /** Null when the scan failed — no real per-category data to ring, so it doesn't render. */
   scores: SkinScanScores | null;
-  /** Null when the scan failed — gates the region diagram the same way `scores` gates the radar. */
-  regionScores: Record<string, SkinScanScores> | null;
   score: number | null;
   confidence: "high" | "medium" | "low" | null;
   summary: string;
@@ -39,19 +34,14 @@ interface EchoTwinProps {
 // rendered 3D face. Two prior attempts (procedural particles, then a
 // generic head) both added render-risk without adding anything a skin
 // product actually needs: proof the analysis is real. The user's own photo,
-// with the 7 real heatmaps switchable on top, IS that proof — Echo stays the
-// assistant persona via the chat entry point below, it just doesn't require
-// a literal face to exist as a concept.
-export function EchoTwin({ photo, overlays, scores, regionScores, score, confidence, summary }: EchoTwinProps) {
-  const router = useRouter();
+// with the 7 real heatmaps switchable on top, IS that proof. No chat entry
+// point here — Echo/Gemini is deferred from v1 (see /echo, kept intact but
+// unreached from this flow).
+export function EchoTwin({ photo, overlays, scores, score, confidence, summary }: EchoTwinProps) {
   const [activeCategory, setActiveCategory] = useState<keyof SkinScanScores>(DEFAULT_CATEGORY);
 
   const photoUrl = useMemo(() => (photo ? URL.createObjectURL(photo) : null), [photo]);
   useEffect(() => () => { if (photoUrl) URL.revokeObjectURL(photoUrl); }, [photoUrl]);
-
-  function handleSelectRegion(region: EchoRegion) {
-    router.push(`/echo?region=${region}`);
-  }
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -110,15 +100,6 @@ export function EchoTwin({ photo, overlays, scores, regionScores, score, confide
       </div>
 
       {scores && <ScoreRadar scores={scores} />}
-
-      {regionScores && (
-        <div className="flex flex-col items-center gap-3 pt-2">
-          <p className="text-[length:var(--home-text-label,0.8125rem)] font-semibold uppercase tracking-[0.12em] text-[#98415A]/70">
-            Ask Echo about a specific area
-          </p>
-          <EchoRegionDiagram onSelectRegion={handleSelectRegion} />
-        </div>
-      )}
     </div>
   );
 }

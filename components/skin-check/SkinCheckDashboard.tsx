@@ -5,18 +5,24 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { getSkinScanResult } from "@/lib/api";
 import { computeCompositeScore } from "@/lib/skin-check-score";
+import { runSkinCheckRules } from "@/lib/skin-check-rules";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
 import type { SkinScanScores, SkinScanState } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import { EchoTwin } from "./EchoTwin";
 
+// hydration is labeled "Dryness", not "Hydration" - bands mean concern-level
+// uniformly (lib/skin-check-rules.ts), and hydration is the one metric where
+// the concern is the inverse of the trait itself (low hydration = high
+// dryness concern). Relabeling to the concern keeps "Low"/"Elevated" meaning
+// the same thing in every row instead of flipping for this one.
 const MAP_LABELS: Record<keyof SkinScanScores, string> = {
   redness: "Redness",
   oiliness: "Oiliness",
   texture: "Texture",
   pores: "Pores",
   blemishes: "Blemishes",
-  hydration: "Hydration",
+  hydration: "Dryness",
   pigment: "Pigment",
 };
 
@@ -88,7 +94,6 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
           photo={photo}
           overlays={null}
           scores={null}
-          regionScores={null}
           score={null}
           confidence={null}
           summary="Echo's still here — we just couldn't read your photo this time."
@@ -103,8 +108,9 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
     );
   }
 
-  const { scores, overlays, region_scores } = scan.result;
+  const { scores, overlays } = scan.result;
   const composite = computeCompositeScore(scores);
+  const rules = runSkinCheckRules(scan.result);
   const keys = Object.keys(MAP_LABELS) as (keyof typeof MAP_LABELS)[];
 
   return (
@@ -113,7 +119,6 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
         photo={scan.photo}
         overlays={overlays}
         scores={scores}
-        regionScores={region_scores}
         score={composite.score}
         confidence={composite.confidence}
         summary={composite.summaryLine}
@@ -137,7 +142,7 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
               <div className="flex items-center justify-between">
                 <span className="text-sm text-[#1A1A1A]/80">{MAP_LABELS[key]}</span>
                 <span className="text-sm font-medium text-[#98415A]">
-                  {Math.round(scores[key] * 100)}
+                  {key === "pores" ? "Not measured yet" : rules.bands[key]}
                 </span>
               </div>
             </div>

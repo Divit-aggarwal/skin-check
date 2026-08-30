@@ -401,13 +401,21 @@ export async function getEchoChatReply(
   return runEchoChat(messages, buildEchoSystemInstruction(context.result, context.vision));
 }
 
-// score scale note: every /skin-check category except hydration is
-// concern-framed (higher = more of that concern), matching the raw numbers
-// already shown on the dashboard — see lib/skin-check-score.ts.
-const SKIN_CHECK_SCORE_SCALE_NOTE = `Score scale: 0-100 per category, matching what the user already sees on their
-dashboard. For every category except Hydration, a HIGHER number means MORE of
-that concern (e.g. Redness: 70 means more redness detected, not healthier
-skin). For Hydration, a HIGHER number means MORE hydrated, healthier skin.`;
+// score scale note: per-category readings are bands (Low/Moderate/Elevated),
+// matching what the user already sees on their dashboard — see
+// lib/skin-check-rules.ts. Band words mean concern-level uniformly across
+// every category now — no per-category inversion to explain here anymore.
+// The one category that used to need one (hydration) is labeled "Dryness"
+// instead (lib/skin-check-format.ts's SKIN_SCAN_CATEGORY_LABELS) so the word
+// "Elevated" still just means "more of this concern," same as every other
+// row — that relabel is what this note used to have to spell out.
+const SKIN_CHECK_SCORE_SCALE_NOTE = `Band scale: Low, Moderate, or Elevated per category, matching what the user
+already sees on their dashboard. These are not percentages or scores — do
+not invent or imply a number behind them. Elevated always means MORE of the
+named concern (e.g. Redness: Elevated means more redness detected; Dryness:
+Elevated means more dryness detected — dryness, not hydration, is the
+category name here on purpose, so "Elevated" doesn't flip meaning for it).
+Pores has no band yet — do not comment on pores.`;
 
 // /echo (Step 4b) — the region a thread is scoped to, and that region's own
 // slice of region_scores (Step 4a). Grounds the reply in "your forehead"
