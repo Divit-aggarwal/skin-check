@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { getSkinScanResult } from "@/lib/api";
 import { summarizeConcerns } from "@/lib/skin-check-score";
 import { runSkinCheckRules, type Band, type BandableMetric } from "@/lib/skin-check-rules";
-import { SKU_DISPLAY, METRIC_LABELS } from "@/lib/skin-check-skus";
+import { SKU_DISPLAY, METRIC_LABELS, SKU_ACCENT_CLASS } from "@/lib/skin-check-skus";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
 import type { SkinScanState } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
@@ -175,7 +175,7 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
               <li key={sku} className="flex gap-3 rounded border border-border p-4">
                 <span
                   aria-hidden
-                  className={`mt-1 h-8 w-1 shrink-0 rounded-pill bg-${product.accent}`}
+                  className={`mt-1 h-8 w-1 shrink-0 rounded-pill ${SKU_ACCENT_CLASS[product.accent] ?? ""}`}
                 />
                 <div className="flex flex-col gap-1">
                   <a

@@ -26,11 +26,28 @@ export interface SkuDisplay {
   name: string;
   /** Shopify product handle — verify before shipping. */
   handle: string;
-  /** Tailwind colour token from tokens.css. */
+  /** Key into SKU_ACCENT_CLASS below — not a class name itself. */
   accent: string;
   /** Plain-language line. What it does, not what it claims. */
   blurb: string;
 }
+
+/**
+ * Static lookup, not `` `bg-${accent}` `` — Tailwind's JIT compiler only
+ * generates utilities it can see as literal strings in source, so an
+ * interpolated class name purges silently instead of erroring.
+ *
+ * TODO(tokens): these colours aren't defined in tailwind.config.ts yet — the
+ * retokenized config (sourced from the Shopify theme's settings_schema
+ * defaults) hasn't landed, so these bars render as no-ops until it does.
+ * Tracked separately; not this fix's scope.
+ */
+export const SKU_ACCENT_CLASS: Record<string, string> = {
+  "sku-sunscreen-sky": "bg-sku-sunscreen-sky",
+  "sku-serum": "bg-sku-serum",
+  "sku-cleanser": "bg-sku-cleanser",
+  "sku-active-boba": "bg-sku-active-boba",
+};
 
 export const SKU_DISPLAY: Record<string, SkuDisplay> = {
   "sunscreen-spf50-provisional": {
