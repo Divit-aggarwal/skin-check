@@ -76,6 +76,18 @@ export const SECTIONS: SectionConfig[] = [
     ],
   },
   {
+    id: "skin-photo",
+    label: "SKIN PHOTO",
+    steps: [
+      {
+        id: "skin_photo",
+        type: "photo-capture",
+        prompt: "One last thing — a quick photo helps us read your skin, not just your answers.",
+        note: "Face the camera in good light. This stays on your device until you save your results.",
+      },
+    ],
+  },
+  {
     id: "your-skin",
     label: "YOUR SKIN",
     steps: [
@@ -425,18 +437,6 @@ export const SECTIONS: SectionConfig[] = [
           { value: "2to3", label: "2–3 litres", sublabel: "≈8–12 glasses" },
           { value: "gt3", label: ">3 litres", sublabel: "≈12+ glasses" },
         ],
-      },
-    ],
-  },
-  {
-    id: "skin-photo",
-    label: "SKIN PHOTO",
-    steps: [
-      {
-        id: "skin_photo",
-        type: "photo-capture",
-        prompt: "One last thing — a quick photo helps us read your skin, not just your answers.",
-        note: "Face the camera in good light. This stays on your device until you save your results.",
       },
     ],
   },

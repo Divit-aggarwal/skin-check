@@ -153,28 +153,36 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
     }
   }, [isMobile, requestCamera]);
 
-  const handleConfirm = useCallback(async () => {
+  const handleConfirm = useCallback(() => {
     const blob = capturedBlobRef.current;
     const original = originalBlobRef.current;
     if (!blob || !original) return;
     const captureMethod: CaptureMethod = isMobile ? "native" : "canvas";
 
-    onScanChange({ status: "loading" });
-    try {
-      const result = await getSkinScanResult(blob);
-      onScanChange({ status: "success", result, photo: blob, original, captureMethod });
-    } catch (err) {
-      console.error("Skin scan failed:", err);
-      onScanChange({
-        status: "error",
-        message: "We couldn't analyze your photo just now — you can still see your results without it.",
-        photo: blob,
-        original,
-        captureMethod,
-      });
-    }
+    // Unlock Continue immediately. The scan runs in the background while the
+    // user answers the remaining sections; by the time they reach the results
+    // step it has almost always resolved. Awaiting here would park them on
+    // this step for the scan's full duration — which is the exact dead time
+    // moving capture earlier was meant to eliminate.
     onChange("done");
     onCommit();
+
+    onScanChange({ status: "loading" });
+    void getSkinScanResult(blob)
+      .then((result) =>
+        onScanChange({ status: "success", result, photo: blob, original, captureMethod })
+      )
+      .catch((err) => {
+        console.error("Skin scan failed:", err);
+        onScanChange({
+          status: "error",
+          message:
+            "We couldn't analyze your photo just now — you can still see your results without it.",
+          photo: blob,
+          original,
+          captureMethod,
+        });
+      });
   }, [onChange, onCommit, onScanChange, isMobile]);
 
   if (value === "done") {
