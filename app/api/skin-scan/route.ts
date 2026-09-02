@@ -15,11 +15,22 @@ const VALID_OVERLAYS = new Set([
 // Pre-login, unauthenticated by design — same as the rest of the /skin-check
 // route (CLAUDE.md). Proxies to the self-hosted skin-scan service (OpenCV +
 // MediaPipe FastAPI, DurtyDhiana/skin-scan) so the client never talks to it
-// directly. Local-only for now; SKIN_SCAN_API_URL swaps to a deployed URL
-// once that service is hosted (separate session).
-const SKIN_SCAN_API_URL = process.env.SKIN_SCAN_API_URL ?? "http://localhost:8000";
+// directly.
+const SKIN_SCAN_API_URL = process.env.SKIN_SCAN_API_URL;
 
 export async function POST(request: NextRequest) {
+  // Fails loudly rather than silently falling back to localhost:8000, which
+  // would otherwise make an unset env var in production look like an
+  // unreachable-service error (502) instead of a misconfiguration (500) —
+  // same reasoning as the SCAN_API_SECRET check below.
+  if (!SKIN_SCAN_API_URL) {
+    console.error("SKIN_SCAN_API_URL is not set — refusing to call the skin-scan service.");
+    return NextResponse.json(
+      { error: "Skin scan service is misconfigured.", code: "SCAN_MISCONFIGURED" },
+      { status: 500 }
+    );
+  }
+
   const scanApiSecret = process.env.SCAN_API_SECRET;
   if (!scanApiSecret) {
     console.error("SCAN_API_SECRET is not set — refusing to call the skin-scan service.");
@@ -44,9 +55,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No image provided." }, { status: 400 });
   }
 
+  // Comma-separated (skin-scan's `overlays` query param takes a list, per
+  // main.py's `Query(...)` — a single combined request generates every
+  // requested category's heatmap rather than one round trip per category).
+  // Still an allowlist, not passthrough: each piece is checked individually
+  // before being rejoined into the upstream query string.
   const requested = formData.get("overlay");
   const overlay =
-    typeof requested === "string" && VALID_OVERLAYS.has(requested) ? requested : null;
+    typeof requested === "string"
+      ? Array.from(new Set(requested.split(",").map((s) => s.trim()).filter((s) => VALID_OVERLAYS.has(s)))).join(",")
+      : "";
 
   if (image.size > MAX_IMAGE_BYTES) {
     return NextResponse.json({ error: "Image too large. Maximum 5MB." }, { status: 400 });
@@ -64,7 +82,7 @@ export async function POST(request: NextRequest) {
   // No overlay requested means no overlay returned — the cheapest path, not
   // the most expensive one.
   const scanUrl = overlay
-    ? `${SKIN_SCAN_API_URL}/scan?overlays=${overlay}`
+    ? `${SKIN_SCAN_API_URL}/scan?overlays=${encodeURIComponent(overlay)}`
     : `${SKIN_SCAN_API_URL}/scan`;
 
   let upstreamResponse: Response;
@@ -232,12 +250,13 @@ export async function POST(request: NextRequest) {
   // instance of that into a visible warning instead of silent data loss.
   const rawKeys = rawJson && typeof rawJson === "object" ? Object.keys(rawJson as Record<string, unknown>) : [];
   const parsedKeys = Object.keys(parsed.data);
-  console.info("skin-scan response keys — raw:", rawKeys, "parsed:", parsedKeys);
-  if (rawKeys.length !== parsedKeys.length || rawKeys.some((key) => !parsedKeys.includes(key))) {
-    console.warn(
-      "skin-scan response fields dropped by schema:",
-      rawKeys.filter((key) => !parsedKeys.includes(key))
-    );
+  const droppedKeys = rawKeys.filter((key) => !parsedKeys.includes(key));
+  // Only logs when a field is actually dropped — was unconditional on every
+  // successful request, which is production log noise for a case that's
+  // fine (no key names are sensitive either way, but there's no reason to
+  // emit this on the hot path when nothing is wrong).
+  if (droppedKeys.length > 0) {
+    console.warn("skin-scan response fields dropped by schema:", droppedKeys);
   }
 
   return NextResponse.json({ ok: true, result: parsed.data });

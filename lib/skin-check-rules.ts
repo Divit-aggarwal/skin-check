@@ -96,7 +96,11 @@ export const BAND_THRESHOLDS: Record<BandableMetric, { low: number; moderate: nu
 // encodes that distinction; concern is just 1 - health, so every metric
 // lands in the same [0,1] "how much of a concern is this" space regardless
 // of which way its raw score points.
-function toConcern(scores: SkinScanScores, metric: BandableMetric): number {
+// Exported so display sites (e.g. the numeric score next to each band on the
+// results dashboard) derive their number from the exact same concern-space
+// value that produced the band next to it — computing the two from different
+// formulas is how you get a number and a band that quietly disagree.
+export function toConcern(scores: SkinScanScores, metric: BandableMetric): number {
   return 1 - healthValue(scores, metric);
 }
 

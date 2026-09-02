@@ -1,6 +1,4 @@
 import { z } from "zod";
-import { SynthesisResultSchema, VisionResultSchema } from "@/types/gemini";
-import type { QuizAnswers, SynthesisResult, VisionResult } from "@/types/gemini";
 import { SkinScanResultSchema } from "@/types/skin-scan";
 import type { SkinScanResult, SkinScanScores } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
@@ -53,69 +51,6 @@ async function request<T>(
 //   return request(`/twin/${userId}`, {}, TwinStateSchema);
 // }
 
-// ─── Assessment two-phase compute (Session 2c routes) ──────────────────────
-// These hit this app's own /api/assessment/* routes (same-origin), not the
-// future FastAPI backend `request()` targets — kept as plain fetch calls here
-// rather than routed through `request()`, whose BASE_URL is reserved for that
-// separate host.
-
-const QuickResultResponseSchema = z.object({
-  ok: z.literal(true),
-  result: SynthesisResultSchema,
-});
-
-const FullResultResponseSchema = z.object({
-  ok: z.literal(true),
-  vision: VisionResultSchema.nullable(),
-  result: SynthesisResultSchema,
-});
-
-export async function getQuickResult(quizAnswers: QuizAnswers): Promise<SynthesisResult> {
-  const response = await fetch("/api/assessment/quick-result", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ quizAnswers }),
-  });
-
-  if (!response.ok) {
-    throw new ApiError(response.status, "Failed to compute quick result.");
-  }
-
-  const parsed = QuickResultResponseSchema.safeParse(await response.json());
-  if (!parsed.success) {
-    console.error("quick-result response validation failed:", parsed.error);
-    throw new ApiError(0, "Unexpected quick-result response shape.");
-  }
-
-  return parsed.data.result;
-}
-
-export async function getFullResult(
-  photo: Blob,
-  quizAnswers: QuizAnswers
-): Promise<{ vision: VisionResult | null; result: SynthesisResult }> {
-  const formData = new FormData();
-  formData.append("photo", photo);
-  formData.append("quiz_answers", JSON.stringify(quizAnswers));
-
-  const response = await fetch("/api/assessment/full-result", {
-    method: "POST",
-    body: formData,
-  });
-
-  if (!response.ok) {
-    throw new ApiError(response.status, "Failed to compute full result.");
-  }
-
-  const parsed = FullResultResponseSchema.safeParse(await response.json());
-  if (!parsed.success) {
-    console.error("full-result response validation failed:", parsed.error);
-    throw new ApiError(0, "Unexpected full-result response shape.");
-  }
-
-  return { vision: parsed.data.vision, result: parsed.data.result };
-}
-
 // ─── Skin scan (/skin-check photo-capture step) ────────────────────────────
 // Hits this app's own /api/skin-scan route (same-origin proxy to the
 // self-hosted skin-scan service), not the future FastAPI backend `request()`
@@ -126,18 +61,44 @@ const SkinScanResponseSchema = z.object({
   result: SkinScanResultSchema,
 });
 
+// Above the server route's own 30s upstream timeout (app/api/skin-scan/route.ts)
+// on purpose — that route always resolves (success, or a clean 502/504) within
+// its own bound, so this only needs to catch a request that never came back at
+// all (dropped connection, hung platform-level request), not race the server's
+// own timeout and turn an otherwise-successful slow scan into a client error.
+const SKIN_SCAN_CLIENT_TIMEOUT_MS = 45_000;
+
 export async function getSkinScanResult(
   photo: Blob,
-  overlay?: string | null
+  overlay?: string | string[] | null
 ): Promise<SkinScanResult> {
   const formData = new FormData();
   formData.append("image", photo, "scan.jpg");
-  if (overlay) formData.append("overlay", overlay);
+  // The proxy (and the skin-scan service itself, main.py's `overlays` query
+  // param) accepts a comma-separated category list in one request — an array
+  // here joins into that same single field rather than firing one request
+  // per category.
+  const overlayParam = Array.isArray(overlay) ? overlay.join(",") : overlay;
+  if (overlayParam) formData.append("overlay", overlayParam);
 
-  const response = await fetch("/api/skin-scan", {
-    method: "POST",
-    body: formData,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), SKIN_SCAN_CLIENT_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch("/api/skin-scan", {
+      method: "POST",
+      body: formData,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError(0, "Photo analysis took too long. Please try again.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     throw new ApiError(response.status, "Failed to analyze photo.");
@@ -152,46 +113,15 @@ export async function getSkinScanResult(
   return parsed.data.result;
 }
 
-// ─── Twin chat (Session 6 — Echo tab) ──────────────────────────────────────
+// ─── Echo chat message shape ────────────────────────────────────────────────
 
 export interface EchoChatMessage {
   role: "user" | "echo";
   text: string;
 }
 
-const ChatResponseSchema = z.object({
-  ok: z.literal(true),
-  reply: z.string(),
-});
-
-export async function getEchoChatReply(
-  messages: EchoChatMessage[],
-  result: SynthesisResult,
-  vision: VisionResult | null
-): Promise<string> {
-  const response = await fetch("/api/twin/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, result, vision }),
-  });
-
-  if (!response.ok) {
-    throw new ApiError(response.status, "Failed to reach Echo.");
-  }
-
-  const parsed = ChatResponseSchema.safeParse(await response.json());
-  if (!parsed.success) {
-    console.error("twin/chat response validation failed:", parsed.error);
-    throw new ApiError(0, "Unexpected twin/chat response shape.");
-  }
-
-  return parsed.data.reply;
-}
-
 // ─── Echo chat (/skin-check dashboard — Step 4) ────────────────────────────
-// Hits /api/skin-check/chat, the /skin-check-shaped retrofit of the twin chat
-// route above — separate route/client fn so the existing twin/chat + Echo tab
-// call site above is left untouched.
+// Hits /api/skin-check/chat.
 
 const SkinCheckChatResponseSchema = z.object({
   ok: z.literal(true),
@@ -203,6 +133,11 @@ export interface SkinCheckRegionFocus {
   scores: SkinScanScores;
 }
 
+// Above lib/gemini.ts's worst-case retry budget for one call (3 attempts at
+// GEMINI_REQUEST_TIMEOUT_MS=10s each, plus backoff — roughly 32s), so this
+// only fires on a request that never got a response at all.
+const CHAT_CLIENT_TIMEOUT_MS = 40_000;
+
 export async function getSkinCheckChatReply(
   messages: EchoChatMessage[],
   answers: SkinCheckAnswers,
@@ -210,11 +145,25 @@ export async function getSkinCheckChatReply(
   composite: CompositeScore | null,
   regionFocus: SkinCheckRegionFocus | null = null
 ): Promise<string> {
-  const response = await fetch("/api/skin-check/chat", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages, answers, scores, composite, regionFocus }),
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), CHAT_CLIENT_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch("/api/skin-check/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages, answers, scores, composite, regionFocus }),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof DOMException && err.name === "AbortError") {
+      throw new ApiError(0, "Echo took too long to respond. Please try again.");
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!response.ok) {
     throw new ApiError(response.status, "Failed to reach Echo.");

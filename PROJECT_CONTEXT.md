@@ -110,6 +110,14 @@ Measured ranges from 3 real phone photos: corrected a* [-10,20], native a*
 - **Results shown as BANDS** (Low/Moderate/Elevated), never numbers. The
   metrics are heuristics; a two-digit score next to a face is fabricated
   precision and reads as a clinical claim.
+  **SUPERSEDED 2026-09-02**: product decided to show the numeric score
+  alongside the band after all (e.g. "72/100"), with a mandatory disclaimer
+  next to it ("Scores are image-relative signals from this scan, not
+  clinically calibrated measurements") so the number is never presented
+  unqualified. The underlying reasoning above (per-image-normalized, not
+  comparable across users or repeat scans — see lib/skin-check-rules.ts and
+  CALIBRATION.md) still holds and is why the disclaimer is mandatory, not
+  optional copy. See components/skin-check/SkinCheckDashboard.tsx.
 - **ITA degrees** (computed from LAB) for skin tone, NOT Fitzpatrick —
   Fitzpatrick compresses most Indian users into IV-V.
 - **SKU selection is a deterministic pure function with a stored `rule_trace`.**
@@ -162,7 +170,28 @@ Measured ranges from 3 real phone photos: corrected a* [-10,20], native a*
   7-tile heatmap grid is empty and EchoTwin's category tabs are interactive but
   inert. All 7 overlays cost 1.11MB (texture/pigment/hydration are 826KB of
   it). Decide: request 1-2 on demand, or cut from v1.
-- Both trees dirty; skin-check has no remote.
+  **RESOLVED 2026-09-02**: decided "request on demand" — `PhotoCapture.tsx`
+  requests the user's stated `primary_concern` overlay at capture time
+  (usually not yet known, since skin-photo is section 2 and primary_concern
+  is section 3), and `SkinCheckDashboard.tsx`'s effect fires one on-demand
+  follow-up overlay fetch once `resolveFocus` (stated concern, else the
+  highest-banded metric) is actually known — same photo blob, one more
+  `/scan?overlays=` call. Verified end-to-end against the live `skin-scan`
+  container: the ORIGINAL/[category] toggle renders and the second
+  `/api/skin-scan` request is visible in the network log. Not the 7-tile
+  grid — a single two-way toggle, matching the "cut from v1" 1.11MB-avoidance
+  half of the original decision.
+- **`/echo` currently has no in-app navigation entry.** The route exists and
+  builds/renders correctly, but nothing in the current UI links to it (checked
+  via a full-repo search for `href`/`Link`/`router.push` referencing `echo`).
+  Consistent with Echo/chat being deferred from v1 (see Locked decisions above)
+  — this is intentional, not dead code, and should not be deleted or flagged as
+  unused in a future cleanup pass.
+- Both trees dirty. **Correction**: skin-check *does* have a remote
+  (`origin` → `github.com/Divit-aggarwal/skin-check.git`) — this line was
+  stale as of a later check (`git remote -v` / `git branch -vv` confirm it
+  directly); local `master` is currently ahead of `origin/master`, not
+  remote-less.
 
 ## Known, deliberately deferred
 

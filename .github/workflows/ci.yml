@@ -1,0 +1,35 @@
+name: CI
+
+# This repo already has a git remote (origin, github.com/Divit-aggarwal/skin-check) —
+# this workflow starts running once this file (and the commits ahead of origin/master
+# that include it) are actually pushed there; it does nothing while only committed
+# locally. Kept minimal on purpose: the same checks already run locally before every
+# change in this repo, just enforced on every push/PR instead of by hand.
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "18.17.0"
+          cache: "npm"
+
+      - run: npm ci
+
+      - run: npx tsc --noEmit
+
+      - run: npm run lint
+
+      # No secrets are configured in this workflow, so GEMINI_API_KEY and
+      # SCAN_API_SECRET are unset here — `next build` must succeed without
+      # them (it does: both are read lazily at request time, not at build
+      # time, so a missing key never fails the build itself).
+      - run: npm run build

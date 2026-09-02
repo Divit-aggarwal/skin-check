@@ -50,6 +50,23 @@ export const SkinScanRegionHistEntrySchema = z.record(
   z.union([z.array(z.number()), SkinScanHistClipSchema])
 );
 
+// Confirmed against a live /scan response (2026-09-02, pipeline_version
+// scan-0.1.5-provisional): every one of the 7 categories currently reports
+// "image_relative" — the server-side confirmation of the same
+// not-comparable-across-users/scans property lib/skin-check-rules.ts and
+// CALIBRATION.md already document from the scoring math. z.string() rather
+// than a fixed enum: this is a forward-compatible label the CV service owns,
+// not a closed set the frontend should reject an unrecognized value from.
+export const SkinScanScoreTypesSchema = z.record(z.string(), z.string());
+
+// Per-region flag, keyed the same as `regions`/`region_scores` (forehead,
+// cheeks, nose, chin today) — true means that region's measurement is less
+// reliable for this photo (e.g. partially occluded, poor lighting), not that
+// the metric itself is bad. The one legitimate image-quality signal the
+// service actually exposes — surfaced on the results screen, unlike a
+// fabricated "face detected"/"100% accurate" claim.
+export const SkinScanRegionLowConfidenceSchema = z.record(z.string(), z.boolean());
+
 export const SkinScanResultSchema = z
   .object({
     scores: SkinScanScoresSchema,
@@ -57,6 +74,13 @@ export const SkinScanResultSchema = z
     // inside it being optional — see SkinScanOverlaysSchema above.
     overlays: SkinScanOverlaysSchema.default({}),
     regions: z.array(z.string()),
+    // Both optional: older pipeline_versions (e.g. the committed
+    // scan-response.json fixture, scan-0.1.1-provisional) predate these
+    // fields entirely — .passthrough() below would otherwise let a caller
+    // that expects them silently see undefined with no schema signal either
+    // way.
+    score_types: SkinScanScoreTypesSchema.optional(),
+    region_low_confidence: SkinScanRegionLowConfidenceSchema.optional(),
     // Per-region breakdown of the same 7 category scores (Step 4a) — keyed by
     // whatever the pipeline's face_mesh masks actually produce (forehead,
     // cheeks, nose, chin today). Keyed by string, not the fixed EchoRegion
@@ -86,6 +110,7 @@ export const SkinScanResultSchema = z
 export type SkinScanScores = z.infer<typeof SkinScanScoresSchema>;
 export type SkinScanOverlays = z.infer<typeof SkinScanOverlaysSchema>;
 export type SkinScanResult = z.infer<typeof SkinScanResultSchema>;
+export type SkinScanRegionLowConfidence = z.infer<typeof SkinScanRegionLowConfidenceSchema>;
 
 // How the capture flow obtained `original`: "native" when the device file
 // picker/camera (<input capture>) returned the actual camera file verbatim

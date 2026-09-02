@@ -1,0 +1,10 @@
+{
+  "name": "The Project SKIN — Your Skin Digital Twin",
+  "short_name": "Project SKIN",
+  "description": "Science-led skincare guidance built around your skin.",
+  "start_url": "/skin-check",
+  "display": "standalone",
+  "background_color": "#FAF4EF",
+  "theme_color": "#3D6B52",
+  "icons": []
+}

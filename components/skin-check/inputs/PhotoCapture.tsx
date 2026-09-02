@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "reac
 import { Camera, RotateCcw } from "lucide-react";
 import { useCameraStream } from "@/hooks/useCameraStream";
 import { getSkinScanResult } from "@/lib/api";
+import { OVERLAY_CATEGORIES } from "@/lib/skin-check-skus";
 import { Button } from "@/components/ui/button";
 import type { PhotoCaptureStep } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanState } from "@/types/skin-scan";
@@ -168,7 +169,15 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
     onCommit();
 
     onScanChange({ status: "loading" });
-    void getSkinScanResult(blob)
+    // Request every traversable category's overlay in this one call — the
+    // skin-scan service accepts a comma-separated `overlays` list and
+    // generates all of them in one pipeline run (measured well under its own
+    // 25s timeout even for all 7 categories), so the results screen's
+    // category switcher has every heatmap already in hand with no per-click
+    // follow-up request. Deliberately not gated on `answers.primary_concern`
+    // (usually still unanswered here — skin-photo is section 2, your-skin is
+    // section 3) since we want all of them regardless.
+    void getSkinScanResult(blob, OVERLAY_CATEGORIES)
       .then((result) =>
         onScanChange({ status: "success", result, photo: blob, original, captureMethod })
       )

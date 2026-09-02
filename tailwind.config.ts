@@ -113,6 +113,15 @@ const config: Config = {
           error:   "#DC2626",
           info:    "#2563EB",
         },
+        // Results-dashboard tokens (SkinCheckDashboard.tsx, EchoTwin.tsx) —
+        // previously referenced as `bg-canvas`/`bg-surface`/`text-text`
+        // without being defined anywhere, so they generated zero CSS
+        // (AUDIT.md S0-2). Values match the raw hex already used ad hoc
+        // for the same roles elsewhere in this feature (EchoPage.tsx,
+        // SkinCheckFlow.tsx, the inputs/* components), not a new palette.
+        canvas:  "#FAF4EF",  // warm off-white panel background
+        surface: "#FFFFFF",  // card/photo-frame background
+        text:    "#1A1A1A",  // primary text
       },
 
       // ─── Typography ────────────────────────────────────────────────
@@ -134,6 +143,18 @@ const config: Config = {
         "3xl": ["1.875rem", { lineHeight: "2.25rem" }],
         "4xl": ["2.25rem",  { lineHeight: "2.5rem" }],
         "5xl": ["3rem",     { lineHeight: "1.15" }],
+        // Same gap as the color tokens above (AUDIT.md S0-2) — body/label
+        // sizes the results dashboard already assumed existed.
+        body:  ["1.0625rem", { lineHeight: "1.5rem" }],   // matches EchoBubble's message copy
+        label: ["0.8125rem", { lineHeight: "1.125rem" }], // matches ProgressHeader's uppercase label size
+      },
+
+      // ─── Letter spacing ────────────────────────────────────────────
+      letterSpacing: {
+        // `tracking-label` — same gap as the color/fontSize tokens above
+        // (AUDIT.md S0-2). Matches the `tracking-[0.12em]` value already
+        // used ad hoc for uppercase labels in ProgressHeader.tsx/EchoPage.tsx.
+        label: "0.12em",
       },
 
       // ─── Spacing ───────────────────────────────────────────────────
@@ -157,6 +178,7 @@ const config: Config = {
         "3xl": "1.5rem",
         card:  "1rem",
         pill:  "9999px",
+        media: "1.25rem", // photo-frame corners — same radius as rounded-2xl, used consistently for cards elsewhere
       },
 
       // ─── Animation ─────────────────────────────────────────────────

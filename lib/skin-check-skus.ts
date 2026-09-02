@@ -1,4 +1,5 @@
-import type { BandableMetric } from "@/lib/skin-check-rules";
+import type { Band, BandableMetric } from "@/lib/skin-check-rules";
+import type { SkinCheckAnswers } from "@/types/skin-check";
 
 /**
  * Display layer for the SKUs that lib/skin-check-rules.ts already selects.
@@ -76,6 +77,18 @@ export const SKU_DISPLAY: Record<string, SkuDisplay> = {
   },
 };
 
+// Bands ride a WEIGHT ramp, not a colour ramp. The Purity theme ships no
+// success/warning/error palette, and a red/amber/green traffic light next to
+// someone's face is exactly the clinical claim this product has spent its
+// whole design refusing to make. Elevated earns the rose rule; nothing earns
+// red. Shared by the results list and the category selector's own score
+// readout — both are the same band, styled once.
+export const BAND_STYLE: Record<Band, string> = {
+  Low: "text-muted-foreground",
+  Moderate: "text-text",
+  Elevated: "text-text font-medium",
+};
+
 /** Concern-noun labels, shared by the tiles and the summary line. */
 export const METRIC_LABELS: Record<BandableMetric, string> = {
   redness: "Redness",
@@ -89,3 +102,25 @@ export const METRIC_LABELS: Record<BandableMetric, string> = {
   hydration: "Dryness",
   pigment: "Dark marks",
 };
+
+// Every category the results screen lets the user traverse — the 6
+// non-pores metrics, in the same fixed order as METRIC_LABELS. Shared by
+// PhotoCapture (requests every one of these overlays in the single scan
+// call, as one comma-separated `overlays` list — the skin-scan service
+// genuinely supports that, main.py:281 splits on ",") and the dashboard
+// (default category order, retry path). "pores" is excluded: it returns
+// exactly 0.0 on every real photo (lib/skin-check-rules.ts), so an overlay
+// for it would highlight nothing and a band would always read "no concern"
+// on a metric that never measured anything.
+export const OVERLAY_CATEGORIES: BandableMetric[] = Object.keys(METRIC_LABELS) as BandableMetric[];
+
+// The user's own stated primary concern from the quiz — used only to pick
+// which category the results screen shows FIRST (SkinCheckDashboard's
+// resolveFocus), not which overlays get requested (all of OVERLAY_CATEGORIES
+// are requested regardless of what's answered by capture time).
+export function resolveStatedConcern(answers: SkinCheckAnswers): BandableMetric | null {
+  const stated = answers.primary_concern;
+  return typeof stated === "string" && stated !== "pores" && stated in METRIC_LABELS
+    ? (stated as BandableMetric)
+    : null;
+}

@@ -7,6 +7,16 @@ explicit Phase 3 additions (`app/api/skin-scan/route.ts`, `app/api/skin-check/ch
 spot-verified by hand. 0 imports were left unresolved during tracing; 0 files were
 dropped.
 
+**Update — post-extraction cleanup.** This manifest is a point-in-time record of
+what the extraction copied, including the dead code it copied unedited (see the
+`types/assessment.ts` note below and Phase 3's dead-exports inventory). A later,
+separately-approved cleanup pass subsequently deleted `types/assessment.ts`,
+`types/gemini.ts`, and the dead exports Phase 3 lists from `lib/api.ts` /
+`lib/gemini.ts`. The sections below are left as-written (describing the
+as-extracted state); where they now describe code that no longer exists, that is
+this document lagging a later cleanup, not an inaccuracy in the extraction record
+itself.
+
 ## Phase 1 — Resolved file list (49 files)
 
 Format: `path` — imported by (file:line), or `ENTRY POINT` if it's one of the seven
