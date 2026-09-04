@@ -122,6 +122,16 @@ const config: Config = {
         canvas:  "#FAF4EF",  // warm off-white panel background
         surface: "#FFFFFF",  // card/photo-frame background
         text:    "#1A1A1A",  // primary text
+
+        // Restrained accent for the Skin Check quiz + results redesign
+        // (PART 4 of the redesign brief) — small selected-state touches
+        // only (a filled chip, an underline), never a large fill. Not the
+        // same as `rebel`/`confidence` above, which belong to the older
+        // marketing-home palette this feature no longer draws from.
+        blush: {
+          DEFAULT: "#9C6B76",
+          soft: "#F4E8E6",
+        },
       },
 
       // ─── Typography ────────────────────────────────────────────────

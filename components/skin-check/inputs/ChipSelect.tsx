@@ -12,8 +12,8 @@ interface ChipSelectProps {
 
 export function ChipSelect({ step, value, onChange, onCommit }: ChipSelectProps) {
   return (
-    <div className="flex flex-col items-end gap-2">
-      <div className="flex flex-wrap justify-end gap-2.5">
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap gap-2.5">
         {step.options.map((opt) => {
           const selected = value === opt.value;
           return (
@@ -25,10 +25,10 @@ export function ChipSelect({ step, value, onChange, onCommit }: ChipSelectProps)
                 onCommit();
               }}
               className={cn(
-                "rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#98415A]/50 focus-visible:ring-offset-2",
+                "rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
                 selected
-                  ? "bg-[#98415A] text-white"
-                  : "border border-[#1A1A1A]/10 bg-white text-[#1A1A1A] hover:border-[#98415A]/40"
+                  ? "bg-blush text-white"
+                  : "border border-text/10 bg-white text-text hover:border-blush/40"
               )}
             >
               {opt.label}
@@ -36,9 +36,7 @@ export function ChipSelect({ step, value, onChange, onCommit }: ChipSelectProps)
           );
         })}
       </div>
-      {step.note && (
-        <p className="max-w-[85%] text-right text-xs text-[#1A1A1A]/45">{step.note}</p>
-      )}
+      {step.note && <p className="max-w-[85%] text-xs text-text/45">{step.note}</p>}
     </div>
   );
 }

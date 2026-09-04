@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
+import { motion, AnimatePresence, type PanInfo, type Variants } from "framer-motion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { METRIC_LABELS, BAND_STYLE } from "@/lib/skin-check-skus";
 import { bandScores, toConcern, type Band, type BandableMetric } from "@/lib/skin-check-rules";
 import { ECHO_REGION_LABELS, isEchoRegion } from "@/lib/echo-regions";
@@ -37,6 +39,16 @@ interface EchoTwinProps {
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// Slide direction for the score/interpretation panel — same shape as
+// SkinCheckFlow's section transition, driven by whichever way the category
+// index just moved (swipe, tab click, or keyboard arrow — see
+// slideDirection below).
+const scorePanelVariants: Variants = {
+  enter: (dir: number) => ({ opacity: 0, x: dir * 24 }),
+  center: { opacity: 1, x: 0 },
+  exit: (dir: number) => ({ opacity: 0, x: dir * -24 }),
+};
 
 // Generic, image-relative, non-clinical — no per-metric fabricated content.
 // METRIC_LABELS is already written for the CONCERN (e.g. "Dryness" for
@@ -116,6 +128,48 @@ export function EchoTwin({
 
   const tabRefs = useRef<Partial<Record<BandableMetric, HTMLButtonElement | null>>>({});
 
+  // Keeps the active tab in view when selection changes off-screen — most
+  // relevant now that a swipe on the photo can move selection past what's
+  // currently visible in the (intentionally scrollable) tab strip.
+  useEffect(() => {
+    if (!selected) return;
+    tabRefs.current[selected]?.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+  }, [selected]);
+
+  // Swipe-to-switch on the photo (PART: "use a proper slider" for the
+  // category results) — an additional input method alongside the tab strip
+  // and keyboard arrows below, not a replacement. `onSelect` stays the one
+  // place selection actually changes, so a swipe can never desync the
+  // overlay/score/interpretation from the tab strip.
+  const currentIndex = categories.findIndex((c) => c.key === selected);
+  const goToRelative = useCallback(
+    (delta: number) => {
+      if (categories.length < 2 || currentIndex === -1) return;
+      const next = categories[(currentIndex + delta + categories.length) % categories.length]!;
+      onSelect(next.key);
+    },
+    [categories, currentIndex, onSelect]
+  );
+  const SWIPE_THRESHOLD_PX = 60;
+  const handlePhotoDragEnd = useCallback(
+    (_event: unknown, info: PanInfo) => {
+      if (info.offset.x <= -SWIPE_THRESHOLD_PX) goToRelative(1);
+      else if (info.offset.x >= SWIPE_THRESHOLD_PX) goToRelative(-1);
+    },
+    [goToRelative]
+  );
+
+  // Which way the score/interpretation panel below should slide in from —
+  // derived by comparing this render's index to the last one, so it reacts
+  // the same way whether the change came from a swipe, a tab click, or a
+  // keyboard arrow.
+  const slideDirection = useRef(1);
+  const prevIndexRef = useRef(currentIndex);
+  if (currentIndex !== prevIndexRef.current) {
+    slideDirection.current = currentIndex > prevIndexRef.current ? 1 : -1;
+    prevIndexRef.current = currentIndex;
+  }
+
   const handleTabKeyDown = useCallback(
     (e: KeyboardEvent<HTMLButtonElement>) => {
       if (categories.length === 0) return;
@@ -158,7 +212,16 @@ export function EchoTwin({
 
   return (
     <div className="flex flex-col items-center gap-4">
-      <div className="relative aspect-[3/4] w-full max-w-[340px] overflow-hidden rounded-media bg-surface">
+      <motion.div
+        drag={categories.length > 1 ? "x" : false}
+        dragConstraints={{ left: 0, right: 0 }}
+        dragElastic={0.2}
+        onDragEnd={handlePhotoDragEnd}
+        whileDrag={{ cursor: "grabbing" }}
+        className={`relative aspect-[3/4] w-full max-w-[340px] touch-pan-y overflow-hidden rounded-media bg-surface ${
+          categories.length > 1 ? "cursor-grab" : ""
+        }`}
+      >
         {photoUrl && !photoFailed ? (
           // eslint-disable-next-line @next/next/no-img-element -- transient object URL
           <img
@@ -195,17 +258,51 @@ export function EchoTwin({
             Analysis complete
           </div>
         )}
-      </div>
+        {categories.length > 1 && (
+          <>
+            {/* Explicit slider controls alongside the swipe gesture — not
+                everyone discovers drag-to-switch, and these give keyboard/
+                pointer users a visible way to move through the same slider. */}
+            <button
+              type="button"
+              aria-label="Previous category"
+              onClick={() => goToRelative(-1)}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute left-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-canvas/80 text-text backdrop-blur-sm transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              aria-label="Next category"
+              onClick={() => goToRelative(1)}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute right-2 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-canvas/80 text-text backdrop-blur-sm transition-colors hover:bg-canvas focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </button>
+          </>
+        )}
+      </motion.div>
 
       {categories.length > 0 && (
         <div
           role="tablist"
           aria-label="Analysis categories"
-          className="flex w-full max-w-[340px] gap-2 overflow-x-auto px-1 py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          // Edge fade, not a second indicator row — a dot strip duplicating
+          // these same labels read as clutter (caught in review). The real
+          // problem it was covering for is that a horizontally-clipped tab
+          // ("TEXTU") looks broken, not scrollable — the mask fades it out
+          // instead, which reads as "more to scroll" the way it's supposed to.
+          className="flex w-full max-w-[340px] gap-2 overflow-x-auto px-1 py-1 [mask-image:linear-gradient(to_right,transparent,black_12px,black_calc(100%-12px),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {categories.map((cat) => {
             const active = cat.key === selected;
             return (
+              // Underline treatment, not a SaaS pill (PART 19) — the border
+              // lives on the inner span, not the button itself, so it hugs
+              // the text instead of sitting at the bottom of the button's
+              // globals.css-enforced 44px touch-target height.
               <button
                 key={cat.key}
                 ref={(el) => {
@@ -217,11 +314,15 @@ export function EchoTwin({
                 tabIndex={active ? 0 : -1}
                 onClick={() => onSelect(cat.key)}
                 onKeyDown={handleTabKeyDown}
-                className={`shrink-0 rounded-pill px-3 py-1.5 text-label uppercase tracking-label transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                  active ? "bg-text text-canvas" : "border border-border text-muted-foreground hover:text-text"
-                }`}
+                className="flex shrink-0 items-center px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                {cat.label}
+                <span
+                  className={`border-b-2 pb-1 text-label uppercase tracking-label transition-colors duration-150 ${
+                    active ? "border-text text-text" : "border-transparent text-muted-foreground"
+                  }`}
+                >
+                  {cat.label}
+                </span>
               </button>
             );
           })}
@@ -229,21 +330,36 @@ export function EchoTwin({
       )}
 
       {selectedCategory && (
-        <div className="flex flex-col items-center gap-1 text-center transition-opacity duration-150">
-          <h2 className="text-label uppercase tracking-label text-muted-foreground">{selectedCategory.label}</h2>
-          <p className="flex items-baseline gap-1 tabular-nums text-text">
-            <span className="text-3xl font-semibold">{selectedCategory.scorePct}</span>
-            <span className="text-label text-muted-foreground">/100</span>
-          </p>
-          <p className={`text-body ${BAND_STYLE[selectedCategory.band]}`}>{selectedCategory.band}</p>
-          <p className="max-w-[85%] text-body text-text/70">
-            {interpretationFor(selectedCategory.band, METRIC_LABELS[selectedCategory.key].toLowerCase())}
-          </p>
-          {overlayUnavailable && (
-            <p className="max-w-[85%] text-label text-muted-foreground">
-              Spatial visualization unavailable for this category.
-            </p>
-          )}
+        <div className="relative w-full max-w-[340px] overflow-hidden">
+          <AnimatePresence mode="wait" initial={false} custom={slideDirection.current}>
+            <motion.div
+              key={selectedCategory.key}
+              custom={slideDirection.current}
+              variants={scorePanelVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.2, ease: [0.19, 1, 0.22, 1] }}
+              className="flex flex-col items-center gap-1 text-center"
+            >
+              <h2 className="text-label uppercase tracking-label text-muted-foreground">
+                {selectedCategory.label}
+              </h2>
+              <p className="flex items-baseline gap-1 tabular-nums text-text">
+                <span className="text-3xl font-semibold">{selectedCategory.scorePct}</span>
+                <span className="text-label text-muted-foreground">/100</span>
+              </p>
+              <p className={`text-body ${BAND_STYLE[selectedCategory.band]}`}>{selectedCategory.band}</p>
+              <p className="max-w-[85%] text-body text-text/70">
+                {interpretationFor(selectedCategory.band, METRIC_LABELS[selectedCategory.key].toLowerCase())}
+              </p>
+              {overlayUnavailable && (
+                <p className="max-w-[85%] text-label text-muted-foreground">
+                  Spatial visualization unavailable for this category.
+                </p>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       )}
 

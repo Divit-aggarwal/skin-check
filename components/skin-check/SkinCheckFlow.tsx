@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import { ALL_SECTION_LABELS } from "@/lib/skin-check-steps";
@@ -19,6 +20,11 @@ const sectionSlideVariants: Variants = {
   exit: (dir: 1 | -1) => ({ opacity: 0, x: dir * -24 }),
 };
 
+// How long a completed section sits still before the auto-advance fires —
+// long enough to register that the tap landed (the option's own selected
+// state changes instantly), short enough not to feel like a stall. PART 7.
+const AUTO_ADVANCE_DELAY_MS = 220;
+
 export function SkinCheckFlow() {
   const {
     section,
@@ -29,6 +35,7 @@ export function SkinCheckFlow() {
     scan,
     setScan,
     commitStep,
+    advanceSignal,
     isSectionComplete,
     sectionFill,
     isFirst,
@@ -39,106 +46,125 @@ export function SkinCheckFlow() {
     blocked,
   } = useSkinCheckFlow();
 
+  // No Continue button — advancing a section is driven by `advanceSignal`,
+  // which ticks on every answer commit (see useSkinCheckFlow). The effect
+  // itself depends on nothing but that tick: everything it reads at fire
+  // time comes off a ref updated every render. Depending on
+  // `isSectionComplete`/`next` directly would re-run this effect mid-timer
+  // under React 18 StrictMode's dev double-invoke (next.config.js has
+  // reactStrictMode on) — cleanup fires, the effect re-enters, and an
+  // identical `advanceSignal` short-circuits it, so the advance silently
+  // never happens. Keeping `advanceSignal` as the only dependency avoids that.
+  const latest = useRef({ isSectionComplete, complete, blocked, next });
+  latest.current = { isSectionComplete, complete, blocked, next };
+
+  useEffect(() => {
+    if (advanceSignal === 0) return;
+    const t = setTimeout(() => {
+      const s = latest.current;
+      if (!s.complete && !s.blocked && s.isSectionComplete) s.next();
+    }, AUTO_ADVANCE_DELAY_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advanceSignal]);
+
   return (
-    <div className="mx-auto flex min-h-dvh max-w-lg flex-col bg-white px-6 pb-10 pt-6">
-      <div className="flex items-center gap-3">
+    <div className="min-h-dvh bg-white">
+      <div className="mx-auto flex max-w-xl items-center gap-3 px-6 pt-6">
         <button
           type="button"
           onClick={back}
           disabled={isFirst}
           aria-label="Go back"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#1A1A1A]/60 transition-opacity hover:text-[#1A1A1A] disabled:opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#98415A]/50 focus-visible:ring-offset-2"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text/60 transition-opacity hover:text-text disabled:opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <div className="flex-1">
-          <ProgressHeader
-            sectionLabels={ALL_SECTION_LABELS}
-            activeSectionIndex={sectionIndex}
-            activeSectionFill={complete ? 1 : sectionFill}
-            activeSectionLabel={section.label}
-          />
-        </div>
+        {!complete && (
+          <div className="flex-1">
+            <ProgressHeader
+              sectionLabels={ALL_SECTION_LABELS}
+              activeSectionIndex={sectionIndex}
+              activeSectionFill={sectionFill}
+              activeSectionLabel={section.label}
+            />
+          </div>
+        )}
       </div>
 
-      <div className="pt-10">
-        <AnimatePresence mode="wait" initial={false} custom={direction}>
-          {blocked ? (
-            <motion.div
-              key="blocked"
-              custom={direction}
-              variants={sectionSlideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            >
-              <EchoBubble message="This experience isn't available yet for users under 18. If that's not right, tap back to change your answer." />
-            </motion.div>
-          ) : complete ? (
-            <motion.div
-              key="complete"
-              custom={direction}
-              variants={sectionSlideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            >
-              <div className="flex flex-col gap-6">
-                <EchoBubble
-                  message={formatPrompt("Thanks, {name} — that's everything for your skin check.", answers)}
-                />
-                <SkinCheckDashboard scan={scan} onScanChange={setScan} answers={answers} />
-              </div>
-            </motion.div>
-          ) : (
-            <motion.div
-              key={section.id}
-              custom={direction}
-              variants={sectionSlideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-              className="flex flex-col gap-9"
-            >
-              {visibleSteps.map((step) => (
-                <motion.div
-                  key={step.id}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, ease: [0.19, 1, 0.22, 1] }}
-                  className="flex flex-col gap-6"
-                >
-                  <EchoBubble message={formatPrompt(step.prompt, answers)} />
-                  <StepAnswer
-                    step={step}
-                    value={answers[step.id] ?? defaultAnswerFor(step)}
-                    onChange={(v) => setAnswer(step.id, v)}
-                    onCommit={() => commitStep(step.id)}
-                    scan={scan}
-                    onScanChange={setScan}
-                  />
-                </motion.div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {!complete && !blocked && (
-        <div className="flex justify-end pt-8">
-          <button
-            type="button"
-            onClick={next}
-            disabled={!isSectionComplete}
-            className="h-14 rounded-full bg-[#E02D79] px-7 text-base font-medium text-white transition-opacity disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#98415A]/50 focus-visible:ring-offset-2"
+      <AnimatePresence mode="wait" initial={false} custom={direction}>
+        {blocked ? (
+          <motion.div
+            key="blocked"
+            custom={direction}
+            variants={sectionSlideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
+            className="mx-auto max-w-xl px-6 pb-10 pt-10"
           >
-            Continue
-          </button>
-        </div>
-      )}
+            <EchoBubble message="This experience isn't available yet for users under 18. If that's not right, tap back to change your answer." />
+          </motion.div>
+        ) : complete ? (
+          <motion.div
+            key="complete"
+            custom={direction}
+            variants={sectionSlideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
+            className="mx-auto max-w-5xl px-6 pb-16 pt-6 sm:px-10"
+          >
+            <div className="flex flex-col gap-10">
+              <div className="flex flex-col gap-3 text-center">
+                <p className="text-label font-semibold uppercase tracking-label text-blush">
+                  Your Results
+                </p>
+                <h1 className="font-display text-4xl italic leading-tight text-text sm:text-5xl">
+                  Your skin, understood.
+                </h1>
+                <p className="mx-auto max-w-md text-body text-text/70">
+                  {formatPrompt("Thanks, {name} — here's a visual reading of your skin, based on your scan.", answers)}
+                </p>
+              </div>
+              <SkinCheckDashboard scan={scan} onScanChange={setScan} answers={answers} />
+            </div>
+          </motion.div>
+        ) : (
+          <motion.div
+            key={section.id}
+            custom={direction}
+            variants={sectionSlideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
+            className="mx-auto flex max-w-xl flex-col gap-10 px-6 pb-10 pt-10"
+          >
+            {visibleSteps.map((step) => (
+              <motion.div
+                key={step.id}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, ease: [0.19, 1, 0.22, 1] }}
+                className="flex flex-col gap-5"
+              >
+                <EchoBubble message={formatPrompt(step.prompt, answers)} />
+                <StepAnswer
+                  step={step}
+                  value={answers[step.id] ?? defaultAnswerFor(step)}
+                  onChange={(v) => setAnswer(step.id, v)}
+                  onCommit={() => commitStep(step.id)}
+                  scan={scan}
+                  onScanChange={setScan}
+                />
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

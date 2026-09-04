@@ -12,7 +12,7 @@ interface SegmentedSliderProps {
 
 export function SegmentedSlider({ step, value, onChange, onCommit }: SegmentedSliderProps) {
   return (
-    <div className="ml-auto flex w-full max-w-[90%] overflow-hidden rounded-2xl border border-[#1A1A1A]/10">
+    <div className="flex max-w-sm overflow-hidden rounded-lg border border-text/10">
       {step.options.map((opt, i) => {
         const selected = value === opt.value;
         return (
@@ -24,13 +24,13 @@ export function SegmentedSlider({ step, value, onChange, onCommit }: SegmentedSl
               onCommit();
             }}
             className={cn(
-              "flex flex-1 flex-col items-center gap-0.5 px-2 py-3 text-center transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#98415A]/50",
-              i > 0 && "border-l border-[#1A1A1A]/10",
-              selected ? "bg-[#98415A] text-white" : "bg-white text-[#1A1A1A] hover:bg-[#F7E3E3]/40"
+              "flex flex-1 flex-col items-center gap-0.5 px-2 py-3 text-center transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blush/50",
+              i > 0 && "border-l border-text/10",
+              selected ? "bg-blush text-white" : "bg-white text-text hover:bg-blush-soft"
             )}
           >
             <span className="text-sm font-semibold">{opt.label}</span>
-            <span className={cn("text-[0.6875rem]", selected ? "text-white/80" : "text-[#1A1A1A]/45")}>
+            <span className={cn("text-[0.6875rem]", selected ? "text-white/80" : "text-text/45")}>
               {opt.sublabel}
             </span>
           </button>

@@ -2,14 +2,14 @@ import { z } from "zod";
 import { SkinScanResultSchema } from "@/types/skin-scan";
 import type { SkinScanResult, SkinScanScores } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
-import type { CompositeScore } from "@/lib/skin-check-score";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 class ApiError extends Error {
   constructor(
     public status: number,
-    message: string
+    message: string,
+    public code?: string
   ) {
     super(message);
     this.name = "ApiError";
@@ -128,6 +128,15 @@ const SkinCheckChatResponseSchema = z.object({
   reply: z.string(),
 });
 
+// The route's error responses (both the upfront CHAT_MISCONFIGURED check and
+// the catch-all CHAT_SERVICE_ERROR) — `code` lets the caller tell "Echo isn't
+// set up, retrying won't help" apart from "transient failure, retry might
+// work" instead of collapsing both into one generic message.
+const ChatErrorResponseSchema = z.object({
+  error: z.string().optional(),
+  code: z.string().optional(),
+});
+
 export interface SkinCheckRegionFocus {
   region: string;
   scores: SkinScanScores;
@@ -138,22 +147,32 @@ export interface SkinCheckRegionFocus {
 // only fires on a request that never got a response at all.
 const CHAT_CLIENT_TIMEOUT_MS = 40_000;
 
+// `composite` is not sent — the server recomputes it from `scores` itself
+// (app/api/skin-check/chat/route.ts), since it's a pure function of scores
+// and trusting a client-supplied summaryLine string used to be a
+// prompt-injection path into Gemini's systemInstruction.
+//
+// `signal` is optional and caller-supplied (EchoPage.tsx aborts it on
+// unmount, e.g. the user navigates away from /echo mid-request) — it
+// composes with, rather than replaces, this function's own timeout abort.
 export async function getSkinCheckChatReply(
   messages: EchoChatMessage[],
   answers: SkinCheckAnswers,
   scores: SkinScanScores | null,
-  composite: CompositeScore | null,
-  regionFocus: SkinCheckRegionFocus | null = null
+  regionFocus: SkinCheckRegionFocus | null = null,
+  signal?: AbortSignal
 ): Promise<string> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), CHAT_CLIENT_TIMEOUT_MS);
+  const onExternalAbort = () => controller.abort();
+  signal?.addEventListener("abort", onExternalAbort);
 
   let response: Response;
   try {
     response = await fetch("/api/skin-check/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages, answers, scores, composite, regionFocus }),
+      body: JSON.stringify({ messages, answers, scores, regionFocus }),
       signal: controller.signal,
     });
   } catch (err) {
@@ -163,10 +182,13 @@ export async function getSkinCheckChatReply(
     throw err;
   } finally {
     clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", onExternalAbort);
   }
 
   if (!response.ok) {
-    throw new ApiError(response.status, "Failed to reach Echo.");
+    const errorBody = ChatErrorResponseSchema.safeParse(await response.json().catch(() => null));
+    const code = errorBody.success ? errorBody.data.code : undefined;
+    throw new ApiError(response.status, "Failed to reach Echo.", code);
   }
 
   const parsed = SkinCheckChatResponseSchema.safeParse(await response.json());

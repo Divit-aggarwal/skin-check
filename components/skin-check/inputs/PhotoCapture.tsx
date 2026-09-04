@@ -9,6 +9,13 @@ import { Button } from "@/components/ui/button";
 import type { PhotoCaptureStep } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanState } from "@/types/skin-scan";
 
+// Optional — the storefront's real Terms & Conditions page. Left unset, the
+// checkbox still gates the scan; the label just doesn't link anywhere ("do
+// not invent a final legal URL" — PART 12 of the redesign brief). This app
+// is mounted on its own subdomain (PROJECT_CONTEXT.md), so a relative path
+// like "/terms" would 404 rather than reach the storefront.
+const TERMS_URL = process.env.NEXT_PUBLIC_TERMS_URL;
+
 interface PhotoCaptureProps {
   step: PhotoCaptureStep;
   value: string;
@@ -90,6 +97,13 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
   const originalBlobRef = useRef<Blob | null>(null);
   const hasCaptured = previewUrl !== null;
 
+  // Required data-collection consent (PART 11-15 of the redesign brief) —
+  // gates the scan request itself, not just the button's disabled look.
+  // Local, session-scoped state: re-mounting this step (e.g. navigating
+  // away and back) resets it, and retaking a photo resets it explicitly
+  // below, so consent never silently carries over to a different image.
+  const [hasConsented, setHasConsented] = useState(false);
+
   useEffect(() => {
     // Native capture is driven entirely by the hidden <input type="file">
     // below — no getUserMedia stream to request or tear down.
@@ -98,6 +112,23 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
     return () => stopCamera();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The committed-photo summary view (value === "done") can be reached by a
+  // fresh remount — going forward a section then back — at which point the
+  // capture-time `previewUrl` local state is gone. `scan.photo` is the same
+  // blob lifted into useSkinCheckFlow, so it survives the remount; this
+  // derives a display URL from it whenever that's the only source left.
+  const [donePreviewUrl, setDonePreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const blob = scan.status === "success" || scan.status === "error" ? scan.photo : null;
+    if (!blob) {
+      setDonePreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    setDonePreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [scan]);
 
   const handleCapture = useCallback(() => {
     const video = videoRef.current;
@@ -147,6 +178,7 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
     });
     capturedBlobRef.current = null;
     originalBlobRef.current = null;
+    setHasConsented(false);
     if (isMobile) {
       fileInputRef.current?.click();
     } else {
@@ -154,17 +186,29 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
     }
   }, [isMobile, requestCamera]);
 
+  // Same as handleRetake, plus unwinding an already-committed step: reopens
+  // the capture UI (value leaves "done") and clears the stale scan result,
+  // so a retake after a completed or failed scan can't leave old data
+  // sitting behind the new photo. Reachable from the "done" summary view,
+  // including after a remount (PART 8's back-and-restore requirement).
+  const handleRetakeFromDone = useCallback(() => {
+    handleRetake();
+    onChange("");
+    onScanChange({ status: "idle" });
+  }, [handleRetake, onChange, onScanChange]);
+
   const handleConfirm = useCallback(() => {
+    if (!hasConsented) return;
     const blob = capturedBlobRef.current;
     const original = originalBlobRef.current;
     if (!blob || !original) return;
     const captureMethod: CaptureMethod = isMobile ? "native" : "canvas";
 
-    // Unlock Continue immediately. The scan runs in the background while the
-    // user answers the remaining sections; by the time they reach the results
-    // step it has almost always resolved. Awaiting here would park them on
-    // this step for the scan's full duration — which is the exact dead time
-    // moving capture earlier was meant to eliminate.
+    // Unlock the next section immediately. The scan runs in the background
+    // while the user answers the remaining sections; by the time they reach
+    // the results step it has almost always resolved. Awaiting here would
+    // park them on this step for the scan's full duration — which is the
+    // exact dead time moving capture earlier was meant to eliminate.
     onChange("done");
     onCommit();
 
@@ -192,28 +236,36 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
           captureMethod,
         });
       });
-  }, [onChange, onCommit, onScanChange, isMobile]);
+  }, [hasConsented, onChange, onCommit, onScanChange, isMobile]);
 
   if (value === "done") {
+    const thumbSrc = previewUrl ?? donePreviewUrl;
     return (
-      <div className="flex items-center gap-3 rounded-2xl border border-[#1A1A1A]/10 bg-white px-4 py-3">
-        {previewUrl && (
-          // eslint-disable-next-line @next/next/no-img-element -- transient object URL, not a static asset
-          <img src={previewUrl} alt="Captured photo" className="h-12 w-12 rounded-xl object-cover" />
-        )}
-        <p className="text-sm text-[#1A1A1A]/70">
-          {scan.status === "loading" ? "Analyzing your photo…" : "Photo captured."}
-        </p>
+      <div className="flex flex-col gap-3 rounded-lg border border-text/10 bg-white p-4 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-3">
+          {thumbSrc && (
+            // eslint-disable-next-line @next/next/no-img-element -- transient object URL, not a static asset
+            <img src={thumbSrc} alt="Captured photo" className="h-14 w-14 rounded-md object-cover" />
+          )}
+          <p className="text-sm text-text/70">
+            {scan.status === "loading" ? "Analyzing your photo…" : "Photo saved for this scan."}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleRetakeFromDone}
+          className="text-sm font-medium text-text underline underline-offset-4 hover:text-blush sm:ml-auto"
+        >
+          Retake photo
+        </button>
       </div>
     );
   }
 
   if (status === "denied" || status === "unavailable") {
     return (
-      <div className="flex flex-col gap-3 rounded-2xl border border-[#1A1A1A]/10 bg-white p-4">
-        <p className="text-sm text-[#1A1A1A]/70">
-          {error ?? "Camera access is needed for this step."}
-        </p>
+      <div className="flex flex-col gap-3 rounded-lg border border-text/10 bg-white p-4">
+        <p className="text-sm text-text/70">{error ?? "Camera access is needed for this step."}</p>
         <Button type="button" variant="outlineLight" size="sm" onClick={requestCamera}>
           Try again
         </Button>
@@ -222,8 +274,8 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="relative aspect-[3/4] w-full max-w-[280px] overflow-hidden rounded-2xl bg-black">
+    <div className="flex flex-col gap-4">
+      <div className="relative aspect-[3/4] w-full max-w-[280px] overflow-hidden rounded-lg bg-black">
         {!isMobile && !hasCaptured && (
           <video
             ref={videoRef}
@@ -261,23 +313,51 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
         />
       )}
 
-      <p className="max-w-[85%] text-xs text-[#1A1A1A]/45">{step.note}</p>
+      <p className="max-w-sm text-xs text-text/45">{step.note}</p>
 
-      <div className="flex gap-2">
-        {!hasCaptured ? (
-          <Button
-            type="button"
-            variant="magenta"
-            size="sm"
-            disabled={!isMobile && status !== "active"}
-            onClick={isMobile ? () => fileInputRef.current?.click() : handleCapture}
-            className="gap-2"
-          >
-            <Camera className="h-4 w-4" />
-            Capture
-          </Button>
-        ) : (
-          <>
+      {!hasCaptured ? (
+        <Button
+          type="button"
+          variant="ink"
+          size="sm"
+          disabled={!isMobile && status !== "active"}
+          onClick={isMobile ? () => fileInputRef.current?.click() : handleCapture}
+          className="w-fit gap-2"
+        >
+          <Camera className="h-4 w-4" />
+          Capture
+        </Button>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {/* Required consent gate — the scan request below never fires
+              until this is checked (PART 13). Unchecked by default, real
+              <input type="checkbox">, keyboard- and screen-reader-visible. */}
+          <label className="flex max-w-sm items-start gap-2.5 text-sm text-text/70">
+            <input
+              type="checkbox"
+              checked={hasConsented}
+              onChange={(e) => setHasConsented(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-text/30 text-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+            />
+            <span>
+              I agree to the{" "}
+              {TERMS_URL ? (
+                <a
+                  href={TERMS_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-text"
+                >
+                  Terms &amp; Conditions
+                </a>
+              ) : (
+                <span className="underline underline-offset-2">Terms &amp; Conditions</span>
+              )}{" "}
+              and consent to my photo being collected and processed for this skin analysis.
+            </span>
+          </label>
+
+          <div className="flex gap-2">
             <Button
               type="button"
               variant="outlineLight"
@@ -291,16 +371,16 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
             </Button>
             <Button
               type="button"
-              variant="magenta"
+              variant="ink"
               size="sm"
-              disabled={scan.status === "loading"}
+              disabled={scan.status === "loading" || !hasConsented}
               onClick={handleConfirm}
             >
-              {scan.status === "loading" ? "Analyzing…" : "Use this photo"}
+              {scan.status === "loading" ? "Analyzing…" : "Analyze my skin"}
             </Button>
-          </>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -67,7 +67,10 @@ export async function POST(request: NextRequest) {
       : "";
 
   if (image.size > MAX_IMAGE_BYTES) {
-    return NextResponse.json({ error: "Image too large. Maximum 5MB." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Image too large. Maximum 5MB.", code: "IMAGE_TOO_LARGE" },
+      { status: 413 }
+    );
   }
 
   const quotaLimited = consumeDailyQuota(request, SKIN_SCAN_ROUTE_LIMITS);
@@ -155,6 +158,38 @@ export async function POST(request: NextRequest) {
           return NextResponse.json(
             { error: "That photo was too large for the scan service. Try again with a smaller image.", code: "IMAGE_TOO_LARGE" },
             { status: 413 }
+          );
+
+        case "IMAGE_DIMENSIONS_TOO_LARGE":
+          console.error("skin-scan service: image dimensions too large:", upstreamDetail);
+          return NextResponse.json(
+            { error: "That photo's resolution is too large. Try again with a smaller image.", code: "IMAGE_DIMENSIONS_TOO_LARGE" },
+            { status: 400 }
+          );
+
+        case "IMAGE_TOO_SMALL":
+          console.error("skin-scan service: image dimensions too small:", upstreamDetail);
+          return NextResponse.json(
+            { error: "That photo's resolution is too small to analyze. Try again with a higher-resolution image.", code: "IMAGE_TOO_SMALL" },
+            { status: 400 }
+          );
+
+        // Transient, not the user's fault — retrying (later) can succeed.
+        case "SCAN_CAPACITY_EXCEEDED":
+          console.error("skin-scan service at capacity:", upstreamDetail);
+          return NextResponse.json(
+            { error: "The scan service is at capacity right now. Please try again in a moment.", code: "SCAN_CAPACITY_EXCEEDED" },
+            { status: 503 }
+          );
+
+        // Same status/code the route already uses for its own 30s abort
+        // (UPSTREAM_TIMEOUT_MS) above — this is the service reporting the
+        // same condition from its side (scan_timeout_seconds) instead.
+        case "SCAN_TIMEOUT":
+          console.error("skin-scan service timed out processing the scan:", upstreamDetail);
+          return NextResponse.json(
+            { error: "Skin scan service took too long to respond. Please try again.", code: "SCAN_TIMEOUT" },
+            { status: 504 }
           );
 
         // AUTH_FAILED means SCAN_API_SECRET is wrong/missing on our side —

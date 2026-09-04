@@ -77,6 +77,12 @@ export function useSkinCheckFlow() {
   // bucket; it is not a substitute for a real consent flow.
   const [blocked, setBlocked] = useState(false);
   const [revealCount, setRevealCount] = useState(() => revealCountFor(SECTIONS[0]!, {}));
+  // Bumped on every commit (not just the section's last step — an edit to
+  // an earlier answer while reviewing a completed section must be able to
+  // move things forward too, see SkinCheckFlow's auto-advance effect). The
+  // effect re-derives `isSectionComplete` itself at fire time, so a commit
+  // that leaves the section incomplete is a harmless no-op here.
+  const [advanceSignal, setAdvanceSignal] = useState(0);
 
   const activeIndex = complete ? SECTIONS.length - 1 : sectionIndex;
   const section = SECTIONS[activeIndex]!;
@@ -93,8 +99,10 @@ export function useSkinCheckFlow() {
   const commitStep = useCallback(
     (stepId: string) => {
       const stepIndex = eligibleSteps.findIndex((s) => s.id === stepId);
-      if (stepIndex !== revealCount - 1) return;
-      setRevealCount((c) => Math.min(c + 1, eligibleSteps.length));
+      if (stepIndex === revealCount - 1) {
+        setRevealCount((c) => Math.min(c + 1, eligibleSteps.length));
+      }
+      setAdvanceSignal((n) => n + 1);
     },
     [eligibleSteps, revealCount]
   );
@@ -156,6 +164,7 @@ export function useSkinCheckFlow() {
     scan,
     setScan,
     commitStep,
+    advanceSignal,
     isSectionComplete,
     sectionFill,
     isFirst: sectionIndex === 0 && !complete && !blocked,

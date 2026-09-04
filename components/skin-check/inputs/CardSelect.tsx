@@ -25,22 +25,18 @@ export function CardSelect({ step, value, onChange, onCommit }: CardSelectProps)
               onCommit();
             }}
             className={cn(
-              "flex items-center justify-between gap-3 rounded-2xl border px-4 py-3.5 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#98415A]/50 focus-visible:ring-offset-2",
-              selected
-                ? "border-[#98415A] bg-[#F7E3E3]/60"
-                : "border-[#1A1A1A]/10 bg-white hover:border-[#98415A]/30"
+              "flex items-center justify-between gap-3 rounded-lg border px-4 py-3.5 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
+              selected ? "border-blush bg-blush-soft" : "border-text/10 bg-white hover:border-blush/40"
             )}
           >
             <span>
-              <span className="block text-[0.9375rem] font-medium text-[#1A1A1A]">
-                {opt.label}
-              </span>
-              <span className="mt-0.5 block text-xs text-[#1A1A1A]/55">{opt.description}</span>
+              <span className="block text-[0.9375rem] font-medium text-text">{opt.label}</span>
+              <span className="mt-0.5 block text-xs text-text/55">{opt.description}</span>
             </span>
             <span
               className={cn(
                 "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
-                selected ? "border-[#98415A] bg-[#98415A] text-white" : "border-[#1A1A1A]/20"
+                selected ? "border-blush bg-blush text-white" : "border-text/20"
               )}
             >
               {selected && <Check className="h-3 w-3" strokeWidth={3} />}

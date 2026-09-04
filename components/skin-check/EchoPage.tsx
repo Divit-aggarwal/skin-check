@@ -9,7 +9,7 @@ import { TypingIndicator } from "@/components/primitives/TypingIndicator";
 import { EchoBubble } from "./EchoBubble";
 import { EchoMark } from "./EchoMark";
 import { useSkinCheckSession, type EchoThreadMessage } from "@/lib/skin-check-session-context";
-import { getSkinCheckChatReply } from "@/lib/api";
+import { getSkinCheckChatReply, ApiError } from "@/lib/api";
 import { bandScores } from "@/lib/skin-check-rules";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import type { SkinScanScores } from "@/types/skin-scan";
@@ -27,7 +27,8 @@ const CATEGORY_LABELS: Record<keyof SkinScanScores, string> = {
 };
 const CATEGORY_KEYS = Object.keys(CATEGORY_LABELS) as (keyof SkinScanScores)[];
 
-const ERROR_MESSAGE = "I couldn't reach Echo just now — try sending that again?";
+const RETRYABLE_ERROR_MESSAGE = "Couldn't reach Echo just now.";
+const CONFIG_ERROR_MESSAGE = "Echo isn't set up yet — this isn't something retrying will fix.";
 
 function greetingFor(region: EchoRegion): string {
   return `Hey — let's talk about your ${ECHO_REGION_LABELS[region].toLowerCase()}. What would you like to know?`;
@@ -51,28 +52,52 @@ export function EchoPage() {
   const [activeRegion, setActiveRegion] = useState<EchoRegion>(isEchoRegion(regionParam) ? regionParam : "forehead");
   const [draft, setDraft] = useState("");
   const [sendingRegion, setSendingRegion] = useState<EchoRegion | null>(null);
+  // Transient, not part of `threads` — an error is UI state about a failed
+  // request, not a message Echo said. The old version pushed a role:"echo"
+  // error string into thread history, which meant it got replayed back to
+  // Gemini as a model turn on the next send (context pollution) and gave the
+  // user no way to retry without retyping. `retryMessages` is the exact
+  // history that failed to send, so Retry resends it verbatim instead of
+  // reconstructing it (which could silently drop or reorder the failed turn).
+  const [sendError, setSendError] = useState<{
+    region: EchoRegion;
+    retryMessages: EchoThreadMessage[];
+    retryable: boolean;
+  } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Aborts any in-flight /api/skin-check/chat request when this page
+  // unmounts (user taps "Back to Skin Check", or navigates away entirely,
+  // while Echo is still thinking) — without this, the fetch resolves after
+  // unmount and calls setThreadMessages/setSendError on a component that's
+  // gone. One controller at a time matches sendingRegion's own one-in-flight
+  // invariant (sendToEcho refuses to start a second request).
+  const abortControllerRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    return () => abortControllerRef.current?.abort();
+  }, []);
 
   const messages = threads[activeRegion];
   const isThinking = sendingRegion === activeRegion;
+  const activeError = sendError?.region === activeRegion ? sendError : null;
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, isThinking]);
+  }, [messages, isThinking, activeError]);
 
   if (!session) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center gap-4 bg-white px-6 text-center">
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-[#F7E3E3]">
+      <div className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center gap-4 bg-surface px-6 text-center">
+        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blush-soft">
           <EchoMark className="h-5 w-5" />
         </span>
-        <p className="text-sm text-[#1A1A1A]/70">
+        <p className="text-sm text-text/70">
           We lost your check-in — Echo needs your Skin Check results to talk this through, and that session
           doesn&apos;t survive a refresh yet.
         </p>
         <Link
           href="/skin-check"
-          className="h-12 rounded-full bg-[#E02D79] px-6 text-sm font-medium leading-[3rem] text-white"
+          className="h-12 rounded-full bg-text px-6 text-sm font-medium leading-[3rem] text-white transition-colors hover:bg-text/85"
         >
           Back to Skin Check
         </Link>
@@ -84,15 +109,17 @@ export function EchoPage() {
   const regionBands = regionScores ? bandScores(regionScores).bands : null;
   const activeSession = session; // fresh const so the closure below keeps the non-null narrowing
 
-  async function handleSend() {
-    const text = draft.trim();
-    if (!text || sendingRegion) return;
-
-    const region = activeRegion;
-    const nextMessages: EchoThreadMessage[] = [...threads[region], { id: messageSeq++, role: "user", text }];
-    setThreadMessages(region, nextMessages);
-    setDraft("");
+  // Shared by a fresh send and a Retry — `nextMessages` already has the
+  // user's turn appended (or, on retry, is exactly what failed last time),
+  // so this never re-adds a user message and never duplicates a request:
+  // sendingRegion gates both entry points the same way.
+  async function sendToEcho(region: EchoRegion, nextMessages: EchoThreadMessage[]) {
+    if (sendingRegion) return;
+    setSendError(null);
     setSendingRegion(region);
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
       const history = nextMessages.map((m) => ({ role: m.role, text: m.text }));
@@ -101,32 +128,58 @@ export function EchoPage() {
         history,
         activeSession.answers,
         activeSession.result.scores,
-        activeSession.composite,
-        focusScores ? { region: ECHO_REGION_LABELS[region], scores: focusScores } : null
+        focusScores ? { region: ECHO_REGION_LABELS[region], scores: focusScores } : null,
+        controller.signal
       );
+      if (controller.signal.aborted) return; // unmounted mid-request — nothing left to update
       setThreadMessages(region, [...nextMessages, { id: messageSeq++, role: "echo", text: reply }]);
     } catch (err) {
-      console.error("Echo region chat failed:", err);
-      setThreadMessages(region, [...nextMessages, { id: messageSeq++, role: "echo", text: ERROR_MESSAGE }]);
+      if (controller.signal.aborted) return;
+      console.error("Echo region chat failed:", err instanceof Error ? err.message : err);
+      const misconfigured = err instanceof ApiError && err.code === "CHAT_MISCONFIGURED";
+      setSendError({ region, retryMessages: nextMessages, retryable: !misconfigured });
     } finally {
-      setSendingRegion(null);
+      if (!controller.signal.aborted) setSendingRegion(null);
+      if (abortControllerRef.current === controller) abortControllerRef.current = null;
     }
   }
 
+  function handleSend() {
+    const text = draft.trim();
+    if (!text || sendingRegion) return;
+
+    const region = activeRegion;
+    const nextMessages: EchoThreadMessage[] = [...threads[region], { id: messageSeq++, role: "user", text }];
+    setThreadMessages(region, nextMessages);
+    setDraft("");
+    void sendToEcho(region, nextMessages);
+  }
+
+  function handleRetry() {
+    if (!activeError || sendingRegion) return;
+    void sendToEcho(activeError.region, activeError.retryMessages);
+  }
+
   return (
-    <div className="mx-auto flex min-h-dvh max-w-lg flex-col bg-white px-6 pb-6 pt-6">
+    <div className="mx-auto flex min-h-dvh max-w-lg flex-col bg-surface px-6 pb-6 pt-6">
       <div className="flex shrink-0 items-center gap-3">
         <Link
           href="/skin-check"
           aria-label="Back to Skin Check"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#1A1A1A]/60 transition-opacity hover:text-[#1A1A1A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#98415A]/50 focus-visible:ring-offset-2"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text/60 transition-opacity hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
         >
           <ChevronLeft className="h-5 w-5" />
         </Link>
-        <p className="text-sm font-semibold text-[#1A1A1A]">Echo</p>
+        <p className="text-sm font-semibold text-text">Echo</p>
       </div>
 
-      <div className="mt-4 flex shrink-0 gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Skin regions">
+      {/* Underline tab treatment, matching EchoTwin's category strip — not a
+          filled pill (same "not a SaaS chatbot" reasoning as EchoBubble). */}
+      <div
+        className="mt-4 flex shrink-0 gap-4 overflow-x-auto pb-1 [mask-image:linear-gradient(to_right,transparent,black_12px,black_calc(100%-12px),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        role="tablist"
+        aria-label="Skin regions"
+      >
         {ECHO_REGIONS.map((region) => {
           const active = region === activeRegion;
           return (
@@ -136,31 +189,32 @@ export function EchoPage() {
               role="tab"
               aria-selected={active}
               onClick={() => setActiveRegion(region)}
-              className={
-                "shrink-0 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#98415A]/50 focus-visible:ring-offset-2 " +
-                (active
-                  ? "bg-[#E02D79] text-white"
-                  : "bg-[#FAF4EF] text-[#1A1A1A]/60 hover:bg-[#FAF4EF]/70")
-              }
+              className="flex shrink-0 items-center px-1 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              {ECHO_REGION_LABELS[region]}
+              <span
+                className={`border-b-2 pb-1 text-label uppercase tracking-label transition-colors duration-150 ${
+                  active ? "border-text text-text" : "border-transparent text-muted-foreground"
+                }`}
+              >
+                {ECHO_REGION_LABELS[region]}
+              </span>
             </button>
           );
         })}
       </div>
 
       {regionBands && (
-        <div className="mt-4 shrink-0 rounded-2xl bg-[#FAF4EF] p-4">
+        <div className="mt-4 shrink-0 rounded-2xl bg-canvas p-4">
           <div className="flex items-center justify-between">
-            <p className="text-[length:var(--home-text-label,0.8125rem)] font-semibold uppercase tracking-[0.12em] text-[#98415A]/70">
+            <p className="text-label font-semibold uppercase tracking-label text-muted-foreground">
               {ECHO_REGION_LABELS[activeRegion]} readings
             </p>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
             {CATEGORY_KEYS.map((key) => (
               <div key={key} className="flex items-center justify-between">
-                <span className="text-xs text-[#1A1A1A]/60">{CATEGORY_LABELS[key]}</span>
-                <span className="text-xs font-medium text-[#98415A]">
+                <span className="text-xs text-text/60">{CATEGORY_LABELS[key]}</span>
+                <span className="text-xs font-medium text-blush">
                   {key === "pores" ? "Not measured yet" : regionBands[key]}
                 </span>
               </div>
@@ -169,14 +223,21 @@ export function EchoPage() {
         </div>
       )}
 
-      <div ref={scrollRef} className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto">
+      <div ref={scrollRef} className="mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto">
         {messages.length === 0 && <EchoBubble message={greetingFor(activeRegion)} />}
         {messages.map((m) =>
           m.role === "echo" ? (
-            <EchoBubble key={m.id} message={m.text} />
+            // Plain left-aligned body copy, no bubble/avatar chrome — same
+            // "doesn't read as a chatbot" intent as EchoBubble, sized for a
+            // running multi-turn reply rather than EchoBubble's single
+            // editorial question/prompt treatment (which EchoBubble is now
+            // used for elsewhere — see SkinCheckFlow.tsx).
+            <p key={m.id} className="max-w-[90%] text-body leading-relaxed text-text">
+              {m.text}
+            </p>
           ) : (
             <div key={m.id} className="flex justify-end">
-              <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-[#98415A] px-4 py-3">
+              <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-text px-4 py-3">
                 <p className="text-[1.0625rem] leading-snug text-white">{m.text}</p>
               </div>
             </div>
@@ -184,12 +245,26 @@ export function EchoPage() {
         )}
         <AnimatePresence initial={false}>
           {isThinking && (
-            <TypingIndicator
-              key="thinking"
-              className="rounded-tl-sm bg-[#F7E3E3] text-[#98415A]"
-            />
+            <TypingIndicator key="thinking" className="rounded-tl-sm bg-blush-soft text-blush" />
           )}
         </AnimatePresence>
+        {activeError && (
+          <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl bg-blush-soft px-4 py-3">
+            <p className="text-body text-text">
+              {activeError.retryable ? RETRYABLE_ERROR_MESSAGE : CONFIG_ERROR_MESSAGE}
+            </p>
+            {activeError.retryable && (
+              <button
+                type="button"
+                onClick={handleRetry}
+                disabled={sendingRegion !== null}
+                className="text-label font-semibold uppercase tracking-label text-blush underline underline-offset-2 disabled:opacity-50"
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="mt-4 flex shrink-0 items-center gap-2 pb-safe-bottom">
@@ -200,15 +275,20 @@ export function EchoPage() {
             if (e.key === "Enter") handleSend();
           }}
           placeholder={`Ask Echo about your ${ECHO_REGION_LABELS[activeRegion].toLowerCase()}...`}
+          aria-label={`Ask Echo about your ${ECHO_REGION_LABELS[activeRegion].toLowerCase()}`}
+          // Matches ChatMessageSchema's text bound (app/api/skin-check/chat/
+          // route.ts) — caps client-side so a too-long message fails to type
+          // rather than failing at send with a 400 the UI can't usefully retry.
+          maxLength={2000}
           disabled={sendingRegion !== null}
-          className="h-12 flex-1 rounded-full border border-[#1A1A1A]/10 bg-[#FAF4EF] px-4 text-sm text-[#1A1A1A] outline-none focus:border-[#98415A]/40 disabled:opacity-60"
+          className="h-12 flex-1 rounded-full border border-border bg-canvas px-4 text-sm text-text outline-none focus:border-blush/40 disabled:opacity-60"
         />
         <button
           type="button"
           onClick={handleSend}
           disabled={sendingRegion !== null || !draft.trim()}
           aria-label="Send"
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#E02D79] text-white transition-opacity disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#98415A]/50 focus-visible:ring-offset-2"
+          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-text text-white transition-colors hover:bg-text/85 disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
         >
           <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
             <path

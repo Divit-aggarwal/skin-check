@@ -1,19 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { getSkinScanResult } from "@/lib/api";
 import { summarizeConcerns } from "@/lib/skin-check-score";
 import { runSkinCheckRules, toConcern, type Band, type BandableMetric } from "@/lib/skin-check-rules";
-import {
-  SKU_DISPLAY,
-  METRIC_LABELS,
-  BAND_STYLE,
-  SKU_ACCENT_CLASS,
-  OVERLAY_CATEGORIES,
-  resolveStatedConcern,
-} from "@/lib/skin-check-skus";
+import { METRIC_LABELS, BAND_STYLE, OVERLAY_CATEGORIES, resolveStatedConcern } from "@/lib/skin-check-skus";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
 import type { SkinScanState } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
@@ -137,7 +131,7 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
   }
 
   const { scores, overlays, regions, region_scores, region_low_confidence } = scan.result;
-  const { bands, skus, rule_trace } = runSkinCheckRules(scan.result);
+  const { bands } = runSkinCheckRules(scan.result);
   const { summaryLine } = summarizeConcerns(scores, bands);
 
   // The one real image-quality signal the service exposes — surfaced
@@ -164,12 +158,6 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
     band: bands[key],
   }));
 
-  // The trace entry that made each SKU fire — this is what turns "buy this"
-  // into "buy this BECAUSE pigment banded Elevated", which is the entire
-  // differentiated pitch of a brand positioned on measurability.
-  const reasonFor = (sku: string) =>
-    rule_trace.find((t) => t.rule === `sku:${sku}` && t.fired)?.detail ?? null;
-
   return (
     <div className="flex flex-col gap-10">
       <EchoTwin
@@ -193,73 +181,73 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
         </p>
       )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-label uppercase text-muted-foreground">What we read</h2>
-        <ul className="flex flex-col">
-          {ranked.map((key) => {
-            const score = Math.round(toConcern(scores, key) * 100);
-            const active = key === selectedCategory;
-            return (
-              <li key={key}>
-                <button
-                  type="button"
-                  onClick={() => setSelectedCategory(key)}
-                  aria-current={active}
-                  className={
-                    bands[key] === "Elevated"
-                      ? `flex w-full items-center justify-between border-l-2 py-3 pl-3 pr-1 text-left transition-colors duration-150 ${active ? "border-accent bg-canvas" : "border-accent"}`
-                      : `flex w-full items-center justify-between border-l-2 py-3 pl-3 pr-1 text-left transition-colors duration-150 ${active ? "border-text/30 bg-canvas" : "border-transparent"}`
-                  }
-                >
-                  <span className="text-body text-text">{METRIC_LABELS[key]}</span>
-                  <span className="flex items-center gap-3">
-                    <span className="text-body tabular-nums text-muted-foreground">{score}/100</span>
-                    <span className={`text-body ${BAND_STYLE[bands[key]]}`}>{bands[key]}</span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        {/* `pores` is deliberately absent from this list. It returns exactly
-            0.0 on every real photo, so it is excluded from banding upstream.
-            The previous version gave it 1/7 of the payoff screen to say
-            "Not measured yet". */}
-        <p className="text-label text-muted-foreground">
-          Scores are image-relative signals from this scan, not clinically
-          calibrated measurements — they compare what showed up in this
-          photo, not against other people or past scans.
-        </p>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <h2 className="text-label uppercase text-muted-foreground">What we&apos;d use</h2>
-        <ul className="flex flex-col gap-2">
-          {skus.map((sku) => {
-            const product = SKU_DISPLAY[sku];
-            if (!product) return null;
-            const reason = reasonFor(sku);
-            return (
-              <li key={sku} className="flex gap-3 rounded border border-border p-4">
-                <span
-                  aria-hidden
-                  className={`mt-1 h-8 w-1 shrink-0 rounded-pill ${SKU_ACCENT_CLASS[product.accent] ?? ""}`}
-                />
-                <div className="flex flex-col gap-1">
-                  <a
-                    href={`/products/${product.handle}`}
-                    className="text-body font-medium text-text underline underline-offset-4"
+      {/* Ivory band — the page alternates white (hero/face) and warm-ivory
+          (editorial content) sections rather than staying one flat white
+          canvas throughout (PART 22). Matches SkinCheckFlow's `complete`
+          container padding (px-6 sm:px-10) so the bleed lines up exactly. */}
+      <div className="-mx-6 flex flex-col gap-10 bg-canvas px-6 py-10 sm:-mx-10 sm:px-10">
+        <section className="flex flex-col gap-3">
+          <h2 className="text-label uppercase text-muted-foreground">What we read</h2>
+          <ul className="flex flex-col">
+            {ranked.map((key) => {
+              const score = Math.round(toConcern(scores, key) * 100);
+              const active = key === selectedCategory;
+              return (
+                <li key={key}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategory(key)}
+                    aria-current={active}
+                    className={
+                      // bg-white, not bg-canvas — this list now sits on the
+                      // ivory band below, so the "selected" highlight has to
+                      // read lighter than its surroundings, not the same tone.
+                      bands[key] === "Elevated"
+                        ? `flex w-full items-center justify-between border-l-2 py-3 pl-3 pr-1 text-left transition-colors duration-150 ${active ? "border-blush bg-white" : "border-blush"}`
+                        : `flex w-full items-center justify-between border-l-2 py-3 pl-3 pr-1 text-left transition-colors duration-150 ${active ? "border-text/30 bg-white" : "border-transparent"}`
+                    }
                   >
-                    {product.name}
-                  </a>
-                  <p className="text-body text-text/70">{product.blurb}</p>
-                  {reason && <p className="text-label text-muted-foreground">Why: {reason}</p>}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      </section>
+                    <span className="text-body text-text">{METRIC_LABELS[key]}</span>
+                    <span className="flex items-center gap-3">
+                      <span className="text-body tabular-nums text-muted-foreground">{score}/100</span>
+                      <span className={`text-body ${BAND_STYLE[bands[key]]}`}>{bands[key]}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+          {/* `pores` is deliberately absent from this list. It returns exactly
+              0.0 on every real photo, so it is excluded from banding upstream.
+              The previous version gave it 1/7 of the payoff screen to say
+              "Not measured yet". */}
+          <p className="text-label text-muted-foreground">
+            Scores are image-relative signals from this scan, not clinically
+            calibrated measurements — they compare what showed up in this
+            photo, not against other people or past scans.
+          </p>
+        </section>
+
+        {/* Echo chat, routed at /echo — replaces the static SKU list. Session
+            data (scan result, answers, composite) is already mirrored into
+            SkinCheckSessionProvider by the effect above by the time this
+            renders, and /echo reads that same context, so this Link is the
+            whole integration: no new data plumbing, no duplicate fetch.
+            EchoPage's own visual design is a follow-up pass, not this one. */}
+        <section className="flex flex-col items-center gap-3 rounded border border-border bg-white p-6 text-center">
+          <p className="text-label uppercase tracking-label text-muted-foreground">Not sure what this means?</p>
+          <h2 className="font-display text-2xl italic text-text">Ask Echo about your skin.</h2>
+          <p className="max-w-sm text-body text-text/70">
+            Echo can walk through what showed up in your scan, region by region, in plain language.
+          </p>
+          <Link
+            href="/echo"
+            className="mt-1 inline-flex h-11 items-center justify-center rounded-md bg-text px-6 text-sm font-medium text-white transition-colors hover:bg-text/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+          >
+            Ask Echo
+          </Link>
+        </section>
+      </div>
     </div>
   );
 }

@@ -23,6 +23,9 @@ const buttonVariants = cva(
         magenta: "bg-[#E02D79] text-white hover:bg-[#c92569]",
         outlineLight:
           "border border-[#1A1A1A]/15 bg-white text-[#1A1A1A] hover:bg-white/80",
+        // Primary action for the Skin Check quiz/results redesign — near-
+        // black, no gradient/glow, per the "restrained" brief (PART 25).
+        ink: "bg-text text-white hover:bg-text/85",
       },
       size: {
         default: "h-10 px-4 py-2",

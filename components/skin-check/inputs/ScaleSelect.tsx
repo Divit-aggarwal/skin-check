@@ -14,8 +14,8 @@ interface ScaleSelectProps {
 
 export function ScaleSelect({ step, value, onChange, onCommit }: ScaleSelectProps) {
   return (
-    <div className="flex flex-col items-end gap-2.5">
-      <div className="flex w-full max-w-[90%] flex-col gap-2">
+    <div className="flex flex-col gap-2.5">
+      <div className="flex max-w-sm flex-col gap-2">
         <div className="flex justify-between gap-2">
           {LEVELS.map((level) => {
             const selected = value === level;
@@ -28,10 +28,10 @@ export function ScaleSelect({ step, value, onChange, onCommit }: ScaleSelectProp
                   onCommit();
                 }}
                 className={cn(
-                  "flex h-11 w-11 items-center justify-center rounded-full border text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#98415A]/50 focus-visible:ring-offset-2",
+                  "flex h-11 w-11 items-center justify-center rounded-full border text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
                   selected
-                    ? "border-[#98415A] bg-[#98415A] text-white"
-                    : "border-[#1A1A1A]/10 bg-white text-[#1A1A1A] hover:border-[#98415A]/40"
+                    ? "border-blush bg-blush text-white"
+                    : "border-text/10 bg-white text-text hover:border-blush/40"
                 )}
               >
                 {level}
@@ -39,14 +39,12 @@ export function ScaleSelect({ step, value, onChange, onCommit }: ScaleSelectProp
             );
           })}
         </div>
-        <div className="flex justify-between text-[0.6875rem] font-medium uppercase tracking-wide text-[#1A1A1A]/45">
+        <div className="flex justify-between text-[0.6875rem] font-medium uppercase tracking-wide text-text/45">
           <span>{step.minLabel}</span>
           <span>{step.maxLabel}</span>
         </div>
       </div>
-      {value && (
-        <p className="max-w-[90%] text-right text-xs text-[#1A1A1A]/55">{step.reflections[value]}</p>
-      )}
+      {value && <p className="max-w-sm text-xs text-text/55">{step.reflections[value]}</p>}
     </div>
   );
 }

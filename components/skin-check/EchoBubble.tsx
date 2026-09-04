@@ -1,14 +1,11 @@
-import { EchoMark } from "./EchoMark";
-
+// Editorial question/statement text — no chat avatar or speech-bubble
+// shape. The name is kept (rather than renamed across every call site) but
+// this no longer renders anything chat-like; PART 3 of the redesign brief
+// is explicit that this shouldn't read as a chatbot.
 export function EchoBubble({ message }: { message: string }) {
   return (
-    <div className="flex items-start gap-2.5">
-      <span className="mt-2.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#F7E3E3]">
-        <EchoMark />
-      </span>
-      <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-[#F7E3E3] px-4 py-3">
-        <p className="text-[1.0625rem] leading-snug text-[#1A1A1A]">{message}</p>
-      </div>
-    </div>
+    <p className="font-display text-2xl italic leading-snug text-text sm:text-[1.75rem]">
+      {message}
+    </p>
   );
 }
