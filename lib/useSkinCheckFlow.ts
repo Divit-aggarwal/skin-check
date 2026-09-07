@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { defaultAnswerFor, isStepAnswerValid } from "@/lib/skin-check-validation";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
@@ -83,6 +83,13 @@ export function useSkinCheckFlow() {
   // effect re-derives `isSectionComplete` itself at fire time, so a commit
   // that leaves the section incomplete is a harmless no-op here.
   const [advanceSignal, setAdvanceSignal] = useState(0);
+  // The step id to auto-scroll to, plus a bump counter so the same id can
+  // fire again later (e.g. re-revealed after an edit) even though the
+  // string value didn't change. Only set when a commit genuinely reveals a
+  // new step — see commitStep — so it's a precise "user just advanced"
+  // signal the UI layer can scroll on without re-deriving it.
+  const [revealTarget, setRevealTarget] = useState<{ id: string; seq: number } | null>(null);
+  const revealSeqRef = useRef(0);
 
   const activeIndex = complete ? SECTIONS.length - 1 : sectionIndex;
   const section = SECTIONS[activeIndex]!;
@@ -101,6 +108,11 @@ export function useSkinCheckFlow() {
       const stepIndex = eligibleSteps.findIndex((s) => s.id === stepId);
       if (stepIndex === revealCount - 1) {
         setRevealCount((c) => Math.min(c + 1, eligibleSteps.length));
+        const revealedStep = eligibleSteps[stepIndex + 1];
+        if (revealedStep) {
+          revealSeqRef.current += 1;
+          setRevealTarget({ id: revealedStep.id, seq: revealSeqRef.current });
+        }
       }
       setAdvanceSignal((n) => n + 1);
     },
@@ -165,6 +177,7 @@ export function useSkinCheckFlow() {
     setScan,
     commitStep,
     advanceSignal,
+    revealTarget,
     isSectionComplete,
     sectionFill,
     isFirst: sectionIndex === 0 && !complete && !blocked,

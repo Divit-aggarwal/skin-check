@@ -36,6 +36,7 @@ export function SkinCheckFlow() {
     setScan,
     commitStep,
     advanceSignal,
+    revealTarget,
     isSectionComplete,
     sectionFill,
     isFirst,
@@ -45,6 +46,42 @@ export function SkinCheckFlow() {
     complete,
     blocked,
   } = useSkinCheckFlow();
+
+  // Keyed by step id so a freshly revealed question can be scrolled into
+  // view without assuming it's the next DOM sibling — entries clean
+  // themselves up on unmount via the ref callback below.
+  const stepRefs = useRef(new Map<string, HTMLDivElement>());
+  const headerRef = useRef<HTMLDivElement>(null);
+  const hasMountedSectionRef = useRef(false);
+
+  // Fires only when commitStep (lib/useSkinCheckFlow) genuinely reveals a
+  // new step — never on mount, editing an earlier answer, or back().
+  useEffect(() => {
+    if (!revealTarget) return;
+    const raf = requestAnimationFrame(() => {
+      stepRefs.current.get(revealTarget.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [revealTarget]);
+
+  // Same problem one level up: finishing a section can leave the page
+  // scrolled past the shorter next section's content. Targets the header
+  // row (not the section box) so the back button/progress bar above it
+  // stay in view instead of scrolling past them. Forward-only (a completed
+  // section is never reached via back()) and skipped on first mount so
+  // landing on the flow doesn't itself trigger a scroll.
+  useEffect(() => {
+    if (!hasMountedSectionRef.current) {
+      hasMountedSectionRef.current = true;
+      return;
+    }
+    if (direction !== 1 || complete || blocked) return;
+    const raf = requestAnimationFrame(() => {
+      headerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [section.id]);
 
   // No Continue button — advancing a section is driven by `advanceSignal`,
   // which ticks on every answer commit (see useSkinCheckFlow). The effect
@@ -70,7 +107,7 @@ export function SkinCheckFlow() {
 
   return (
     <div className="min-h-dvh bg-white">
-      <div className="mx-auto flex max-w-xl items-center gap-3 px-6 pt-6">
+      <div ref={headerRef} className="mx-auto flex max-w-xl items-center gap-3 px-6 pt-6">
         <button
           type="button"
           onClick={back}
@@ -146,6 +183,10 @@ export function SkinCheckFlow() {
             {visibleSteps.map((step) => (
               <motion.div
                 key={step.id}
+                ref={(el) => {
+                  if (el) stepRefs.current.set(step.id, el);
+                  else stepRefs.current.delete(step.id);
+                }}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.3, ease: [0.19, 1, 0.22, 1] }}
