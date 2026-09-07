@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
 
 const fraunces = Fraunces({
@@ -59,7 +60,7 @@ export default function RootLayout({
     >
       <body className="bg-skin-base font-body text-sage-900 antialiased">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
+          <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>
       </body>
     </html>
