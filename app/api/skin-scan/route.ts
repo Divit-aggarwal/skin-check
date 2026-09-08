@@ -1,6 +1,12 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { checkRequestRate, consumeDailyQuota, SKIN_SCAN_ROUTE_LIMITS } from "@/lib/rate-limit";
+import { AdminNotConfiguredError, bearerToken, verifyFirebaseIdToken } from "@/lib/firebase/admin";
 import { SkinScanResultSchema } from "@/types/skin-scan";
+
+// firebase-admin needs Node APIs and hard-fails on the Edge runtime. This is
+// already the App Router default; stated explicitly so a future edge opt-in
+// can't silently break token verification.
+export const runtime = "nodejs";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 30_000;
@@ -12,11 +18,23 @@ const VALID_OVERLAYS = new Set([
   "redness", "oiliness", "texture", "pores", "blemishes", "hydration", "pigment",
 ]);
 
-// Pre-login, unauthenticated by design — same as the rest of the /skin-check
-// route (CLAUDE.md). Proxies to the self-hosted skin-scan service (OpenCV +
-// MediaPipe FastAPI, DurtyDhiana/skin-scan) so the client never talks to it
-// directly.
+// PHASE 2: authenticated. Every request must carry a Firebase ID token that
+// this server verifies itself (see lib/firebase/admin.ts) — the browser's own
+// claim to be signed in, and Phase 1's client-side ordering, are no longer
+// part of the security decision. Proxies to the self-hosted skin-scan service
+// (OpenCV + MediaPipe FastAPI, DurtyDhiana/skin-scan) so the client never
+// talks to it directly.
 const SKIN_SCAN_API_URL = process.env.SKIN_SCAN_API_URL;
+
+// A function, not a shared constant: a Response body can only be consumed
+// once, so a module-level instance would work for exactly one request and
+// then start failing.
+//
+// One message and one code for every failure mode — missing, malformed,
+// invalid, expired, revoked. Which of those it was stays in the server log:
+// telling a caller *why* their token failed is free reconnaissance.
+const unauthorized = () =>
+  NextResponse.json({ error: "Authentication required.", code: "AUTH_REQUIRED" }, { status: 401 });
 
 export async function POST(request: NextRequest) {
   // Fails loudly rather than silently falling back to localhost:8000, which
@@ -40,8 +58,51 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Stays first: IP burst protection is payload-agnostic and purely in-memory,
+  // so it shields the token verification below (which does touch the network)
+  // rather than sitting behind it.
   const rateLimited = checkRequestRate(request, SKIN_SCAN_ROUTE_LIMITS);
   if (rateLimited) return rateLimited;
+
+  // ── Trust boundary ───────────────────────────────────────────────────────
+  // Everything below this block — reading the body, the daily quota, the
+  // upstream call — is unreachable without a Firebase ID token this server
+  // verified. Header shape is checked BEFORE any credential is touched, so a
+  // missing or malformed token is a 401 even on a box with no service account
+  // configured; only a genuine verification attempt can surface a 500.
+  const token = bearerToken(request.headers.get("authorization"));
+  if (!token) {
+    console.warn("skin-scan: rejected request with no usable Bearer token.");
+    return unauthorized();
+  }
+
+  try {
+    // The ONLY source of identity for this request. There is no uid in the
+    // body, the query, or any other header, and if one were ever added it
+    // would be client-asserted data, never this.
+    //
+    // The returned uid is deliberately not bound to a local: nothing in this
+    // route consumes an identity yet (FastAPI neither expects nor uses one).
+    // Phase 3 is what starts reading it — see verifyFirebaseIdToken.
+    await verifyFirebaseIdToken(token);
+  } catch (err) {
+    if (err instanceof AdminNotConfiguredError) {
+      // Names of unset env vars only — never a credential value.
+      console.error("skin-scan:", err.message);
+      return NextResponse.json(
+        { error: "Authentication is misconfigured.", code: "AUTH_MISCONFIGURED" },
+        { status: 500 }
+      );
+    }
+    // Deliberately not forwarded to the client: the Firebase error code
+    // distinguishes expired from revoked from wrong-signature, which is
+    // exactly the feedback an attacker wants.
+    console.warn(
+      "skin-scan: ID token verification failed:",
+      (err as { code?: string })?.code ?? "unknown"
+    );
+    return unauthorized();
+  }
 
   let formData: FormData;
   try {
@@ -73,6 +134,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Reached only by an authenticated caller now, so anonymous traffic can no
+  // longer burn the shared daily budget. Still keyed by IP, not by `uid` —
+  // rate limiting is explicitly out of scope for this phase (see the report's
+  // limitations); the verified uid is available here whenever that changes.
   const quotaLimited = consumeDailyQuota(request, SKIN_SCAN_ROUTE_LIMITS);
   if (quotaLimited) return quotaLimited;
 

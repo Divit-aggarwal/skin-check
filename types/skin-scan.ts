@@ -121,17 +121,33 @@ export type SkinScanRegionLowConfidence = z.infer<typeof SkinScanRegionLowConfid
 // stratified by whether real EXIF exists.
 export type CaptureMethod = "native" | "canvas";
 
-// Held in useSkinCheckFlow, alongside quiz answers — not persisted (Step 5).
+// Held in useSkinCheckFlow, alongside quiz answers, and draft-persisted to
+// IndexedDB (lib/skin-check-draft.ts) so a refresh doesn't lose the capture
+// or force a second paid analysis of the same bytes.
+//
+// `original` is OPTIONAL because only `photo` survives a draft restore. The
+// full-res camera file is what PHASE 3 PUTs to private S3 before the analysis
+// runs; persisting several MB of it per draft on top of that would be the
+// wrong trade. On the restore path it is simply absent, so a resumed draft
+// can no longer upload an original — `originalStored` then stays false even
+// if an object from the pre-refresh attempt exists (under-claiming, which is
+// the safe direction). The CV service only ever sees `photo` regardless.
 // `photo` on the success variant is the dashboard hero's base layer (Step
 // 3.7) — the same captured blob carried through, not refetched or re-derived.
-// `original` is the bytes that will eventually populate scan_images.original_path:
+// `original` is the bytes PHASE 3 stores at users/{uid}/scans/{scanId}/original.jpg:
 // on native capture it is the actual camera file (`photo` is a ~1280px
 // downscale of it, for the CV call only); on canvas capture `original` and
 // `photo` are the SAME blob — canvas has nothing higher-fidelity to fall back
 // to. The CV service only ever sees `photo`, never `original` directly, but
-// on the canvas path they happen to be identical bytes.
+// on the canvas path they happen to be identical bytes. `originalStored` is
+// true once that S3 PUT has succeeded for this scan — the flag the Firestore
+// record's image metadata is built from. `retentionConsentVersion` is set only
+// when the user actively checked the image-retention box for THIS capture
+// (lib/consent.ts); its absence is what stops the upload from happening at
+// all, and it is never carried over from another scan or restored from a
+// draft.
 export type SkinScanState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "success"; result: SkinScanResult; photo: Blob; original: Blob; captureMethod: CaptureMethod }
-  | { status: "error"; message: string; photo: Blob; original: Blob; captureMethod: CaptureMethod };
+  | { status: "success"; result: SkinScanResult; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined }
+  | { status: "error"; message: string; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined };

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { getSkinScanResult } from "@/lib/api";
+import { isAuthError, isUploadError, runSkinScan } from "@/lib/api";
 import { summarizeConcerns } from "@/lib/skin-check-score";
 import { runSkinCheckRules, toConcern, type Band, type BandableMetric } from "@/lib/skin-check-rules";
 import { METRIC_LABELS, BAND_STYLE, OVERLAY_CATEGORIES, resolveStatedConcern } from "@/lib/skin-check-skus";
@@ -32,11 +32,13 @@ function resolveFocus(
 
 interface SkinCheckDashboardProps {
   scan: SkinScanState;
+  /** Stable id for this scan attempt — half of the S3 key for the original. */
+  scanId: string;
   onScanChange: (scan: SkinScanState) => void;
   answers: SkinCheckAnswers;
 }
 
-export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDashboardProps) {
+export function SkinCheckDashboard({ scan, scanId, onScanChange, answers }: SkinCheckDashboardProps) {
   const { setSession } = useSkinCheckSession();
   // The single authoritative "which category is on screen" state — EchoTwin
   // derives the overlay, score, band, and explanation from this same value,
@@ -52,6 +54,8 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
       composite: summarizeConcerns(scan.result.scores, bands),
       photo: scan.photo,
       original: scan.original,
+      originalStored: scan.originalStored,
+      retentionConsentVersion: scan.retentionConsentVersion,
       captureMethod: scan.captureMethod,
     });
   }, [scan, answers, setSession]);
@@ -92,15 +96,55 @@ export function SkinCheckDashboard({ scan, onScanChange, answers }: SkinCheckDas
   }
 
   if (scan.status === "error") {
-    const { message, photo, original, captureMethod } = scan;
+    const { message, photo, original, captureMethod, originalStored, retentionConsentVersion } = scan;
     const handleRetry = async () => {
       onScanChange({ status: "loading" });
       try {
-        const result = await getSkinScanResult(photo, OVERLAY_CATEGORIES);
-        onScanChange({ status: "success", result, photo, original, captureMethod });
+        // Same sequence as the capture step: store the original first (unless
+        // it's already up, or the bytes didn't survive a draft restore), then
+        // analyze.
+        const retried = await runSkinScan({
+          scanId,
+          photo,
+          original,
+          // Carried from the capture step, never re-asserted here: this screen
+          // shows no consent control, so a retry can only ever store what the
+          // user already agreed to store.
+          retentionConsent: Boolean(retentionConsentVersion),
+          alreadyStored: originalStored ?? false,
+          overlays: OVERLAY_CATEGORIES,
+        });
+        onScanChange({
+          status: "success",
+          result: retried.result,
+          photo,
+          original,
+          captureMethod,
+          originalStored: retried.originalStored,
+          retentionConsentVersion,
+        });
       } catch (err) {
         console.error("Skin scan retry failed:", err);
-        onScanChange({ status: "error", message, photo, original, captureMethod });
+        // Reusing the previous `message` would misreport a fresh auth failure
+        // as whatever went wrong the first time.
+        onScanChange({
+          status: "error",
+          message: isAuthError(err)
+            ? "Your session expired. Refresh the page to sign in again, then retry."
+            : isUploadError(err)
+              ? "We couldn't save your photo just now. Check your connection and retry."
+              : message,
+          photo,
+          original,
+          captureMethod,
+          // An upload failure leaves nothing stored. Anything else means the
+          // upload phase completed (or was skipped because it was already
+          // stored), so a CV failure must not un-claim an object that is up.
+          originalStored: isUploadError(err)
+            ? false
+            : (originalStored || (Boolean(original) && Boolean(retentionConsentVersion))),
+          retentionConsentVersion,
+        });
       }
     };
 

@@ -22,9 +22,23 @@ interface StepAnswerProps {
   /** Whole-questionnaire context, needed by the final phone step to
       associate the finished session with the authenticated user. */
   answers: SkinCheckAnswers;
+  /** Stable id for this scan attempt — the final step writes under it. */
+  scanId: string;
+  /** Clears the local draft once the scan is safely persisted. */
+  onSaved: () => void;
 }
 
-export function StepAnswer({ step, value, onChange, onCommit, scan, onScanChange, answers }: StepAnswerProps) {
+export function StepAnswer({
+  step,
+  value,
+  onChange,
+  onCommit,
+  scan,
+  onScanChange,
+  answers,
+  scanId,
+  onSaved,
+}: StepAnswerProps) {
   switch (step.type) {
     case "text":
       return <TextInput step={step} value={value as string} onChange={onChange} onCommit={onCommit} />;
@@ -36,12 +50,16 @@ export function StepAnswer({ step, value, onChange, onCommit, scan, onScanChange
           onChange={onChange}
           onCommit={onCommit}
           answers={answers}
+          scanId={scanId}
+          scan={scan}
+          onSaved={onSaved}
         />
       );
     case "photo-capture":
       return (
         <PhotoCapture
           step={step}
+          scanId={scanId}
           value={value as string}
           onChange={onChange}
           onCommit={onCommit}

@@ -1,9 +1,17 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { defaultAnswerFor, isStepAnswerValid } from "@/lib/skin-check-validation";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
+import {
+  clearDraft,
+  loadDraft,
+  loadDraftScan,
+  newScanId,
+  saveDraft,
+  saveDraftScan,
+} from "@/lib/skin-check-draft";
 import type { SectionConfig, SkinCheckAnswers, StepAnswerValue, StepConfig } from "@/types/skin-check";
 import type { SkinScanState } from "@/types/skin-scan";
 
@@ -56,7 +64,21 @@ export function useSkinCheckFlow() {
   // user tapped "back" from /echo. Land them back on the finished dashboard
   // instead of resetting to section 0; this hook has no other memory of a
   // prior visit since its own state is local to the component instance.
-  const { session } = useSkinCheckSession();
+  const { session, setSession } = useSkinCheckSession();
+
+  // Minted once per scan attempt and stable from the questionnaire's first
+  // answer through to the Firestore write, where it becomes the document id.
+  // One value does three jobs: it keys the local draft, it makes a
+  // double-submission address the same document instead of creating a
+  // second one, and it's the stable id an image reference will hang off if
+  // a bucket is ever wired up.
+  const [scanId, setScanId] = useState(newScanId);
+  // Draft restore reads localStorage/IndexedDB, which don't exist during
+  // SSR. Doing it in an effect rather than a useState initializer is what
+  // keeps the server and first client render identical — restoring answers
+  // inline would be a hydration mismatch. The flow renders a placeholder
+  // until this flips (see SkinCheckFlow).
+  const [restored, setRestored] = useState(false);
 
   const [sectionIndex, setSectionIndex] = useState(0);
   const [direction, setDirection] = useState<1 | -1>(1);
@@ -68,6 +90,8 @@ export function useSkinCheckFlow() {
           result: session.result,
           photo: session.photo,
           original: session.original,
+          originalStored: session.originalStored,
+          retentionConsentVersion: session.retentionConsentVersion,
           captureMethod: session.captureMethod,
         }
       : { status: "idle" }
@@ -93,6 +117,144 @@ export function useSkinCheckFlow() {
   // signal the UI layer can scroll on without re-deriving it.
   const [revealTarget, setRevealTarget] = useState<{ id: string; seq: number } | null>(null);
   const revealSeqRef = useRef(0);
+  // StrictMode double-invokes mount effects in dev; restoring twice would be
+  // harmless but re-entrant, so the restore runs exactly once either way.
+  const restoreStartedRef = useRef(false);
+
+  // ── Draft restore (once, on mount) ───────────────────────────────────────
+  // Recovers a questionnaire abandoned by a refresh, a dropped connection, a
+  // crash, or a closed tab. Deliberately does NOT require a Firebase user:
+  // at this point in the flow there isn't one, and there must not need to be.
+  useEffect(() => {
+    if (restoreStartedRef.current) return;
+    restoreStartedRef.current = true;
+
+    // A live in-memory session (returning from /echo) already holds newer
+    // state than any draft — don't overwrite it.
+    if (session) {
+      setRestored(true);
+      return;
+    }
+
+    const draft = loadDraft();
+    if (!draft) {
+      setRestored(true);
+      return;
+    }
+
+    setScanId(draft.scanId);
+    setAnswers(draft.answers);
+    const idx = Math.min(Math.max(draft.sectionIndex, 0), SECTIONS.length - 1);
+    setSectionIndex(idx);
+    // Derived, never persisted — reveal position is a pure function of which
+    // answers are filled in, so it can't drift out of sync with them.
+    setRevealCount(revealCountFor(SECTIONS[idx]!, draft.answers));
+
+    // The photo and its analysis live in IndexedDB (too large for
+    // localStorage), keyed by this same scanId. Restoring a SUCCESSFUL
+    // result matters for more than convenience: it's what stops a refresh
+    // from silently re-running the CV analysis on bytes we already paid to
+    // process.
+    //
+    // No cancellation flag here, deliberately. StrictMode runs mount effects
+    // as effect → cleanup → effect; a `cancelled` closure set by that
+    // cleanup would be poisoned before this promise resolves, while
+    // restoreStartedRef blocks the second invocation from starting a
+    // replacement load — so the photo would silently never restore in dev.
+    // restoreStartedRef alone already guarantees this runs once, and React
+    // 18 no longer warns about setState after unmount.
+    void loadDraftScan(draft.scanId).then((stored) => {
+      if (!stored) {
+        // localStorage survived but IndexedDB didn't (blocked, evicted, or
+        // cleared independently). The answer says a photo was committed but
+        // there are no bytes behind it — re-ask for the capture rather than
+        // restoring a "Photo saved" state with nothing in it.
+        setAnswers((prev) => {
+          if (prev.skin_photo !== "done") return prev;
+          const rest = { ...prev };
+          delete rest.skin_photo;
+          return rest;
+        });
+        return;
+      }
+      if (stored.result) {
+        setScan({
+          status: "success",
+          result: stored.result,
+          photo: stored.photo,
+          captureMethod: stored.captureMethod,
+        });
+      } else {
+        // Captured, but the analysis never landed (refresh mid-scan, or it
+        // failed). Surface it as retryable rather than as a committed photo
+        // with no reading behind it.
+        setScan({
+          status: "error",
+          message: "We didn't finish reading your photo. You can try again.",
+          photo: stored.photo,
+          captureMethod: stored.captureMethod,
+        });
+      }
+    });
+
+    setRestored(true);
+    // Mount-only: `session` is read for its value at mount, and re-running
+    // this on a later session change would fight the live state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Draft persist (incremental) ──────────────────────────────────────────
+  // Every answer commit, not just the end of the questionnaire.
+  useEffect(() => {
+    if (!restored || complete) return;
+    saveDraft({ scanId, answers, sectionIndex });
+  }, [restored, complete, scanId, answers, sectionIndex]);
+
+  // The photo is written as soon as it's captured (result still null) and
+  // rewritten once the analysis lands, so a refresh at any point in that
+  // window recovers whatever exists.
+  useEffect(() => {
+    if (!restored) return;
+    if (scan.status === "success") {
+      void saveDraftScan({
+        scanId,
+        photo: scan.photo,
+        result: scan.result,
+        captureMethod: scan.captureMethod,
+      });
+    } else if (scan.status === "error") {
+      void saveDraftScan({
+        scanId,
+        photo: scan.photo,
+        result: null,
+        captureMethod: scan.captureMethod,
+      });
+    }
+  }, [restored, scanId, scan]);
+
+  /**
+   * Starts a genuinely new scan for the same user — the "many" half of
+   * ONE USER → MANY SCANS. A new scanId means the next Firestore write
+   * creates a new document instead of colliding with the finished one, so
+   * this is the deliberate second scan the idempotency guard must not block.
+   */
+  const startNewScan = useCallback(() => {
+    void clearDraft();
+    setScanId(newScanId());
+    setAnswers({});
+    setScan({ status: "idle" });
+    setSectionIndex(0);
+    setRevealCount(revealCountFor(SECTIONS[0]!, {}));
+    setComplete(false);
+    setBlocked(false);
+    setDirection(1);
+    setSession(null);
+  }, [setSession]);
+
+  /** Called once the scan is safely in Firestore — the draft has no more use. */
+  const finishDraft = useCallback(() => {
+    void clearDraft();
+  }, []);
 
   const activeIndex = complete ? SECTIONS.length - 1 : sectionIndex;
   const section = SECTIONS[activeIndex]!;
@@ -171,6 +333,10 @@ export function useSkinCheckFlow() {
   }, [blocked, complete, sectionIndex, answers]);
 
   return {
+    scanId,
+    restored,
+    startNewScan,
+    finishDraft,
     section,
     sectionIndex: activeIndex,
     visibleSteps,

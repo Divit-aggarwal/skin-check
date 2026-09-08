@@ -25,6 +25,8 @@
 *service-account*.json
 
 # debug
+firestore-debug.log
+firebase-debug.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*

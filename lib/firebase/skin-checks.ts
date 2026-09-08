@@ -1,22 +1,138 @@
-import { addDoc, collection, serverTimestamp } from "firebase/firestore";
+import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import type { SkinCheckAnswers } from "@/types/skin-check";
+import { scanImageKey } from "@/lib/s3-key";
+import { IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
+import type { SkinScanResult, SkinScanState } from "@/types/skin-scan";
+
+/** Terminal state of one scan, recorded in a single write. */
+export type SkinCheckStatus =
+  | "completed"           // questionnaire + a successful analysis
+  | "analysis_failed"     // questionnaire saved, the CV scan errored
+  | "questionnaire_only"; // no photo was captured
+
+export const SKIN_CHECK_SCHEMA_VERSION = 1;
 
 /**
- * Associates a completed questionnaire with the authenticated Firebase user
- * by writing it under that user's own subtree. The uid is never taken from
- * anything the client asserts in a payload — it comes from the ID token
- * Firebase attaches to the request, and firestore.rules only permits a write
- * where `request.auth.uid == uid`, so a forged uid is rejected server-side.
+ * What we keep from a scan result, as an allowlist rather than the whole
+ * object. Two reasons, both hard:
  *
- * Questionnaire answers only. Photos and scan results stay in the in-memory
- * session (lib/skin-check-session-context.tsx); nothing here is on the path
- * to showing the user their results, which is why the caller treats a
- * failure as non-fatal.
+ *  - `overlays` holds up to 7 base64 PNG heatmaps. Firestore's hard document
+ *    limit is 1MiB, so persisting the raw result FAILS at runtime on any
+ *    scan that requested overlays — which is every scan (PhotoCapture asks
+ *    for all of OVERLAY_CATEGORIES).
+ *  - `region_hist*` / `region_raw` are per-region stat dumps for retroactive
+ *    rescoring. Useful someday, not needed to re-render a past result, and
+ *    they dominate the remaining size.
+ *
+ * Everything the results dashboard actually reads is kept.
  */
-export async function saveSkinCheck(uid: string, answers: SkinCheckAnswers) {
-  await addDoc(collection(db(), "users", uid, "skinChecks"), {
-    answers,
-    createdAt: serverTimestamp(),
-  });
+function persistableResult(result: SkinScanResult) {
+  return {
+    scores: result.scores,
+    regions: result.regions,
+    region_scores: result.region_scores,
+    // Both genuinely absent on older pipeline versions — Firestore rejects
+    // an explicit `undefined`, so omit the key instead of writing one.
+    ...(result.score_types ? { score_types: result.score_types } : {}),
+    ...(result.region_low_confidence ? { region_low_confidence: result.region_low_confidence } : {}),
+    pipeline_version: result.pipeline_version,
+  };
+}
+
+/**
+ * Writes one completed Skin Check to `users/{uid}/skinChecks/{scanId}`.
+ *
+ * ONE USER → MANY SCANS: each scan is its own document under the user's own
+ * subtree, keyed by a client-generated `scanId` that was minted when the
+ * draft started (lib/skin-check-draft.ts). A user can hold any number of
+ * these; nothing here overwrites or looks at a previous one.
+ *
+ * IDEMPOTENCY: the id is deterministic for a given scan attempt, so a
+ * double-tap, a remount, or a retry all address the SAME document. The
+ * second write is an update of an existing path, and firestore.rules denies
+ * `update` outright — so the duplicate is rejected by the server, not merely
+ * guarded against in the client. That's why `permission-denied` is treated
+ * as "already saved" below rather than as a failure.
+ *
+ * The uid is never taken from anything the client asserts in the payload —
+ * it comes from the ID token Firebase attaches to the request, and the rules
+ * only permit a write where `request.auth.uid == uid`, so a forged uid is
+ * rejected server-side.
+ */
+export async function saveSkinCheck(
+  uid: string,
+  scanId: string,
+  answers: SkinCheckAnswers,
+  scan: SkinScanState
+): Promise<void> {
+  const status: SkinCheckStatus =
+    scan.status === "success"
+      ? "completed"
+      : scan.status === "error"
+        ? "analysis_failed"
+        : "questionnaire_only";
+
+  try {
+    await setDoc(doc(db(), "users", uid, "skinChecks", scanId), {
+      schemaVersion: SKIN_CHECK_SCHEMA_VERSION,
+      scanId,
+      answers,
+      status,
+      // PHASE 3: the ORIGINAL image lives in a private S3 bucket, never here
+      // — no bytes, no base64, no public URL. `key` is only ever the
+      // deterministic path built from this uid + scanId (lib/s3-key.ts), the
+      // same builder the presign route uses, so it cannot name another
+      // user's object; firestore.rules re-checks that server-side.
+      //
+      // `stored: false` when the upload didn't happen or didn't succeed —
+      // including a resumed draft, which no longer has the original bytes.
+      // That under-claims rather than over-claims: never write stored: true
+      // for an object we didn't watch land.
+      image: scan.status === "success" || scan.status === "error"
+        ? scan.originalStored
+          ? {
+              stored: true,
+              captureMethod: scan.captureMethod,
+              storage: "s3",
+              key: scanImageKey(uid, scanId),
+            }
+          : { stored: false, captureMethod: scan.captureMethod }
+        : null,
+      // Image-retention consent, recorded per scan and never inferred: this is
+      // only true when the user checked the retention box for THIS capture
+      // (components/skin-check/inputs/PhotoCapture.tsx). The processing
+      // consent that gates the analysis is a separate permission and is not
+      // represented by this field.
+      //
+      // The timestamp is serverTimestamp(), like createdAt — a client clock is
+      // not evidence of when consent was given. firestore.rules requires this
+      // block to say true, with this exact version, before it will accept a
+      // record claiming image.stored == true.
+      consent:
+        (scan.status === "success" || scan.status === "error") &&
+        // Compared against the constant, not merely checked for presence: a
+        // session or in-memory state carrying a superseded version string is
+        // consent to different wording, and must not be recorded as consent to
+        // this one.
+        scan.retentionConsentVersion === IMAGE_RETENTION_CONSENT_VERSION
+          ? {
+              imageRetention: true,
+              imageRetentionVersion: scan.retentionConsentVersion,
+              imageRetentionConsentedAt: serverTimestamp(),
+            }
+          : { imageRetention: false },
+      result: scan.status === "success" ? persistableResult(scan.result) : null,
+      createdAt: serverTimestamp(),
+    });
+  } catch (error) {
+    // The rules deny `update`, so this is what a duplicate submission looks
+    // like from the client: the scan is already saved and the second write
+    // was correctly refused. Not an error the user should ever see.
+    if ((error as { code?: string })?.code === "permission-denied") {
+      console.info("[skin-check] scan already saved, duplicate write refused:", scanId);
+      return;
+    }
+    throw error;
+  }
 }
