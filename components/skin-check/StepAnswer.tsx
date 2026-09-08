@@ -1,9 +1,9 @@
 "use client";
 
-import type { StepAnswerValue, StepConfig } from "@/types/skin-check";
+import type { SkinCheckAnswers, StepAnswerValue, StepConfig } from "@/types/skin-check";
 import type { SkinScanState } from "@/types/skin-scan";
 import { TextInput } from "./inputs/TextInput";
-import { PhoneInput } from "./inputs/PhoneInput";
+import { PhoneAuthStep } from "./inputs/PhoneAuthStep";
 import { PhotoCapture } from "./inputs/PhotoCapture";
 import { ChipSelect } from "./inputs/ChipSelect";
 import { CardSelect } from "./inputs/CardSelect";
@@ -19,14 +19,25 @@ interface StepAnswerProps {
   onCommit: () => void;
   scan: SkinScanState;
   onScanChange: (scan: SkinScanState) => void;
+  /** Whole-questionnaire context, needed by the final phone step to
+      associate the finished session with the authenticated user. */
+  answers: SkinCheckAnswers;
 }
 
-export function StepAnswer({ step, value, onChange, onCommit, scan, onScanChange }: StepAnswerProps) {
+export function StepAnswer({ step, value, onChange, onCommit, scan, onScanChange, answers }: StepAnswerProps) {
   switch (step.type) {
     case "text":
       return <TextInput step={step} value={value as string} onChange={onChange} onCommit={onCommit} />;
     case "phone":
-      return <PhoneInput step={step} value={value as string} onChange={onChange} onCommit={onCommit} />;
+      return (
+        <PhoneAuthStep
+          step={step}
+          value={value as string}
+          onChange={onChange}
+          onCommit={onCommit}
+          answers={answers}
+        />
+      );
     case "photo-capture":
       return (
         <PhotoCapture
