@@ -3,8 +3,15 @@
 import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
 import { Camera, RotateCcw } from "lucide-react";
 import { useCameraStream } from "@/hooks/useCameraStream";
-import { getSkinScanResult } from "@/lib/api";
+import { useAuth } from "@/lib/auth-context";
+import { isAuthError, isUploadError, runSkinScan } from "@/lib/api";
 import { OVERLAY_CATEGORIES } from "@/lib/skin-check-skus";
+import {
+  IMAGE_RETENTION_CONSENT_COPY,
+  IMAGE_RETENTION_CONSENT_VERSION,
+  PRIVACY_POLICY_LINK_TEXT,
+  PRIVACY_POLICY_URL,
+} from "@/lib/consent";
 import { Button } from "@/components/ui/button";
 import type { PhotoCaptureStep } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanState } from "@/types/skin-scan";
@@ -18,6 +25,8 @@ const TERMS_URL = process.env.NEXT_PUBLIC_TERMS_URL;
 
 interface PhotoCaptureProps {
   step: PhotoCaptureStep;
+  /** Stable id for this scan attempt — half of the S3 key for the original. */
+  scanId: string;
   value: string;
   onChange: (value: string) => void;
   onCommit: () => void;
@@ -81,7 +90,12 @@ async function downscaleToJpeg(file: Blob, maxDimension: number, quality: number
 // /scan route — this step has to accumulate on the same scrolling page like
 // every other /skin-check step (CLAUDE.md-adjacent product spec for this
 // flow), not break into a full-screen slide.
-export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChange }: PhotoCaptureProps) {
+export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, onScanChange }: PhotoCaptureProps) {
+  // PHASE 1: this step is only reachable after the "verify" section, so a
+  // signed-in user is the normal case. Read anyway — ordering alone is a
+  // property of the SECTIONS array, and the camera and the CV request are
+  // worth gating on the identity itself.
+  const { user, loading: authLoading } = useAuth();
   // Computed once — the device type doesn't change mid-session.
   const [isMobile] = useState(isMobileCaptureDevice);
   const { videoRef, status, error, requestCamera, stopCamera } = useCameraStream();
@@ -103,15 +117,34 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
   // away and back) resets it, and retaking a photo resets it explicitly
   // below, so consent never silently carries over to a different image.
   const [hasConsented, setHasConsented] = useState(false);
+  // SEPARATE permission, separate boolean, deliberately never merged with the
+  // one above: that one allows this photo to be analyzed, this one allows the
+  // original to be RETAINED in private S3. Optional — declining it still gives
+  // the user their analysis, it just means nothing is stored. Local state
+  // only: never written to the draft, so a new scan (or a retake) has to ask
+  // again rather than inheriting an answer given for a different image.
+  const [hasRetentionConsent, setHasRetentionConsent] = useState(false);
+  // "Analyze my skin" is only disabled once `scan.status` flips to "loading",
+  // which is a re-render away — two taps inside the same tick would both get
+  // through and bill two upstream CV jobs for one photo. Reset on retake, so
+  // a genuinely new capture can still be analyzed.
+  const scanRequestedRef = useRef(false);
 
+  // Keyed on the uid, not the User object: onAuthStateChanged hands out a new
+  // object on every hourly token refresh, and depending on that would tear
+  // down and re-acquire the camera mid-capture.
+  const uid = user?.uid ?? null;
   useEffect(() => {
     // Native capture is driven entirely by the hidden <input type="file">
     // below — no getUserMedia stream to request or tear down.
     if (isMobile) return;
+    // No camera permission prompt for someone who hasn't verified a number:
+    // the request would be for a photo they aren't allowed to submit.
+    if (!uid) return;
     if (value !== "done") requestCamera();
     return () => stopCamera();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [uid]);
 
   // The committed-photo summary view (value === "done") can be reached by a
   // fresh remount — going forward a section then back — at which point the
@@ -178,7 +211,9 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
     });
     capturedBlobRef.current = null;
     originalBlobRef.current = null;
+    scanRequestedRef.current = false;
     setHasConsented(false);
+    setHasRetentionConsent(false);
     if (isMobile) {
       fileInputRef.current?.click();
     } else {
@@ -198,10 +233,15 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
   }, [handleRetake, onChange, onScanChange]);
 
   const handleConfirm = useCallback(() => {
-    if (!hasConsented) return;
+    if (!hasConsented || scanRequestedRef.current) return;
+    // Belt to getSkinScanResult's braces (lib/api.ts throws on the same
+    // condition). Here so an unauthenticated tap is a silent no-op rather
+    // than a rejected promise rendered as "analysis failed".
+    if (!user) return;
     const blob = capturedBlobRef.current;
     const original = originalBlobRef.current;
     if (!blob || !original) return;
+    scanRequestedRef.current = true;
     const captureMethod: CaptureMethod = isMobile ? "native" : "canvas";
 
     // Unlock the next section immediately. The scan runs in the background
@@ -221,22 +261,80 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
     // follow-up request. Deliberately not gated on `answers.primary_concerns`
     // (usually still unanswered here — skin-photo is section 2, your-skin is
     // section 3) since we want all of them regardless.
-    void getSkinScanResult(blob, OVERLAY_CATEGORIES)
-      .then((result) =>
-        onScanChange({ status: "success", result, photo: blob, original, captureMethod })
+    // PHASE 3 ordering: the original image is PUT to private S3 first and the
+    // CV analysis only starts once that succeeded (runSkinScan owns both
+    // halves, so the dashboard's retry runs the same sequence).
+    const retentionConsentVersion = hasRetentionConsent ? IMAGE_RETENTION_CONSENT_VERSION : undefined;
+
+    void runSkinScan({
+      scanId,
+      photo: blob,
+      original,
+      retentionConsent: hasRetentionConsent,
+      overlays: OVERLAY_CATEGORIES,
+    })
+      .then(({ result, originalStored }) =>
+        onScanChange({
+          status: "success",
+          result,
+          photo: blob,
+          original,
+          captureMethod,
+          originalStored,
+          retentionConsentVersion,
+        })
       )
       .catch((err) => {
         console.error("Skin scan failed:", err);
         onScanChange({
           status: "error",
-          message:
-            "We couldn't analyze your photo just now — you can still see your results without it.",
+          // An expired/refused session is not a photo problem, and telling
+          // the user to retake the picture wouldn't fix it. This message is
+          // rendered by SkinCheckDashboard (the step commits and advances
+          // before the scan resolves), and the results view has no verify
+          // step to send them to — so it points at the one action that does
+          // work there: a refresh, which re-runs Firebase auth restoration.
+          message: isAuthError(err)
+            ? "Your session expired before we could read your photo. Refresh the page to sign in again, then retry."
+            : isUploadError(err)
+              // Upload failed, so the analysis never ran — retrying is the
+              // fix, and the retry starts from the upload again.
+              ? "We couldn't save your photo just now. Check your connection and retry."
+              : "We couldn't analyze your photo just now — you can still see your results without it.",
           photo: blob,
           original,
           captureMethod,
+          // Anything that isn't an upload error means the upload phase
+          // already completed — the object IS in S3 and only the analysis
+          // failed (case B), so the record must not claim otherwise.
+          originalStored: !isUploadError(err) && Boolean(original) && hasRetentionConsent,
+          retentionConsentVersion,
         });
       });
-  }, [hasConsented, onChange, onCommit, onScanChange, isMobile]);
+  }, [hasConsented, hasRetentionConsent, onChange, onCommit, onScanChange, isMobile, user, scanId]);
+
+  // Firebase hasn't reported yet — holding the frame is the difference
+  // between "we don't know" and "you're signed out" (failure case 6).
+  if (authLoading) {
+    return <div className="h-40 w-full max-w-[280px] animate-pulse rounded-lg bg-canvas" />;
+  }
+
+  // Unreachable through the normal flow — the "verify" section sits directly
+  // above this one and can't be completed without a Firebase user. Kept as
+  // the hard stop for every other way in: a restored draft that resumed past
+  // the verify section, a signOut in another tab, an expired session.
+  if (!user) {
+    return (
+      <div className="flex flex-col gap-2 rounded-lg border border-text/10 bg-white p-4">
+        <p className="text-sm text-text/70">
+          Verify your phone number before taking your photo.
+        </p>
+        <p className="text-xs text-text/45">
+          Tap back to the Verify step to continue.
+        </p>
+      </div>
+    );
+  }
 
   if (value === "done") {
     const thumbSrc = previewUrl ?? donePreviewUrl;
@@ -354,6 +452,31 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
                 <span className="underline underline-offset-2">Terms &amp; Conditions</span>
               )}{" "}
               and consent to my photo being collected and processed for this skin analysis.
+            </span>
+          </label>
+
+          {/* Image RETENTION consent — a second, independent checkbox. Optional:
+              leaving it unchecked still runs the analysis, it just means the
+              original is never uploaded (runSkinScan skips the S3 step). Never
+              pre-checked, never inferred from the box above or from continuing
+              the questionnaire. */}
+          <label className="flex max-w-sm items-start gap-2.5 text-sm text-text/70">
+            <input
+              type="checkbox"
+              checked={hasRetentionConsent}
+              onChange={(e) => setHasRetentionConsent(e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-text/30 text-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+            />
+            <span>
+              {IMAGE_RETENTION_CONSENT_COPY}{" "}
+              <a
+                href={PRIVACY_POLICY_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline underline-offset-2 hover:text-text"
+              >
+                {PRIVACY_POLICY_LINK_TEXT}
+              </a>
             </span>
           </label>
 

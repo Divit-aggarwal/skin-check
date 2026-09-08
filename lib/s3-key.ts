@@ -1,0 +1,32 @@
+// NOTE: `@/lib/s3` (one character away) DOES import the AWS SDK and is
+// server-only. Importing that from anything a client component reaches
+// throws at runtime, not at build — reach for THIS module from client code.
+//
+// Pure, dependency-free, and deliberately SDK-free: this is imported by the
+// presign route (server) AND by lib/firebase/skin-checks.ts (client), so one
+// AWS import here would drag the SDK into the browser bundle. Keep it that way.
+
+// Accepts both shapes newScanId() produces (lib/skin-check-draft.ts): a
+// crypto.randomUUID(), and the `scan-<base36>-<base36>` fallback used on
+// plain-HTTP local testing. `.` and `/` are outside the class, so every
+// traversal attempt ("../other-user", "users/foo", "a/../b"), the empty
+// string, and an over-long value all fail here rather than reaching S3.
+const SCAN_ID = /^[A-Za-z0-9_-]{8,64}$/;
+
+export function isValidScanId(value: unknown): value is string {
+  return typeof value === "string" && SCAN_ID.test(value);
+}
+
+/**
+ * The one and only place an original-image key is constructed.
+ *
+ * `uid` must be a server-VERIFIED Firebase uid (presign route) or the uid
+ * Firebase itself attached to the client session (Firestore write) — never a
+ * value read out of a request body. Deterministic for a given uid + scanId,
+ * so a retry overwrites the same object instead of minting original-2.jpg.
+ */
+export function scanImageKey(uid: string, scanId: string): string {
+  return `users/${uid}/scans/${scanId}/original.jpg`;
+}
+
+export const ORIGINAL_CONTENT_TYPE = "image/jpeg";

@@ -21,8 +21,42 @@ service cloud.firestore {
       // Append-only — a submitted questionnaire is a record, not a draft.
       match /skinChecks/{checkId} {
         allow get, list: if request.auth != null && request.auth.uid == uid;
-        allow create: if request.auth != null && request.auth.uid == uid;
+        allow create: if request.auth != null && request.auth.uid == uid
+                      && imageKeyIsOwn(uid, checkId)
+                      && storedImageHasConsent();
         allow update, delete: if false;
+      }
+
+      // PHASE 3 consent gate. A record may only claim that the original image
+      // is stored if it also carries image-retention consent at the current
+      // version. The presign route asks the client for the same flag, but that
+      // is a client assertion — THIS is the check a tampered client cannot get
+      // past, and it is what keeps a stored object from being recorded as
+      // consented-to when it was not.
+      //
+      // Nothing is asserted about the timestamp: serverTimestamp() resolves
+      // after evaluation, and a client clock would be no evidence anyway.
+      function storedImageHasConsent() {
+        let img = request.resource.data.get('image', null);
+        let consent = request.resource.data.get('consent', null);
+        return img == null
+               || img.get('stored', false) != true
+               || (consent != null
+                   && consent.get('imageRetention', false) == true
+                   && consent.get('imageRetentionVersion', '') == 'skin image retention version 1');
+      }
+
+      // PHASE 3. `image.key` names an object in a private S3 bucket. The
+      // client builds it from the same uid it is already constrained to by
+      // the path rule, but a doctored client could still claim another
+      // user's key inside its own document — this makes that write fail
+      // instead of relying on the client to be honest. A record that claims
+      // nothing is stored (or no image at all) is unconstrained.
+      function imageKeyIsOwn(uid, checkId) {
+        let img = request.resource.data.get('image', null);
+        return img == null
+               || img.get('stored', false) != true
+               || img.get('key', '') == 'users/' + uid + '/scans/' + checkId + '/original.jpg';
       }
     }
   }

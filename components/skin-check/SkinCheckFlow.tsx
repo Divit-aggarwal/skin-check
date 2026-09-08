@@ -27,6 +27,10 @@ const AUTO_ADVANCE_DELAY_MS = 220;
 
 export function SkinCheckFlow() {
   const {
+    scanId,
+    restored,
+    startNewScan,
+    finishDraft,
     section,
     sectionIndex,
     visibleSteps,
@@ -105,6 +109,14 @@ export function SkinCheckFlow() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [advanceSignal]);
 
+  // Until the draft check has run we don't yet know whether this is a fresh
+  // start or a recovered one. Rendering section 1 first and snapping to the
+  // restored position a tick later would be a visible flash, so hold the
+  // frame — this resolves synchronously off localStorage in practice.
+  if (!restored) {
+    return <div className="min-h-dvh bg-white" />;
+  }
+
   return (
     <div className="min-h-dvh bg-white">
       <div ref={headerRef} className="mx-auto flex max-w-xl items-center gap-3 px-6 pt-6">
@@ -166,7 +178,20 @@ export function SkinCheckFlow() {
                   {formatPrompt("Thanks, {name} — here's a visual reading of your skin, based on your scan.", answers)}
                 </p>
               </div>
-              <SkinCheckDashboard scan={scan} onScanChange={setScan} answers={answers} />
+              <SkinCheckDashboard scan={scan} scanId={scanId} onScanChange={setScan} answers={answers} />
+
+              {/* The storage model has always allowed many scans per user
+                  (each is its own document); without this there was simply
+                  no way to start the next one without a hard reload. */}
+              <div className="flex justify-center">
+                <button
+                  type="button"
+                  onClick={startNewScan}
+                  className="text-sm font-medium text-text underline underline-offset-4 hover:text-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+                >
+                  Start a new skin check
+                </button>
+              </div>
             </div>
           </motion.div>
         ) : (
@@ -201,6 +226,8 @@ export function SkinCheckFlow() {
                   scan={scan}
                   onScanChange={setScan}
                   answers={answers}
+                  scanId={scanId}
+                  onSaved={finishDraft}
                 />
               </motion.div>
             ))}

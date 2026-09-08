@@ -16,6 +16,13 @@ export interface TextStep extends BaseStep {
 export interface PhoneStep extends BaseStep {
   type: "phone";
   note: string;
+  /**
+   * True only for the flow's final step, which writes the finished scan to
+   * Firestore once the user confirms. The pre-capture "verify" step leaves
+   * this unset: it authenticates and nothing else — there is no completed
+   * questionnaire to save at that point.
+   */
+  savesScan?: boolean;
 }
 
 export interface PhotoCaptureStep extends BaseStep {

@@ -97,11 +97,15 @@ export function usePhoneAuth({
     if (!recaptchaRef.current) {
       throw new Error("reCAPTCHA container is not mounted.");
     }
-    // TEMP DIAGNOSTIC — revert to "invisible" once phone auth is confirmed.
-    // A visible widget renders its own error text ("Invalid domain for site
-    // key", etc.) instead of failing silently behind an opaque error code.
+    // Invisible: no checkbox for the user to tick. This is app verification,
+    // not a weaker mode — Firebase still runs reCAPTCHA and will escalate to
+    // a visible challenge on its own if the risk score demands one, which is
+    // the behaviour we want to keep. `size: "normal"` here was a temporary
+    // diagnostic (a visible widget renders its own error text instead of
+    // failing behind an opaque code) and was the sole reason every user was
+    // being shown a checkbox.
     verifierRef.current = new RecaptchaVerifier(auth(), recaptchaRef.current, {
-      size: "normal",
+      size: "invisible",
     });
     return verifierRef.current;
   }

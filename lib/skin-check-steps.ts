@@ -5,6 +5,7 @@ import type { SectionConfig, SkinCheckAnswers } from "@/types/skin-check";
 // section's progress the bar is showing.
 export const ALL_SECTION_LABELS = [
   "About You",
+  "Verify",
   "Skin Photo",
   "Your Skin",
   "Personal Context",
@@ -52,6 +53,24 @@ export const SECTIONS: SectionConfig[] = [
           { value: "male", label: "Male" },
           { value: "other", label: "Other" },
         ],
+      },
+    ],
+  },
+  {
+    // PHASE 1: authentication boundary. Deliberately sits between
+    // "about-you" and "skin-photo" — the under-18 gate in useSkinCheckFlow's
+    // `next()` still fires first (it keys off section id "about-you", not an
+    // index), so a blocked minor never gets as far as burning an SMS, and no
+    // camera or /api/skin-scan request exists on any path that hasn't passed
+    // through here. The ordering invariant IS this array's literal order.
+    id: "verify",
+    label: "VERIFY",
+    steps: [
+      {
+        id: "phone_verify",
+        type: "phone",
+        prompt: "Before we look at your skin, {name} — let's confirm it's you.",
+        note: "Enter your WhatsApp number. We'll verify it before your photo is taken or analysed, and use it to send your results.",
       },
     ],
   },
@@ -330,8 +349,16 @@ export const SECTIONS: SectionConfig[] = [
       {
         id: "final_phone",
         type: "phone",
-        prompt: "That's everything, {name} — where should we send your results?",
-        note: "Enter your WhatsApp number to get your personalised skin report. We'll only use this to send your results.",
+        // PHASE 1: no longer the authentication boundary — that moved to the
+        // "verify" section above. Firebase has already signed this user in by
+        // the time this renders, so PhoneAuthStep takes its already-signed-in
+        // branch (an explicit "Get my results" tap, never an auto-submit) and
+        // this step keeps its existing job: writing the finished scan to
+        // Firestore. Copy updated because the old "where should we send your
+        // results?" now sits above a button with no input.
+        savesScan: true,
+        prompt: "That's everything, {name} — ready for your results?",
+        note: "We'll send your personalised skin report to the number you verified.",
       },
     ],
   },

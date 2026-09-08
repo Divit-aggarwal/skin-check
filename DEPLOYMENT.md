@@ -268,3 +268,153 @@ against a live Amplify URL in this pass; only the local-server equivalents
 - [ ] Trigger a deliberate 500-class failure (e.g. temporarily unset a
       required env var in a non-production stage) and confirm the response
       body contains no stack trace, file path, or internal hostname
+
+---
+
+## S3 original-image storage (Phase 3) — PROVISIONED 2026-09-08
+
+Every scan's original image is PUT by the browser, using a short-lived
+presigned URL from `POST /api/skin-scan/upload`, to:
+
+```
+s3://projectskin-skin-originals-prod/users/{verified Firebase uid}/scans/{scanId}/original.jpg
+```
+
+**Deploy target correction:** this app deploys to **Vercel**
+(`https://skin-check-sigma.vercel.app` today, `https://theprojectskin.com`
+next), not AWS Amplify. `aws amplify list-apps` in ap-south-1 returns nothing.
+The Amplify guidance earlier in this file predates that and applies only if the
+target ever moves.
+
+### Bucket (created and verified 2026-09-08)
+
+| Property | Value |
+| --- | --- |
+| Name | `projectskin-skin-originals-prod` |
+| Account / region | `550428926515` / `ap-south-1` |
+| Block Public Access | all four settings `true` |
+| Object Ownership | `BucketOwnerEnforced` (ACLs disabled) |
+| Default encryption | `AES256` (SSE-S3), bucket key enabled |
+| Bucket policy | none (`NoSuchBucketPolicy`) |
+| Public ACL grants | none — owner `FULL_CONTROL` only |
+| Lifecycle rules | none — **do not add an expiry rule**; these are user-owned originals kept for scan history |
+| Versioning | not enabled — retries overwrite the one canonical original per scan |
+
+Not managed by the `skin-scan-tfstate-550428926515-ap-south-1` Terraform state
+that governs the CV service; this bucket was created out-of-band via the CLI.
+Fold it into that IaC when convenient, or it will drift.
+
+### CORS (applied — `aws s3api get-bucket-cors` confirms)
+
+Two explicit rules, no wildcard origin, `PUT` only, one allowed header:
+
+```json
+[
+  { "ID": "skin-check-production-put",
+    "AllowedOrigins": ["https://theprojectskin.com", "https://www.theprojectskin.com", "https://skin-check-sigma.vercel.app"],
+    "AllowedMethods": ["PUT"], "AllowedHeaders": ["content-type"],
+    "ExposeHeaders": [], "MaxAgeSeconds": 3000 },
+  { "ID": "skin-check-local-development-put",
+    "AllowedOrigins": ["http://localhost:3000", "http://localhost:3100"],
+    "AllowedMethods": ["PUT"], "AllowedHeaders": ["content-type"],
+    "ExposeHeaders": [], "MaxAgeSeconds": 3000 }
+]
+```
+
+The dev rule is a separate entry precisely so it can be deleted without
+touching production. Add a preview-deployment origin explicitly if Vercel
+preview URLs ever need to upload — they are not covered.
+
+### IAM (applied)
+
+Runtime identity: IAM user **`skin-check-uploader`**, inline policy
+`skin-check-put-originals`:
+
+```json
+{ "Effect": "Allow", "Action": "s3:PutObject",
+  "Resource": "arn:aws:s3:::projectskin-skin-originals-prod/users/*/scans/*/original.jpg" }
+```
+
+Verified with that identity: `GetObject` → AccessDenied, `ListBucket` →
+AccessDenied, `DeleteObject` → AccessDenied, `PutObject` to `evil/elsewhere.jpg`
+→ AccessDenied, `PutObject` to `users/x/scans/y/notoriginal.jpg` → AccessDenied,
+`PutObject` to `users/…/original.jpg` → allowed.
+
+A static access key is used because Vercel functions have no AWS execution
+role. **Upgrade path:** Vercel's AWS OIDC integration (`/docs/oidc/aws`) with
+an IAM role trust policy removes the long-lived key entirely; `lib/s3.ts`
+already falls back to the default provider chain when the explicit key vars are
+absent, so that switch is env-only.
+
+Rotate the key with `aws iam create-access-key` → update Vercel → `aws iam
+delete-access-key` on the old one.
+
+### Image-retention consent (Phase 3 closure)
+
+Storing the original is gated on a **second, separate** consent checkbox — the
+existing analysis-processing checkbox is unchanged and does not imply it.
+
+| Item | Value |
+| --- | --- |
+| Consent version | `skin image retention version 1` (`lib/consent.ts`) |
+| Privacy URL | `https://theprojectskin.com/policies/privacy-policy` — a constant, not an env var, so the link can never silently go missing |
+| Where enforced | UI (unchecked by default, reset on retake) → `runSkinScan` skips the upload without it → presign route returns 403 `CONSENT_REQUIRED` → `firestore.rules` rejects any record claiming `image.stored == true` without matching consent |
+| Where persisted | `users/{uid}/skinChecks/{scanId}.consent` = `{ imageRetention, imageRetentionVersion, imageRetentionConsentedAt: serverTimestamp() }` |
+
+Declining retention is not an error: the scan still runs and the record says
+`stored: false`.
+
+**Legal publication dependency (not an engineering item):** the published
+Privacy Policy at the URL above must be updated by the responsible
+legal/business team with the finalized skin-image collection, retention,
+processing, storage and user-rights language before public launch/marketing.
+As of 2026-09-09 that page does not describe image retention.
+
+### Environment variables (Vercel → Settings → Environment Variables)
+
+| Variable | Notes |
+| --- | --- |
+| `S3_SKIN_IMAGES_BUCKET` | `projectskin-skin-originals-prod` |
+| `S3_SKIN_IMAGES_REGION` | `ap-south-1` — required; there is no `AWS_REGION` fallback (Vercel injects its own) |
+| `S3_SKIN_IMAGES_ACCESS_KEY_ID` | mark **Sensitive** |
+| `S3_SKIN_IMAGES_SECRET_ACCESS_KEY` | mark **Sensitive** |
+
+Deliberately **not** named `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`.
+Vercel permits those names but its function runtime can also inject its own
+`AWS_*` values including `AWS_SESSION_TOKEN`; the SDK's env provider reads all
+three together, so a half-overridden set signs with our key and Vercel's stale
+token and fails as `InvalidToken`. `lib/s3.ts` reads the app-specific names and
+passes credentials explicitly, falling back to the provider chain when they are
+unset (local `~/.aws`, or a future role/OIDC).
+
+None of these are `NEXT_PUBLIC_`. Never set an AWS credential as `NEXT_PUBLIC_*`.
+
+### Firestore rules
+
+Deployed to `projectskin-a202c` (latest ruleset
+`abbf06b4-c569-419d-ad70-d882c9fc6043`, 2026-09-08T18:29:34Z), byte-identical to
+`firestore.rules` — includes both `imageKeyIsOwn` and `storedImageHasConsent`.
+Redeploy after any change:
+
+```
+npx firebase-tools deploy --only firestore:rules --project projectskin-a202c
+```
+
+### Post-deploy checks (run against the deployed app, not localhost)
+
+- [ ] Set the four env vars in Vercel for Production **and** Preview if
+      previews are used, then redeploy — the presign route 500s
+      (`UPLOAD_MISCONFIGURED`) without them.
+- [ ] Confirm `FIREBASE_PROJECT_ID` / `FIREBASE_CLIENT_EMAIL` /
+      `FIREBASE_PRIVATE_KEY` exist in the **same** Vercel environment(s) you
+      add the S3 vars to. The presign route verifies tokens with them; if
+      Phase 2 scoped them to only one environment, the new route 500s
+      `AUTH_MISCONFIGURED` there on the first deploy.
+- [ ] Complete a real scan on the deployed URL; confirm the object exists at
+      `users/<uid>/scans/<scanId>/original.jpg` (`aws s3api head-object`).
+- [ ] `curl -I https://projectskin-skin-originals-prod.s3.ap-south-1.amazonaws.com/<key>`
+      → 403.
+- [ ] The Firestore document for that scan has `image.stored == true`,
+      `image.storage == "s3"`, and the matching key.
+- [ ] Devtools → Network: the presign response carries no credentials, and the
+      PUT goes straight to S3 (not through `/api`).

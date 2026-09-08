@@ -17,7 +17,11 @@ export interface SkinCheckSession {
   result: SkinScanResult;
   composite: CompositeScore;
   photo: Blob;
-  original: Blob;
+  original?: Blob | undefined;
+  /** True when this scan's original image is already in private S3. */
+  originalStored?: boolean | undefined;
+  /** Set only if the user consented to retention for this scan. */
+  retentionConsentVersion?: string | undefined;
   captureMethod: CaptureMethod;
 }
 
@@ -27,7 +31,8 @@ const EMPTY_THREADS: EchoThreads = { forehead: [], cheeks: [], nose: [], chin: [
 
 interface SkinCheckSessionContextValue {
   session: SkinCheckSession | null;
-  setSession: (session: SkinCheckSession) => void;
+  /** null clears the session — used when starting a new scan. */
+  setSession: (session: SkinCheckSession | null) => void;
   threads: EchoThreads;
   setThreadMessages: (region: EchoRegion, messages: EchoThreadMessage[]) => void;
 }
