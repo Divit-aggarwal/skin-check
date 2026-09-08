@@ -16,22 +16,34 @@ interface BodyZoneChecklistProps {
 
 export function BodyZoneChecklist({ step, value, onChange, onCommit }: BodyZoneChecklistProps) {
   function toggle(optValue: string) {
-    onChange(value.includes(optValue) ? value.filter((v) => v !== optValue) : [...value, optValue]);
+    const alreadySelected = value.includes(optValue);
+    if (!alreadySelected && step.maxSelections !== undefined && value.length >= step.maxSelections) {
+      return;
+    }
+    onChange(alreadySelected ? value.filter((v) => v !== optValue) : [...value, optValue]);
   }
+
+  const atMax = step.maxSelections !== undefined && value.length >= step.maxSelections;
 
   return (
     <div className="flex flex-col gap-4">
       <div className="flex max-w-sm flex-col gap-2">
         {step.options.map((opt) => {
           const selected = value.includes(opt.value);
+          const disabled = !selected && atMax;
           return (
             <button
               key={opt.value}
               type="button"
               onClick={() => toggle(opt.value)}
+              disabled={disabled}
               className={cn(
                 "flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
-                selected ? "border-blush bg-blush-soft" : "border-text/10 bg-white hover:border-blush/40"
+                selected
+                  ? "border-blush bg-blush-soft"
+                  : disabled
+                    ? "cursor-not-allowed border-text/10 bg-white opacity-40"
+                    : "border-text/10 bg-white hover:border-blush/40"
               )}
             >
               <span className="text-sm font-medium text-text">{opt.label}</span>

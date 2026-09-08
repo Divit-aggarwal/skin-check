@@ -114,13 +114,20 @@ export const METRIC_LABELS: Record<BandableMetric, string> = {
 // on a metric that never measured anything.
 export const OVERLAY_CATEGORIES: BandableMetric[] = Object.keys(METRIC_LABELS) as BandableMetric[];
 
-// The user's own stated primary concern from the quiz — used only to pick
+// The user's own stated primary concern(s) from the quiz — used only to pick
 // which category the results screen shows FIRST (SkinCheckDashboard's
 // resolveFocus), not which overlays get requested (all of OVERLAY_CATEGORIES
 // are requested regardless of what's answered by capture time).
+//
+// `primary_concerns` is a multi-select (up to 3, lib/skin-check-steps.ts) —
+// the first selection is treated as "the" stated concern (array order is
+// selection order, see ImageCardMultiSelect's toggle()), skipping "pores"
+// since it's not a bandable metric. Values are unchanged from the old
+// single-select `primary_concern` field, so this stays a straight lookup
+// against METRIC_LABELS with no translation layer needed.
 export function resolveStatedConcern(answers: SkinCheckAnswers): BandableMetric | null {
-  const stated = answers.primary_concern;
-  return typeof stated === "string" && stated !== "pores" && stated in METRIC_LABELS
-    ? (stated as BandableMetric)
-    : null;
+  const stated = answers.primary_concerns;
+  if (!Array.isArray(stated)) return null;
+  const first = stated.find((v) => v !== "pores" && v in METRIC_LABELS);
+  return (first as BandableMetric | undefined) ?? null;
 }

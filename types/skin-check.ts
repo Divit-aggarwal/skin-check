@@ -59,6 +59,8 @@ export interface MultiSelectCardsStep extends BaseStep {
   note?: string;
   /** Selecting this option value clears every other selection, and vice versa. */
   exclusiveValue?: string;
+  /** Once this many are selected, remaining unselected options are disabled. */
+  maxSelections?: number;
 }
 
 export interface BodyZoneOption {
@@ -71,6 +73,8 @@ export interface BodyZoneOption {
 export interface BodyMapStep extends BaseStep {
   type: "body-map";
   options: BodyZoneOption[];
+  /** Once this many are selected, remaining unselected options are disabled. */
+  maxSelections?: number;
 }
 
 export interface Scale1to5Step extends BaseStep {

@@ -218,7 +218,7 @@ export function PhotoCapture({ step, value, onChange, onCommit, scan, onScanChan
     // generates all of them in one pipeline run (measured well under its own
     // 25s timeout even for all 7 categories), so the results screen's
     // category switcher has every heatmap already in hand with no per-click
-    // follow-up request. Deliberately not gated on `answers.primary_concern`
+    // follow-up request. Deliberately not gated on `answers.primary_concerns`
     // (usually still unanswered here — skin-photo is section 2, your-skin is
     // section 3) since we want all of them regardless.
     void getSkinScanResult(blob, OVERLAY_CATEGORIES)

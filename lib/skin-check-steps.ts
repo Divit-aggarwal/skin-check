@@ -1,44 +1,24 @@
 import type { SectionConfig, SkinCheckAnswers } from "@/types/skin-check";
 
+// Order matches SECTIONS below exactly — ProgressHeader indexes into this by
+// the real section index, so a mismatch here silently mislabels which
+// section's progress the bar is showing.
 export const ALL_SECTION_LABELS = [
   "About You",
-  "Your Skin",
-  "For You",
-  "Recovery",
-  "Gut",
   "Skin Photo",
+  "Your Skin",
+  "Personal Context",
+  "Diet & Hydration",
+  "Sun Protection",
   "Get Your Results",
 ];
 
-// Gender/age condition predicates for the "For You" branch — a single
-// predicate per step rather than parallel per-gender step arrays, so an
-// age modifier (onset/rosacea/menopause) is just another predicate inside
-// the same branch instead of a second tree to keep in sync.
+// Gender remains a real, useful branch — only the old age-bucket branches
+// (onset/30+/45+/menopause) are gone, folded into female_skin_context's
+// "going through or past menopause" option instead of a separate
+// age-gated question.
 const isFemale = (answers: SkinCheckAnswers) => answers.gender === "female";
 const isMale = (answers: SkinCheckAnswers) => answers.gender === "male";
-
-// The age step (lib/skin-check-steps.ts "about-you" section) has no bucket
-// isolating exactly 30-34 or 40-44 — "35-44" and "45-plus" are the closest
-// fit to the research's "30+" trigger. These modifiers are soft weighting
-// signals, not diagnostic gates, so the approximation is fine without
-// changing the user-facing age buckets.
-const AGE_30_PLUS_BUCKETS = ["35-44", "45-plus"];
-const is30PlusAge = (answers: SkinCheckAnswers) =>
-  typeof answers.age === "string" && AGE_30_PLUS_BUCKETS.includes(answers.age);
-const is45PlusAge = (answers: SkinCheckAnswers) => answers.age === "45-plus";
-// Under-18 is hard-blocked before this section ever renders (see the
-// `blocked` state in useSkinCheckFlow), and there's no bucket isolating
-// teens (13-19) from adults otherwise — "18-24" is the closest remaining
-// bucket to the research's teen-onset question, so this is framed as a
-// plain onset question rather than "teen" copy, since most of that bucket
-// is 20-24.
-const isOnsetAge = (answers: SkinCheckAnswers) => answers.age === "18-24";
-const isMenopauseAge = (answers: SkinCheckAnswers) => isFemale(answers) && is45PlusAge(answers);
-// Pregnancy/breastfeeding status is a safety-gate field, not a female-only
-// data point — it should exist for anyone it could apply to. Only the male
-// branch has no equivalent need, so this is female-or-other rather than
-// requiring female specifically.
-const isFemaleOrOther = (answers: SkinCheckAnswers) => isFemale(answers) || answers.gender === "other";
 
 export const SECTIONS: SectionConfig[] = [
   {
@@ -92,17 +72,26 @@ export const SECTIONS: SectionConfig[] = [
     label: "YOUR SKIN",
     steps: [
       {
-        id: "primary_concern",
-        type: "single-select-chips",
-        prompt: "What's the main thing you'd like to work on?",
+        // Multi-select (max 3), replacing the old single-select
+        // `primary_concern`. Values are unchanged from the old question
+        // (blemishes/redness/pigment/texture/pores/hydration/oiliness) —
+        // that vocabulary is shared with BandableMetric/METRIC_LABELS
+        // (lib/skin-check-rules.ts, lib/skin-check-skus.ts), so only the
+        // labels and the multi-select shape changed here. See
+        // lib/skin-check-skus.ts's resolveStatedConcern for how the first
+        // selected concern becomes "the" stated concern.
+        id: "primary_concerns",
+        type: "multi-select-cards",
+        prompt: "What are your main skin concerns?",
+        maxSelections: 3,
         options: [
           { value: "blemishes", label: "Breakouts" },
-          { value: "redness", label: "Redness" },
           { value: "pigment", label: "Dark marks" },
-          { value: "texture", label: "Texture" },
-          { value: "pores", label: "Pores" },
+          { value: "redness", label: "Redness" },
+          { value: "texture", label: "Uneven texture" },
+          { value: "pores", label: "Visible pores" },
           { value: "hydration", label: "Dryness" },
-          { value: "oiliness", label: "Oiliness" },
+          { value: "oiliness", label: "Excess oil" },
         ],
       },
       {
@@ -126,49 +115,61 @@ export const SECTIONS: SectionConfig[] = [
         ],
       },
       {
-        id: "breakouts",
+        // Replaces `breakouts` — same underlying idea (breakout texture/
+        // severity pattern) in plain language instead of dermatological
+        // terms, plus the old combined "marks_scars" option split into two
+        // clearer ones. New id because this is a genuinely different value
+        // vocabulary, not just a relabel — see the id-rename audit in the
+        // engineering report. No downstream code reads the old `breakouts`
+        // values (verified: only raw JSONB storage did), so nothing else
+        // needed to change for this rename.
+        id: "breakout_pattern",
         type: "multi-select-cards",
-        prompt: "How would you describe your breakouts?",
+        prompt: "What do your breakouts usually look like?",
         options: [
           {
-            value: "whiteheads_blackheads",
-            label: "Whiteheads / Blackheads",
-            description: "Small clogged pores, on the surface.",
-            imagePlaceholder: "Macro texture — whiteheads/blackheads",
+            value: "small_bumps",
+            label: "Small bumps or clogged pores",
+            imagePlaceholder: "Macro texture — small bumps/clogged pores",
           },
           {
-            value: "papules_pustules",
-            label: "Papules / Pustules",
-            description: "Red, inflamed bumps, sometimes with pus.",
-            imagePlaceholder: "Macro texture — papules/pustules",
+            value: "red_inflamed",
+            label: "Red or inflamed pimples",
+            imagePlaceholder: "Macro texture — red/inflamed pimples",
           },
           {
-            value: "nodules_cysts",
-            label: "Nodules / Cysts",
-            description: "Deep, painful, under the skin.",
-            imagePlaceholder: "Macro texture — nodules/cysts",
+            value: "deep_painful",
+            label: "Deep or painful breakouts",
+            imagePlaceholder: "Macro texture — deep/painful breakouts",
           },
           {
-            value: "marks_scars",
-            label: "Marks / Scars",
-            description: "Leftover marks after breakouts heal.",
-            imagePlaceholder: "Macro texture — marks/scars",
+            value: "leaves_dark_marks",
+            label: "Breakouts that leave dark marks",
+            imagePlaceholder: "Macro texture — dark marks",
+          },
+          {
+            value: "leaves_scars",
+            label: "Breakouts that leave scars or indentations",
+            imagePlaceholder: "Macro texture — scars/indentations",
           },
         ],
       },
       {
+        // Same id as before — options reduced from 8 to 6 (left/right cheek
+        // merged into "Cheeks", "Mouth area" dropped per the target list).
+        // No downstream code reads specific acne_areas values, so this is a
+        // pure content change.
         id: "acne_areas",
         type: "body-map",
-        prompt: "Select all the areas where your acne comes up.",
+        prompt: "Where do you usually get breakouts?",
+        maxSelections: 6,
         options: [
           { value: "forehead", label: "Forehead" },
           { value: "nose", label: "Nose" },
-          { value: "left_cheek", label: "Left cheek" },
-          { value: "right_cheek", label: "Right cheek" },
-          { value: "mouth", label: "Mouth area" },
+          { value: "cheeks", label: "Cheeks" },
           { value: "chin_jawline", label: "Chin / jawline" },
           { value: "neck", label: "Neck" },
-          { value: "shoulders_back_chest", label: "Shoulders / back / chest" },
+          { value: "shoulders_back_chest", label: "Chest / shoulders / back" },
         ],
       },
       {
@@ -177,7 +178,7 @@ export const SECTIONS: SectionConfig[] = [
         prompt: "When a breakout heals, what usually happens after?",
         options: [
           { value: "fades_no_trace", label: "Fades with no trace" },
-          { value: "dark_mark_fades", label: "Leaves a dark mark that fades in a few months" },
+          { value: "dark_mark_fades", label: "Leaves a dark mark that fades over time" },
           { value: "dark_mark_lingers", label: "Leaves a dark mark that lingers" },
           { value: "scar_or_indent", label: "Leaves a scar or indentation" },
         ],
@@ -196,17 +197,6 @@ export const SECTIONS: SectionConfig[] = [
         ],
       },
       {
-        id: "sunscreen_habit",
-        type: "single-select-chips",
-        prompt: "How often do you wear sunscreen?",
-        options: [
-          { value: "daily", label: "Daily" },
-          { value: "most_days", label: "Most days" },
-          { value: "occasionally", label: "Occasionally" },
-          { value: "rarely_never", label: "Rarely or never" },
-        ],
-      },
-      {
         id: "current_products",
         type: "multi-select-cards",
         prompt: "What are you currently using on your skin?",
@@ -222,220 +212,113 @@ export const SECTIONS: SectionConfig[] = [
   },
   {
     id: "personal-context",
-    label: "FOR YOU",
+    label: "PERSONAL CONTEXT",
     steps: [
       {
-        id: "cycle_regularity",
-        type: "single-select-chips",
-        prompt: "Is your cycle generally regular?",
-        condition: isFemale,
-        options: [
-          { value: "regular", label: "Regular" },
-          { value: "irregular", label: "Irregular" },
-          { value: "no_periods", label: "I don't get periods" },
-        ],
-      },
-      {
-        id: "cycle_acne_correlation",
-        type: "single-select-chips",
-        prompt: "Do your breakouts tend to show up around a certain point in your cycle?",
-        condition: isFemale,
-        options: [
-          { value: "yes", label: "Yes" },
-          { value: "no", label: "No" },
-          { value: "not_sure", label: "Not sure" },
-        ],
-      },
-      {
-        id: "pcos_symptom_screen",
+        // Consolidates the old cycle_regularity, cycle_acne_correlation,
+        // pcos_symptom_screen, pregnancy_breastfeeding_status, and
+        // contraception_type questions into one multi-select. The old
+        // pregnancy/breastfeeding question was flagged in code as a
+        // "safety-gate field" — audited before this consolidation: no rule
+        // engine, prompt, or route in this repo actually branches on it
+        // today (lib/skin-check-rules.ts's SKU selection is driven only by
+        // photo scores), so nothing active is being weakened. The signal
+        // itself is preserved via the "pregnant_or_breastfeeding" option
+        // below so it's still collected for whenever that gate is built.
+        id: "female_skin_context",
         type: "multi-select-cards",
-        prompt: "Do any of these apply to you?",
-        note: "This helps us understand hormonal patterns — it's a screening question, not a diagnosis.",
+        prompt: "Are there any hormonal or reproductive factors that may be affecting your skin right now?",
+        note: "This helps us personalize your skin recommendations. It isn't a diagnosis.",
         condition: isFemale,
-        exclusiveValue: "none",
+        exclusiveValue: "none_not_sure",
         options: [
-          { value: "irregular_absent_periods", label: "Irregular or absent periods" },
-          { value: "excess_hair_growth", label: "Extra hair growth on chin, chest, or abdomen" },
-          { value: "scalp_hair_thinning", label: "Scalp hair thinning" },
-          { value: "weight_change", label: "Unexplained weight change" },
-          { value: "none", label: "None of these" },
+          { value: "period_related_breakouts", label: "My breakouts change around my period" },
+          { value: "irregular_periods", label: "My periods are irregular" },
+          { value: "hormonal_contraception", label: "I'm using hormonal contraception" },
+          { value: "pregnant_or_breastfeeding", label: "I'm currently pregnant or breastfeeding" },
+          { value: "menopause", label: "I'm going through or past menopause" },
+          { value: "none_not_sure", label: "None of these / not sure" },
         ],
       },
       {
-        id: "pregnancy_breastfeeding_status",
-        type: "single-select-chips",
-        prompt: "Are you currently pregnant or breastfeeding?",
-        note: "This helps us keep recommendations safe for you.",
-        condition: isFemaleOrOther,
-        options: [
-          { value: "yes", label: "Yes" },
-          { value: "no", label: "No" },
-          { value: "prefer_not_to_say", label: "Prefer not to say" },
-        ],
-      },
-      {
-        id: "contraception_type",
-        type: "single-select-chips",
-        prompt: "Are you currently using any hormonal contraception?",
-        condition: isFemale,
-        options: [
-          { value: "none", label: "None" },
-          { value: "combined_pill", label: "Combined pill" },
-          { value: "progestin_only", label: "Progestin-only pill" },
-          { value: "hormonal_iud", label: "Hormonal IUD" },
-          { value: "implant_or_injection", label: "Implant or injection" },
-          { value: "other", label: "Other" },
-        ],
-      },
-      {
-        id: "shaving_area_involvement",
-        type: "single-select-chips",
-        prompt: "Does the shaving area on your face or neck tend to break out or get irritated?",
+        // Consolidates the old shaving_area_involvement and
+        // sweat_gear_exposure questions.
+        id: "male_skin_context",
+        type: "multi-select-cards",
+        prompt: "Are there any patterns that seem to affect your facial breakouts or irritation?",
         condition: isMale,
+        exclusiveValue: "none_not_sure",
         options: [
-          { value: "regularly", label: "Regularly" },
-          { value: "sometimes", label: "Sometimes" },
-          { value: "rarely_never", label: "Rarely or never" },
+          { value: "shaving_irritation", label: "Shaving often causes bumps or irritation" },
+          { value: "sweat_gear_irritation", label: "Sweat, helmets, or tight collars make my skin worse" },
+          { value: "exercise_sweat_breakouts", label: "Exercise or heavy sweating seems to trigger breakouts" },
+          { value: "none_not_sure", label: "None of these / not sure" },
         ],
       },
       {
-        id: "sweat_gear_exposure",
-        type: "single-select-chips",
-        prompt: "Do you regularly wear gear that traps sweat against your skin — helmets, pads, tight collars?",
-        condition: isMale,
+        // Consolidates the old sleep_quality, stress_level,
+        // sweat_humidity_exposure, and smoking questions. Smoking is
+        // deliberately not reinstated as its own question — no downstream
+        // logic in this repo depends on it.
+        id: "skin_factors",
+        type: "multi-select-cards",
+        prompt: "What has been affecting your skin lately?",
+        exclusiveValue: "nothing_noticeable",
         options: [
-          { value: "yes", label: "Yes" },
-          { value: "sometimes", label: "Sometimes" },
-          { value: "no", label: "No" },
-        ],
-      },
-      {
-        id: "breakout_onset_age",
-        type: "single-select-chips",
-        prompt: "Around what age did breakouts first start for you?",
-        condition: isOnsetAge,
-        options: [
-          { value: "before_teens", label: "Before my teens" },
-          { value: "teens", label: "In my teens" },
-          { value: "early_twenties", label: "In my early twenties" },
-        ],
-      },
-      {
-        id: "rosacea_screen",
-        type: "single-select-chips",
-        prompt:
-          "Do you notice flushing or persistent redness across your cheeks and nose, separate from breakouts?",
-        note: "This helps us tell redness patterns apart — it's a screening question, not a diagnosis.",
-        condition: is30PlusAge,
-        options: [
-          { value: "yes", label: "Yes" },
-          { value: "no", label: "No" },
-          { value: "not_sure", label: "Not sure" },
-        ],
-      },
-      {
-        id: "menopause_status",
-        type: "single-select-chips",
-        prompt: "Are you currently in or past menopause?",
-        condition: isMenopauseAge,
-        options: [
-          { value: "yes", label: "Yes" },
-          { value: "no", label: "No" },
-          { value: "not_sure", label: "Not sure" },
+          { value: "stress", label: "Stress" },
+          { value: "poor_sleep", label: "Poor or inconsistent sleep" },
+          { value: "heat_humidity_sweat", label: "Heat, humidity, or sweating" },
+          { value: "recent_diet_changes", label: "Recent diet changes" },
+          { value: "nothing_noticeable", label: "Nothing noticeable" },
         ],
       },
     ],
   },
   {
-    id: "recovery",
-    label: "RECOVERY",
-    steps: [
-      {
-        id: "sleep_quality",
-        type: "scale-1-5",
-        prompt: "Help us understand your recovery patterns. How would you rate your sleep quality?",
-        minLabel: "Broken",
-        maxLabel: "Rested",
-        reflections: {
-          "1": "Rest has been hard to come by.",
-          "2": "Sleep's been rough more nights than not.",
-          "3": "Some nights are good, some not.",
-          "4": "Mostly restful, with the odd rough night.",
-          "5": "Consistently deep, restful sleep.",
-        },
-      },
-      {
-        id: "stress_level",
-        type: "scale-1-5",
-        prompt: "And your stress level lately?",
-        minLabel: "Almost zen",
-        maxLabel: "Immense",
-        reflections: {
-          "1": "Pretty much unbothered.",
-          "2": "Manageable, low-key.",
-          "3": "A mix of calm and chaotic.",
-          "4": "Frequently stretched thin.",
-          "5": "Constantly overwhelmed.",
-        },
-      },
-      {
-        id: "smoking",
-        type: "single-select-chips",
-        prompt: "Do you smoke or vape?",
-        options: [
-          { value: "never", label: "Never" },
-          { value: "occasionally", label: "Occasionally" },
-          { value: "frequently", label: "Frequently" },
-        ],
-        note: "We ask because regular exposure to smoke can affect acne.",
-      },
-      {
-        id: "sweat_humidity_exposure",
-        type: "single-select-chips",
-        prompt: "How much do you sweat during a typical day — commute, weather, exercise combined?",
-        options: [
-          { value: "minimal", label: "Minimal" },
-          { value: "moderate", label: "Moderate" },
-          { value: "high", label: "High" },
-        ],
-      },
-    ],
-  },
-  {
-    id: "gut",
-    label: "GUT",
+    id: "diet-hydration",
+    label: "DIET & HYDRATION",
     steps: [
       {
         id: "diet",
         type: "multi-select-cards",
-        prompt: "Select all foods you eat 3+ times a week.",
-        note: "We focus on identifying meaningful food-acne patterns before recommending restrictions.",
+        prompt: "Which of these are a regular part of your diet?",
+        note: "We're looking for patterns that may be relevant to your skin — not reasons to restrict your diet.",
         exclusiveValue: "none",
         options: [
-          { value: "whey_protein", label: "Whey protein", imagePlaceholder: "Icon — whey protein" },
-          { value: "dairy", label: "Milk / Dairy", imagePlaceholder: "Icon — milk/dairy" },
-          {
-            value: "sugar_desserts",
-            label: "Sugar / Desserts",
-            imagePlaceholder: "Icon — sugar/desserts",
-          },
-          {
-            value: "fried_packaged",
-            label: "Fried / packaged snacks",
-            imagePlaceholder: "Icon — fried/packaged snacks",
-          },
-          { value: "none", label: "None of these apply" },
+          { value: "dairy", label: "Dairy / milk" },
+          { value: "whey_protein", label: "Whey protein" },
+          { value: "sugar_desserts", label: "Sugary foods or desserts" },
+          { value: "fried_packaged", label: "Fried or packaged foods" },
+          { value: "none", label: "None of these" },
         ],
       },
       {
         id: "water_intake",
         type: "segmented-slider",
-        prompt: "How much water do you drink in a day?",
+        prompt: "How much water do you usually drink in a day?",
         options: [
-          { value: "lt1", label: "<1 litre", sublabel: "≈2 glasses" },
-          { value: "1to2", label: "1–2 litres", sublabel: "≈4–8 glasses" },
-          { value: "2to3", label: "2–3 litres", sublabel: "≈8–12 glasses" },
-          { value: "gt3", label: ">3 litres", sublabel: "≈12+ glasses" },
+          { value: "lt1", label: "Less than 1 L", sublabel: "" },
+          { value: "1to2", label: "1–2 L", sublabel: "" },
+          { value: "2to3", label: "2–3 L", sublabel: "" },
+          { value: "gt3", label: "More than 3 L", sublabel: "" },
+          { value: "not_sure", label: "Not sure", sublabel: "" },
+        ],
+      },
+    ],
+  },
+  {
+    id: "sun-protection",
+    label: "SUN PROTECTION",
+    steps: [
+      {
+        id: "sunscreen_habit",
+        type: "single-select-chips",
+        prompt: "How often do you wear sunscreen?",
+        options: [
+          { value: "daily", label: "Daily" },
+          { value: "most_days", label: "Most days" },
+          { value: "occasionally", label: "Occasionally" },
+          { value: "rarely_never", label: "Rarely or never" },
         ],
       },
     ],
