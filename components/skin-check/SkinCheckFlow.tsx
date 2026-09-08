@@ -200,6 +200,7 @@ export function SkinCheckFlow() {
                   onCommit={() => commitStep(step.id)}
                   scan={scan}
                   onScanChange={setScan}
+                  answers={answers}
                 />
               </motion.div>
             ))}

@@ -27,10 +27,13 @@ function revealCountFor(section: SectionConfig, answers: SkinCheckAnswers): numb
   return Math.min(answeredCount + 1, eligible.length);
 }
 
-// A section can end up with zero eligible steps for a given user (e.g. "For
-// You" when gender is "other" and no age modifier applies either) — skip
+// A section can in principle end up with zero eligible steps for a given
+// user if every one of its steps carries a `condition` that fails — skip
 // straight past it instead of rendering an empty section with a vacuously
-// "complete" Continue button.
+// "complete" Continue button. No section hits this today (personal-context's
+// skin_factors step is unconditional, so that section is never empty), but
+// eligibleStepsFor has no way to guarantee that for every future section, so
+// this stays as the general-purpose guard.
 function nextEligibleIndex(fromIndex: number, answers: SkinCheckAnswers): number {
   let idx = fromIndex;
   while (idx < SECTIONS.length && eligibleStepsFor(SECTIONS[idx]!, answers).length === 0) {

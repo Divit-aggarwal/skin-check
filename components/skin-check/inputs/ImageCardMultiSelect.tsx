@@ -20,12 +20,14 @@ export function ImageCardMultiSelect({ step, value, onChange, onCommit }: ImageC
     const withoutExclusive = step.exclusiveValue
       ? value.filter((v) => v !== step.exclusiveValue)
       : value;
-    onChange(
-      withoutExclusive.includes(optValue)
-        ? withoutExclusive.filter((v) => v !== optValue)
-        : [...withoutExclusive, optValue]
-    );
+    const alreadySelected = withoutExclusive.includes(optValue);
+    if (!alreadySelected && step.maxSelections !== undefined && withoutExclusive.length >= step.maxSelections) {
+      return;
+    }
+    onChange(alreadySelected ? withoutExclusive.filter((v) => v !== optValue) : [...withoutExclusive, optValue]);
   }
+
+  const atMax = step.maxSelections !== undefined && value.length >= step.maxSelections;
 
   return (
     <div className="flex flex-col gap-4">
@@ -33,14 +35,20 @@ export function ImageCardMultiSelect({ step, value, onChange, onCommit }: ImageC
       <div className="grid grid-cols-2 gap-2.5 sm:max-w-md">
         {step.options.map((opt) => {
           const selected = value.includes(opt.value);
+          const disabled = !selected && opt.value !== step.exclusiveValue && atMax;
           return (
             <button
               key={opt.value}
               type="button"
               onClick={() => toggle(opt.value)}
+              disabled={disabled}
               className={cn(
                 "relative flex flex-col gap-2 rounded-lg border p-3 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
-                selected ? "border-blush bg-blush-soft" : "border-text/10 bg-white hover:border-blush/40"
+                selected
+                  ? "border-blush bg-blush-soft"
+                  : disabled
+                    ? "cursor-not-allowed border-text/10 bg-white opacity-40"
+                    : "border-text/10 bg-white hover:border-blush/40"
               )}
             >
               {opt.imagePlaceholder && (

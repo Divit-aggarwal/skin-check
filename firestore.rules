@@ -1,0 +1,29 @@
+rules_version = '2';
+
+// Deny by default: any path not matched below is unreachable from the client
+// SDK, so adding a collection is a deliberate act, not an accident. Rules do
+// not cascade into subcollections — every level a client touches is matched
+// explicitly here.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // A user owns exactly their own profile doc and nothing else. No list
+    // rule — phone numbers must not be enumerable, and nothing in the app
+    // queries the collection.
+    match /users/{uid} {
+      allow get, create, update: if request.auth != null && request.auth.uid == uid;
+      allow delete: if false;
+
+      // Completed Skin Check questionnaires. This is the whole server-side
+      // identity check: `request.auth.uid` comes from the Firebase ID token
+      // on the request, never from the payload, so a client cannot write a
+      // session into another user's subtree by claiming their uid.
+      // Append-only — a submitted questionnaire is a record, not a draft.
+      match /skinChecks/{checkId} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow create: if request.auth != null && request.auth.uid == uid;
+        allow update, delete: if false;
+      }
+    }
+  }
+}
