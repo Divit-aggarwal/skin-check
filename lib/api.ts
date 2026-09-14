@@ -6,8 +6,6 @@ import { SkinScanResultSchema } from "@/types/skin-scan";
 import type { SkinScanResult, SkinScanScores } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
-
 class ApiError extends Error {
   constructor(
     public status: number,
@@ -19,45 +17,9 @@ class ApiError extends Error {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars -- wired up to API functions in a later session
-async function request<T>(
-  path: string,
-  options: RequestInit = {},
-  schema: z.ZodSchema<T>
-): Promise<T> {
-  const response = await fetch(`${BASE_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options.headers,
-    },
-    ...options,
-  });
-
-  if (!response.ok) {
-    throw new ApiError(response.status, `API error: ${response.status} on ${path}`);
-  }
-
-  const data: unknown = await response.json();
-  const parsed = schema.safeParse(data);
-
-  if (!parsed.success) {
-    console.error("API response validation failed:", parsed.error);
-    throw new ApiError(0, `Unexpected API response shape from ${path}`);
-  }
-
-  return parsed.data;
-}
-
-// API functions will be added here in Session 8 when FastAPI is wired up.
-// Example structure:
-// export async function getTwinState(userId: string) {
-//   return request(`/twin/${userId}`, {}, TwinStateSchema);
-// }
-
 // ─── Skin scan (/skin-check photo-capture step) ────────────────────────────
 // Hits this app's own /api/skin-scan route (same-origin proxy to the
-// self-hosted skin-scan service), not the future FastAPI backend `request()`
-// targets — same reasoning as the assessment routes above.
+// self-hosted skin-scan service).
 
 const SkinScanResponseSchema = z.object({
   ok: z.literal(true),
@@ -302,7 +264,7 @@ export interface EchoChatMessage {
   text: string;
 }
 
-// ─── Echo chat (/skin-check dashboard — Step 4) ────────────────────────────
+// ─── Echo chat (/echo) ─────────────────────────────────────────────────────
 // Hits /api/skin-check/chat.
 
 const SkinCheckChatResponseSchema = z.object({
@@ -380,27 +342,6 @@ export async function getSkinCheckChatReply(
   }
 
   return parsed.data.reply;
-}
-
-// ─── Home marketing page — waitlist & newsletter ───────────────────────────
-// No real endpoint/provider confirmed yet (owed — see app/home spec). These
-// stubs let the UI's submit/loading/success states be wired end-to-end now;
-// swap the body for a real call once the endpoint is known.
-
-export interface WaitlistSignupPayload {
-  email: string;
-  whatsapp: string;
-  interests: string[];
-}
-
-export async function submitWaitlistSignup(payload: WaitlistSignupPayload): Promise<void> {
-  // TODO: point at the real waitlist provider/endpoint once confirmed.
-  console.info("[waitlist] signup captured (endpoint not yet wired):", payload);
-}
-
-export async function subscribeNewsletter(email: string): Promise<void> {
-  // TODO: point at the real newsletter provider/endpoint once confirmed.
-  console.info("[newsletter] subscription captured (endpoint not yet wired):", email);
 }
 
 export { ApiError };

@@ -23,7 +23,15 @@ const PROJECT_ID = process.env.FIREBASE_PROJECT_ID ?? process.env.NEXT_PUBLIC_FI
 const CLIENT_EMAIL = process.env.FIREBASE_CLIENT_EMAIL;
 // Env vars can't hold real newlines, so a service-account key is stored with
 // literal backslash-n. cert() needs the real thing.
-const PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");
+//
+// The surrounding quotes are stripped first. A .env file needs them (dotenv
+// consumes them when parsing), a dashboard env-var field does not — and a key
+// pasted WITH them parses as an invalid PEM, which surfaces as every token
+// being rejected rather than as a configuration error. Cheaper to tolerate
+// than to diagnose in production.
+const PRIVATE_KEY = process.env.FIREBASE_PRIVATE_KEY?.trim()
+  .replace(/^["']|["']$/g, "")
+  .replace(/\\n/g, "\n");
 
 export class AdminNotConfiguredError extends Error {
   constructor(missing: string[]) {

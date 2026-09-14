@@ -46,3 +46,14 @@ next-env.d.ts
 
 # Claude Code local session state
 .claude/
+
+# Local working docs and leftovers — kept on disk, not in the repo
+*.md
+/scan-response.json
+/supabase/
+/.mcp.json
+
+# Firebase emulator / CLI local state
+.firebase/
+ui-debug.log
+database-debug.log

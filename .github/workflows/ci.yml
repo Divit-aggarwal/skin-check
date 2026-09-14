@@ -28,6 +28,12 @@ jobs:
 
       - run: npm run lint
 
+      # The unit suite needs no secrets and no network. The Firestore rules
+      # tests skip themselves unless FIRESTORE_EMULATOR_HOST is set (see
+      # tests/firestore-rules.test.ts), so this stays a plain, fast run and
+      # does not pull the emulator into CI.
+      - run: npm test
+
       # No secrets are configured in this workflow, so GEMINI_API_KEY and
       # SCAN_API_SECRET are unset here — `next build` must succeed without
       # them (it does: both are read lazily at request time, not at build
