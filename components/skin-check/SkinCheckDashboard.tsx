@@ -272,25 +272,23 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, answers }: Skin
           </p>
         </section>
 
-        {/* Echo chat, routed at /echo — replaces the static SKU list. Session
-            data (scan result, answers, composite) is already mirrored into
-            SkinCheckSessionProvider by the effect above by the time this
-            renders, and /echo reads that same context, so this Link is the
-            whole integration: no new data plumbing, no duplicate fetch.
-            EchoPage's own visual design is a follow-up pass, not this one. */}
-        <section className="flex flex-col items-center gap-3 rounded border border-border bg-white p-6 text-center">
-          <p className="text-label uppercase tracking-label text-muted-foreground">Not sure what this means?</p>
-          <h2 className="font-display text-2xl italic text-text">Ask Echo about your skin.</h2>
-          <p className="max-w-sm text-body text-text/70">
-            Echo can walk through what showed up in your scan, region by region, in plain language.
-          </p>
-          <Link
-            href="/echo"
-            className="mt-1 inline-flex h-11 items-center justify-center rounded-md bg-text px-6 text-sm font-medium text-white transition-colors hover:bg-text/85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
-          >
-            Ask Echo
-          </Link>
-        </section>
+      </div>
+
+      {/* Echo chat, routed at /echo. Session data (scan result, answers,
+          composite) is already mirrored into SkinCheckSessionProvider by the
+          effect above, and /echo reads that same context, so this Link is the
+          whole integration. Pinned to the bottom of the screen for the whole
+          results view: as a card after the score list it sat at the very end
+          of a long page and was easy to never see. Sticky rather than fixed,
+          because the results container animates with a transform, which
+          breaks `position: fixed`. */}
+      <div className="sticky bottom-0 z-raised -mx-6 -mt-10 border-t border-border bg-white/95 px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:-mx-10 sm:px-10">
+        <div className="mx-auto flex max-w-xl items-center justify-between gap-3">
+          <p className="text-sm text-text/70">Questions about your results?</p>
+          <Button asChild variant="ink" size="lg" className="shrink-0 px-5">
+            <Link href="/echo">Chat with Echo</Link>
+          </Button>
+        </div>
       </div>
     </div>
   );

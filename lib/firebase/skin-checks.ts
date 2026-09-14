@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, orderBy, query, serverTimestamp, setDoc, type Timestamp } from "firebase/firestore";
+import { collection, doc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, type Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import { scanImageKey } from "@/lib/s3-key";
@@ -195,4 +195,16 @@ export async function listSkinChecks(uid: string): Promise<SkinCheckSummary[]> {
       hasResult: data.result != null,
     };
   });
+}
+
+/**
+ * The questionnaire answers from this user's most recent scan, or null if they
+ * have none. Ownership is enforced by firestore.rules, as for listSkinChecks.
+ */
+export async function latestSkinCheckAnswers(uid: string): Promise<SkinCheckAnswers | null> {
+  const snapshot = await getDocs(
+    query(collection(db(), "users", uid, "skinChecks"), orderBy("createdAt", "desc"), limit(1))
+  );
+  const answers: unknown = snapshot.docs[0]?.data().answers;
+  return answers && typeof answers === "object" ? (answers as SkinCheckAnswers) : null;
 }
