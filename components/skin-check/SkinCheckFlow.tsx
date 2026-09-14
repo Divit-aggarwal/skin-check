@@ -8,6 +8,7 @@ import { ALL_SECTION_LABELS } from "@/lib/skin-check-steps";
 import { useSkinCheckFlow } from "@/lib/useSkinCheckFlow";
 import { defaultAnswerFor } from "@/lib/skin-check-validation";
 import { formatPrompt } from "@/lib/skin-check-format";
+import { Button } from "@/components/ui/button";
 import { ProgressHeader } from "./ProgressHeader";
 import { EchoBubble } from "./EchoBubble";
 import { StepAnswer } from "./StepAnswer";
@@ -187,20 +188,13 @@ export function SkinCheckFlow() {
                   The /account link is the only in-app route to a returning
                   user's saved scans — without it that page is reachable by
                   typing the URL and nothing else. */}
-              <div className="flex justify-center gap-6">
-                <button
-                  type="button"
-                  onClick={startNewScan}
-                  className="text-sm font-medium text-text underline underline-offset-4 hover:text-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
-                >
-                  Start a new skin check
-                </button>
-                <Link
-                  href="/account"
-                  className="text-sm font-medium text-text underline underline-offset-4 hover:text-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
-                >
-                  Your previous scans
-                </Link>
+              <div className="mx-auto flex w-full max-w-md flex-col gap-3 sm:flex-row">
+                <Button type="button" variant="ink" size="lg" onClick={startNewScan} className="flex-1">
+                  Take a new scan
+                </Button>
+                <Button asChild variant="outlineLight" size="lg" className="flex-1">
+                  <Link href="/account">Your previous scans</Link>
+                </Button>
               </div>
             </div>
           </motion.div>

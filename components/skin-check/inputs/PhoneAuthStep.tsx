@@ -135,6 +135,10 @@ export function PhoneAuthStep({
   // in. On the final step that's still an explicit tap rather than an
   // auto-commit, so finishing the questionnaire stays the user's action.
   if (activeUser?.phoneNumber) {
+    // Saving while the photo is still being analysed would record the scan
+    // without its result. Reachable quickly when a reused questionnaire goes
+    // straight from the photo to this step.
+    const analyzing = Boolean(step.savesScan) && scan.status === "loading";
     return (
       <div className="flex flex-col gap-3">
         <p className="text-body text-text/70">
@@ -143,10 +147,11 @@ export function PhoneAuthStep({
         <Button
           variant="ink"
           size="sm"
+          disabled={analyzing}
           onClick={() => handleAuthenticated(activeUser)}
           className="w-fit"
         >
-          {step.savesScan ? "Get my results" : "Continue"}
+          {analyzing ? "Analyzing your photo…" : step.savesScan ? "Get my results" : "Continue"}
         </Button>
       </div>
     );
