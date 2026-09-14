@@ -46,3 +46,15 @@ next-env.d.ts
 
 # Claude Code local session state
 .claude/
+
+# Local working docs and leftovers — kept on disk, not in the repo
+/AUDIT.md
+/DEPLOYMENT.md
+/MANIFEST.md
+/PHASE_3_FINAL_REPORT.md
+/PROJECT_CONTEXT.md
+/README_PORT.md
+/onboarding-questions.md
+/scan-response.json
+/supabase/
+/.mcp.json
