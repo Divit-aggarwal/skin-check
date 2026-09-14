@@ -112,7 +112,7 @@ export function toConcern(scores: SkinScanScores, metric: BandableMetric): numbe
 // screen depending on which row it was next to (Redness: Low = good,
 // Hydration: Low = bad), which a user has no way to know without reading
 // this file. The metric that needed its own direction gets its own LABEL
-// instead (see MAP_LABELS/CATEGORY_LABELS/SKIN_SCAN_CATEGORY_LABELS'
+// instead (see METRIC_LABELS/CATEGORY_LABELS/SKIN_SCAN_CATEGORY_LABELS'
 // "Dryness" override for hydration, at each render site) - the word means
 // one thing everywhere; the label is what tells you which trait it's about.
 function bandForConcern(metric: BandableMetric, concern: number): Band {

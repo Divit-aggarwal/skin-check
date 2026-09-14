@@ -1,16 +1,39 @@
 # Deployment
 
+> ## ⚠️ CORRECTION — read before anything below
+>
+> **This app is deployed on Vercel, not AWS Amplify.**
+>
+> Production is `https://skin-check-sigma.vercel.app` (confirmed from live
+> response headers: `server: Vercel`, `x-vercel-id: bom1::…`). The two most
+> recent commits (`a39146b`, `d2a9532`) are both Vercel-specific deploy fixes,
+> and `lib/s3.ts` encodes Vercel-runtime-specific reasoning about the `AWS_*`
+> variables that platform injects into functions.
+>
+> **Everything below describing AWS Amplify Hosting as "a locked decision" is
+> historical and no longer accurate.** Treat the Amplify console steps, the
+> Amplify environment-variable instructions, and the Amplify-specific smoke
+> test as superseded. The env-var *names* and their purposes are still
+> correct — only the platform they get entered into has changed.
+>
+> Two further corrections to the text below:
+> - **Node.js `>=22.12.0`** is the real floor (`package.json` `engines`), not
+>   `>=18.17.0`. `firebase-admin` 13 fails to load below it — that is what
+>   commit `a39146b` fixed. CI pins `22.x`.
+> - **"No health endpoint was added"** is justified below by Amplify's
+>   platform checks. That reasoning no longer applies; the app still has no
+>   health endpoint, and `/health`, `/health/live` and `/health/ready` all
+>   return 404 in production.
+
 ## Prerequisites
 
-- **Node.js `>=18.17.0`** — matches `next@14.2.35`'s own declared minimum
-  (`package.json`'s `engines` field, and `node_modules/next/package.json`).
-  Confirmed compatible with AWS Amplify Hosting's current default build
-  image: Amazon Linux 2023 ships Node 18 and 20 pre-installed, and standard
-  Next.js 14 App Router apps deploy against it with no custom Node
-  configuration in the common case. Local development in this repo has been
-  done on Node v26 — that mismatch is expected and fine (`engines` only
-  constrains what runs the *build*, not what you develop with); it has not
-  been tested against anything below 18.17.0.
+- **Node.js `>=22.12.0`** — this repo's `package.json` `engines` field.
+  `next@14.2.35` itself only requires `>=18.17.0`, but `firebase-admin` 13
+  does not load below 22.12, which takes every authenticated API route down
+  with it (commit `a39146b`). 22.12 is therefore the real floor, not a
+  preference. CI pins `22.x` (`.github/workflows/ci.yml`). Local development
+  in this repo has been done on Node v26 — that mismatch is expected and fine
+  (`engines` constrains what runs the *build*, not what you develop with).
 - **npm** (this repo uses `package-lock.json`, not yarn/pnpm).
 - An AWS account with permission to create an Amplify Hosting app, and the
   app created with the **Web Compute** platform type, not the static-only
@@ -82,12 +105,12 @@ Exact procedure:
 4. Configure the 3 required environment variables (below) in the Amplify
    console under the app's **Environment variables** — never in `.env.local`,
    which never leaves your machine.
-5. If the console exposes a Node-version setting, confirm it's 18.x or 20.x
-   (both are pre-installed in Amplify's current default build image); if not
-   exposed, the default build image's Node version already satisfies this
-   repo's `>=18.17.0` constraint per AWS's own current documentation — verify
-   the exact resolved version in the first build's logs regardless, since
-   that's a fact only the actual build run can confirm.
+5. Confirm the build runs on **Node 22.12 or newer** — this repo's `engines`
+   floor, below which `firebase-admin` 13 fails to load and every
+   authenticated API route 500s. Do not accept a default 18.x/20.x image:
+   set the Node version explicitly and verify the resolved version in the
+   first build's logs, since that's a fact only the actual build run can
+   confirm. (On Vercel, this is Project Settings → Node.js Version.)
 6. Trigger the first deploy, inspect the build logs for the full
    `npm ci` → `npm run build` sequence completing without error.
 7. Once deployed, work through the Production Smoke Test below against the
@@ -186,11 +209,6 @@ rather than folded into hardening scope:
   real traffic/abuse patterns justify it.
 - **A real Content-Security-Policy**, once there's an actual third-party
   script/embed to justify the nonce/hash architecture it needs.
-- **`lib/api.ts`'s `submitWaitlistSignup`/`subscribeNewsletter` log the full
-  signup payload (email, WhatsApp number) via `console.info`.** Currently
-  dead code (zero callers, confirmed) — not a live risk. If this waitlist
-  feature is ever wired to a real endpoint, fix the logging in that same
-  change; don't let the current stub's logging pattern ship live untouched.
 
 ## Pre-deploy checklist
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
 import { ALL_SECTION_LABELS } from "@/lib/skin-check-steps";
@@ -182,8 +183,11 @@ export function SkinCheckFlow() {
 
               {/* The storage model has always allowed many scans per user
                   (each is its own document); without this there was simply
-                  no way to start the next one without a hard reload. */}
-              <div className="flex justify-center">
+                  no way to start the next one without a hard reload.
+                  The /account link is the only in-app route to a returning
+                  user's saved scans — without it that page is reachable by
+                  typing the URL and nothing else. */}
+              <div className="flex justify-center gap-6">
                 <button
                   type="button"
                   onClick={startNewScan}
@@ -191,6 +195,12 @@ export function SkinCheckFlow() {
                 >
                   Start a new skin check
                 </button>
+                <Link
+                  href="/account"
+                  className="text-sm font-medium text-text underline underline-offset-4 hover:text-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+                >
+                  Your previous scans
+                </Link>
               </div>
             </div>
           </motion.div>

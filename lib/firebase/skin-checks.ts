@@ -1,4 +1,4 @@
-import { doc, serverTimestamp, setDoc } from "firebase/firestore";
+import { collection, doc, getDocs, orderBy, query, serverTimestamp, setDoc, type Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import { scanImageKey } from "@/lib/s3-key";
@@ -135,4 +135,64 @@ export async function saveSkinCheck(
     }
     throw error;
   }
+}
+
+// ─── Reading a user's own scans back ───────────────────────────────────────
+
+/**
+ * One row of the "your previous scans" list. Deliberately a summary, not the
+ * whole document: this list only needs to say what happened and when, and
+ * pulling every `answers` map and `result` payload to render a date and a
+ * status is bandwidth nobody asked for.
+ */
+export interface SkinCheckSummary {
+  scanId: string;
+  status: SkinCheckStatus;
+  /**
+   * null is a real, expected value — `createdAt` is a serverTimestamp(), so a
+   * document this same client just wrote reads back with it still unresolved
+   * until the server round-trips. Render it as "just now", never as an error.
+   */
+  createdAt: Date | null;
+  /** True only when the original image is actually in S3 for this scan. */
+  imageStored: boolean;
+  /** True when a CV analysis landed — false for questionnaire-only/failed. */
+  hasResult: boolean;
+}
+
+/**
+ * Every scan this user owns, newest first.
+ *
+ * OWNERSHIP IS NOT CHECKED HERE, ON PURPOSE. The path is
+ * `users/{uid}/skinChecks`, and firestore.rules only allows `get, list` where
+ * `request.auth.uid == uid` — so a caller passing someone else's uid gets a
+ * permission-denied from the server, not a filtered list from this function.
+ * Adding a client-side check would imply the server needed help; it doesn't.
+ *
+ * Returns every terminal status, not just "completed". A user whose analysis
+ * failed still made a scan, and hiding it would read as "my data is gone".
+ */
+export async function listSkinChecks(uid: string): Promise<SkinCheckSummary[]> {
+  const snapshot = await getDocs(
+    query(collection(db(), "users", uid, "skinChecks"), orderBy("createdAt", "desc"))
+  );
+
+  return snapshot.docs.map((entry) => {
+    const data = entry.data() as {
+      status?: SkinCheckStatus;
+      createdAt?: Timestamp | null;
+      image?: { stored?: boolean } | null;
+      result?: unknown;
+    };
+    return {
+      scanId: entry.id,
+      // A document written before `status` existed would have none; treat it
+      // as questionnaire-only rather than crashing the whole list.
+      status: data.status ?? "questionnaire_only",
+      // toDate() only exists on a resolved Timestamp — see the null note above.
+      createdAt: data.createdAt?.toDate() ?? null,
+      imageStored: data.image?.stored === true,
+      hasResult: data.result != null,
+    };
+  });
 }

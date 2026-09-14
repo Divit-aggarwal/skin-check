@@ -14,7 +14,7 @@ import { bandScores } from "@/lib/skin-check-rules";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import type { SkinScanScores } from "@/types/skin-scan";
 
-// hydration is labeled "Dryness" - see SkinCheckDashboard.tsx's MAP_LABELS
+// hydration is labeled "Dryness" - see lib/skin-check-skus.ts's METRIC_LABELS
 // comment. Same reasoning, same relabel, kept in sync across both sites.
 const CATEGORY_LABELS: Record<keyof SkinScanScores, string> = {
   redness: "Redness",

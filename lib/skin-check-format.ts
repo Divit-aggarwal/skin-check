@@ -60,7 +60,7 @@ export function summarizeSkinCheckAnswers(answers: SkinCheckAnswers): string {
   return lines.length > 0 ? lines.join("\n") : "No quiz answers provided.";
 }
 
-// hydration is labeled "Dryness" - see SkinCheckDashboard.tsx's MAP_LABELS
+// hydration is labeled "Dryness" - see lib/skin-check-skus.ts's METRIC_LABELS
 // comment. Same reasoning, same relabel, kept in sync across every site
 // (this one feeds Echo's prompt context, not a screen, but Echo should
 // narrate the same label a user already saw).

@@ -5,7 +5,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Runs only inside the Firestore emulator:
@@ -156,5 +156,26 @@ describe.skipIf(!EMULATOR)("firestore.rules — skinChecks image metadata", () =
   it("guards the exact key format the app writes", async () => {
     const { scanImageKey } = await import("@/lib/s3-key");
     expect(scanImageKey(OWNER, SCAN)).toBe(`users/${OWNER}/scans/${SCAN}/original.jpg`);
+  });
+
+  // ── The READ path (lib/firebase/skin-checks.ts listSkinChecks) ───────────
+  // Every test above covers writes. `listSkinChecks` added a read, and its
+  // whole ownership guarantee is these rules — there is deliberately no
+  // client-side uid filter to fall back on, so if `list` were ever loosened
+  // nothing else in the codebase would catch it.
+  it("lets a user list their OWN scans — the /account previous-scans query", async () => {
+    await assertSucceeds(write(OWNER, "scan-read-own-001", null, { imageRetention: false }));
+    const db = env.authenticatedContext(OWNER).firestore();
+    await assertSucceeds(getDocs(collection(db, "users", OWNER, "skinChecks")));
+  });
+
+  it("REFUSES to list another user's scans", async () => {
+    const db = env.authenticatedContext(VICTIM).firestore();
+    await assertFails(getDocs(collection(db, "users", OWNER, "skinChecks")));
+  });
+
+  it("REFUSES to list scans when signed out", async () => {
+    const db = env.unauthenticatedContext().firestore();
+    await assertFails(getDocs(collection(db, "users", OWNER, "skinChecks")));
   });
 });

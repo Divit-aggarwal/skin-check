@@ -1,21 +1,24 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Strict React mode — catches side effects early
   reactStrictMode: true,
 
-  // Images — add domains as you add external image sources
   images: {
     formats: ["image/avif", "image/webp"],
     remotePatterns: [],
   },
 
-  // Enables compression
   compress: true,
 
-  // Standalone output for potential future containerization
-  // output: "standalone",
+  // There is no "/" route — the app's only entry points are /skin-check,
+  // /echo and /account — so the root returned a 404 in production. That is
+  // the first thing anyone arriving from the Shopify storefront would hit,
+  // so send them to the funnel instead. Not permanent (307, not 308): if a
+  // real landing page is ever added at "/", a permanent redirect cached in
+  // users' browsers would keep redirecting past it.
+  async redirects() {
+    return [{ source: "/", destination: "/skin-check", permanent: false }];
+  },
 
-  // Log only errors in production
   logging: {
     fetches: {
       fullUrl: process.env.NEXT_PUBLIC_APP_ENV === "development",
