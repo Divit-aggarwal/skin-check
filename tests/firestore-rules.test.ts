@@ -5,7 +5,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Runs only inside the Firestore emulator:
@@ -172,6 +172,22 @@ describe.skipIf(!EMULATOR)("firestore.rules — skinChecks image metadata", () =
   it("REFUSES to list another user's scans", async () => {
     const db = env.authenticatedContext(VICTIM).firestore();
     await assertFails(getDocs(collection(db, "users", OWNER, "skinChecks")));
+  });
+
+  // The repeat-scan shortcut (lib/firebase/skin-checks.ts latestSkinCheckAnswers)
+  // reads the newest scan with orderBy + limit. Same ownership guarantee as
+  // the list above, checked for the exact query shape the app sends.
+  it("lets a user read their OWN latest scan — the repeat-scan answers query", async () => {
+    await assertSucceeds(write(OWNER, "scan-latest-own-01", null, { imageRetention: false }));
+    const db = env.authenticatedContext(OWNER).firestore();
+    const latest = query(collection(db, "users", OWNER, "skinChecks"), orderBy("createdAt", "desc"), limit(1));
+    await assertSucceeds(getDocs(latest));
+  });
+
+  it("REFUSES another user's latest scan", async () => {
+    const db = env.authenticatedContext(VICTIM).firestore();
+    const latest = query(collection(db, "users", OWNER, "skinChecks"), orderBy("createdAt", "desc"), limit(1));
+    await assertFails(getDocs(latest));
   });
 
   it("REFUSES to list scans when signed out", async () => {

@@ -27,7 +27,7 @@ function eligibleStepsFor(section: SectionConfig, answers: SkinCheckAnswers): St
 
 // How many of a section's eligible questions should be visible: every
 // contiguously answered step from the start, plus one more to reveal next.
-function revealCountFor(section: SectionConfig, answers: SkinCheckAnswers): number {
+export function revealCountFor(section: SectionConfig, answers: SkinCheckAnswers): number {
   const eligible = eligibleStepsFor(section, answers);
   let answeredCount = 0;
   for (const step of eligible) {
@@ -51,7 +51,7 @@ function isSkipped(idx: number, answers: SkinCheckAnswers, reusing: boolean): bo
   return eligibleStepsFor(section, answers).length === 0 || (reusing && !PER_SCAN_SECTION_IDS.has(section.id));
 }
 
-function nextEligibleIndex(fromIndex: number, answers: SkinCheckAnswers, reusing: boolean): number {
+export function nextEligibleIndex(fromIndex: number, answers: SkinCheckAnswers, reusing: boolean): number {
   let idx = fromIndex;
   while (idx < SECTIONS.length && isSkipped(idx, answers, reusing)) {
     idx++;
@@ -59,7 +59,7 @@ function nextEligibleIndex(fromIndex: number, answers: SkinCheckAnswers, reusing
   return idx;
 }
 
-function prevEligibleIndex(fromIndex: number, answers: SkinCheckAnswers, reusing: boolean): number {
+export function prevEligibleIndex(fromIndex: number, answers: SkinCheckAnswers, reusing: boolean): number {
   let idx = fromIndex;
   while (idx > 0 && isSkipped(idx, answers, reusing)) {
     idx--;
