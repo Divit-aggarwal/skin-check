@@ -22,7 +22,8 @@ const jakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   title: "The Project SKIN — Your Skin Digital Twin",
   description:
-    "Science-led skincare guidance built around your skin. Know what your skin needs today, why it needs it, and whether your routine is actually working.",
+    // Neutral (D-12): no claim that a routine or product works.
+    "Science-led skincare guidance built around your skin. Get a visual reading of your skin and keep a record of your own routine.",
   keywords: ["skincare", "skin analysis", "digital twin", "Indian skincare", "Benotia"],
   authors: [{ name: "The Project SKIN" }],
   manifest: "/manifest.json",
