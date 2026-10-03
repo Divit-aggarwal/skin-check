@@ -1,12 +1,14 @@
 import { PhoneOtpForm } from "@/components/auth/PhoneOtpForm";
 import { PreviousScans } from "@/components/skin-check/PreviousScans";
+import { DeleteAccount } from "./DeleteAccount";
 
 export const metadata = {
   title: "Account — The Project SKIN",
 };
 
 // Sign in / sign out, plus the signed-in user's own scan history. PreviousScans
-// renders nothing at all when signed out, so the signed-out page is unchanged.
+// and DeleteAccount (H01b) render nothing at all when signed out, so the
+// signed-out page is unchanged.
 export default function AccountPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-8 px-6 py-24">
@@ -18,6 +20,7 @@ export default function AccountPage() {
       </div>
       <PhoneOtpForm />
       <PreviousScans />
+      <DeleteAccount />
     </main>
   );
 }
