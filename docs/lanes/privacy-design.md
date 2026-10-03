@@ -1,6 +1,6 @@
 # Privacy lane design: H01, H02, H03
 
-Branch `lane/privacy`, worktree `../skin-check-privacy`, `PORT_BASE=3400`. Design only: no app code is written until the owner approves this document (README rule 3).
+Branch `lane/privacy`, worktree `../skin-check-privacy`, `PORT_BASE=3400`. Design only: no app code is written until the owner approves this document (README rule 3). README.md says the design brief goes into `privacy-report.md`. This file is that brief, kept separate as the task asked; the report will link to it.
 
 Inputs: CLAUDE.md, [README.md](README.md), [privacy.md](privacy.md), DECISION_LOG.md (D-03, D-03a, D-12, D-14, D-15, D-16, D-17, D-19, D-23, D-26), GEMINI_BOUNDARY.md, PREFLIGHT_AUDIT.md (G1, G4), H01_S3_ERASURE_READINESS.md.
 
@@ -10,18 +10,23 @@ Decisions are cited by name and ID. The log has two entries numbered D-21 ("Fire
 
 ## 1. What will be built
 
-**H01a: Consent ledger (D-16, "consent ledger, server-written").** Today, consent lives only inside the client-written `skinChecks` document. The image-retention consent is recorded only if the user finishes the flow. This lane adds an append-only list of consent events per user, written only by the server. Clients can read their own entries and can never write them. The presign route writes an "image retention" entry before it hands out an upload URL, so an abandoned flow still has a record (audit finding D11). The same ledger also holds the 18+ attestation (H02) and the AI-share consent (H03).
+**H01a: Consent ledger (D-16, "consent ledger, server-written").** Today, consent lives only inside the client-written `skinChecks` document. The image-retention consent is recorded only if the user finishes the flow. This lane adds an append-only list of consent events per user, written only by the server. Clients can read their own entries and can never write them. The presign route writes an "image retention" entry before it hands out an upload URL, so an abandoned flow still has a record (audit finding D11). The write is best-effort: it is retried once, and if it still fails, the URL is issued anyway and the failure is logged without the uid. The reason is that the client uploads before it scans and aborts the scan when the upload fails (`lib/api.ts:251`, `runSkinScan`). A refused presign would therefore break the live scan, which D-03 ("persistence must never break the live scan") forbids. The client-written `skinChecks.consent` block stays as the fallback record. The same ledger also holds the 18+ attestation (H02) and the AI-share consent (H03).
 
 **H01b: User erasure (D-17, "erasure route: S3, then Firestore `recursiveDelete`, then Auth").** A signed-in user can delete their account from `/account`. The server first revokes the user's sessions. Revoking is not a deletion step: it only stops new uploads and scans during the erase. Then the server deletes, in order:
 1. every S3 object under `users/<uid>/`;
 2. the whole Firestore `users/<uid>` tree;
 3. the Firebase Auth user.
 
-If any step fails, the later steps do not run. The response names the failed step, and running the route again finishes the job. Locally, S3Mock stands in for S3. D-17 says "Immutability is a promise to clients, not a retention promise." The immutable-state rule in CLAUDE.md stops clients from changing records. It does not stop a user from erasing their own data.
+If any step fails, the later steps do not run, and the response names the failed step. A retry needs a fresh SMS sign-in, because the old token is revoked. If the failure came before the Auth step, the uid is unchanged, and running the route again finishes the job. Signing in again rewrites `users/{uid}` (`lib/auth-context.tsx:63`), but the rerun deletes it. If the Auth user is already gone, a new sign-in is a new account. Locally, S3Mock stands in for S3. D-17 says "Immutability is a promise to clients, not a retention promise." The immutable-state rule in CLAUDE.md stops clients from changing records. It does not stop a user from erasing their own data.
 
 **H01c: Retention period.** Nothing is built in this lane. Originals are kept forever today, because the bucket has no lifecycle rule. The period is an owner decision (§7, decision 5). Enforcing it means an S3 lifecycle rule, which is infra work and an OWNER ACTION, not lane code. The lane only shows the period in the consent copy once the owner sets it.
 
-**H02a: Server-side 18+ attestation (D-19).** Today the under-18 check exists only in the browser (`useSkinCheckFlow.ts:486`). After phone sign-in, the client sends the user's age answer to a new `POST /api/account/attestation`. The server records `over18: true|false` in the ledger. The upload, scan and chat routes read that record on the server. An under-18 record is always refused. What happens when no record exists is decision 3 in §7. The record is sticky: once a user is recorded as under 18, a later "18+" answer does not unlock them (decision 4). Skipping the client gate therefore doesn't help a minor: either no record exists, or an under-18 record exists.
+**H02a: Server-side 18+ attestation (D-19).** Today the under-18 check exists only in the browser (`useSkinCheckFlow.ts:486`). After phone sign-in, the client sends the user's age answer to a new `POST /api/account/attestation`. The server records `over18: true|false` in the ledger. The upload, scan and chat routes read that record on the server.
+- **An under-18 record:** refused on all three routes. On the scan route this is an explicit exception to D-03a, for the owner to approve (decision 3). Old bundles can't hold an under-18 record, so they are not affected.
+- **No record:** chat refuses, since D-03a allows the chat route to hard-reject once the attestation UI has shipped. Upload and scan follow decision 3.
+- **The attestation read itself fails (Firestore error):** upload and scan go ahead (D-03a); chat refuses.
+
+The record is sticky: once a user is recorded as under 18, a later "18+" answer does not unlock them (decision 4). **This is self-attestation.** It stops a minor who was blocked from getting around the block by skipping the browser gate or answering again. It does not stop a minor who answers "18–24" the first time; no attestation design can.
 
 **H02b: Re-confirm sensitive answers on every scan (D-19).** When a returning user reuses a saved questionnaire, `current_products` and `female_skin_context` (for female users) are no longer carried over silently. Those two questions are asked again on every scan. Everything else is still reused.
 
@@ -60,7 +65,7 @@ These are client-safe strings with no SDK import.
 - `AGE_ATTESTATION_VERSION: string`
 - `AGE_ATTESTATION_COPY: string`. Draft wording: "I confirm I am 18 or older." The owner approves the final copy.
 - `AI_SHARE_CONSENT_VERSION: string` and `AI_SHARE_CONSENT_COPY: string`. Copy pending (decision 7).
-- `PROCESSING_CONSENT_VERSION: string` and `PROCESSING_CONSENT_COPY: string`. The copy moves here from PhotoCapture, which is a capture-lane change (request R3).
+- `PROCESSING_CONSENT_VERSION: string` and `PROCESSING_CONSENT_COPY: string`. D-16 requires new copy that covers storing measurements at scan time (decision 7). PhotoCapture's import of it is a capture-lane change (R3). Recording it at scan time is R4.
 - `type ConsentPurpose` (the union above).
 
 ### 2.3 Request and response shapes
@@ -70,8 +75,8 @@ These are client-safe strings with no SDK import.
 | `POST /api/account/attestation` (new) | Bearer token; body `{ ageBucket: "under-18"\|"18-24"\|"25-34"\|"35-44"\|"45-plus", version }`, strict | `{ ok: true, over18: boolean }` | 401 `AUTH_REQUIRED`, 400 `BAD_REQUEST`, 409 `VERSION_STALE`, 500 `LEDGER_UNAVAILABLE` |
 | `POST /api/account/consent` (new) | Bearer token; body `{ purpose: "ai_share", granted: boolean, version }`, strict | `{ ok: true }` | 401, 400, 409 `VERSION_STALE`, 500 |
 | `POST /api/account/erase` (new) | Bearer token, with `auth_time` no older than `ERASE_MAX_AUTH_AGE_SECONDS` (named setting, **provisional**); body `{ confirm: "DELETE MY DATA" }`, strict | `{ ok: true, steps: { revoke, s3, firestore, auth }: "done" }` | 401, 403 `REAUTH_REQUIRED`, 400, 500 `{ ok:false, failedStep, completedSteps }` |
-| `POST /api/skin-scan/upload` (changed) | unchanged body | unchanged | new: 403 `UNDER_18`, 403 `ATTESTATION_REQUIRED`, 500 `LEDGER_UNAVAILABLE` (no URL is issued if the retention entry can't be written) |
-| `POST /api/skin-scan` (preamble changed) | new optional header `X-Consent-Processing-Version` | unchanged | new: 403 `UNDER_18`; missing attestation per decision 3 |
+| `POST /api/skin-scan/upload` (changed) | unchanged body | unchanged | new: 403 `UNDER_18`. 403 `ATTESTATION_REQUIRED` only if decision 3 picks "refuse". A failed ledger write or read never refuses (D-03) |
+| `POST /api/skin-scan` (preamble changed) | unchanged | unchanged | new: 403 `UNDER_18` (exception to D-03a, decision 3). 403 `ATTESTATION_REQUIRED` only if decision 3 picks "refuse". A failed read never refuses |
 | `POST /api/skin-check/chat` (changed) | unchanged | unchanged | new: 403 `UNDER_18`, 403 `ATTESTATION_REQUIRED`, 403 `AI_CONSENT_REQUIRED` |
 
 Field changes in stored answers (`users/{uid}/skinChecks/{scanId}.answers`):
@@ -97,17 +102,17 @@ The source is `lib/gemini.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-fo
 | 8 | `acne_areas` | answers | low | **needed** | Matches region threads |
 | 9 | `pih_scar_tendency` | answers | low | **needed** | Explains pigment readings |
 | 10 | `skin_tone` (sun response) | answers | low | **needed** | Explains pigment and redness wording |
-| 11 | `current_products` | answers (re-confirmed per scan after H02b) | medium ("a prescription product") | **needed** | Echo must not suggest stacking actives on a prescription. Labels only, no product names |
+| 11 | `current_products` | answers (re-confirmed per scan after H02b) | medium ("a prescription product") | **needed** | Lets Echo describe the user's routine "as directed". Labels only, no product names. Any safety rule about actives or prescriptions belongs to deterministic code, never to Gemini (CLAUDE.md; GEMINI_BOUNDARY §2) |
 | 12 | `male_skin_context` | answers | low (shaving, sweat gear) | **needed** | Explains irritation patterns |
 | 13 | `female_skin_context` | answers | **high: pregnancy, contraception, menopause** | **remove** (contested, decision 8) | Reproductive-health data sent to a processor outside India. Pregnancy safety must come from deterministic rules, not from Gemini (Gemini is not the source of truth) |
 | 14 | `skin_factors` | answers | low | **needed** | Stress and sleep context |
 | 15 | `diet` | answers | low | **needed** | Users ask diet questions |
 | 16 | `water_intake` | answers | low | **needed** | Users ask about dryness |
 | 17 | `sunscreen_habit` | answers | low | **needed** | Core advice context |
-| 18 | Band: Redness, Oiliness, Texture, Blemishes, Pigmentation | scanAnalyses.scores → `bandScores` | low | **needed** | The thing being explained |
-| 19 | Band: "Dryness" (hydration) | scanAnalyses.scores.hydration | low | **remove** | D-05 ("stop displaying hydration"): photos can't measure it. Pores is already excluded |
-| 20 | `composite.topConcerns` | computed server-side | low | **needed** | Matches what the user saw |
-| 21 | `composite.summaryLine` | computed server-side | low | **needed** | Same |
+| 18 | Band: Redness, Oiliness, Texture irregularity, Blemishes, Pigmentation | scanAnalyses.scores → `bandScores` | low | **needed** | The thing being explained |
+| 19 | Band: "Dryness" (hydration) | scanAnalyses.scores.hydration | low | **remove** (contested, decision 8) | Photos can't measure hydration. D-05 ("stop displaying hydration") proposes this but is still PROPOSED. Pores is already excluded |
+| 20 | `composite.topConcerns` | computed server-side (`summarizeConcerns`) | low | **needed**, but without `hydration` if row 19 is removed | Matches what the user saw. It holds raw metric keys, including `hydration` (`lib/skin-check-score.ts:57-74`) |
+| 21 | `composite.summaryLine` | computed server-side | low | **needed**, but without "dryness" if row 19 is removed | Same. The chat route (owned) passes `hydration: "Low"` into `summarizeConcerns`, so the summary drops it without editing `skin-check-score.ts` |
 | 22 | Region label (enum of 4) | request `region` | low | **needed** | Scopes the thread |
 | 23 | Region bands (same categories as 18 and 19) | scanAnalyses.region_scores | low | **needed**, except Dryness: **remove** | Same as 18 and 19 |
 | 24 | User `message` (≤2000 chars) | request | whatever the user types | **needed** | The question itself |
@@ -137,17 +142,16 @@ The source is `lib/gemini.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-fo
 | File | Change | Task |
 |---|---|---|
 | `lib/consent.ts` | new version and copy constants (§2.2), `ConsentPurpose` type | H01a, H02a, H03c |
-| `app/api/skin-scan/upload/route.ts` | read attestation (refuse under 18 or missing); write the `image_retention` ledger entry before presigning; refuse if the write fails | H01a, H02a |
+| `app/api/skin-scan/upload/route.ts` | read attestation (refuse under 18; missing per decision 3; a read failure goes ahead); write the `image_retention` ledger entry before presigning (best-effort: one retry, then issue the URL anyway and log) | H01a, H02a |
 | `lib/s3.ts` | new server-only `eraseUserPrefix(uid)`: list `users/<uid>/` and batch-delete until empty, using **separate** erase credentials (`S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY`); fails closed if they are unset | H01b |
 | `lib/s3-key.ts` | new `userPrefix(uid)` → `users/${uid}/`, the one place a prefix is built | H01b |
 | `app/(marketing)/account/page.tsx` | render the delete-account section (component location: request R1) | H01b |
 | `lib/skin-check-validation.ts` | phone answer is valid when it equals `"verified"`; `RECONFIRM_EACH_SCAN_IDS = ["current_products", "female_skin_context"]`, stripped from reuse and skipped in the completeness check | H02b, H02c |
 | `components/skin-check/inputs/PhoneAuthStep.tsx` | store `"verified"`, never `user.phoneNumber`, in both phone answers; after sign-in on `phone_verify`, call the attestation route | H02a, H02c |
-| `lib/skin-check-steps.ts` | no shape change. Only if needed: a step flag `reconfirmEachScan: true` on the two steps, instead of the id list in validation (one of the two, not both) | H02b |
 | `lib/gemini.ts` | `GEMINI_FIELD_INVENTORY` constant (step id → `"sent" \| "not_sent"`); drop the Dryness band from the scale note | H03a, H03b |
 | `lib/skin-check-format.ts` | `summarizeSkinCheckAnswers` renders only step ids marked `"sent"`; `summarizeSkinScanScores` skips the fields marked remove | H03b |
 | `lib/echo-trusted-context.ts` | none planned; re-checked when the inventory changes | H03 |
-| `app/api/skin-check/chat/route.ts` | after auth: read the ledger; refuse `UNDER_18`, `ATTESTATION_REQUIRED` (only after the attestation UI ships, per D-03a) and `AI_CONSENT_REQUIRED` | H02a, H03c |
+| `app/api/skin-check/chat/route.ts` | after auth: read the ledger; refuse `UNDER_18`, `ATTESTATION_REQUIRED` (only after the attestation UI ships, per D-03a) and `AI_CONSENT_REQUIRED`; build the composite without hydration if row 19 is removed | H02a, H03b, H03c |
 | `components/skin-check/EchoPage.tsx`, `app/(marketing)/echo/page.tsx` | AI-share consent prompt; on `AI_CONSENT_REQUIRED`, show it and post to `/api/account/consent` | H03c |
 
 ### 3.2 New owned files
@@ -157,7 +161,7 @@ The source is `lib/gemini.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-fo
 | `app/api/account/_ledger.ts` | **server-only** ledger read and write helpers (`appendConsent`, `latestGrant`, `ageStatus`). Lives under `app/api/account/**` because `lib/consent.ts` is imported by client code and must not pull in the admin SDK. `_`-prefixed, so Next.js doesn't route it |
 | `app/api/account/attestation/route.ts` | H02a |
 | `app/api/account/consent/route.ts` | H03c |
-| `app/api/account/erase/route.ts` | H01b. Uses `adminDb().recursiveDelete(...)` and `getAuth(getApp("admin"))` from `firebase-admin/auth` (see request R2) |
+| `app/api/account/erase/route.ts` | H01b. Uses `adminDb().recursiveDelete(...)` and Admin Auth (`revokeRefreshTokens`, `deleteUser`). It first calls `verifyFirebaseIdToken`, which keeps the production-emulator guard and the revocation check. It then needs `auth_time` from the decoded token (request R2) |
 | `scripts/seed-lane-privacy.ts` | ledger entries for the seed users, plus one under-18 seed user and one user with S3Mock objects to erase |
 | `tests/privacy-*.test.ts`, `tests/firestore-rules-privacy.test.ts`, `tests/privacy.e2e.test.ts` | §4 |
 
@@ -166,11 +170,11 @@ The source is `lib/gemini.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-fo
 | File | My part |
 |---|---|
 | `firestore.rules` | between `// ── lane:privacy ──` and `// ── end lane:privacy ──`, inside `match /users/{uid}`: `match /consentLedger/{id} { allow get, list: if request.auth != null && request.auth.uid == uid; allow write: if false; }`. No change to existing blocks |
-| `app/api/skin-scan/route.ts` | preamble only, after `verifyFirebaseIdToken` and before `request.formData()`: the attestation check; read `X-Consent-Processing-Version` and write the `processing` ledger entry (scanId is not known before formData, so `scanId: null`; see R4) |
+| `app/api/skin-scan/route.ts` | preamble only, after `verifyFirebaseIdToken` and before `request.formData()`: the 18+ attestation check and nothing else. Under 18 → 403. Missing → decision 3. A read failure goes ahead. In degrade mode it only logs; the response is built after `formData()` (capture's side) and is not changed |
 | `lib/useSkinCheckFlow.ts` | the reuse path (`isSkipped` / `nextEligibleIndex` when `reusing`) visits sections that contain a re-confirm step and reveals only those steps. The age gate stays as it is |
-| `lib/api.ts` | new optional parameter on the scan helper: the processing-consent version, sent as a header. Existing callers are unchanged |
+| `lib/api.ts` | none in this lane. The processing-consent parameter belongs with R3 and R4 |
 | `lib/firebase/skin-checks.ts` | `consent` block only: no shape change planned. The phone fix happens upstream in PhoneAuthStep |
-| `lib/skin-check-draft.ts` | export a `clearAllLocalData()` (draft + IndexedDB scan) if `clearDraft` doesn't already cover both; used after erasure |
+| `lib/skin-check-draft.ts` | none. The existing `clearDraft()` already clears both localStorage and the IndexedDB scan (`skin-check-draft.ts:206-227`); the delete button calls it |
 | `.env.development.example` | append a `# lane:privacy` block: `S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID`, `S3_SKIN_IMAGES_ERASE_SECRET_ACCESS_KEY` with S3Mock-safe values |
 
 ### 3.4 Requests (files I do not own)
@@ -178,11 +182,12 @@ The source is `lib/gemini.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-fo
 | # | To | Request |
 |---|---|---|
 | R1 | owner | Ownership of a new client component `app/(marketing)/account/DeleteAccount.tsx`. `page.tsx` is a server component (it exports `metadata`), so the button needs its own `"use client"` file next to it. Only `page.tsx` is listed today |
-| R2 | owner / main | `admin.ts` exports no Auth getter. The app is named `"admin"` and initialised lazily inside `adminApp()`. Calling `adminDb()` or `verifyFirebaseIdToken()` first and then `getAuth(getApp("admin"))` works without editing admin.ts, but that relies on a private name. Preferred: main adds `export function adminAuth()` to admin.ts. The lane uses the `getApp("admin")` fallback until then |
+| R2 | owner / main | `admin.ts` exports no Auth getter, and `verifyFirebaseIdToken` returns only the uid. Erasure needs Admin Auth (`revokeRefreshTokens`, `deleteUser`) and the token's `auth_time`. Request: main adds `adminAuth()` and a `verifyFirebaseIdTokenClaims()` that returns the decoded token, with the same production-emulator guard and revocation check. Fallback until then: call `verifyFirebaseIdToken` first, so the guard runs, then `getAuth(getApp("admin"))`, relying on the private app name `"admin"` |
 | R3 | capture lane | PhotoCapture: import `PROCESSING_CONSENT_COPY` and `_VERSION` from `lib/consent.ts`, and pass the version to the scan helper (`lib/api.ts` new param). Today the processing checkbox has no version (audit, CURRENT_SYSTEM_AUDIT §50) |
-| R4 | capture lane | `app/api/skin-scan/route.ts` after formData: when the preamble found no processing-consent version, skip `persistScanAnalysis` and return `persisted:false, reason:"consent_missing"` (D-03a). Also add the scanId to the processing ledger entry, or accept `scanId: null` |
+| R4 | capture lane, or after merge | Processing consent at scan time (D-16, D-03a). After `formData()`, read the processing-consent version as a form field. Write the `processing` ledger entry with the scanId using the privacy `_ledger.ts` helper, best-effort. When the version is missing, skip `persistScanAnalysis` and return `persisted:false, reason:"consent_missing"`. This is entirely after `formData()`, so it is not privacy's part |
 | R5 | main (not lane-owned) | `lib/dev-env-guard.cjs` must learn the two new erase-credential names, because they could point at production |
-| R6 | owner / main | Update `tests/skin-check-flow-navigation.test.ts:43` and `:48`. With H02b, the reuse walk for a female user becomes verify → skin-photo → your-skin (current_products only) → personal-context (female_skin_context only) → get-your-results, not verify → skin-photo → get-your-results. The test is not lane-owned. `tests/reusable-answers.test.ts` and `tests/echo-prompt-answers.test.ts` keep passing under this design (checked: they assert partial matches and the absence of phone numbers) |
+| R6 | owner / main | Update `tests/skin-check-flow-navigation.test.ts:43` and `:48`. The test's saved user is male (`:10`). With H02b, the reuse walk becomes verify → skin-photo → your-skin (current_products only) → get-your-results, and going back from results lands on `your-skin`, not `skin-photo`. The test is not lane-owned. `tests/reusable-answers.test.ts` and `tests/echo-prompt-answers.test.ts` keep passing under this design (checked: they assert partial matches and the absence of phone numbers) |
+| R8 | capture lane | Only if decision 3 picks "refuse": PhotoCapture must not offer an endless retry when the upload fails with `ATTESTATION_REQUIRED` or `UNDER_18`. It should send the user to the age question instead. Not needed for "degrade" |
 | R7 | routine lane | `SkinCheckDashboard.tsx`: a "Your data and consents" link to `/account`. Optional; not needed for any test |
 
 ---
@@ -206,28 +211,31 @@ Unit tests use vitest with the same fake-Firestore pattern as `skin-check-chat-t
 
 **`tests/privacy-upload-consent.test.ts`**
 - A presign writes an `image_retention` entry before the URL is returned. The entry exists even though nothing calls the scan route or saves the questionnaire (the abandoned flow, D-16).
-- A failed ledger write gives 500 `LEDGER_UNAVAILABLE` and no URL.
+- A failed ledger write is retried once. If it fails again, the URL is still returned (D-03) and a log line without the uid is written.
+- A failed attestation read: the URL is still returned.
 - Missing or wrong consent version: still 403 `CONSENT_REQUIRED` and no ledger entry.
-- Under-18 record: 403 `UNDER_18`. Missing attestation: 403 `ATTESTATION_REQUIRED`.
+- Under-18 record: 403 `UNDER_18`.
+- Missing attestation: the URL is returned in "degrade" mode, and 403 `ATTESTATION_REQUIRED` in "refuse" mode (decision 3).
 
 **`tests/privacy-attestation.test.ts`**
 - Unauthenticated: 401.
 - A body with extra keys, such as `uid` or `over18`: 400 (strict).
 - `"under-18"` records `granted:false`. Every other bucket records `granted:true`.
 - A stale version: 409, and nothing is written.
-- **Bypass:** a client that skips the attestation route and calls upload or chat directly is refused. A client that posts under-18 and then 18-24 stays refused.
+- **Bypass:** a client that skips the attestation route and calls chat directly is refused (and upload, in "refuse" mode). A client that posts under-18 and then 18-24 stays refused on all three routes.
 
 **`tests/privacy-scan-gate.test.ts`**
 - Under-18 record: the scan route returns 403 `UNDER_18` before `formData()` is read and before the engine is called.
-- Missing attestation, mode "degrade" (D-03a): the scan runs and the response flags `attestationMissing: true`.
+- Missing attestation, mode "degrade" (D-03a): the scan runs, the response is unchanged, and a log line is written.
 - Missing attestation, mode "refuse": 403 `ATTESTATION_REQUIRED`.
-- The mode is one named constant, `SCAN_REQUIRES_ATTESTATION`, set by decision 3.
-- The processing header is present: a `processing` entry is written. Absent: no entry, and the scan still runs.
+- The mode is one named constant, `REQUIRE_AGE_ATTESTATION` (upload and scan), set by decision 3.
+- The attestation read throws: the scan runs.
 
 **`tests/privacy-chat-gate.test.ts`**
 - Under 18: 403. Missing attestation: 403. No AI-share grant: 403 `AI_CONSENT_REQUIRED`.
 - A grant followed by a later `granted:false`: 403.
 - In every refused case, Gemini is not called and no quota is consumed.
+- The attestation read throws: 503, and Gemini is not called.
 
 **`tests/privacy-phone.test.ts`**
 - PhoneAuthStep's save payload: `answers.phone_verify` and `answers.final_phone` equal `"verified"`.
@@ -248,6 +256,7 @@ Unit tests use vitest with the same fake-Firestore pattern as `skin-check-chat-t
 - Every `SECTIONS` step id has an entry in `GEMINI_FIELD_INVENTORY`. A new step with no entry fails with a message that names it.
 - The category labels in the instruction equal the approved set exactly.
 - No uid, scanId or digit sequence ≥ 3 (numeric score) appears.
+- After H03b, if row 19 is removed: no "Dryness", "dryness" or "hydration" appears anywhere, including in topConcerns and summaryLine.
 - Before H03b ships, the test pins today's set (name, age, gender, female context and Dryness present). The minimisation commit changes the pinned set and the inventory together, so the diff shows exactly what was removed.
 
 **`tests/privacy-erase.test.ts`** (unit, with fakes)
@@ -308,7 +317,13 @@ Unit tests use vitest with the same fake-Firestore pattern as `skin-check-chat-t
 | 16 | Shopify | store customers (separate system) | not linked by uid; out of scope |
 | 17 | Engine (ECS) | processes the image; logs carry no images (T7). That the service writes no image to disk or S3 is **not verified** here | nothing to erase if confirmed; check skin-scan code before H01 ships |
 
-**Known race (gap):** a presigned PUT issued up to `UPLOAD_URL_TTL_SECONDS` (300 s) before the erase can land after the S3 step. Revoking sessions first stops new presigns, but not one already issued. A scheduled sweep or a lifecycle rule is the fix. It is a new tracker row, not this lane.
+**Known race (gap): writes after erasure.**
+- Revocation stops server routes (`checkRevoked: true`). Firestore rules, however, check only `request.auth.uid` (firestore.rules:14, 24) and do not see revocation.
+- So an open tab on another device, holding an ID token that hasn't expired yet (up to about 1 h), can recreate `users/{uid}` (`auth-context.tsx:63`) or a `skinChecks` doc after step 2.
+- This device signs out at once after erasing.
+- A fix needs one of two things: a rules check against a server-written tombstone (a change to existing rule blocks, which is outside this lane), or a second Firestore sweep after the token lifetime has passed. Both are a new tracker row.
+
+**Known race (gap): late uploads.** A presigned PUT issued up to `UPLOAD_URL_TTL_SECONDS` (300 s) before the erase can land after the S3 step. Revoking sessions first stops new presigns, but not one already issued. A scheduled sweep or a lifecycle rule is the fix. It is a new tracker row, not this lane.
 
 ---
 
@@ -320,18 +335,18 @@ Each step ends with passing tests (`npm run test:local`, typecheck, lint) and on
 |---|---|---|---|
 | 1 | **H03 pin test against today's behaviour.** Add `GEMINI_FIELD_INVENTORY` to `lib/gemini.ts`, classifying today's real behaviour, and `tests/privacy-gemini-inventory.test.ts` | inventory test (today's set) | design approval |
 | 2 | **Consent ledger + rules.** `app/api/account/_ledger.ts`, the privacy section in `firestore.rules`, constants in `lib/consent.ts` | `firestore-rules-privacy`, `privacy-ledger` | design approval |
-| 3 | **Presign writes the retention entry.** Upload route; refuses if the ledger write fails | `privacy-upload-consent` (consent part) | design approval |
-| 4 | **Erasure helpers.** `userPrefix` in s3-key.ts, `eraseUserPrefix` in s3.ts, the env block in `.env.development.example` | unit tests of the S3 helper against S3Mock | design approval (R5 filed) |
+| 3 | **Presign writes the retention entry.** Upload route, best-effort; never refuses because of the ledger (D-03) | `privacy-upload-consent` (consent part) | design approval |
+| 4 | **Erasure helpers.** `userPrefix` in s3-key.ts, `eraseUserPrefix` in s3.ts, the env block in `.env.development.example` (S3Mock values only) | unit tests of the S3 helper against S3Mock | design approval. R5 (guard learns the names) must land before the lane merges |
 | 5 | **Erasure route + e2e, local only.** `app/api/account/erase/route.ts`, the seed script | `privacy-erase`, `privacy.e2e` | design approval (R2 fallback) |
 | 6 | **Delete button on /account** | e2e extended: the UI calls the route and clears local data | R1 |
 | 7 | **Attestation route** and the PhoneAuthStep call after sign-in | `privacy-attestation` | blocked: D-19 approval (decision 2), stickiness (decision 4) |
-| 8 | **Attestation gate on upload and chat** | `privacy-upload-consent` (attestation part), `privacy-chat-gate` (attestation part) | blocked: decision 2. Chat hard-reject only after step 7's UI ships (D-03a) |
-| 9 | **Attestation gate in the scan-route preamble** | `privacy-scan-gate` | blocked: decision 3 (degrade or refuse) |
+| 8 | **Attestation gate on chat** | `privacy-chat-gate` (attestation part) | blocked: decision 2. Hard-reject only after step 7's UI ships (D-03a) |
+| 9 | **Attestation gate on upload and in the scan-route preamble** | `privacy-upload-consent` (attestation part), `privacy-scan-gate` | blocked: decision 3 (degrade or refuse; under-18 exception), and R8 if "refuse" |
 | 10 | **Phone stored as `"verified"`** | `privacy-phone` | blocked: decision 2 |
 | 11 | **Re-confirm `current_products` and `female_skin_context` per scan** | `privacy-reconfirm` | blocked: decision 2, decision 10 (prefill), R6 |
 | 12 | **Gemini minimisation:** remove the fields marked remove, allowlist rendering, update the pinned set | inventory test (new set) | blocked: decision 8 |
 | 13 | **AI-share consent:** consent route, chat gate, Echo prompt | `privacy-chat-gate` (consent part) | blocked: decision 6 (G1) and decision 7 (copy) |
-| 14 | **Processing-consent header** in the scan preamble and `lib/api.ts` | `privacy-scan-gate` (processing part) | blocked: R3 and R4 (capture lane), merge order |
+| 14 | **Processing consent at scan time** (with the capture lane, or after merge) | a test in the merged scan route | blocked: R3, R4, decision 7 (copy), merge order |
 | 15 | **`privacy-report.md`:** commits, test results, the H03 inventory, the open owner items | none (document) | none |
 
 ---
@@ -341,7 +356,7 @@ Each step ends with passing tests (`npm run test:local`, typecheck, lint) and on
 **Decision 1: Approve this design (README rule 3; tracker H02 says design gate first).**
 - **What it means:** no app code is written in this lane until you say yes.
 - **Options:** (a) approve as written; (b) approve with changes; (c) reject.
-- **Recommendation:** (a), or (b) with your edits to decisions 2–10.
+- **Recommendation:** (a), or (b) with your edits to decisions 2–12. The early steps (1–5) close known FAILs: the Gemini name leak (G1.4) and no erasure path (G3.4). They need no other decision, so approving now unblocks real progress.
 - **Blocks:** every step. **Can start without it:** nothing.
 
 **Decision 2: Approve D-19 ("re-confirm `female_skin_context` and `current_products` on every scan; stop storing the phone number in answers; server-side 18+ attestation"). Status PROPOSED.**
@@ -353,14 +368,19 @@ Each step ends with passing tests (`npm run test:local`, typecheck, lint) and on
 - **Recommendation:** (a). Each part closes a known gap (audit findings D8 and D14, PREFLIGHT G1.5). Gemini's terms require 18+.
 - **Blocks:** steps 7–11. **Can start without it:** steps 1–6, 12–14.
 
-**Decision 3: When a scan arrives with no 18+ record on file, should the scan route refuse it or let it run?**
-- **What it means:** the lane brief says the server must refuse a scan without attestation. D-03a ("a new server-side requirement on the scan route degrades, never rejects") says a missing attestation must not break the scan, because cached old app versions and existing users don't have one yet. These two disagree. A recorded under-18 answer is refused in every option; this decision is only about "no record".
+**Decision 3: When a scan or photo upload arrives with no 18+ record on file, refuse it or let it run? And may a recorded under-18 user be refused on the scan route?**
+- **What it means:** the lane brief says the server must refuse a scan or upload without attestation. D-03a ("a new server-side requirement on the scan route degrades, never rejects") says a missing attestation must not break the scan, because cached old app versions and existing users don't have one yet. These two disagree.
+- **Upload counts as the scan here.** The app uploads the photo first, and a failed upload stops the scan (`lib/api.ts:251`). Refusing the upload therefore refuses the scan for every user who ticked "keep my photo". Chat is different: D-03a allows chat to refuse once the attestation UI ships, and the design does that in every option.
+- **The under-18 exception.** Separately, refusing a user with a recorded under-18 answer on the scan route is a rejection, which D-03a doesn't allow as written. Old bundles can't have such a record, so this harms no legitimate user. It still needs your explicit OK.
 - **Options:**
-  - (a) **Degrade now, refuse later.** The scan runs and is flagged `attestationMissing`. Upload and chat refuse at once. A constant `SCAN_REQUIRES_ATTESTATION` flips to refuse in a later commit, once old bundles are gone.
-  - (b) **Refuse now.** This amends D-03a. Old bundles get an error on scan.
-  - (c) **Degrade forever.** Upload and chat still refuse.
-- **Recommendation:** (a). It honours D-03a. Users of old bundles never get the photo stored (upload refuses) and never reach Gemini (chat refuses), so a minor gains nothing from an old bundle. It also meets the brief once flipped. Because prod data is disposable (owner, 2026-10-03), the flip can come early.
-- **Blocks:** step 9 only. **Can start without it:** everything else. The upload and chat gates (step 8) are not affected by D-03a.
+  - (a) **Degrade now, refuse later.** With no record, upload and scan run and the server logs it. A constant `REQUIRE_AGE_ATTESTATION` flips to refuse in a later commit, once old bundles are gone (then R8 applies). Under-18 records are refused from day one.
+  - (b) **Refuse now.** This amends D-03a. Old bundles fail to scan until the user reloads.
+  - (c) **Degrade forever.** Only chat refuses.
+- **Recommendation:** (a), plus approving the under-18 exception.
+  - It honours D-03a for everyone who has done nothing wrong.
+  - A minor on an old bundle still can't reach Gemini, because chat refuses.
+  - It meets the brief once flipped. Because prod data is disposable (owner, 2026-10-03), the flip can come early.
+- **Blocks:** step 9 only. **Can start without it:** everything else, including the chat gate (step 8).
 
 **Decision 4: Is an under-18 answer permanent for that account?**
 - **What it means:** if someone answers "under 18" and is blocked, can they come back and answer "18–24"?
@@ -380,23 +400,27 @@ Each step ends with passing tests (`npm run test:local`, typecheck, lint) and on
 **Decision 6: Which Google project and billing tier owns the production Gemini key? (PREFLIGHT G1.2)**
 - **What it means:** on the free tier, Google may use users' skin answers for training and let humans read them. D-14 makes the paid tier a release gate. Only you can check AI Studio or the Cloud Console.
 - **Options:** (a) the key is already on a paid project: record which; (b) switch the key to `projectskin-a202c` (billing active); (c) move to Vertex AI for residency controls (bigger change, not this lane).
-- **Recommendation:** (b) if not already (a). Keep (c) for later.
+- **Recommendation:** (b) if not already (a). It is the smallest change that ends free-tier training and human review on users' health answers, and its billing is already active. (c) is a bigger migration; keep it for later.
 - **Blocks:** step 13 going live, and the processor wording in decision 7. **Can start without it:** steps 1–12, 14.
 
-**Decision 7: The wording of the new "AI share" consent (D-16, GEMINI_BOUNDARY §8).**
-- **What it means:** before Echo sends anything to Gemini, the user must agree to a sentence naming Google as the processor and saying the data leaves India. The lane will not write legal copy.
-- **Options:** (a) you or legal supply the final sentence; (b) the lane ships the GEMINI_BOUNDARY §8 draft ("share my skin check with the AI assistant (processed by Google, outside India)") for local testing only, marked DRAFT, and production waits for (a).
+**Decision 7: The wording of the new "AI share" consent and the new "processing" consent (D-16, GEMINI_BOUNDARY §8).**
+- **What it means:**
+  - **AI share:** before Echo sends anything to Gemini, the user must agree to a sentence naming Google as the processor and saying the data leaves India.
+  - **Processing:** D-16 also says the photo-processing consent needs new versioned wording that covers storing measurements at scan time. Today that checkbox has no version at all.
+  - The lane will not write legal copy.
+- **Options:** (a) you or legal supply both final sentences; (b) the lane ships the GEMINI_BOUNDARY §8 draft ("share my skin check with the AI assistant (processed by Google, outside India)") for local testing only, marked DRAFT, and production waits for (a).
 - **Recommendation:** (b) for building, then (a) before production.
 - **Blocks:** step 13 production use. **Can start without it:** all steps (13 locally, with the DRAFT copy).
 
-**Decision 8: Two contested Gemini fields: `female_skin_context` and `gender`.**
+**Decision 8: Three contested Gemini fields: `female_skin_context`, `gender` and the "Dryness" band.**
 - **What it means:**
   - `female_skin_context` holds pregnancy, contraception and menopause answers. This is the most sensitive data in the app, and today it goes to Google outside India.
   - Removing it means Echo can't tailor wording to pregnancy. Pregnancy safety then has to come from fixed rules, which is where CLAUDE.md wants it anyway: Gemini explains, it does not decide.
   - `gender` adds little once the context answers exist.
-  - Name, age and Dryness are marked remove without debate (GEMINI_BOUNDARY §4, D-05).
-- **Options:** (a) remove both; (b) remove `female_skin_context`, keep `gender`; (c) keep both.
-- **Recommendation:** (a). Send the minimum to a processor outside India. Safety must not depend on the LLM.
+  - "Dryness" (hydration) can't be measured from a photo. D-05 proposes removing it from display, but D-05 is still PROPOSED. If it goes, it also goes from topConcerns and summaryLine.
+  - Name and age are marked remove without debate (GEMINI_BOUNDARY §4).
+- **Options:** (a) remove all three; (b) remove `female_skin_context` and Dryness, keep `gender`; (c) keep all three.
+- **Recommendation:** (a). Send the minimum to a processor outside India. Safety must not depend on the LLM. Echo should not narrate a number that measures flat pixels.
 - **Blocks:** step 12. **Can start without it:** all other steps (step 1 pins today's set either way).
 
 **Decision 9: After erasure, keep a minimal receipt?**
@@ -408,19 +432,19 @@ Each step ends with passing tests (`npm run test:local`, typecheck, lint) and on
 **Decision 10: Re-confirmed questions: blank, or pre-filled with last time's answer?**
 - **What it means:** D-19 says "re-confirm". Pre-filled is faster, but users tap through, which keeps the stale-pregnancy problem D-19 exists to fix. Blank forces a real answer.
 - **Options:** (a) blank, with "last time you said: …" shown under it; (b) pre-filled, and the user must tap Continue on that step.
-- **Recommendation:** (a).
+- **Recommendation:** (a). The point of D-19 is that a stale pregnancy or prescription answer is not reused by default. A pre-filled answer is reused by default with one tap. Showing last time's answer keeps it quick without choosing for the user.
 - **Blocks:** step 11. **Can start without it:** all others.
 
 **Decision 11: Erasure IAM principal (D-17 "blocked on IAM"; H01_S3_ERASURE_READINESS).**
 - **What it means:** the only production key today can upload photos but cannot list or delete them, so a production erase can't remove photos.
 - **Options:** (a) a separate IAM user or role for erasure with `s3:ListBucket` (prefix `users/*`) and `s3:DeleteObject` on `…/users/*`; (b) widen the uploader key.
-- **Recommendation:** (a). A leaked upload key then can't delete data. The lane reads it from the separate erase variable names (§3.1). If versioning is ever turned on, add `s3:DeleteObjectVersion`.
+- **Recommendation:** (a). A leaked upload key then can't delete data. The lane reads it from the separate erase variable names (§3.1). D-17's other blocker, Object Lock and versioning, was checked on 2026-10-03: neither is enabled (H01_S3_ERASURE_READINESS), so a delete is final. Re-check both before H01 ships. If versioning is ever turned on, add `s3:DeleteObjectVersion`.
 - **Blocks:** H01 in production only. **Can start without it:** all lane steps (S3Mock locally).
 
 **Decision 12: Ownership requests R1, R2 and R6 (§3.4).**
 - **What it means:** three small edits outside the lane's file list:
   - a new delete-button component next to the account page (R1);
-  - an `adminAuth()` export in admin.ts, or permission to use `getApp("admin")` (R2);
+  - an `adminAuth()` and a claims-returning token verifier in admin.ts, or permission to use the `getApp("admin")` fallback (R2);
   - updating two expectations in an existing navigation test (R6).
 - **Options:** approve each, or route it to main or after merge.
 - **Recommendation:**
@@ -429,4 +453,4 @@ Each step ends with passing tests (`npm run test:local`, typecheck, lint) and on
   - R6: approve. The test change is exactly the D-19 behaviour change.
 - **Blocks:** R1 blocks step 6; R6 blocks step 11. **Can start without it:** steps 1–5, 7–10, 12–14.
 
-Cross-lane items R3, R4, R5 and R7 are requests to the capture lane, routine lane and main, not owner decisions. R3 and R4 block step 14.
+Cross-lane items R3, R4, R5, R7 and R8 are requests to the capture lane, routine lane and main, not owner decisions. R3 and R4 block step 14; R8 is needed only if decision 3 picks "refuse".
