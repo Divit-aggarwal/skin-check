@@ -124,7 +124,7 @@ The labels are the quiz text from `lib/skin-check-steps.ts`. The reviewer signs 
 
 This is the same list as `lib/gemini.ts` `EXTRA_CAUTION_TRIGGERS`, and a test keeps them equal. The tracker E05 note also asks the reviewer to judge two things:
 - The sentence Echo receives: "Extra caution applies to this user. Do not suggest any active ingredients. Advise them to ask a doctor before starting anything new. Never guess at or mention a reason for this."
-- Whether the residual pregnancy inference is acceptable. A user who did not tick "prescription" and sees the caution can infer the pregnancy answer. The options are to accept it, to drop the flag, or to drop the trigger.
+- Whether the residual pregnancy inference is acceptable. In the words of privacy-report §5: "The pregnancy inference is narrowed, not closed. With the flag on and a female user who uses no products, Gemini can still guess." The options are to accept it, to drop the flag from the Gemini prompt, or to drop the pregnancy trigger from it.
 
 ### 4.3 Constraints and notices
 
@@ -182,7 +182,7 @@ None of these blocked the build. Each has a provisional default in the code.
 1. **Main, contract comment:** `RecommendedItem.position` says "order within the slot". The lane emits one order key per item. Sorting any slot's items by it gives that slot's order, because an AM_PM item cannot carry two ranks. Please confirm this, or change the comment.
 2. **Main, contract comment:** `inputSha256` "of the exact inputs" — confirm the reading in §5.4.
 3. **Main, at integration:** keep one extra-caution list. Today there are two equal copies, `lib/gemini.ts` (context lane) and `lib/rules/settings.ts`, kept equal by `tests/rules-settings.test.ts`. After the merge, the context builder should take `SafetyState.extraCaution` from `evaluateSafety` and drop its own list.
-4. **Main, at integration:** call `recommend` only where `RULES_ENABLED` is true. It throws `RulesDisabledError` otherwise, and the caller should catch that and show nothing, not "no red flag". The same applies to `evaluateSafety`.
+4. **Main, at integration:** call `recommend` and `evaluateSafety` only where `RULES_ENABLED` is true. Both throw on purpose: `RulesDisabledError` when switched off, and `TypeError` for malformed input or an answers object with none of the rule fields. The caller must treat **any** throw as "show nothing". It must never fall back to "no red flag" or a default routine. This rule keeps the fail-closed design closed after integration.
 5. **Owner, E01:** the synthetic catalogue has no niacinamide serum. Today the active rule can fire, but the result has no item and carries the limit "No matching product is available right now."
 
 ## 7. Proposed tracker rows and updates (for main at merge; this lane does not edit the tracker)
@@ -208,6 +208,7 @@ None of these blocked the build. Each has a provisional default in the code.
 | `d0a7409` | feat(rules): deterministic recommender and production-switch tests (step 4) |
 | `45b6231` | test(rules): import boundary, no clock or randomness (step 5) |
 | `1b0741f` | fix(rules): review fixes |
-| (this commit) | docs(rules): lane report |
+| `f0c4cb6` | docs(rules): lane report |
+| (next commit) | docs(rules): pregnancy-inference wording, integration throw rule |
 
 Nothing was pushed.

@@ -137,7 +137,7 @@ Labels are the quiz text from `lib/skin-check-steps.ts`. The reviewer signs both
 
 The reviewer is also asked (tracker E05 note, 2026-10-04) to judge:
 - the caution sentence Echo receives (`lib/gemini.ts` `EXTRA_CAUTION_INSTRUCTION`): "Extra caution applies to this user. Do not suggest any active ingredients. Advise them to ask a doctor before starting anything new. Never guess at or mention a reason for this."
-- whether the residual pregnancy inference is acceptable. A user who did not tick "prescription" but sees the caution can infer the pregnancy answer. The options are to accept it, to drop the flag, or to drop the trigger.
+- whether the residual pregnancy inference is acceptable. In the words of privacy-report §5: "The pregnancy inference is narrowed, not closed. With the flag on and a female user who uses no products, Gemini can still guess." The options are to accept it, to drop the flag from the Gemini prompt, or to drop the pregnancy trigger from it.
 
 ### 5.3 Constraints and notices
 
