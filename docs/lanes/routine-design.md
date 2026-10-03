@@ -1,16 +1,30 @@
 # Routine lane design (E01, E03, E04)
 
-Branch `lane/routine`, worktree `../skin-check-routine`. Status: **DESIGN, waiting for owner approval.** No app code exists yet. Lane README rule 3 applies: implementation starts only after the owner approves this design.
+Branch `lane/routine`, worktree `../skin-check-routine`. Status: **APPROVED by the owner on 2026-10-03** with the decisions in §0. Lane README rule 3 is met.
 
 This file sits at the path the owner named for the design step. `routine-report.md` will link it. README rule 3 says the brief goes "in your report": if the owner prefers that, the content moves into the report unchanged.
 
 Read with: [README.md](README.md), [routine.md](routine.md), `docs/architecture/RECOMMENDATION_MODEL.md`, `DATA_MODEL.md`, `GEMINI_BOUNDARY.md`, and `DECISION_LOG.md` (D-08, D-09, D-12, D-23, D-26, B14).
 
+## 0. Owner decisions (2026-10-03)
+
+The owner approved this design with these answers. Where a decision changes the text below, the text has been updated to match.
+
+| # | Answer | Effect on the build |
+|---|---|---|
+| R-1 | **A.** Store routine data for one purpose only: the user keeps and sees their own routine record. No analytics, no Gemini, no join to scans. | Steps 2 to 8 go ahead. The purpose text belongs in `lib/consent.ts` (privacy lane request). |
+| R-2 | **B.** No product cards for now. | Nothing in this lane changes. |
+| R-3 | **A.** Keep the synthetic sample until the owner supplies real data through the template. | Step 9 is skipped. |
+| R-4 | **A.** No skin data and no claims on the routine page. | The wording and import tests apply to the page. |
+| R-5 | **B.** Our catalogue plus one unnamed entry, "other product (not ours)". No free text. | `OTHER_PRODUCT_ID` (§2.2). |
+| R-6 | **A.** The server writes the events. | Rules are read-only for clients (§2.4). |
+| Names | Real product names such as "Clear Seal" get an **exact-name exception** from the word check. The check still applies to usage text and all other wording. | `PRODUCT_NAME_EXCEPTIONS` (§4). |
+
 ## 1. What will be built
 
 **E01: product catalogue schema.** This is a typed, versioned list of our own products: what each product is, its ingredients, the claims we are allowed to make (each with evidence, source and date), its safety notes, its price and whether it is on sale. The lane builds the schema, the checks that reject a bad entry, and a small **synthetic** sample. The owner fills in the real products using the template `lib/catalog/catalogue-template.csv`, and an engineer copies them into the typed file. The catalogue lives in git as TypeScript, so review is a pull request and the release is a deploy (D-08). Nothing in this lane *chooses* products for a user. That is E02, which is not in this lane.
 
-**E03: routine model and event history.** A routine is the user's own record of which of our products they use, and when (morning, evening or both; which days of the week). It is not a suggestion from the app. Every change is a new, permanent event: start a product, stop it, swap it for another, change its schedule, or log "used" or "skipped" for one day. Nothing is ever edited or deleted. The user's current routine is *computed* from the events on every read; it is never stored. The server writes the events after checking the signed-in user. Clients can read their own events and can never write, change or delete them.
+**E03: routine model and event history.** A routine is the user's own record of which of our products they use (plus at most one unnamed "other product (not ours)", R-5 B), and when (morning, evening or both; which days of the week). It is not a suggestion from the app. Every change is a new, permanent event: start a product, stop it, swap it for another, change its schedule, or log "used" or "skipped" for one day. Nothing is ever edited or deleted. The user's current routine is *computed* from the events on every read; it is never stored. The server writes the events after checking the signed-in user. Clients can read their own events and can never write, change or delete them.
 
 **E04: adherence summary.** This is a pure function. It takes the events and a date range, and says for each product, day and slot whether the user reported **used**, reported **skipped**, or reported nothing, which is **unknown**. A missing log is always "unknown" and never "skipped". It returns counts only: no percentage, no score and no threshold. Days in the future are left out.
 
@@ -87,7 +101,8 @@ RoutineEventInput =
                                slot: "AM" | "PM", status: "used" | "skipped" }
 
 eventId:       UUID v4, chosen by the client, used as the doc id (makes retries safe)
-productId:     must exist in the current CATALOGUE
+productId:     a product id in the current CATALOGUE, or OTHER_PRODUCT_ID ("other-not-ours"; R-5 B)
+toProductId:   the same rule as productId
 effectiveDate: "YYYY-MM-DD", the user's local day the event applies to; not after "today" in timeZone
 timeZone:      IANA name (checked with Intl.DateTimeFormat), default "Asia/Kolkata"
                (no lower limit on effectiveDate, and the user may pick any valid zone: this is
@@ -103,6 +118,8 @@ RoutineEvent = RoutineEventInput & {
 ```
 
 There are no free-text fields. Stop reasons, notes and non-catalogue product names are not collected, because free text here could hold health data such as a prescription name (decision R-5).
+
+`OTHER_PRODUCT_ID = "other-not-ours"` (R-5 B) is defined in `lib/routine/events.ts`, not as a catalogue row, because a catalogue row needs price, INCI and claims that do not exist for it. Its only display name is "Other product (not ours)". It carries no name, brand or ingredient, so a user can have **one** "other" item at a time: a second `start` of it is ignored like any double start. It can be scheduled, stopped, swapped and logged like a catalogue product.
 
 ### 2.3 Computed views (never stored)
 
@@ -201,7 +218,8 @@ All are unit tests (vitest) unless marked emulator. Emulator tests run under `np
 - Failure: an unknown `ingredientClass` is rejected.
 - Failure: `shopifyHandleVerified: true` with `shopifyHandle: null` is rejected.
 - Every row of `catalogue-template.csv` has exactly the header's column count. The test holds an explicit table mapping each CSV column to its schema field (for example `mrp_inr` → `price.mrpInr`, `claim_1_text` → `claims[0].text`, `shopify_handle_verified` yes/no → boolean). The test fails if a column has no mapping or a schema field has no column. This catches drift between the template and the schema.
-- Every user-visible catalogue field (`name`, `usageText`) passes the same D-12 word check as `routine-copy.test.ts`. An owner name such as "Brightening Serum" fails here.
+- Every user-visible catalogue field (`name`, `usageText`) passes the same D-12 word check as `routine-copy.test.ts`. An owner name such as "Brightening Serum" fails here, **unless** the full name is listed exactly in `PRODUCT_NAME_EXCEPTIONS` (`lib/catalog/catalogue.ts`; owner decision, for real brand names such as "Clear Seal"). The exception is exact and whole-name only: "Clear Seal Serum" is not excepted, and `usageText` never is.
+- `PRODUCT_NAME_EXCEPTIONS` has a self-check: the excepted name is skipped, and the same words in a usage text still fail.
 
 **`routine-events.test.ts` (E03, pure)**
 - Each event type parses.
@@ -216,6 +234,7 @@ All are unit tests (vitest) unless marked emulator. Emulator tests run under `np
 - Failure: `slot` on a `usage` event of `AM_PM` is rejected.
 - Failure: `status: "unknown"` cannot be submitted.
 - Failure: a `substitute` with `toProductId === productId` is rejected.
+- `OTHER_PRODUCT_ID` parses as `productId` and `toProductId`; a second `start` of it while active is ignored.
 - `currentRoutine`:
   - start then stop;
   - stop on D excludes D;
@@ -253,13 +272,14 @@ All are unit tests (vitest) unless marked emulator. Emulator tests run under `np
 - Failure: the test's own self-check shows that a planted "your skin improved" string is caught.
 - No file under `lib/routine/**`, `lib/catalog/**`, `app/api/routine/**`, `components/routine/**` or `app/(marketing)/routine/**` imports `gemini`, `echo`, `skin-check-rules`, `skin-state` or `scanAnalyses`.
 - No routine UI file references `claims`.
-- The same check runs over `CATALOGUE[].name` and `CATALOGUE[].usageText` (the catalogue fields the page shows).
+- The same check runs over `CATALOGUE[].name` (except an exact `PRODUCT_NAME_EXCEPTIONS` match) and `CATALOGUE[].usageText` (no exception), the catalogue fields the page shows.
 
 **`routine-route.test.ts` (route, with the Admin SDK mocked as in the existing route tests)**
 - Failure: no token gives 401.
 - Failure: a bad token gives 401.
 - Failure: a `uid` field in the body is rejected (strict).
 - Failure: an unknown `productId` gives 400 `unknown_product`.
+- `OTHER_PRODUCT_ID` is accepted as `productId` and as `toProductId`.
 - Failure: an unknown `toProductId` gives 400 `unknown_product`.
 - Failure: `toProductId === productId` gives 400.
 - POST writes to `users/{uid from the token}/routineEvents/{eventId}` and nowhere else. This is the owner-only write check, since under R-6 A only the route can write.
@@ -287,7 +307,7 @@ All are unit tests (vitest) unless marked emulator. Emulator tests run under `np
 - Any routine data sent to Gemini or Echo. `lib/echo-trusted-context.ts` and `lib/gemini.ts` belong to privacy, and the ContextPackage is F01, later.
 - Adherence rates, percentages, streaks, scores or "good/bad" labels.
 - Reminders and notifications.
-- Free-text notes, stop reasons, and non-catalogue products.
+- Free-text notes, stop reasons, and named non-catalogue products (only the one unnamed "other" entry, R-5 B).
 - Event correction or delete. A wrong usage log is fixed by logging again (the latest wins). A wrong start is fixed by a stop.
 - Shopify integration and handle verification (an owner data task).
 - Erasure of routine events. That is the privacy lane's H01 (see the cross-lane requests below).
@@ -296,7 +316,7 @@ All are unit tests (vitest) unless marked emulator. Emulator tests run under `np
 
 **Cross-lane requests (go in the report; not owner decisions):**
 - privacy (H01): add `users/{uid}/routineEvents/*` to the list of places user data lives. `recursiveDelete` on `users/{uid}` covers it, and the erasure test should seed one routine event.
-- privacy (D-16): if R-1 is approved, the consent or purpose text for the routine record belongs in `lib/consent.ts`, which privacy owns.
+- privacy (D-16): R-1 A is approved. The purpose text for the routine record ("So you can keep a record of your own routine and see it back. Only you see it. It is not used for analytics, not sent to Gemini and not joined to your scans.") belongs in `lib/consent.ts`, which privacy owns. Until then the page shows the same sentence from `lib/routine/copy.ts`.
 
 **Proposed tracker rows (the lane cannot edit the tracker):**
 - "Purpose conflict: RECOMMENDATION_MODEL §8, DATA_MODEL (Events row), SYSTEM_MODEL C16 and DECISION_LOG B14 mark Routine, ProductUse and Adherence as LATER on purpose-limitation grounds. The tracker assigns E03 and E04 to the routine lane." This is R-1.
@@ -316,7 +336,7 @@ Every step needs the owner's approval of this design first (README rule 3). Each
 | 6 | `POST`/`GET /api/routine/events` | `routine-route.test.ts` green; commit | **R-1, R-6** |
 | 7 | `scripts/seed-lane-routine.ts` | `npm run test:local` green; commit | **R-1** |
 | 8 | `/routine` page and component; copy test extended to the UI | `routine-copy.test.ts` green, page works on the local stack; commit | **R-1, R-4** |
-| 9 | Replace the synthetic catalogue with owner data from the template | `catalog-schema.test.ts` green; commit | **R-3** |
+| 9 | Replace the synthetic catalogue with owner data from the template | `catalog-schema.test.ts` green; commit | **R-3**. **Skipped** (R-3 A: no owner data yet) |
 | 10 | `routine-report.md`, full typecheck, lint and `npm run build` | all green; commit | none |
 
 R-2 (OPEN-R1) blocks no step. R-5 is best answered together with the design approval, because step 2 writes its schema.
@@ -383,7 +403,7 @@ How to fill the template: one row per product; lists (`ingredient_classes`, `inc
 - **B.** Catalogue products plus one generic "other product (not ours)" entry, with no name.
 - **C.** Catalogue products plus free-text names.
 
-**Recommendation: A** for v1. It is the smallest amount of personal data. B can be added later as one catalogue row if the owner wants it. C is not recommended.
+**Decision: B** (owner, 2026-10-03). Recommendation was A for v1. It is the smallest amount of personal data. B can be added later as one catalogue row if the owner wants it. C is not recommended.
 
 **Blocks:** step 2, which writes the event schema. Please answer R-5 with the design approval; choosing B or C after step 2 means a schema change. **Does not block:** steps 1, 3, 4 and 9.
 
