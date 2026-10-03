@@ -138,6 +138,7 @@ sleep 15; aws logs get-query-results --region $REG --query-id "$Q" --query '{sta
 - Good output: three lines, `RequestCount <n>`, `HTTPCode_ELB_5XX_Count <n>`, `HTTPCode_Target_5XX_Count <n>` (a metric with no datapoints prints `0`), then the query result with `"status": "Complete"`, `n` and `p95_ms`. If the status is `Running`, run the `get-query-results` line again.
 - `p95_ms` is the engine's own `/scan` time (`duration_ms` in the `scan_request` log line, successful scans only). The ALB adds network time on top, which this baseline leaves out on purpose so the two engine versions compare like for like.
 - **Write the five numbers into the tracker (A12) before C3.** Also compute the baseline 5xx rate: (ELB 5xx + Target 5xx) / RequestCount.
+- `"results": []` with `"status": "Complete"` means no successful scans in the window (`n` = 0), not a broken query. Checked 2026-10-03: the ALB name, the log group and the fields `message`, `status`, `duration_ms` match the live logs, and the same query over 7 days returned `n` 4, `p95_ms` 384.
 - If `n` is below about 20, the p95 is not meaningful. Write that down; the p95 rule in C3 then does not apply, and the other rollback rules still do.
 - Undo: nothing to undo. (Logs Insights bills a few cents for the data it scans.)
 
