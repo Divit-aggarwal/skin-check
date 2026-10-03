@@ -434,7 +434,7 @@ Key-pair table (each row lists the verdict and its exact reasons):
 | entry for another region only | test table | `quantity_not_validated` |
 | build null on either side | — | `engine_build_unknown` |
 | builds differ | — | `engine_build_differs` |
-| pipeline versions differ | — | `pipeline_version_differs` |
+| pipeline versions differ | — | `quantity_not_validated`, `pipeline_version_differs` (a table entry is keyed by one pipeline version, §2.7) |
 | input variants differ | — | `input_variant_differs` |
 | capture method null | — | `capture_method_unknown` |
 | capture methods differ | — | `capture_method_differs` |
@@ -442,7 +442,7 @@ Key-pair table (each row lists the verdict and its exact reasons):
 | absent region | — | `region_absent` |
 | low pixel count | — | `region_low_pixel_count` |
 | `cheek_image_left` native vs canvas | — | `capture_method_differs` and `lr_cheek_cross_capture_method` |
-| unknown fieldPath | — | `field_not_defined` |
+| unknown fieldPath | — | `quantity_not_validated`, `field_not_defined` (no table entry can name it) |
 | several failures at once | — | every reason, in fixed order |
 
 State-pair tests:
