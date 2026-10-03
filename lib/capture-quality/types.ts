@@ -51,3 +51,7 @@ export interface CaptureQuality {
   /** Retakes in this attempt before this photo. */
   retakeCount: number;
 }
+
+export const notMeasured = (id: CheckId, why: NotMeasuredWhy): CheckResult => ({
+  id, status: "not_measured", measured: null, retakeReason: null, notMeasuredWhy: why,
+});

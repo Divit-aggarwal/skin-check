@@ -16,7 +16,7 @@ describe("capture quality settings", () => {
   });
 
   // The checks read thresholds from settings only; luma.ts holds the named BT.601 weights.
-  const CHECK_FILES: string[] = [];
+  const CHECK_FILES: string[] = ["lib/capture-quality/exposure.ts"];
   it.skipIf(CHECK_FILES.length === 0).each(CHECK_FILES)("%s has no numeric literal beyond 0-4 and 255", (file) => {
     const code = readFileSync(file, "utf8")
       .replace(/\/\*[\s\S]*?\*\//g, "")
