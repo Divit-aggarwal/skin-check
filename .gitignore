@@ -53,6 +53,7 @@ next-env.d.ts
 !docs/architecture/*.md
 !docs/Longitudinal skin platform architecture.md
 !docs/research/**/*.md
+!docs/PROJECT_SKIN_EXECUTION_TRACKER.md
 /scan-response.json
 /supabase/
 /.mcp.json
