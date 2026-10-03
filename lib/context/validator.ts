@@ -4,6 +4,7 @@ import { packageFacts, type CitableFact } from "./builder";
 import {
   ACTIVE,
   BAND_WORD,
+  FORMAT_CHARS,
   CAUSE,
   CHANGE,
   CONFIDENCE,
@@ -18,6 +19,7 @@ import {
   PRODUCT,
   UNMEASURED_WORDS,
   firstMatch,
+  normalizeForMatch,
 } from "./lexicon";
 
 // F03 (docs/lanes/context-design.md §3.6; GEMINI_BOUNDARY §5). A pure function
@@ -89,8 +91,22 @@ function quotable(f: CitableFact): string[] {
   return out;
 }
 
+/** smalltalk, clarify and out_of_scope claims are short, uncited free text (security finding 5). */
+const UNCITED_MAX = 240;
+
+// Words that may frame a quote. Anything else must come from the cited facts' own text.
+const FRAME = new Set(
+  "you told us said say mentioned noted shared your that the a an and or is are was were for about on in of with we as it this these listed picked chose selected answered answer answers quiz here also so i me my our".split(" ")
+);
+const wordsOf = (text: string) => text.toLowerCase().match(new RegExp(String.raw`\p{L}+`, "gu")) ?? [];
+
+function extraWord(stripped: string, cited: CitableFact[]): string | null {
+  const own = new Set(cited.flatMap((f) => wordsOf(normalizeForMatch(f.text))));
+  return wordsOf(stripped).find((w) => !FRAME.has(w) && !own.has(w)) ?? null;
+}
+
 function stripQuotes(text: string, cited: CitableFact[]): string {
-  const segments = cited.flatMap(quotable).filter((s) => s.trim().length > 0).sort((a, b) => b.length - a.length);
+  const segments = cited.flatMap(quotable).map(normalizeForMatch).filter((s) => s.trim().length > 0).sort((a, b) => b.length - a.length);
   return segments.reduce((t, seg) => t.replace(new RegExp(escape(seg), "giu"), " "), text);
 }
 
@@ -103,7 +119,8 @@ export function parseAnswer(raw: string): GeminiAnswer | null {
   }
 }
 
-const bandsIn = (text: string) => Array.from(text.matchAll(new RegExp(BAND_WORD.source, "giu")), (m) => m[0].toLowerCase());
+const matchesOf = (re: RegExp, text: string) =>
+  Array.from(text.matchAll(new RegExp(re.source, "giu")), (m) => ({ word: m[0].toLowerCase(), index: m.index ?? 0 }));
 const metricsIn = (text: string) => (Object.keys(METRIC_WORDS) as (keyof typeof METRIC_WORDS)[]).filter((m) => METRIC_WORDS[m].test(text));
 
 export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: string): Validation {
@@ -122,57 +139,76 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
       return f ? [f] : [];
     });
     const kinds = new Set(cited.map((f) => f.kind));
-    const stripped = stripQuotes(claim.text, cited);
+
+    // §5 rule 4b: no Devanagari or other script is validated in v1. Zero-width
+    // and soft-hyphen characters can split a word past every list: rejected too.
+    const script = firstMatch(NON_LATIN, claim.text.normalize("NFKC")) ?? firstMatch(FORMAT_CHARS, claim.text);
+    if (script) fail("non_latin_script", i, script);
+
+    const text = normalizeForMatch(claim.text);
+    const stripped = stripQuotes(text, cited);
+    // Band and contradiction checks keep quoted readings, so their metric and
+    // band stay paired. Quoted labels are removed ("Exercise or heavy sweating
+    // seems to trigger breakouts" is not a band); a band word added around a
+    // label fails the quote-framing rule below instead (security finding 1).
+    const bandText = stripQuotes(text, cited.filter((f) => f.kind !== "state"));
 
     // §5 rule 2. A claim type the package does not allow is a citation failure too.
     if (!pkg.allowedClaims.includes(claim.claim_type)) fail("citation_rule", i, claim.claim_type);
     if (MUST_CITE.has(claim.claim_type) && claim.fact_ids.length === 0) fail("citation_rule", i);
-    if (!MUST_CITE.has(claim.claim_type) && (claim.fact_ids.length > 0 || BAND_WORD.test(claim.text) || metricsIn(claim.text).length > 0)) {
+    if (!MUST_CITE.has(claim.claim_type) && (claim.fact_ids.length > 0 || BAND_WORD.test(text) || metricsIn(text).length > 0 || text.length > UNCITED_MAX)) {
       fail("citation_rule", i);
     }
 
-    // §5 rule 4b: no Devanagari or other script is validated in v1.
-    const script = firstMatch(NON_LATIN, claim.text);
-    if (script) fail("non_latin_script", i, script);
-
     for (const [check, pattern] of WORD_CHECKS) {
-      const term = firstMatch(pattern, stripped);
+      // Numbers also on the raw text: NFKD folds "Ⅳ" to the letters "IV".
+      const term = firstMatch(pattern, stripped) ?? (check === "made_up_number" ? firstMatch(pattern, stripQuotes(claim.text, cited)) : null);
       if (term) fail(check, i, term);
     }
     // With extra caution on, no active ingredient at all, even one a rec.* fact names.
     if (pkg.safety.extraCaution) {
-      const active = firstMatch(ACTIVE, claim.text);
+      const active = firstMatch(ACTIVE, text);
       if (active && !failures.some((f) => f.claimIndex === i && f.check === "product_claim")) fail("product_claim", i, active);
     }
 
     // §5 rule 6: a descriptive band word must be a band of a cited reading.
     if (claim.claim_type === "descriptive") {
       const citedBands = new Set(cited.filter((f) => f.band).map((f) => f.band!.toLowerCase()));
-      for (const band of bandsIn(stripped)) if (!citedBands.has(band)) fail("band_mismatch", i, band);
+      for (const band of matchesOf(BAND_WORD, bandText)) if (!citedBands.has(band.word)) fail("band_mismatch", i, band.word);
     }
 
-    // A metric named with a band the package does not hold for it, cited or not.
-    for (const clause of stripped.split(new RegExp(String.raw`[.;!?]|,\s|\band\b|\bbut\b|\bwhile\b`, "iu"))) {
-      const bands = bandsIn(clause);
+    // A metric named with a band the package does not hold for it, cited or
+    // not. Per sentence, each metric word pairs with its nearest band word.
+    for (const sentence of bandText.split(/[.;!?]/)) {
+      const bands = matchesOf(BAND_WORD, sentence);
       if (bands.length === 0) continue;
-      if (UNMEASURED_WORDS.test(clause)) {
-        fail("contradicts_package", i, firstMatch(UNMEASURED_WORDS, clause) ?? undefined);
-        continue;
-      }
-      const regions = REGION_WORDS.filter(([, re]) => re.test(clause)).map(([r]) => r);
-      for (const metric of metricsIn(clause)) {
-        const held = readings.filter((r) => r.metric === metric && (regions.length === 0 || regions.includes(r.region)));
-        const heldBands = new Set(held.map((r) => r.band.toLowerCase()));
-        const wrong = bands.find((b) => !heldBands.has(b));
-        if (wrong) fail("contradicts_package", i, wrong);
+      const unmeasured = firstMatch(UNMEASURED_WORDS, sentence);
+      if (unmeasured) fail("contradicts_package", i, unmeasured);
+      const regions = REGION_WORDS.filter(([, re]) => re.test(sentence)).map(([r]) => r);
+      for (const metric of Object.keys(METRIC_WORDS) as (keyof typeof METRIC_WORDS)[]) {
+        for (const at of matchesOf(METRIC_WORDS[metric], sentence)) {
+          const band = bands.find((b) => b.index > at.index) ?? bands[bands.length - 1]!;
+          const held = readings.filter((r) => r.metric === metric && (regions.length === 0 || regions.includes(r.region)));
+          if (!held.some((r) => r.band.toLowerCase() === band.word)) fail("contradicts_package", i, band.word);
+        }
       }
     }
 
     // F04: what the user told us is never presented as measured.
-    if (claim.claim_type === "descriptive" && kinds.has("self")) fail("self_report_as_measurement", i);
+    if (kinds.has("self") && claim.claim_type !== "self_reported_echo") fail("self_report_as_measurement", i);
     if (claim.claim_type === "self_reported_echo" && cited.some((f) => f.kind !== "self")) fail("self_report_as_measurement", i);
     const measured = firstMatch(MEASUREMENT, stripped);
     if (measured && !kinds.has("state")) fail("self_report_as_measurement", i, measured);
+    // A quote may be framed ("You told us …") but not extended with Gemini's
+    // own words: "…, and that is what your Moderate redness reflects" (security finding 8).
+    if (claim.claim_type === "self_reported_echo") {
+      const extra = extraWord(stripped, cited);
+      if (extra) fail("self_report_as_measurement", i, extra);
+    }
+    if (kinds.has("rec")) {
+      const extra = extraWord(stripped, cited);
+      if (extra) fail("product_claim", i, extra);
+    }
   });
 
   // An answer that describes a reading also says what the reading cannot tell.

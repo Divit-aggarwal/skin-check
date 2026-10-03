@@ -24,7 +24,10 @@ import { SCAN_ANALYSIS_SCHEMA_VERSION } from "@/lib/scan-analysis-record";
 import type { EchoRegion } from "@/lib/echo-regions";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import type { SkinScanScores } from "@/types/skin-scan";
-import { CAUSE, CHANGE, CONFIDENCE, DIAGNOSIS, FORECAST, INSTRUCTION, MEDICAL, NON_LATIN, NUMBER, PRODUCT_INTENT } from "./lexicon";
+import {
+  BAND_NAME, CAUSE, CHANGE, CONFIDENCE, DIAGNOSIS, FORECAST, FORMAT_CHARS, INSTRUCTION, MEASUREMENT, MEDICAL, NON_LATIN, NUMBER,
+  PAST_EVENT, PRODUCT_INTENT, UNMEASURED_WORDS, normalizeForMatch,
+} from "./lexicon";
 
 // F01 + F04 (docs/lanes/context-design.md §3.3, §3.4). Deterministic: the
 // same inputs give the same package. Every field is constructed here from
@@ -92,9 +95,9 @@ export const REASON_TEXT: Record<NotEnoughEvidenceReasonCode, string> = {
   engine_boundary: "The analysis software was updated between these checks.",
   legacy_record: "An older check was saved in a format that cannot be matched up.",
   bad_raw_data: "Some of the photo data could not be read.",
-  conflicting_scans: "The first checks do not agree with each other closely enough.",
-  identical_scan: "Both readings come from the same photo.",
-  persistence_not_available: "Whether a reading holds steady across several checks cannot be told yet.",
+  conflicting_scans: "The starting checks do not agree with each other closely enough.",
+  identical_scan: "Both readings are from the same photo.",
+  persistence_not_available: "Whether a reading holds steady across checks cannot be told yet.",
 };
 
 const SELF_TOPICS: Record<GeminiAnswerField, string> = {
@@ -137,11 +140,17 @@ export const MISSING_TEXT = {
 
 const missing = (key: string, about: MissingItem["about"], text: string): MissingItem => ({ id: `missing.all.${key}`, text, about });
 
-const SCREENS = [CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST, CONFIDENCE, INSTRUCTION, NUMBER, NON_LATIN];
+const SCREENS = [CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST, CONFIDENCE, INSTRUCTION, NUMBER, PAST_EVENT, MEASUREMENT, BAND_NAME, UNMEASURED_WORDS];
 
-/** Outside text (catalog names, claims) must pass the same lexicons as Gemini's answer, plus an instruction screen. */
+/**
+ * Outside text (catalog names, claims) must pass the same lexicons as Gemini's
+ * answer, plus an instruction screen. A quote of it is exempt in the
+ * validator, so it may carry no band, measurement or past-event word either.
+ */
 export function screenExternalText(text: string): boolean {
-  return text.trim().length > 0 && text.length <= 300 && !SCREENS.some((re) => re.test(text));
+  if (!text.trim() || text.length > 300 || FORMAT_CHARS.test(text) || NON_LATIN.test(text.normalize("NFKC"))) return false;
+  const folded = normalizeForMatch(text);
+  return !SCREENS.some((re) => re.test(folded));
 }
 
 const SLUG = /^[a-z0-9-]{1,40}$/;

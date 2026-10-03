@@ -303,6 +303,30 @@ The other findings were design-text gaps. This file now matches the code:
 
 The switch-off test now also asserts that `handleContextChat` is never called.
 
+### 3.11 Security review (2026-10-04) and the fixes
+
+Each finding below has tests in `context-attacks.test.ts` ("security review bypasses").
+
+1. **A quoted label hid the metric next to a band.** Fixed:
+   - band and contradiction checks keep reading quotes, so metric and band stay paired;
+   - a `self_reported_echo` may only frame its quote ("You told us …"). Any other word must come from the cited fact's own text (`extraWord`).
+2. **Self facts were cited under other claim types.** Fixed: any claim citing a `self.*` fact must be `self_reported_echo`.
+3. **The measurement-phrase and band-word lists were too narrow.** Fixed:
+   - the lists are wider and include intensity words ("a lot of", "significant");
+   - contradiction checks run per sentence, pairing each metric word with its nearest band word, not split on commas.
+4. **Plain paraphrases got past the lexicons.** Fixed: the cause, number, past-event, diagnosis and active lists are widened. Numbers use `\p{N}`, and also run on the un-normalised text, because NFKD folds "Ⅳ" to letters. Our own reason texts were reworded so they contain no listed word.
+5. **Uncited free text was unchecked.** Fixed: `smalltalk`, `clarify` and `out_of_scope` claims are capped at 240 characters, and the widened lists apply to them.
+6. **Unicode tricks split words past the lists.** Fixed:
+   - text is NFKD-folded and combining marks are removed before matching;
+   - any format character (zero-width, soft hyphen) is rejected as `non_latin_script`, which goes to the fallback.
+7. **Catalog text could carry instructions or claims.** Fixed: the screen also covers past events, measurement phrases, band names and unmeasured words, plus wider instruction phrasings and spaced-out letters. It runs on normalised text and rejects format characters. Quoting a `rec.*` fact may only frame the quote, the same rule as self echoes.
+8. **Laundering through the quote exemption.** Fixed by the quote-framing rule in item 1.
+9. **The red-flag pre-filter missed inputs.** Fixed: it now covers each listed miss. `needs_referral` remains the second signal.
+10. **A rejected injection stayed in history.** Fixed: an exchange that ended in the fallback is stored with `historyExcluded: true`, like pre-filter and referral turns. `loadChatHistory` reads only turns with `historyExcluded === false`.
+11. **No TTL on chatTurns.** `expireAt` does nothing until the Firestore TTL policy exists. That is a request to main, not code here.
+
+**Residual (GEMINI_BOUNDARY §5 known limit):** the lexicons catch phrasing, not meaning. A paraphrase in an unlisted word can still pass. The package never holds cross-scan data, so a change claim always has nothing true behind it.
+
 ## 4. Tests, with the failure each catches
 
 | File | Proves | Fails if |

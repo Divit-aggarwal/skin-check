@@ -9,16 +9,28 @@
 
 const re = (parts: string[]) => new RegExp(parts.join("|"), "iu");
 
+/**
+ * Compatibility forms folded (fullwidth, small capitals, ligatures) and
+ * combining marks removed, so "ｃａｕｓｅｄ" or "câused" match like "caused"
+ * (security review finding 6). Format characters (zero-width, soft hyphen)
+ * are not removed here: hasFormatChars() rejects them outright.
+ */
+export function normalizeForMatch(text: string): string {
+  return text.normalize("NFKD").replace(new RegExp(String.raw`\p{M}`, "gu"), "");
+}
+
+export const FORMAT_CHARS = new RegExp(String.raw`\p{Cf}`, "u");
+
 export function firstMatch(pattern: RegExp, text: string): string | null {
   return pattern.exec(text)?.[0] ?? null;
 }
 
 // §5 rule 3. "do" (two) is left out: it is also an English verb.
 export const NUMBER = re([
-  "\\p{Nd}",
+  "\\p{N}",
   "%",
-  "\\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|half|double|twice|dozen|percent|percentage)\\b",
-  "\\b(?:ek|teen|char|chaar|paanch|panch|chhe|chhah|saat|aath|nau|das|bees|pachaas|sau|hazaar|hazar|aadha|dugna)\\b",
+  "\\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|half|halves|double|twice|thrice|triple|dozen|percent|percentage|third|quarter|several|couple|first|second|fifth|tenth)s?\\b",
+  "\\b(?:ek|teen|char|chaar|paanch|panch|chhe|chhah|saat|aath|nau|das|bees|pachees|tees|chalees|pachaas|sau|hazaar|hazar|lakh|crore|aadha|dedh|dhai|dugna)\\b",
 ]);
 
 // §5 rule 4: change and comparative words, on every claim type.
@@ -76,7 +88,12 @@ export const MEDICAL = re([
 ]);
 
 export const DIAGNOSIS = re([
-  "\\bacne vulgaris\\b",
+  "\\bacne\\b",
+  "\\bpcos\\b",
+  "\\bhives\\b",
+  "\\ballerg\\w*",
+  "\\bmilia\\b",
+  "\\bseborrh\\w*",
   "\\brosacea\\b",
   "\\bmelasma\\b",
   "\\beczema\\b",
@@ -93,7 +110,17 @@ export const DIAGNOSIS = re([
 ]);
 
 export const CAUSE = re([
-  "\\bbecause of\\b",
+  "\\bbecause\\b",
+  "\\bstem(?:s|med|ming)? from\\b",
+  "\\bcom(?:e|es|ing) from\\b",
+  "\\blinked (?:to|with)\\b",
+  "\\bdriven by\\b",
+  "\\bthanks to\\b",
+  "\\bas a result\\b",
+  "\\bexplain\\w*",
+  "\\bfrom (?:shaving|stress|diet|sleep|sweat\\w*|food|dairy|sugar|sun|hormones?)\\b",
+  "\\bky[uo]n(?:ki|ke)\\b",
+  "\\bse ho (?:raha|rahi|rha|rhi)\\b",
   "\\bdue to\\b",
   "\\bcaus\\w*",
   "\\bleads? to\\b",
@@ -136,7 +163,15 @@ export const CONFIDENCE = re([
 ]);
 
 export const PAST_EVENT = re([
-  "\\blast (?:time|week|month|year|scan|check|visit|photo)\\b",
+  "\\blast (?:\\w+ )?(?:times?|weeks?|months?|years?|days?|scans?|checks?|visits?|photos?)\\b",
+  "\\bprior\\b",
+  "\\brecent(?:ly)?\\b",
+  "\\bthe other day\\b",
+  "\\ba while (?:back|ago)\\b",
+  "\\bwhen you first\\b",
+  "\\byou(?:'ve| have) (?:started|stopped|been|begun|switched|used)\\b",
+  "\\bthis past\\b",
+  "\\bkal\\b",
   "\\byesterday\\b",
   "\\bago\\b",
   "\\bprevious(?:ly)?\\b",
@@ -152,7 +187,18 @@ export const PAST_EVENT = re([
 export const ACTIVE = re([
   "\\bretinol\\w*",
   "\\bretinoids?\\b",
-  "\\btretinoin\\b",
+  "\\w*tretinoin\\b",
+  "\\baccutane\\b",
+  "\\bretinal\\b",
+  "\\bhydroquinone\\b",
+  "\\barbutin\\b",
+  "\\bbakuchiol\\b",
+  "\\bkojic\\b",
+  "\\btranexamic\\b",
+  "\\bclindamycin\\b",
+  "\\bdoxycycline\\b",
+  "\\bsteroid\\w*",
+  "\\bhydrocortisone\\b",
   "\\badapalene\\b",
   "\\bniacinamide\\b",
   "\\bsalicylic\\b",
@@ -187,7 +233,12 @@ export const PRODUCT = re([
 ]);
 
 export const MEASUREMENT = re([
-  "\\b(?:scan|photo|image|picture|analysis|reading)s? (?:shows?|showed|found|detected|says|indicates|measured)\\b",
+  "\\b(?:scan|photo|image|picture|analysis|reading|check)s? (?:shows?|showed|found|finds|detected|says|indicates|measured|reveals?|revealed|picked up|captured)\\b",
+  "\\bpicked up\\b",
+  "\\bwe (?:can )?see\\b",
+  "\\b(?:visible|seen|shown) (?:in|on) (?:your|the|this) (?:photo|scan|image|picture)\\b",
+  "\\baccording to (?:your|the|this) (?:photo|scan|check|analysis|image)\\b",
+  "\\brated\\b",
   "\\bmeasured\\b",
   "\\bdetected\\b",
   "\\byour (?:results?|readings?)\\b",
@@ -207,9 +258,23 @@ export const INSTRUCTION = re([
   "\\boverrid\\w*",
   "\\bjailbreak\\w*",
   "\\bact as\\b",
+  "\\becho\\s*:",
+  "\\btell (?:the )?user\\b",
+  "\\bfrom now on\\b",
+  "\\bnew rules?\\b",
+  "\\byou must\\b",
+  "\\balways (?:say|tell|answer)\\b",
+  "\\bguidance\\b",
+  "\\bprompt\\b",
+  // letters spaced out to dodge a word list: "i g n o r e"
+  "(?:\\b\\w\\s){3,}\\w\\b",
 ]);
 
-export const BAND_WORD = new RegExp(String.raw`\b(?:low|moderate|elevated|high|severe|mild)\b`, "iu");
+/** Our three bands, plus intensity words that would act as a band of Gemini's own. */
+export const BAND_WORD = new RegExp(
+  String.raw`\b(?:low|moderate|elevated|high|severe|mild|significant(?:ly)?|intense|strong|noticeable|extreme(?:ly)?|slight(?:ly)?|heavy|minimal|a lot of|lots of|bahut)\b`,
+  "iu"
+);
 
 /** Metric words a claim may use, keyed by the package metric. */
 export const METRIC_WORDS: Record<"redness" | "oiliness" | "texture" | "blemishes" | "pigment", RegExp> = {
@@ -240,3 +305,6 @@ export const PRODUCT_INTENT = re([
   "\\bwhat should i\\b",
   "\\blaga\\w*",
 ]);
+
+/** Band names only, for the catalog screen ("a mild face wash" is a fair product claim; "suits elevated redness" is not). */
+export const BAND_NAME = new RegExp(String.raw`\b(?:low|moderate|elevated|high|severe)\b`, "iu");

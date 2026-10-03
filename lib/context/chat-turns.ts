@@ -39,7 +39,10 @@ export async function recordChatTurns(
 ): Promise<void> {
   const col = turns(uid);
   const expireAt = Timestamp.fromMillis(now + CHAT_TURN_TTL_DAYS * DAY_MS);
-  const common = { scanId, region, expireAt, prefilter: meta.prefilter, redFlag: meta.redFlag };
+  // Left out of later Gemini history: pre-filter hits, referrals, and answers
+  // that ended in the fallback, so a rejected injection is not replayed.
+  const historyExcluded = meta.prefilter !== null || meta.redFlag || meta.validator?.fallback === true;
+  const common = { scanId, region, expireAt, prefilter: meta.prefilter, redFlag: meta.redFlag, historyExcluded };
   const batch = adminDb().batch();
   batch.create(col.doc(), {
     ...common,
@@ -54,15 +57,15 @@ export async function recordChatTurns(
 
 /**
  * The last HISTORY_TURNS stored turns of this (scan, region) thread, oldest
- * first. Pre-filter and referral turns are left out, so a red-flag message
- * never reaches Gemini. Equality-only query, filtered and sorted in code: no composite index.
+ * first. Pre-filter, referral and fallback turns are left out, so a red-flag
+ * message or a rejected injection never reaches Gemini again. Equality-only query, filtered and sorted in code: no composite index.
  */
 // ponytail: reads every turn of the scan; add a region field index and a limit when threads get long.
 export async function loadChatHistory(uid: string, scanId: string, region: EchoRegion): Promise<EchoChatMessage[]> {
   const snap = await turns(uid).where("scanId", "==", scanId).get();
   return snap.docs
     .map((d) => d.data())
-    .filter((t) => t.region === region && t.prefilter == null && t.redFlag !== true && (t.role === "user" || t.role === "echo") && typeof t.text === "string")
+    .filter((t) => t.region === region && t.historyExcluded === false && (t.role === "user" || t.role === "echo") && typeof t.text === "string")
     .sort((a, b) => (a.createdAt as Timestamp).toMillis() - (b.createdAt as Timestamp).toMillis())
     .slice(-HISTORY_TURNS)
     .map((t) => ({ role: t.role as "user" | "echo", text: t.text as string }));
