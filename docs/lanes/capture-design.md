@@ -2,10 +2,27 @@
 
 Branch `lane/capture`, worktree `../skin-check-capture`. Read [README.md](README.md) for the lane rules and [capture.md](capture.md) for the brief.
 
-**Status: design only.**
-- No app code is written until the owner approves this design (README rule 3).
-- `capture-report.md` will link to this file and record the approval (capture.md exit conditions).
+**Status: approved by the owner on 2026-10-03, with the decisions in part 0.**
+- `capture-report.md` links to this file and records the approval (capture.md exit conditions).
 - In part 6, "needs no owner decision" means no decision beyond approving this design.
+
+## 0. Owner decisions (2026-10-03)
+
+| Item | Decision | What it means for the build |
+|---|---|---|
+| O-1 | **A** | `captureMethod` stays in the comparability key and is marked client-asserted (`captureMethodAssertedBy: "client"` on the key). This is an owner change to D-26, which listed only two options. It goes to the tracker as a proposed row (below). |
+| O-2 | **A** | The gate result is saved on the server-written `scanAnalyses` record as `captureQuality`, labelled `assertedBy: "client"`. It carries a numeric version field, `schemaVersion: 1` (§2.5). The server drops a value with any other version. |
+| O-3 | **C** | No new library. Pose, expression, distance and framing stay `not_measured`. S10 is skipped. Proposed tracker row: derive pose, distance and framing later on the server from the engine's own face landmarks. |
+| O-4 | **B** | Soft block. A failed check disables Analyze. After `gate.retakesBeforeOverride` retakes, "Use this photo anyway" appears and the result is saved as `override`. `unchecked` is allowed and saved as `unchecked`. |
+| O-5 | **A** | `lib/api.ts` passes the server's error `code` through on a failed scan, as a one-function exception for the capture lane. |
+| Q-1 | Follow the frozen contract | A different capture method is `not_comparable` (`capture_method_differs`). There is no "comparable-with-caveats" tier. |
+| Q-2 | The browser's quality result never feeds comparability | `lib/comparability.ts` never reads `captureQuality`. Steps 2 and 5 of LONGITUDINAL_METHOD §3 stay unmet until a server-side quality producer exists. |
+
+Build order set by the owner: S1 to S9, then S11 and S12. S10 is skipped (O-3 = C).
+
+**Proposed tracker rows (go into `capture-report.md`; the lane does not edit the tracker)**
+- **D-26 amendment (owner change, O-1 = A):** `captureMethod` stays in the skinstate comparability key, marked client-asserted. The SkinState contract amendment names `captureMethod`, `persistAttempt` and `captureQuality` as client-asserted, and states that a forged `captureMethod` can only merge two capture paths, while every other key part and the validated-quantity table still apply.
+- **Server-side capture quality (O-3 = C follow-up):** derive pose, distance (face scale) and framing on the server from the engine's own mediapipe face landmarks, as a separately versioned server-side quality producer. That is the only route by which quality can enter comparability (Q-2). Engine work needs approval under D-18.
 
 **Sources read**
 - Decisions and specs:
@@ -190,6 +207,7 @@ type RetakeReason =
 
 ```ts
 interface CaptureQuality {
+  schemaVersion: 1;                    // owner O-2: numeric shape version; any other value is dropped by the server
   producer: "capture-quality-web";     // the "separately versioned quality producer" (contract §7.2)
   producerVersion: "cq-1";
   settingsVersion: string;             // e.g. "cq-settings-0-provisional"
