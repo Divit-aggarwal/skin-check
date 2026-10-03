@@ -10,7 +10,9 @@ Recorded as given:
 2. **D01.** "The baseline rule is the first 3 comparable scans, as a named setting marked provisional."
 3. **D02.** "With the empty noise table, every real pair answers 'not enough evidence'. This is accepted."
 
-The owner approved the contract version. The text of `docs/architecture/SKIN_STATE_CONTRACT_2.md` still needs the owner's sign-off. That does not block the build.
+The owner's instruction of 2026-10-04 is to write this design, have the verifier check it, fix what it finds, and then build every step that needs no new owner decision. That instruction is the design gate (lanes README rule 3) for this lane. The owner approved the contract version. The text of `docs/architecture/SKIN_STATE_CONTRACT_2.md` still needs the owner's sign-off. Under that instruction, the build does not wait for it.
+
+This file is not in the lanes README ownership table. It is the design brief that rule 3 asks for, and it was named in the owner's instruction. capture-design.md is the precedent.
 
 ## 1. What will be built
 
@@ -33,11 +35,11 @@ Everything is computed on read. Nothing new is stored, and no UI or route is bui
 export const SKIN_STATE_2_CONTRACT_VERSION = "skinstate-2";
 
 /** The fields a browser can set. Fixed literal, not configuration. */
-export const CLIENT_ASSERTED = {
+export const CLIENT_ASSERTED = Object.freeze({
   "input.captureMethod": "in the comparability key; a forged value can only merge the two capture paths (TD-05, O-1 A)",
   "provenance.persistAttempt": "provenance only; never in the comparability key",
   captureQuality: "stored on the record, not mapped; never feeds comparability (TD-06 Q-2)",
-} as const;
+} as const);
 
 export interface SkinState2 extends Omit<SkinState, "contractVersion" | "engine"> {
   contractVersion: "skinstate-2";
@@ -59,7 +61,7 @@ export function toSkinState2(record: unknown, analysisRef: string, expectedUid: 
 ### 2.2 Comparability (`lib/comparability.ts`, additive)
 
 - `ComparabilityKey.contractVersion` becomes `"skinstate-1" | "skinstate-2"`.
-- `comparabilityKey` and `compareStates` take `SkinState | SkinState2`. The function bodies do not change.
+- `comparabilityKey`, `compareStates` and the private `uidOf` take `SkinState | SkinState2`. Only the types change; the function bodies stay the same.
 - Under skinstate-2 the build is real, so `engine_build_unknown` and `engine_build_differs` become meaningful.
 - A skinstate-1 state compared with a skinstate-2 state gives `contract_version_differs`.
 - `COMPARABLE_QUANTITIES` stays empty. Only tests pass a table.
@@ -86,21 +88,26 @@ export function longitudinalResult(
 ): LongitudinalResult;
 ```
 
-The engine works in this order. It stops at the first step that ends the answer.
+The engine works in this order. Only step 1 stops early. Every other step adds each reason that applies, so a "not enough evidence" answer lists all of them. For example, A A A then B gives both `engine_boundary` and `not_comparable` (with `engine_build_differs`).
 
-1. **Bad raw data.** If any entry is `invalid`, the answer is `bad_raw_data`. All detail is null and nothing partial is given.
-2. **Legacy.** Legacy readings are never used. If the series contains any, the reason `legacy_record` is added whenever the answer ends as "not enough evidence".
+1. **Bad raw data.** If any entry is `invalid`, the answer is `bad_raw_data` and nothing else. Every detail number and reference is null, the arrays are empty, and nothing partial is given.
+2. **Legacy.** Legacy readings are never used, and they never block a valid series. If the series contains any, the reason `legacy_record` is added only when the answer ends as "not enough evidence".
 3. **Order.** Valid states are sorted by `analyzedAt`, then by `analysisRef`. The **latest** is the last one. With no valid state the answer is `too_few_scans_for_baseline` with an empty window.
-4. **Baseline candidates (D01).** These are the first 3 states before the latest, in time order, that have a known `engine.build`. States with an unknown build (for example 0.1.5 records) are skipped. They are unusable, but they are not a boundary: no two of them can ever be compared. Fewer than 3 candidates gives `too_few_scans_for_baseline`. The window is `{ status: "insufficient", scans: <comparable candidates> }`. One scan is never a baseline.
+4. **Baseline candidates (D01, "first 3 comparable scans").** These are the first 3 states before the latest, in time order, that have a known `engine.build` and are usable on their own for this quantity and region. A state is skipped when its check against itself names `region_absent`, `region_low_pixel_count`, `native_stats_missing` or `capture_method_unknown`. States with an unknown build (for example 0.1.5 records) are skipped too. They are unusable, but they are not a boundary: no two of them can ever be compared. A state is never skipped for its engine identity, and never for not matching the latest. A capture method that differs from the latest is not a skip reason, so it gives `not_comparable` (owner question, §7). Fewer than 3 candidates gives `too_few_scans_for_baseline`. The window is `{ status: "insufficient", scans: <comparable candidates> }`. One scan is never a baseline.
 5. **Window and engine boundary.** The window runs from the first candidate to the latest, and includes every valid state in that time span. If it holds more than one `pipelineVersion`, or more than one known `engine.build`, the reason is `engine_boundary`. The baseline never moves past a boundary into a newer epoch: candidates are picked by time and known build, not by matching the latest. Re-baselining after an engine change is D05 (LATER).
 6. **Comparability.** Each candidate is checked with `compareStates(candidate, latest, quantity, region, comparable)`.
    - If any pair is not comparable, the reason is `not_comparable`. `comparability` carries the union of the reasons, in the fixed `NOT_COMPARABLE_REASONS` order.
-   - If all 3 pairs are comparable, the window is `{ status: "established", scans: 3 }` and `comparability` is the comparable verdict with its key.
+   - If all 3 pairs are comparable, the window is `{ status: "established", scans: 3 }` and `comparability` is the comparable verdict with its key. Otherwise the window is `{ status: "insufficient", scans: <pairs that are comparable> }`. An established window can still give "not enough evidence", for example with a boundary or an unknown floor.
+   - **Narrowing to the shared shape.** `compareStates` returns a plain reason array and a key with nullable parts. The engine copies the reasons as a non-empty tuple in the fixed order. It copies a comparable key field by field into `ComparableKey`, and checks at run time that no part is null (it throws if one is, which cannot happen). The `noiseThreshold` field is dropped.
+   - **No pair to check (convention; request to main).** The shape needs a `comparability` value even when nothing was compared. In that case:
+     - With a latest but no candidate, it is the latest checked against itself, which names what stops that state from pairing at all.
+     - With no state, or `bad_raw_data`, it is an all-unknown key checked against itself. That gives `quantity_not_validated` and every `*_unknown` reason, plus `region_absent`. This is why `pipeline_version_unknown` and `input_variant_unknown` can appear, though only in this case.
+     - A "not evaluated" comparability arm in the shared shape would be cleaner. That is a request to main.
 7. **Noise floor.** Look up exactly one `NoiseTableEntry` for (quantity, region, latest `pipelineVersion`). The floor is the largest `mdc95ByToneBand` value (`most_conservative`), and it must be finite and greater than zero.
    - No entry, more than one entry, a bad value, or a histogram quantity (`*Hist`) gives `noise_table_empty` with `noiseFloor: unknown`.
    - Histograms have no scalar difference. The engine never subtracts arrays, and it ignores table rows for histogram paths. A dedicated reason code is a request to main.
 8. **Values.** The baseline value is the median of the 3 baseline values. The difference is latest minus baseline. These go into `detail` (internal only).
-9. **Identical scan.** If the latest and all 3 baseline scans have the same `analysedImageSha256` and the same value, the reason `identical_scan` is added. It never skips the noise-floor check: with no known floor the answer is still "not enough evidence", with `identical_scan` and `noise_table_empty`.
+9. **Identical scan.** If there are 3 candidates, and the latest and all 3 have the same `analysedImageSha256` and the same value, the reason `identical_scan` is added. Comparability does not matter for this step. It never skips the noise-floor check: with production tables the answer is "not enough evidence", with `identical_scan`, `noise_table_empty` and `not_comparable`.
 10. **Conflicting baseline.** If the baseline values span more than the noise floor (max minus min > floor), the reason is `conflicting_scans`.
 11. **Answer.**
     - A **pairwise** answer needs all of these: no invalid entry, an established window, no engine boundary, all pairs comparable, a known floor, a scalar quantity, and no conflicting scans. Then `change` is `beyond_noise` (with `passedNoiseFloor: true`) when |difference| > floor, and `within_noise` (with `passedNoiseFloor: false`) otherwise. The reasons are `[beyond_noise | within_noise | identical_scan, persistence_not_available]`, and the answer names every confounder.
@@ -176,13 +183,14 @@ The fixtures are synthetic records built with `tests/synthetic-scan.ts` (read on
 - Histogram quantity with test tables that include a row for it: `noise_table_empty`, never a difference.
 - **Production tables:** each of the 10 series and the histogram case, run with no `tables` argument, gives `not_enough_evidence`.
 - **Adversarial, production defaults only:** identical sha256 values, a huge difference, a forged `captureMethod`, `persistAttempt: "recovery"`, `captureQuality` saying pass, 3 matching-build baseline scans. Every case gives `not_enough_evidence`.
-- **Wording:** every reason text from every result above, and the full reason-text map, contains no digit, no `%` and no direction word (better, worse, improv*, worsen*, increas*, decreas*, higher, lower, more, less, gain, loss).
+- **Wording:** every reason text from every result above, and the full reason-text map, contains no digit (checked with `\p{Nd}`), no `%`, and no word from the GEMINI_BOUNDARY §5 rule 4 change lexicon. A few more direction words are banned too (worse*, decreas*, down, up, gain, loss, rise, drop).
 - **Determinism:** the same series in a shuffled order gives the same result.
 
 **longitudinal-guard**
 - No file under `lib/`, `app/`, `components/` or `scripts/` passes a table argument to `longitudinalResult`, `compareStates` or `compareKeys`. Only `tests/` may. There is one exception: `lib/longitudinal/engine.ts` forwards its own optional `tables` parameter, which defaults to the production tables. `NOISE_TABLE` and `COMPARABLE_QUANTITIES` are empty and frozen. *Fails if* production code ever supplies a table.
 
 **longitudinal-series.e2e** (stack only)
+- It uses `describe.skipIf(!WEB)`, like the other e2e tests, so `npm test` skips it.
 - It reads the seeded series from the Firestore emulator. Every record maps under both skinstate-1 and skinstate-2. skinstate-2 carries the seeded build.
 - For each region and each scalar quantity, `longitudinalResult` with production tables gives `not_enough_evidence`.
 
@@ -190,7 +198,7 @@ The fixtures are synthetic records built with `tests/synthetic-scan.ts` (read on
 
 - Forecasting, trends, persistence (D03 shows it only as a reason), patterns, product attribution (D-12).
 - Re-baselining after an engine change (D05, LATER), and the `first_14_days` rule (named in the type, not used).
-- A production loader or any wiring into routes, the context builder or the UI. Wiring is a main-session step after merge. The e2e test reads the emulator itself.
+- A production loader or any wiring into routes, the context builder or the UI. Wiring is a main-session step after merge. The e2e test reads the emulator itself. Under D-26, a SkinState may only come from a trusted, path-built server read. `lib/skin-state-loader.ts` is frozen, so wiring needs a new server-only skinstate-2 loader. That is a request to main.
 - `engine.build` derived from ECS deploy history. `processingConsentVersion` mapping (not stored).
 - Any change to the noise table or `COMPARABLE_QUANTITIES` (C05–C07).
 - Any edit to `lib/contracts/` or `tests/contracts.test.ts`.
@@ -199,7 +207,7 @@ The fixtures are synthetic records built with `tests/synthetic-scan.ts` (read on
 
 | # | Step | Commit |
 |---|---|---|
-| 1 | This design, verifier check, fixes | docs |
+| 1 | This design, verifier check, fixes (verifier FAIL on 70c8e31: findings fixed in the next commit) | docs |
 | 2 | skinstate-2 code, contract doc, `tests/skin-state-2.test.ts` | feat |
 | 3 | Comparability additive change, `tests/comparability-2.test.ts` | feat |
 | 4 | Settings and baseline (D01), `tests/longitudinal-baseline.test.ts` | feat |
@@ -213,3 +221,6 @@ Each code step ends with `npm test`, `npm run typecheck` and `npm run lint` gree
 
 - **D05 window wording.** After an engine change the baseline stays in the old epoch. That user gets "not enough evidence" until D05 decides how to re-baseline. The alternative, starting a new window in the new epoch, is D05's decision.
 - **Contract text.** `SKIN_STATE_CONTRACT_2.md` needs sign-off.
+- **D01 reading.** The design reads "first 3 comparable scans" as: the first 3 known-build scans that are usable on their own, each of which must then be comparable with the latest. One early scan with a different capture method therefore blocks that quantity until D05 or a new rule.
+- **Retakes.** Each retake is its own record (D-21), so three retakes in one sitting can form the whole baseline. Grouping records by `scanId` would change that. Note that `scanId` is set by the browser.
+- **D-24** is cited by the brief and the shared shape, but `DECISION_LOG.md` has no D-24 entry.
