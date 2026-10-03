@@ -15,7 +15,9 @@ const CheckSchema = z.strictObject({
   id: z.enum(CHECK_ORDER),
   status: z.enum(["pass", "fail", "not_measured"]),
   measured: z
-    .record(z.string().max(32), z.number())
+    // Plain identifiers only: Firestore refuses reserved names such as "__x__",
+    // which would lose the whole record rather than just this field.
+    .record(z.string().regex(/^[A-Za-z][A-Za-z0-9]{0,31}$/), z.number())
     .refine((m) => Object.keys(m).length <= 8)
     .nullable(),
   retakeReason: RetakeReasonSchema.nullable(),
@@ -36,7 +38,18 @@ export const CaptureQualitySchema = z
     retakeReasons: z.array(RetakeReasonSchema).max(CHECK_ORDER.length),
     retakeCount: z.number().int().min(0).max(1_000),
   })
-  .refine((q) => q.checks.every((c, i) => c.id === CHECK_ORDER[i]));
+  .refine((q) => q.checks.every((c, i) => c.id === CHECK_ORDER[i]))
+  // The gate's own rules (design §2.3, §2.5): a stored verdict agrees with its checks.
+  .refine((q) => {
+    const failed = q.checks.filter((c) => c.status === "fail");
+    const exposureMeasured = q.checks[0]!.status !== "not_measured";
+    if (!q.checks.every((c) => (c.retakeReason !== null) === (c.status === "fail"))) return false;
+    if (q.verdict === "unchecked") return !exposureMeasured && q.retakeReasons.length === 0;
+    if (!exposureMeasured) return false;
+    if (q.verdict === "pass") return failed.length === 0 && q.retakeReasons.length === 0;
+    // retake / override
+    return failed.length > 0 && q.retakeReasons.length === failed.length && failed.every((c, i) => c.retakeReason === q.retakeReasons[i]);
+  });
 
 /**
  * The form field as sent by the client, or undefined when absent, oversized,

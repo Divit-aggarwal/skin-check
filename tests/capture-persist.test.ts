@@ -18,7 +18,7 @@ import { NextRequest } from "next/server";
 import { toSkinState } from "@/lib/skin-state";
 import { runCaptureGate } from "@/lib/capture-quality/gate";
 import { MAX_CAPTURE_QUALITY_CHARS } from "@/lib/capture-quality/schema";
-import { checkerboard } from "@/lib/capture-quality/synthetic-frames";
+import { checkerboard, flat } from "@/lib/capture-quality/synthetic-frames";
 import { buildScanAnalysisRecord } from "@/lib/scan-analysis-record";
 import type { SkinScanResult } from "@/types/skin-scan";
 import { syntheticAnalysis, syntheticNative } from "./synthetic-scan";
@@ -26,6 +26,9 @@ import { syntheticAnalysis, syntheticNative } from "./synthetic-scan";
 const SCAN_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const RESULT = { ...syntheticAnalysis(), ...syntheticNative(), overlays: {} };
 const QUALITY = runCaptureGate(checkerboard(400, 400, 1, 100, 156), { captureMethod: "native", retakeCount: 1 });
+const DARK = runCaptureGate(flat(400, 400, 0), { captureMethod: "native", retakeCount: 2 });
+const OVERRIDE = { ...DARK, verdict: "override" as const };
+const UNCHECKED = runCaptureGate(null, { captureMethod: "native", retakeCount: 0 });
 
 let seq = 0;
 function post(fields: Record<string, string>) {
@@ -62,7 +65,7 @@ describe("captureQuality persistence (O-2 = A)", () => {
   });
 
   it("the record stays a valid skinstate-1 source; quality.* stays null and captureQuality is not exposed", async () => {
-    await post({ captureQuality: JSON.stringify({ ...QUALITY, verdict: "override", retakeReasons: ["too_dark"] }) });
+    await post({ captureQuality: JSON.stringify(OVERRIDE) });
     const [path, data] = create.mock.calls.at(-1)! as [string, Record<string, unknown>];
     const out = toSkinState({ ...data, createdAt: "2026-10-01T00:00:00.000Z" }, path, "verified-uid");
     expect(out.kind).toBe("skinstate");
@@ -71,6 +74,13 @@ describe("captureQuality persistence (O-2 = A)", () => {
     expect(JSON.stringify(out.state)).not.toContain("capture-quality-web");
   });
 
+  it.each([["retake", DARK], ["override", OVERRIDE], ["unchecked", UNCHECKED]] as const)("stores a consistent %s result", async (_n, q) => {
+    await post({ captureQuality: JSON.stringify(q) });
+    expect(stored().captureQuality).toEqual(q);
+  });
+
+  const withMeasuredKey = (key: string) =>
+    JSON.stringify({ ...QUALITY, checks: QUALITY.checks.map((c, i) => (i === 0 ? { ...c, measured: { [key]: 1 } } : c)) });
   const tooBig = JSON.stringify({ ...QUALITY, settingsVersion: "x".repeat(MAX_CAPTURE_QUALITY_CHARS) });
   it.each<[string, string]>([
     ["not JSON", "{not json"],
@@ -83,6 +93,14 @@ describe("captureQuality persistence (O-2 = A)", () => {
     ["an unknown retake reason", JSON.stringify({ ...QUALITY, retakeReasons: ["looks_bad"] })],
     ["a different capture method from the request", JSON.stringify({ ...QUALITY, captureMethod: "canvas" })],
     ["oversized", tooBig],
+    ["a Firestore-reserved measured key", withMeasuredKey("__x__")],
+    ["an empty measured key", withMeasuredKey("")],
+    ["pass next to a failed check", JSON.stringify({ ...DARK, verdict: "pass", retakeReasons: [] })],
+    ["retake with no failed check", JSON.stringify({ ...QUALITY, verdict: "retake", retakeReasons: ["too_dark"] })],
+    ["pass with retake reasons", JSON.stringify({ ...QUALITY, retakeReasons: ["blurry"] })],
+    ["a fail without a reason", JSON.stringify({ ...DARK, checks: DARK.checks.map((c, i) => (i === 0 ? { ...c, retakeReason: null } : c)) })],
+    ["unchecked with exposure measured", JSON.stringify({ ...QUALITY, verdict: "unchecked" })],
+    ["reasons out of order", JSON.stringify({ ...DARK, retakeReasons: [...DARK.retakeReasons].reverse() })],
   ])("drops %s and still succeeds", async (_name, value) => {
     const res = await post({ captureQuality: value });
     expect(res.status).toBe(200);
