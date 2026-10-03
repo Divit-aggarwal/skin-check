@@ -1,4 +1,182 @@
-# Phase 0 bench re-run on scan-0.1.6: PARTIAL (1 of 10 images)
+# Phase 0 on scan-0.1.6: release candidate (Part I, authoritative) and bench build (Part II)
+
+**Status: PARTIAL Phase 0 (1 of 10 images), run twice on 0.1.6.**
+- **Part I** scores the **release candidate**: the exact image ENGINE_0_1_6_DEPLOYMENT_PLAN §5 will push. **It is authoritative for 0.1.6.**
+- **Part II** is the earlier run the same day on a separately built bench image (`ce51ed2d…`). It is kept as history.
+
+This is signal screening only: not clinical validation, not longitudinal, and not evidence that skin changes. **No surviving field is a validated skin measurement.**
+
+---
+
+# Part I: release candidate `sha256:9a8f96c0…`
+
+## I.1 Identity (recorded before scoring; rule addendum B, `ebbe755`)
+
+| Item | Value |
+|---|---|
+| Git SHA | **`8dc37dc501ea974825427c665acd7019120c20ec`** (skin-scan, branch `engine-build-identity`; not pushed) |
+| Source | a fresh `git archive 8dc37dc` export, untouched before the build (0 `__pycache__` directories) |
+| Docker tag (local only) | **`550428926515.dkr.ecr.ap-south-1.amazonaws.com/skin-scan:sha-8dc37dc501ea974825427c665acd7019120c20ec`** |
+| Image digest (local image ID, containerd store) | **`sha256:9a8f96c0a54025c4137b89dee181ba7fb140db1431fa95156cc20d8880e1fc2c`**, linux/amd64, created 2026-10-03T11:41:51Z |
+| Engine version | `pipeline_version: "scan-0.1.6-provisional"` (all 30 rows and `/health/ready`). cv2 4.11.0 |
+| `engine_build` | **`sha-8dc37dc501ea974825427c665acd7019120c20ec`**, equal to the tag, in every response |
+| Build command | `docker build --platform linux/amd64 --no-cache --build-arg ENGINE_BUILD=sha-8dc37dc… -t <tag> .` (Docker 29.5.2, arm64 Mac, containerd snapshotter) |
+| `/app` contents | `.env.example`, `.gitignore`, `LICENSE`, `pyproject.toml`, `requirements.txt`, `src`, `uv.lock`. **No `egg-info`, no `__pycache__`.** The 0.1.5 image carried a stray `src/skin_scan.egg-info` |
+| Pushed? | **No.** It is held locally so the deployment can push **these bytes** (plan §5 step 5). It must not be rebuilt |
+| Production | **Not called.** The engine ran locally only (`127.0.0.1:18017`, `ENV=production`, `--cpus 2 --memory 4g`, `MAX_CONCURRENT_SCANS=4`, `SCAN_TIMEOUT_SECONDS=300`, emulated amd64) |
+
+**Pre-flight on a clean export of `8dc37dc`:** ruff clean, pyright 0 errors, pytest **81 passed**.
+
+**Smoke test** (plan §5 step 3):
+- `/health/ready` returns 200 with `scan-0.1.6-provisional`.
+- Fixture `/scan` returns 200 with 7 scores and `engine_build` equal to the tag.
+- No native block is returned without `stats`, as expected.
+- The cv2-pin startup assertion passed under `ENV=production`.
+
+**Package inventory:**
+- **Identical to the bench build `ce51ed2d`** (pip and dpkg).
+- **Against the live 0.1.5 image `668b1f56`:** the same 12 differences found in Part II (11 transitive pip packages and `libglib2.0-0t64`).
+- Every measurement-path package is identical: numpy 1.26.4, opencv-contrib 4.11.0.86, mediapipe 0.10.21, scikit-image 0.26.0, pillow 12.3.0, Python 3.11.16, Debian 13.6.
+
+## I.2 What was run
+
+The full feasible protocol, identical to the 0.1.5 run and to Part II:
+- **Harness:** the same committed `bench.py`, source image, masks (`meta` identical to 0.1.5), client transform (≤ 1280, PIL JPEG q0.92), matrix and levels.
+- **Scoring:** HTTP `POST /scan?stats=both` on the release image.
+- **Mapping:** the frozen skinstate-1 view (`lib/skin-state.ts` at `fb9dfc2`, identical to `dd9a3fe`).
+- **Analysis:** the unchanged `analyse.py`.
+- **Output:** `phase0/results_0_1_6_release/`.
+
+**About "the exact preprocessing path expected in production":**
+- The engine side is exact: the production image, its HTTP decode (PIL, no EXIF transpose, ICC ignored) and its preprocessing.
+- The client side is approximated by PIL (≤ 1280, q0.92), the same as every earlier run. It is **not** the browser's `createImageBitmap` + canvas encoder (A2, impossible here).
+
+| Protocol step | Status |
+|---|---|
+| §4.1 pinned build | **Run.** The release digest, by image ID. Emulated amd64, not native hardware |
+| §4.3 determinism (A1) | **Run.** 100 × 5 at concurrency 4, 5 fresh containers |
+| §4.4 responsiveness | **Run, 1 of 10 images.** Every pre-registered row, plus the EXPLORATORY face-b\* rows |
+| §4.2 A2 real-device input fidelity | **IMPOSSIBLE here.** No iOS Safari or Android Chrome device in the loop |
+| §4.5 ColorChecker under real capture | **IMPOSSIBLE here.** No target or illuminants |
+| Images 2–10 across MST bands and beards | **IMPOSSIBLE here.** No consented face images exist |
+| Native linux/amd64 hardware | **IMPOSSIBLE here.** arm64 Mac only. Fargate is native amd64; cross-platform identity is NOT ESTABLISHED |
+| ECR digest equals the local ID | **Not checkable before push.** It is plan §5 step 5. If it differs, this replay must be repeated on the pulled ECR digest |
+
+## I.3 OBSERVED
+
+- **Validity guards:** 30/30 rows returned 200, with `scan-0.1.6-provisional` and `engine_build` equal to the tag.
+- **H-EQ against 0.1.5 (`668b1f56`):**
+  - Transmitted bytes, realised shifts and masks are identical.
+  - All 30 responses are **bit-identical** apart from `pipeline_version` and the added `engine_build`. No key was removed.
+  - **Against the bench build (Part II):** also bit-identical, apart from the `engine_build` value.
+- **Determinism (A1): MET.**
+  - Each of the 5 inputs gives 1 distinct canonical response across 100 submissions in 5 fresh containers, 500/500 HTTP 200.
+  - Each equals its matrix response.
+  - Without the provenance keys, the set equals the 0.1.5 determinism set.
+- **Analysis:** `summary.md` and `summary.json` are **byte-identical to 0.1.5's**. That covers every slope, leakage figure, monotonicity flag, confounder response, ITA value and clip mass.
+- **SkinState (frozen view):** `regions`, `quality`, `uncertainty`, `input` and `provenance` are identical to 0.1.5 in all 30 rows. Only `engine` differs:
+  - `pipelineVersion` is 0.1.6;
+  - `landmarkModel` and `opencvVersion` are **null** (the verified table has 0.1.5 only);
+  - `build` is null (skinstate-1 has no source key for it).
+- **Deviation conditions** (`CLASSIFICATION_RULE_0_1_6.md` §2):
+  - **(a)** `hydration.py`, `oiliness.py` and `preprocess.py` are unchanged.
+  - **(b)** reproduces with the same values as Part II §2.6. It is implied by H-EQ, so it is not independent evidence.
+
+### Focus items (release image; every value identical to 0.1.5)
+
+| | native L\* | native a\* | native b\* |
+|---|---|---|---|
+| A3 slope, intended change (C / F / N / Ch) | 0.967 / 1.014 / 1.046 / 0.973 | 0.997 / 1.000 / 1.001 / 0.991 | *1.015 / 1.008 / 1.002 / 1.007* (exploratory; no pre-registered A3) |
+| Monotone in the intended change | yes, all regions | yes, all regions | yes (exploratory) |
+| A4 background leakage (worst, % of a ±10 cast) | 1–5% | 0–2% | 0–1% |
+| Exposure, Δ at ±0.5 EV | 5.9–9.0 units | 1.1–1.4 units | 2.0–2.9 units |
+| Exposure monotone (−1 … +1 EV) | yes, all regions | **no**: reverses at +1 EV on forehead and nose, flat on cheeks | yes, all regions |
+| JPEG q0.75 instead of q0.92 (Δ) | −0.25 to +0.59 | −0.04 to +0.10 | −0.20 to +0.06 |
+| Regional consistency | slope spread 0.967–1.046 | 0.991–1.001 | 1.002–1.015 |
+| Deterministic | yes (500/500) | yes | yes |
+
+**ITA (cheeks; derived):**
+- background ≤ 0.8° (≤ 1.4° in any region);
+- JPEG ≤ 1.2°;
+- ±0.5 EV moves it **15–21°**;
+- a −8 L\* face shift moves it −19.0°.
+
+**Texture and shine:** unchanged from 0.1.5.
+- `lbpEntropy`: JPEG +1.3% to +3.7%; −1 EV +1.8% to +5.0%.
+- `laplacianVarMean`: JPEG +27% to +32%.
+- `gradientMean`: chroma-only spread 21–59%.
+- `specular.fraction`: background-only cast 21–57%.
+
+## I.4 Comparison with the previous Phase 0 (0.1.5), per candidate
+
+Categories were pre-defined in addendum B §3. Every field's values are bit-identical to 0.1.5 on every row, so "improved" and "degraded" cannot occur.
+
+| Field | 0.1.5 class | 0.1.6 release class | Category |
+|---|---|---|---|
+| `colour.native.lStarMean` | KEEP | KEEP FOR HUMAN VALIDATION | **same behaviour** |
+| `colour.native.aStarMean` | KEEP | KEEP FOR HUMAN VALIDATION | **same behaviour** |
+| `colour.native.aStarP90` | KEEP (secondary) | KEEP (secondary, not an endpoint) | **same behaviour** |
+| `colour.native.bStarMean` | INCONCLUSIVE | INCONCLUSIVE | **same behaviour.** Not newly eligible: the protocol still has no face-b\* A3 |
+| D1 ITA | INCONCLUSIVE | INCONCLUSIVE | **same behaviour** |
+| `colour.native.aStarSd`, `lStarSd`, native histograms | INCONCLUSIVE | INCONCLUSIVE | **same behaviour** |
+| `colour.corrected.aStarMean`, `aStarP90`, `bStarMean`, `lStarMeanPostClahe`, `aStarSd` | DROP | DROP | **same behaviour** (drops confirmed) |
+| `colour.corrected.lStarSdPostClahe`, `aStarHist`, `texture.localLContrastHist` | INCONCLUSIVE | INCONCLUSIVE | **same behaviour** |
+| `texture.laplacianVarMean`, `texture.lbpEntropy` | INCONCLUSIVE | INCONCLUSIVE | **same behaviour** |
+| `texture.gradientMean`, `specular.fraction` | DROP (declared deviations) | DROP (re-declared) | **same behaviour** |
+
+**Improved: none. Degraded: none. Newly inconclusive: none. Newly eligible: none.**
+
+## I.5 OBSERVED / INFERRED / NOT ESTABLISHED
+
+**OBSERVED:**
+- On the exact release-candidate image, every Phase 0 measurement is bit-identical to the live 0.1.5 engine and to the bench build.
+- Output is deterministic across fresh containers.
+- The release image reports the identity the deployment needs (`engine_build` equal to the ECR tag).
+
+**INFERRED:**
+- Deploying this image changes no measured value for any input exercised here.
+- The 0.1.6 rollout is a provenance change, not a measurement change.
+- The 12-package build drift did not reach the measurement path, in this image or in the bench build.
+
+**NOT ESTABLISHED:**
+- Anything about skin, or any clinical meaning of a signal response.
+- Validity of L\* or a\* as skin measurements.
+- Behaviour on other faces, tones, beards or real phones.
+- Identity on Fargate's native amd64 (production) against this emulated bench.
+- That the pushed ECR digest will equal `9a8f96c0…`.
+- Between-capture and between-day noise.
+
+## I.6 Answers
+
+**WHICH METRICS DESERVE HUMAN VALIDATION?**
+
+| # | Field | Regions | Why |
+|---|---|---|---|
+| 1 | `colour.native.lStarMean` | cheeks, forehead | Passes A3 (slope 0.97–1.05) and A4 (≤ 5%) in every region, monotone, deterministic. **Exposure is its main risk** (0.5 EV ≈ the whole −8 L\* injection) |
+| 2 | `colour.native.aStarMean` | cheeks, nose | Passes A3 (0.99–1.00) and A4 (≤ 2%) in every region, deterministic. Exposure ±1.1–1.4 units, non-monotone at +1 EV |
+
+These two only.
+- They are **photo statistics that earn a human test–retest study.** They are not validated skin measurements.
+- KEEP was close to guaranteed by construction (the native path only resizes). The tests that can really fail them (§4.5, ACCEPTANCE C4) remain impossible here.
+- Native b\* and ITA would need the face-b\* amendment pre-registered first. Texture, shine and corrected colour are not candidates.
+
+**DOES 0.1.6 CHANGE ANY ARCHITECTURAL DECISION?**
+
+**No.** MD-1, D-07, D-23 (the skinstate-1 freeze), D-24 and the deployment plan all stand unchanged. 0.1.6 makes four pending items concrete; it does not change them:
+
+1. **The skinstate-1 engine table has a 0.1.5 entry only.** Records from 0.1.6 will get `landmarkModel` and `opencvVersion` null.
+   - This release image supplies verifying evidence for an entry: cv2 4.11.0 from `/health/ready`, mediapipe 0.10.21 from the image.
+   - Adding it is a SkinState code change and needs owner approval. It is **not** made here.
+2. **`engine.build` is still null in skinstate-1.** Mapping it needs skinstate-2 or an approved amendment. That was already open in gate 04.
+3. **0.1.5 and 0.1.6 records are not comparable under the contract key,** because `pipelineVersion` is a component. This run shows them measurement-identical on the bench, which could support a future **declared equivalence** between the two versions. That would be a contract decision, **not** made here; until then, the key keeps them apart.
+4. **Deployment plan §5:** steps 1–4 are now done for `9a8f96c0…`. **Push this image, do not rebuild it.** A rebuild is a new digest and needs another replay.
+
+---
+
+# Part II: bench build `ce51ed2d…` (earlier run, same day)
+
+The header below is from the bench run. Its results are identical to Part I.
+
 
 | | |
 |---|---|
@@ -270,7 +448,7 @@ RESULTS_DIR=results_0_1_6 ../../../../../skin-scan/.venv/bin/python analyse.py >
 
 ---
 
-## FINAL 0.1.6 CANDIDATE SET
+## Bench-run candidate set (superseded by Part I)
 
 **Unchanged from MD-1. Two metrics.** The new experiment gives no grounds to change it.
 

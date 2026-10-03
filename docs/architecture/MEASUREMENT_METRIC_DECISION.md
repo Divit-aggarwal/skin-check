@@ -7,7 +7,7 @@
 | Decision | **MD-1**, 2026-10-03 |
 | Status | **ACCEPTED** for study design. It changes **no production behaviour and no contract**. The `skinstate-1` field names and classes are untouched |
 | Evidence | [PHASE_0_RESULTS.md](../research/measurement-validation/PHASE_0_RESULTS.md): a **partial** Phase 0, on one image, on the production digest `sha256:668b1f56…`. Determinism: 500/500 bit-identical |
-| Applies to | Engine `scan-0.1.5-provisional` (deployed digest `668b1f56…`) **and `scan-0.1.6-provisional`** at the bench digest `sha256:ce51ed2d…` (skin-scan `8dc37dc`, gate 04, not deployed). Re-confirmed by a full Phase 0 re-run: see the 0.1.6 addendum (§6). Any other engine build re-opens every row (ACCEPTANCE §G, PROTOCOL §8), **including CI's eventual build of `8dc37dc`**, whose digest will differ |
+| Applies to | Engine `scan-0.1.5-provisional` (deployed digest `668b1f56…`) **and `scan-0.1.6-provisional`** at the bench digest `sha256:ce51ed2d…` (skin-scan `8dc37dc`, gate 04, not deployed). Re-confirmed by full Phase 0 re-runs: Addendum A (bench build) and **Addendum B (release candidate `sha256:9a8f96c0…`, authoritative for 0.1.6)**, §6–§7. Any other engine build re-opens every row (ACCEPTANCE §G, PROTOCOL §8), **including CI's eventual build of `8dc37dc`**, whose digest will differ |
 | Supersedes | The P1–P5/D1 primary list in PROTOCOL §2.2, **for the human study only** (see §3). Only P5's removal is forced by a gate failure. Removing P2, P4 and D1 (all INCONCLUSIVE) follows the smallest-set instruction, and **the owner may reverse it before Phase 1 pre-registration** |
 | DECISION_LOG | Not edited here, because uncommitted entries D-22 and D-24 belong to another session. Add **D-25 → this file** when those are committed |
 
@@ -112,3 +112,28 @@
 - **One correction to PHASE_0_RESULTS §3.3 and §4 Q2,** from the same data: native `aStarMean` is also flat (non-increasing) on cheeks at +1 EV (+1.34 → +1.30), not only on forehead and nose.
 
 **FINAL 0.1.6 CANDIDATE SET: unchanged.** `colour.native.lStarMean` (cheeks, forehead) and `colour.native.aStarMean` (cheeks, nose), both KEEP FOR HUMAN VALIDATION. Neither is a validated skin measurement.
+
+## 7. Addendum B (2026-10-03): Phase 0 on the 0.1.6 release candidate
+
+**Evidence:** [PHASE_0_0_1_6_RESULTS.md](../research/measurement-validation/PHASE_0_0_1_6_RESULTS.md) Part I. The rule addendum `phase0/CLASSIFICATION_RULE_0_1_6_RELEASE.md` (`ebbe755`) was committed before the image was built.
+
+- **Image:** the exact image the deployment plan will push.
+  - skin-scan `8dc37dc`, from a clean export.
+  - Tag `…/skin-scan:sha-8dc37dc501ea974825427c665acd7019120c20ec`.
+  - Local digest `sha256:9a8f96c0a54025c4137b89dee181ba7fb140db1431fa95156cc20d8880e1fc2c`.
+  - `engine_build` equal to the tag. Not pushed or deployed.
+- **Result:**
+  - Every response is bit-identical to 0.1.5 (`668b1f56`) and to the bench build, apart from `pipeline_version` and `engine_build`.
+  - 500/500 determinism submissions across 5 fresh containers.
+  - The analysis is byte-identical to 0.1.5.
+- **Comparison per field:**
+  - all **same behaviour**;
+  - improved: none; degraded: none; newly inconclusive: none; newly eligible: none.
+- **Candidate set: unchanged on the evidence, not carried over.** It was re-derived from the release image's data by the unchanged rule: `colour.native.lStarMean` (cheeks, forehead) and `colour.native.aStarMean` (cheeks, nose), both KEEP FOR HUMAN VALIDATION. Neither is a validated skin measurement.
+- **Still impossible here:** A2, §4.5, 9 of 10 images, native amd64 hardware, and the ECR-digest equality check (it happens at push).
+- **Architecture: no decision changes.** Open items made concrete by 0.1.6, none decided here:
+  - a verified 0.1.6 row in the skinstate-1 engine table;
+  - mapping `engine.build`;
+  - any declared 0.1.5 ↔ 0.1.6 equivalence for comparability;
+  - deployment of **this** image, not a rebuild.
+
