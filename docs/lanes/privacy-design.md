@@ -4,7 +4,31 @@ Branch `lane/privacy`, worktree `../skin-check-privacy`, `PORT_BASE=3400`. Desig
 
 Inputs: CLAUDE.md, [README.md](README.md), [privacy.md](privacy.md), DECISION_LOG.md (D-03, D-03a, D-12, D-14, D-15, D-16, D-17, D-19, D-23, D-26), GEMINI_BOUNDARY.md, PREFLIGHT_AUDIT.md (G1, G4), H01_S3_ERASURE_READINESS.md.
 
+**Status: APPROVED by the owner on 2026-10-03, with the decisions in §0.** Where §0 differs from the text below, §0 wins.
+
 Decisions are cited by name and ID. The log has two entries numbered D-21 ("Firestore to asia-south1" and "Gate 01 stores raw analysis in scanAnalyses"). An uncommitted D-22 ("recreate Firestore `(default)` in asia-south1, no data copy") is in flight in the main checkout. This design does not depend on it.
+
+---
+
+## 0. Owner decisions (2026-10-03)
+
+The owner approved this design (decision 1) with these answers to §7.
+
+| # | Decision | What the lane builds |
+|---|---|---|
+| 2 | **(a)** All three parts of D-19 approved. | Steps 7–11. |
+| 3 | **(a)** Degrade now, refuse later. **The under-18 exception is approved.** | `REQUIRE_AGE_ATTESTATION = false`. With no record, upload and scan run and the server logs it. An under-18 record is refused (403 `UNDER_18`) on upload, scan and chat from day one. R8 is not needed until the constant flips. |
+| 4 | **(a)** Sticky. | Any under-18 entry blocks the account, even after a later 18+ answer. |
+| 5 | **Not decided.** | The retention period is a named setting with **no value**: `IMAGE_RETENTION_PERIOD_DAYS = null` in `lib/consent.ts`. No number is invented. While it is null, the consent copy does not state a period. |
+| 6 | **The owner is checking** (G1). | Step 13 is built for **local use only**. It does not go to production until decision 6 is answered. |
+| 7 | **(b)** Draft wording, marked DRAFT. | `AI_SHARE_CONSENT_COPY` uses the GEMINI_BOUNDARY §8 draft, with `DRAFT` in its version string. Production waits for final copy. Processing-consent copy is not written: it belongs to step 14, which is skipped. |
+| 8 | **(a)** Remove `female_skin_context`, `gender` and the Dryness band, **with one addition: "extra caution".** | The server works out one yes/no flag, `extraCaution`, from the user's answers. Only the flag reaches Gemini, never the answers that set it. When the flag is on, the prompt tells Gemini, in one fixed sentence that gives no reason, not to suggest active ingredients and to advise asking a doctor. The answers that turn the flag on are a named setting, `EXTRA_CAUTION_TRIGGERS`, marked **provisional, waiting for clinical review (tracker E05)**. Provisional list: `female_skin_context: pregnant_or_breastfeeding` and `current_products: prescription`. |
+| 9 | **(b)** Receipt with no uid. | After a successful erase, the server writes `erasures/{auto-id}` with `erasedAt`, the step results and a `schemaVersion`. It holds no uid, no hash of a uid, and nothing else that links it to the person. No client rule is added: deny-by-default already blocks clients. |
+| 10 | **(a)** Blank, with "last time you said: …" shown under it. | Re-confirmed steps start blank. The hook exposes last time's answer as display text and never saves it into answers. Showing it needs `SkinCheckFlow.tsx`, which is not lane-owned (request R9). |
+| 11 | **(a)** A separate erase IAM principal, **production only**. | The erase credentials are separate variables. Locally, S3Mock is used. |
+| 12 | **R1 and R6 approved. R2: the lane makes the one `admin.ts` edit itself, as a one-time exception.** | R1: new `app/(marketing)/account/DeleteAccount.tsx`. R6: update the two expectations in `tests/skin-check-flow-navigation.test.ts`. R2: add `adminAuth()` and `verifyFirebaseIdTokenClaims()` to `lib/firebase/admin.ts`, **add-only**, with nothing that exists changed, and a new test. The `getApp("admin")` fallback is not used. |
+
+Effect on §2.4: rows 2, 3, 4, 13 and 19 are removed, and the Dryness parts of rows 20, 21 and 23 are removed. A new row 26 sends the `extraCaution` flag (computed server-side; boolean).
 
 ---
 
@@ -117,6 +141,7 @@ The source is `lib/gemini.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-fo
 | 23 | Region bands (same categories as 18 and 19) | scanAnalyses.region_scores | low | **needed**, except Dryness: **remove** | Same as 18 and 19 |
 | 24 | User `message` (≤2000 chars) | request | whatever the user types | **needed** | The question itself |
 | 25 | History turns, user text and Echo replies (server-signed, last 20) | request, verified by HMAC | same as 24 | **needed** | Multi-turn chat. Text is not stored server-side (D-26) |
+| 26 | `extraCaution` flag (decision 8, added in §0) | computed server-side from `EXTRA_CAUTION_TRIGGERS` | low (one boolean; the answers that set it are not sent) | **needed** | Lets Gemini hold back on actives and advise a doctor without seeing why |
 
 **Not sent today, and pinned as not sent by the test:**
 - `phone_verify` and `final_phone` (dropped by type);
@@ -182,12 +207,13 @@ The source is `lib/gemini.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-fo
 | # | To | Request |
 |---|---|---|
 | R1 | owner | Ownership of a new client component `app/(marketing)/account/DeleteAccount.tsx`. `page.tsx` is a server component (it exports `metadata`), so the button needs its own `"use client"` file next to it. Only `page.tsx` is listed today |
-| R2 | owner / main | `admin.ts` exports no Auth getter, and `verifyFirebaseIdToken` returns only the uid. Erasure needs Admin Auth (`revokeRefreshTokens`, `deleteUser`) and the token's `auth_time`. Request: main adds `adminAuth()` and a `verifyFirebaseIdTokenClaims()` that returns the decoded token, with the same production-emulator guard and revocation check. Fallback until then: call `verifyFirebaseIdToken` first, so the guard runs, then `getAuth(getApp("admin"))`, relying on the private app name `"admin"` |
+| R2 | owner / main (**approved in §0: the lane makes this edit, add-only**) | `admin.ts` exports no Auth getter, and `verifyFirebaseIdToken` returns only the uid. Erasure needs Admin Auth (`revokeRefreshTokens`, `deleteUser`) and the token's `auth_time`. Request: main adds `adminAuth()` and a `verifyFirebaseIdTokenClaims()` that returns the decoded token, with the same production-emulator guard and revocation check. Fallback until then: call `verifyFirebaseIdToken` first, so the guard runs, then `getAuth(getApp("admin"))`, relying on the private app name `"admin"` |
 | R3 | capture lane | PhotoCapture: import `PROCESSING_CONSENT_COPY` and `_VERSION` from `lib/consent.ts`, and pass the version to the scan helper (`lib/api.ts` new param). Today the processing checkbox has no version (audit, CURRENT_SYSTEM_AUDIT §50) |
 | R4 | capture lane, or after merge | Processing consent at scan time (D-16, D-03a). After `formData()`, read the processing-consent version as a form field. Write the `processing` ledger entry with the scanId using the privacy `_ledger.ts` helper, best-effort. When the version is missing, skip `persistScanAnalysis` and return `persisted:false, reason:"consent_missing"`. This is entirely after `formData()`, so it is not privacy's part |
 | R5 | main (not lane-owned) | `lib/dev-env-guard.cjs` must learn the two new erase-credential names, because they could point at production |
 | R6 | owner / main | Update `tests/skin-check-flow-navigation.test.ts:43` and `:48`. The test's saved user is male (`:10`). With H02b, the reuse walk becomes verify → skin-photo → your-skin (current_products only) → get-your-results, and going back from results lands on `your-skin`, not `skin-photo`. The test is not lane-owned. `tests/reusable-answers.test.ts` and `tests/echo-prompt-answers.test.ts` keep passing under this design (checked: they assert partial matches and the absence of phone numbers) |
 | R8 | capture lane | Only if decision 3 picks "refuse": PhotoCapture must not offer an endless retry when the upload fails with `ATTESTATION_REQUIRED` or `UNDER_18`. It should send the user to the age question instead. Not needed for "degrade" |
+| R9 | owner / main (after merge) | `components/skin-check/SkinCheckFlow.tsx`: under a re-confirmed step, render the hook's `lastAnswerHints[step.id]` as "Last time you said: …" (decision 10a). The hook already exposes it; the text is never saved into answers |
 | R7 | routine lane | `SkinCheckDashboard.tsx`: a "Your data and consents" link to `/account`. Optional; not needed for any test |
 
 ---
