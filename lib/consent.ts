@@ -49,3 +49,6 @@ export const AI_SHARE_CONSENT_COPY =
  * nothing enforces one (an S3 lifecycle rule is an infra OWNER ACTION).
  */
 export const IMAGE_RETENTION_PERIOD_DAYS: number | null = null;
+
+/** What the user types to confirm account erasure (H01b); the erase route requires it verbatim. */
+export const ERASE_CONFIRMATION = "DELETE MY DATA";
