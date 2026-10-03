@@ -7,6 +7,8 @@
       "Bash(*firestore:delete*)",
       "Bash(*firebase* deploy*)",
       "Bash(*deploy --only*)",
+      "Bash(*F deploy*)",
+      "mcp__plugin_firebase_firebase__firestore_delete_document",
       "Bash(*gcloud* firestore databases delete*)",
       "mcp__plugin_firebase_firebase__firestore_delete_database",
       "mcp__plugin_firebase_firebase__firebase_deploy",

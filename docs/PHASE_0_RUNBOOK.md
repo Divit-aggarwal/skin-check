@@ -92,15 +92,18 @@ echo "containers in skin-scan:1: $N"
 - Good output: `containers in skin-scan:1: 1` and no STOP line.
 - **If it prints STOP: stop here.** Do not run the register command. Record the container count in the tracker (A12). The `jq` must then be changed to set the image of the engine container only, by name, and this runbook re-reviewed.
 
-Then register:
+Then register. The `jq` repeats the one-container check and fails if it does not hold; the `&&` chain then never reaches `register-task-definition`, even if the check above was skipped:
 
 ```bash
 umask 077; TD=$(mktemp -d)
-aws ecs describe-task-definition --region $REG --task-definition skin-scan:1 --query taskDefinition --output json \
-  | jq --arg img "$REPO@$DIGEST" '.containerDefinitions |= map(.image = $img)
+aws ecs describe-task-definition --region $REG --task-definition skin-scan:1 --query taskDefinition --output json > "$TD/src.json" \
+&& jq --arg img "$REPO@$DIGEST" '
+      if (.containerDefinitions | length) != 1
+      then error("STOP: skin-scan:1 has \(.containerDefinitions | length) containers, expected 1") else . end
+      | .containerDefinitions |= map(.image = $img)
       | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
-  > "$TD/td.json"
-aws ecs register-task-definition --region $REG --cli-input-json "file://$TD/td.json" --query 'taskDefinition.{rev:revision,image:containerDefinitions[0].image}'
+  "$TD/src.json" > "$TD/td.json" \
+&& aws ecs register-task-definition --region $REG --cli-input-json "file://$TD/td.json" --query 'taskDefinition.{rev:revision,image:containerDefinitions[0].image}'
 rm -rf "$TD"
 ```
 - Who: owner.
@@ -396,8 +399,9 @@ scan works, tracker A05 updated. Do not start job D before this.
   ```
 - Run these checks **before** A14 step 5 (`git stash drop`).
 - **After P2, `.env.local` no longer has the Firebase Admin and S3 variables. The checks still pass; they need no production keys.**
-  - `next build` needs **no** environment variables. Firebase client, Firebase Admin and S3 are all initialised lazily (`lib/firebase/client.ts`, `lib/firebase/admin.ts`, `lib/s3.ts`), so a missing value is a runtime error, not a build error. Verified 2026-10-03 at 5105b3b: `next build` passed in a clean worktree with no `.env*` file at all. ff08107 adds no new `process.env` reads.
-  - `npm test` (vitest) and `typecheck`/`lint` read no `.env` values. The Firestore rules tests (`npm run test:rules`) use the local emulator and the demo project `demo-rules-check`, never production.
+  - None of the four checks needs an environment variable. Firebase client, Firebase Admin and S3 are all initialised lazily (`lib/firebase/client.ts`, `lib/firebase/admin.ts`, `lib/s3.ts`), so a missing value is a runtime error, not a build error.
+  - Verified 2026-10-03 at b0a7424 in a clean worktree with no `.env` file other than `.env.example`: `npm test` (217 passed, 24 skipped), `typecheck`, `lint` and `build` all passed. ff08107 adds no new `process.env` reads.
+  - The 24 skipped tests are the Firestore rules tests. Run them with `npm run test:rules`; it uses the local emulator and the demo project `demo-rules-check`, never production.
   - If a check fails with `Firebase Admin is not configured` or `S3 image storage is not configured`, a test or page started calling them at build time. That is a bug to record in the tracker. Never put the production keys back to make the check pass.
 - A14_RECONCILIATION_PROPOSAL step 4 has the same `grep` bug: it matches `**D-03a` as `**D-03`. Use the fixed command above.
 - Undo (before step 5 and before pushing): `git reset --hard ORIG_HEAD`, then `git stash pop` to restore the drafts.
@@ -457,4 +461,5 @@ production check) may start.
 
 ## Known gaps, recorded in the tracker, not fixed here
 
-- None open. `ENGINE_TABLE` now lists `scan-0.1.6-provisional` (A17), and the deny rules now match the `npx -y firebase-tools@latest …` and `F …` forms (B05).
+- B06: the `.claude/settings.json` deny rules do not cover several other production-changing commands, among them `gh pr merge` (D2, the production deploy), `vercel rollback`, `git push`, `docker push`, `aws ecs deregister-task-definition`, `aws ecr batch-delete-image` and `firestore:databases:update`. Only the CLAUDE.md hard rules stop agents from running them.
+- Fixed: `ENGINE_TABLE` now lists `scan-0.1.6-provisional` (A17). The deny rules now match the `npx -y firebase-tools@latest …` and `F …` forms (B05).
