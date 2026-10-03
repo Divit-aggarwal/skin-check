@@ -112,3 +112,24 @@ describe("last-time hints (decision 10a)", () => {
     expect(hook).not.toMatch(/setAnswers\([^)]*[Hh]int/);
   });
 });
+
+describe("last-time hint on screen (R9)", () => {
+  const flow = readFileSync("components/skin-check/SkinCheckFlow.tsx", "utf8");
+
+  it("SkinCheckFlow shows the hook's hint under the step", () => {
+    expect(flow).toContain("{lastAnswerHints[step.id] && (");
+    expect(flow).toMatch(/<p[^>]*>\{lastAnswerHints\[step\.id\]\}<\/p>/);
+  });
+
+  it("the hint is only displayed, never written into answers", () => {
+    const uses = flow.split("\n").filter((l) => l.includes("lastAnswerHints"));
+    expect(uses.length).toBeGreaterThanOrEqual(3);
+    for (const line of uses) expect(line).not.toMatch(/setAnswer|onChange|value=/);
+  });
+
+  it("only re-confirmed steps can have a hint", () => {
+    const hints = reconfirmHints(saved("female"));
+    expect(Object.keys(hints).length).toBeGreaterThan(0);
+    for (const id of Object.keys(hints)) expect(RECONFIRM_EACH_SCAN_IDS).toContain(id);
+  });
+});

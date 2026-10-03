@@ -53,6 +53,7 @@ export function SkinCheckFlow() {
     blocked,
     confirmingUnder18,
     confirmUnder18,
+    lastAnswerHints,
   } = useSkinCheckFlow();
 
   // Keyed by step id so a freshly revealed question can be scrolled into
@@ -245,6 +246,11 @@ export function SkinCheckFlow() {
                 className="flex flex-col gap-5"
               >
                 <EchoBubble message={formatPrompt(step.prompt, answers)} />
+                {/* R9, decision 10a: re-confirmed steps start blank; last time's
+                    answer is shown, never filled in. Only those steps have a hint. */}
+                {lastAnswerHints[step.id] && (
+                  <p className="text-sm text-text/60">{lastAnswerHints[step.id]}</p>
+                )}
                 <StepAnswer
                   step={step}
                   value={answers[step.id] ?? defaultAnswerFor(step)}
