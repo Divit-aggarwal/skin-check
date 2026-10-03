@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { isAuthError, isUploadError, runSkinScan } from "@/lib/api";
+import { canRetrySamePhoto, retrySkinScan } from "@/lib/scan-retry";
 import { summarizeConcerns } from "@/lib/skin-check-score";
 import { runSkinCheckRules, toConcern, type Band, type BandableMetric } from "@/lib/skin-check-rules";
 import { METRIC_LABELS, BAND_STYLE, OVERLAY_CATEGORIES, resolveStatedConcern } from "@/lib/skin-check-skus";
@@ -36,10 +36,12 @@ interface SkinCheckDashboardProps {
   scanId: string;
   /** `forScanId` lets the flow drop a response from a superseded attempt. */
   onScanChange: (scan: SkinScanState, forScanId?: string) => void;
+  /** A new photo under a new scanId: this scan's record is already saved. */
+  onRetake: () => void;
   answers: SkinCheckAnswers;
 }
 
-export function SkinCheckDashboard({ scan, scanId, onScanChange, answers }: SkinCheckDashboardProps) {
+export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answers }: SkinCheckDashboardProps) {
   const { setSession } = useSkinCheckSession();
   // The single authoritative "which category is on screen" state — EchoTwin
   // derives the overlay, score, band, and explanation from this same value,
@@ -98,57 +100,10 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, answers }: Skin
   }
 
   if (scan.status === "error") {
-    const { message, photo, original, captureMethod, originalStored, retentionConsentVersion } = scan;
+    const { message, photo } = scan;
     const handleRetry = async () => {
       onScanChange({ status: "loading" });
-      try {
-        // Same sequence as the capture step: store the original first (unless
-        // it's already up, or the bytes didn't survive a draft restore), then
-        // analyze.
-        const retried = await runSkinScan({
-          scanId,
-          photo,
-          captureMethod,
-          original,
-          // Carried from the capture step, never re-asserted here: this screen
-          // shows no consent control, so a retry can only ever store what the
-          // user already agreed to store.
-          retentionConsent: Boolean(retentionConsentVersion),
-          alreadyStored: originalStored ?? false,
-          overlays: OVERLAY_CATEGORIES,
-        });
-        onScanChange({
-          status: "success",
-          result: retried.result,
-          photo,
-          original,
-          captureMethod,
-          originalStored: retried.originalStored,
-          retentionConsentVersion,
-        }, scanId);
-      } catch (err) {
-        console.error("Skin scan retry failed:", err);
-        // Reusing the previous `message` would misreport a fresh auth failure
-        // as whatever went wrong the first time.
-        onScanChange({
-          status: "error",
-          message: isAuthError(err)
-            ? "Your session expired. Refresh the page to sign in again, then retry."
-            : isUploadError(err)
-              ? "We couldn't save your photo just now. Check your connection and retry."
-              : message,
-          photo,
-          original,
-          captureMethod,
-          // An upload failure leaves nothing stored. Anything else means the
-          // upload phase completed (or was skipped because it was already
-          // stored), so a CV failure must not un-claim an object that is up.
-          originalStored: isUploadError(err)
-            ? false
-            : (originalStored || (Boolean(original) && Boolean(retentionConsentVersion))),
-          retentionConsentVersion,
-        }, scanId);
-      }
+      onScanChange(await retrySkinScan(scan, scanId), scanId);
     };
 
     return (
@@ -169,9 +124,16 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, answers }: Skin
         />
         <div className="flex flex-col gap-3 rounded border border-border bg-canvas p-4">
           <p className="text-body text-text/70">{message}</p>
-          <Button type="button" variant="outlineLight" size="sm" onClick={handleRetry} className="self-start">
-            Take another photo
-          </Button>
+          {canRetrySamePhoto(scan) ? (
+            <Button type="button" variant="outlineLight" size="sm" onClick={handleRetry} className="self-start">
+              Take another photo
+            </Button>
+          ) : (
+            // The engine refused this photo; re-sending it can only fail again.
+            <Button type="button" variant="outlineLight" size="sm" onClick={onRetake} className="self-start">
+              Retake photo
+            </Button>
+          )}
         </div>
       </div>
     );

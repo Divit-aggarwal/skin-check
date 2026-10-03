@@ -180,7 +180,7 @@ export function SkinCheckFlow() {
                   {formatPrompt("Thanks, {name} — here's a visual reading of your skin, based on your scan.", answers)}
                 </p>
               </div>
-              <SkinCheckDashboard scan={scan} scanId={scanId} onScanChange={setScan} answers={answers} />
+              <SkinCheckDashboard scan={scan} scanId={scanId} onScanChange={setScan} onRetake={startNewScan} answers={answers} />
 
               {/* The storage model has always allowed many scans per user
                   (each is its own document); without this there was simply
