@@ -54,10 +54,14 @@ function describeStepAnswer(step: StepConfig, value: StepAnswerValue | undefined
 // Human-readable grounding text for Echo's chat context (lib/gemini.ts) — the
 // /skin-check funnel's answers are stored as opaque value slugs, so this maps
 // each answered step back to its prompt + selected label/reflection text.
-export function summarizeSkinCheckAnswers(answers: SkinCheckAnswers): string {
+//
+// H03b: `isSent` is the allowlist. lib/gemini.ts always passes one built from
+// GEMINI_FIELD_INVENTORY, so only steps marked "sent" reach the prompt.
+export function summarizeSkinCheckAnswers(answers: SkinCheckAnswers, isSent: (stepId: string) => boolean = () => true): string {
   const lines: string[] = [];
   for (const section of SECTIONS) {
     for (const step of section.steps) {
+      if (!isSent(step.id)) continue;
       const described = describeStepAnswer(step, answers[step.id]);
       if (described) lines.push(`${step.prompt} ${described}`);
     }
@@ -98,10 +102,12 @@ const SKIN_SCAN_CATEGORY_LABELS: Record<keyof SkinScanScores, string> = {
 // Elevated, not raw numbers (bands-not-numbers is a locked decision, see
 // lib/skin-check-rules.ts). Pores has no band (see that file's exclusion
 // comment) and is left out here rather than printed with a fake one.
+// Gemini-only. Hydration ("Dryness") is not sent either (H03, owner decision
+// 8): a photo can't measure it, and Echo should not narrate it.
 export function summarizeSkinScanScores(scores: SkinScanScores): string {
   const { bands } = bandScores(scores);
   return (Object.keys(SKIN_SCAN_CATEGORY_LABELS) as (keyof SkinScanScores)[])
-    .filter((key) => key !== "pores")
+    .filter((key): key is Exclude<keyof SkinScanScores, "pores" | "hydration"> => key !== "pores" && key !== "hydration")
     .map((key) => `${SKIN_SCAN_CATEGORY_LABELS[key]}: ${bands[key]}`)
     .join("\n");
 }
