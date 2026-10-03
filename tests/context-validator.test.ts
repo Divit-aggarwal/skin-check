@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ForbiddenClaim } from "@/lib/contracts/context-package";
-import { buildContextPackage, MISSING_TEXT, packageFacts, REASON_TEXT, UNCERTAINTY } from "@/lib/context/builder";
+import { buildContextPackage, MISSING_TEXT, packageFacts, REASON_TEXT, UNCERTAINTY, UNCERTAINTY_BANDS } from "@/lib/context/builder";
 import { validateAnswer, type GeminiAnswer } from "@/lib/context/validator";
 import { CAUSE, CHANGE, CONFIDENCE, DIAGNOSIS, FORECAST, MEASUREMENT, MEDICAL, NUMBER, PAST_EVENT, PRODUCT } from "@/lib/context/lexicon";
 import { SECTIONS } from "@/lib/skin-check-steps";
@@ -58,6 +58,23 @@ describe("validator: each check has a passing and a failing answer", () => {
     expect(checksOf(JSON.stringify({ claims: [UNC], needs_referral: false, extra: 1 }))).toEqual(["malformed_output"]);
     expect(checksOf(ok(Array(6).fill(UNC)))).toEqual(["malformed_output"]);
     expect(checksOf(ok([{ claim_type: "routine_as_directed", text: "Use it as directed.", fact_ids: ["missing.all.routine"] }]))).toContain("citation_rule");
+  });
+
+  it("'condition' is a medical term", () => {
+    expect(checksOf(ok([{ ...UNC, text: "This skin condition is common." }]))).toContain("medical_or_efficacy_term");
+  });
+
+  it("contradicts_package reads 'whole face' as the whole-face reading, not the focus region", () => {
+    const wholeRed = reading("state.all.redness").band;
+    const cheekRed = reading("state.cheeks.redness").band;
+    expect(wholeRed).not.toBe(cheekRed); // fixture control: the bands differ
+    expect(checksOf(ok([{ ...UNC, text: `Redness for the whole face is ${cheekRed}.` }]))).toContain("contradicts_package");
+    expect(checksOf(ok([{ ...UNC, text: `Redness for the whole face is ${wholeRed}.` }]))).not.toContain("contradicts_package");
+  });
+
+  it("a rec item may be named and its claim quoted, but a recommendation verb always fails (design §3.6)", () => {
+    expect(checksOf(ok([{ claim_type: "comparability", text: "Gentle Cleanser: A mild face wash for daily use.", fact_ids: ["rec.gentle-cleanser"] }]))).not.toContain("product_claim");
+    expect(checksOf(ok([{ claim_type: "comparability", text: "I recommend Gentle Cleanser.", fact_ids: ["rec.gentle-cleanser"] }]))).toContain("product_claim");
   });
 
   it("a paraphrase of a quotable label is not exempt", () => {
@@ -131,7 +148,7 @@ describe("our own text passes our own validator", () => {
   });
 
   it("our own fixed sentences contain no lexicon word at all, so a paraphrase is not punished", () => {
-    const ours = [...Object.values(REASON_TEXT), ...Object.values(MISSING_TEXT), UNCERTAINTY.text, ...packageFacts(allPkg).filter((f) => f.kind === "state" || f.kind === "long").map((f) => f.text)];
+    const ours = [...Object.values(REASON_TEXT), ...Object.values(MISSING_TEXT), UNCERTAINTY.text, UNCERTAINTY_BANDS.text, ...packageFacts(allPkg).filter((f) => f.kind === "state" || f.kind === "long").map((f) => f.text)];
     for (const text of ours) {
       for (const re of [CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST, CONFIDENCE, PAST_EVENT, PRODUCT, MEASUREMENT]) expect(re.test(text), `${re.source.slice(0, 30)}: ${text}`).toBe(false);
     }

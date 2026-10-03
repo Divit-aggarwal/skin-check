@@ -67,6 +67,7 @@ export const MEDICAL = re([
   "\\bproven\\b",
   "\\bdiseases?\\b",
   "\\bdisorders?\\b",
+  "\\bconditions?\\b",
   "\\bclinical(?:ly)?\\b",
   "\\btwin\\b",
   "\\bmedicines?\\b",

@@ -13,8 +13,10 @@ const AnalysisSchema = z.object({
   scores: SkinScanScoresSchema,
   region_scores: z.record(z.string(), SkinScanScoresSchema).optional(),
   // lane:context, additive: provenance and confidence for the context package.
-  region_low_confidence: SkinScanRegionLowConfidenceSchema.optional(),
-  pipeline_version: z.string().max(100).optional(),
+  // .catch: a bad value here is dropped, never turns a record today's Echo
+  // could read into a 409.
+  region_low_confidence: SkinScanRegionLowConfidenceSchema.optional().catch(undefined),
+  pipeline_version: z.string().max(100).optional().catch(undefined),
 });
 
 // Same bounds the chat route used to apply to client-sent answers. Answers are

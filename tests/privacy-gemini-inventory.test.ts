@@ -231,3 +231,18 @@ describe("context-package path (lane:context)", () => {
     expect(instruction).not.toMatch(/digital twin|confidence: (low|medium|high)/i);
   });
 });
+
+describe("context-package path with every internal input (lane:context)", () => {
+  it("no uid, scanId, rule id, trigger, date, ref or internal number from the internal results reaches Gemini", async () => {
+    const { buildContextPackage } = await import("@/lib/context/builder");
+    const { answerFromPackage } = await import("@/lib/context/answer");
+    const { generateContextAnswer } = await import("@/lib/gemini");
+    const { fullInput, withExtraKeys, SECRETS } = await import("./context-fixtures");
+    const input = withExtraKeys(fullInput());
+    generateContent.mockResolvedValue({ text: "{}" });
+    await answerFromPackage(buildContextPackage(input), input.message, [], { generate: generateContextAnswer, redFlag: false });
+    const all = JSON.stringify(generateContent.mock.calls[0]![0]);
+    for (const secret of SECRETS) expect(all, secret).not.toContain(secret);
+    expect(all).not.toMatch(/redFlag|raisedBy|ruleId|triggeredBy|inputSha256|ZZSECRET/);
+  });
+});

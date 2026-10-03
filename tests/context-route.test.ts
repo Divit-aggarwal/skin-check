@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
   recordChatTurns: vi.fn(),
   loadChatHistory: vi.fn(),
   buildContextPackage: vi.fn(),
+  handleContextChat: vi.fn(),
 }));
 
 vi.mock("@google/genai", () => ({ GoogleGenAI: class { models = { generateContent: h.generateContent }; } }));
@@ -27,6 +28,11 @@ vi.mock("@/lib/context/builder", async () => {
   const actual = await vi.importActual<typeof import("@/lib/context/builder")>("@/lib/context/builder");
   h.buildContextPackage.mockImplementation(actual.buildContextPackage);
   return { ...actual, buildContextPackage: h.buildContextPackage };
+});
+vi.mock("@/lib/context/chat", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/context/chat")>("@/lib/context/chat");
+  h.handleContextChat.mockImplementation(actual.handleContextChat);
+  return { handleContextChat: h.handleContextChat };
 });
 vi.mock("@/lib/rate-limit", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
@@ -81,6 +87,7 @@ describe("switch off: today's Echo, unchanged", () => {
     expect(res.status).toBe(200);
     expect((await res.json()).reply).toBe("today's echo");
     expect(h.getSkinCheckChatReply).toHaveBeenCalledTimes(1);
+    expect(h.handleContextChat).not.toHaveBeenCalled();
     expect(h.buildContextPackage).not.toHaveBeenCalled();
     expect(h.recordChatTurns).not.toHaveBeenCalled();
   });

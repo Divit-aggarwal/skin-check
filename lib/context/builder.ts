@@ -118,7 +118,7 @@ export const UNCERTAINTY: UncertaintyStatement = {
   source: "uncertainty",
 };
 
-const UNCERTAINTY_BANDS: UncertaintyStatement = {
+export const UNCERTAINTY_BANDS: UncertaintyStatement = {
   id: "uncert.all.bands",
   text: "Low, Moderate and Elevated are rough groupings, not exact amounts.",
   source: "uncertainty",

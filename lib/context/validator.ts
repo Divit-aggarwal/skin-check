@@ -73,6 +73,7 @@ const WORD_CHECKS: [ForbiddenClaim, RegExp][] = [
 ];
 
 const REGION_WORDS: [string, RegExp][] = [
+  ["all", new RegExp(String.raw`\bwhole face\b|\boverall\b`, "iu")],
   ["forehead", new RegExp(String.raw`\bforehead\b`, "iu")],
   ["cheeks", new RegExp(String.raw`\bcheeks?\b`, "iu")],
   ["nose", new RegExp(String.raw`\bnose\b`, "iu")],
