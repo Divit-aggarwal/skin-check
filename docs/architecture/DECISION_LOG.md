@@ -135,6 +135,26 @@ None of these decisions has been implemented. "PROPOSED" means the investigation
 **D-20 Remove "digital twin" from the persona and from app metadata. (PROPOSED)**
 - **Evidence:** research doc §8; the FTC net-impression standard; the system is not a twin by NASEM criteria.
 
+**D-21 Move Firestore to a named database in `asia-south1` before C2 ships, and move the Vercel function region to `bom1` in the same window. (PROPOSED)**
+- Resolves PREFLIGHT_AUDIT G4.2. Full analysis, runbook and risks are in [DATA_LOCALITY_DECISION.md](DATA_LOCALITY_DECISION.md).
+- **Evidence:**
+  - Production holds 21 docs (7 users, 14 skinChecks, 0 scanAnalyses) and no composite indexes.
+  - A Firestore location is immutable.
+  - Longitudinal records are append-only, so they are cheapest to place correctly at birth.
+  - ECS and S3 are already in ap-south-1.
+- **Rejected:**
+  - Recreating `(default)` in place: destructive, no fallback database, and its viability is unverified.
+  - A new Firebase project: requires an Auth migration.
+  - Staying on nam5 and disclosing it: the cost of moving grows with every scan.
+
+**D-21 Gate 01 stores raw analysis in `users/{uid}/scanAnalyses/{scanId}_{sha16}`, not in `skinStates`. (IMPLEMENTED in 6e9081d; not deployed)**
+- This gate was scoped to preservation only; SkinState semantics (comparability keys, engineBuild, requestedScanId join) are deferred to a later gate.
+- `scanAnalyses` is the immutable raw substrate. A later SkinState may be derived from it or replace it, but it is never mutated.
+- The record is written only when the client sends `scanId`. Old bundles get the exact previous behaviour.
+- Retries of the same bytes are idempotent. A retake gets its own document, keyed by hash. A failed write never fails the scan (D-03 honoured).
+- **Also in gate 01:** the scan save now blocks until it succeeds or times out after 15 s, with a retry. This replaces the old "non-fatal by design" save, so a failed save can no longer silently lose the scan.
+- Details: IMPLEMENTATION_GATE_01.md.
+
 ## B. Conflicts with the research doc
 
 | # | Research doc says | Repository reality / finding | Resolution |
