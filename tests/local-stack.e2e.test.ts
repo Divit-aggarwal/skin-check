@@ -25,7 +25,7 @@ describe.skipIf(!WEB)("local stack end to end", () => {
     const { getAuth } = await import("firebase-admin/auth");
     const { collection, getDocs } = await import("firebase/firestore");
     const { saveSkinCheck, listSkinChecks } = await import("@/lib/firebase/skin-checks");
-    const { IMAGE_RETENTION_CONSENT_VERSION } = await import("@/lib/consent");
+    const { IMAGE_RETENTION_CONSENT_VERSION, PROCESSING_CONSENT_VERSION } = await import("@/lib/consent");
 
     // 1. Sign in seeded user Asha: the emulator issues the code, the real SDK signs in.
     const idp = `http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1`;
@@ -73,6 +73,7 @@ describe.skipIf(!WEB)("local stack end to end", () => {
     form.append("image", new Blob([face], { type: "image/png" }), "face.png");
     form.append("scanId", scanId);
     form.append("captureMethod", "native");
+    form.append("processingConsentVersion", PROCESSING_CONSENT_VERSION);
     const scan = await fetch(`${WEB}/api/skin-scan`, { method: "POST", headers: bearer, body: form });
     expect(scan.status).toBe(200);
     const body = (await scan.json()) as { ok: boolean; persisted: boolean; result: Record<string, unknown> };
@@ -98,6 +99,11 @@ describe.skipIf(!WEB)("local stack end to end", () => {
     const record = analyses.docs.map((d) => d.data()).find((d) => d.scanId === scanId);
     expect(record).toMatchObject({ source: "server", engine_build: "sha-8dc37dc501ea974825427c665acd7019120c20ec", captureMethod: "native" });
     expect(record?.region_raw_native).toBeTruthy();
+    // Privacy step 14 (R4): the scan recorded its processing consent in the ledger.
+    const ledger = await getDocs(collection(db(), "users", user.uid, "consentLedger"));
+    expect(ledger.docs.map((d) => d.data()).filter((e) => e.purpose === "processing" && e.scanId === scanId)).toEqual([
+      expect.objectContaining({ granted: true, version: PROCESSING_CONSENT_VERSION, source: "scan" }),
+    ]);
 
     // 6. Echo uses only the dev key: without GEMINI_DEV_API_KEY it is misconfigured, never the production key.
     const chat = await fetch(`${WEB}/api/skin-check/chat`, { method: "POST", headers: { ...bearer, "content-type": "application/json" }, body: "{}" });

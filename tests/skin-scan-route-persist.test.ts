@@ -24,6 +24,7 @@ vi.mock("@/lib/firebase/admin", async () => {
 // (tests/privacy-scan-gate.test.ts); here it always goes ahead.
 vi.mock("@/app/api/account/_ledger", () => ({ scanAgeGate: async () => null }));
 import { POST } from "@/app/api/skin-scan/route";
+import { PROCESSING_CONSENT_VERSION } from "@/lib/consent";
 import { AdminNotConfiguredError } from "@/lib/firebase/admin";
 import { NextRequest } from "next/server";
 import { toSkinState } from "@/lib/skin-state";
@@ -50,7 +51,8 @@ function post(fields: Record<string, string> = {}, bytes = "photo-bytes") {
   callSeq += 1;
   const form = new FormData();
   form.append("image", new Blob([bytes], { type: "image/jpeg" }), "scan.jpg");
-  for (const [k, v] of Object.entries(fields)) form.append(k, v);
+  // R4: a scan carries the processing consent (privacy-processing-consent tests its absence).
+  for (const [k, v] of Object.entries({ processingConsentVersion: PROCESSING_CONSENT_VERSION, ...fields })) form.append(k, v);
   return POST(
     new NextRequest("http://localhost:3000/api/skin-scan", {
       method: "POST",

@@ -14,6 +14,7 @@ vi.mock("@/lib/firebase/admin", async () => {
 });
 
 import { POST } from "@/app/api/skin-scan/route";
+import { PROCESSING_CONSENT_VERSION } from "@/lib/consent";
 import { NextRequest } from "next/server";
 import { toSkinState } from "@/lib/skin-state";
 import { runCaptureGate } from "@/lib/capture-quality/gate";
@@ -35,7 +36,7 @@ function post(fields: Record<string, string>) {
   seq += 1;
   const form = new FormData();
   form.append("image", new Blob([`bytes-${seq}`], { type: "image/jpeg" }), "scan.jpg");
-  for (const [k, v] of Object.entries({ scanId: SCAN_ID, captureMethod: "native", ...fields })) form.append(k, v);
+  for (const [k, v] of Object.entries({ scanId: SCAN_ID, captureMethod: "native", processingConsentVersion: PROCESSING_CONSENT_VERSION, ...fields })) form.append(k, v);
   return POST(new NextRequest("http://localhost:3000/api/skin-scan", {
     method: "POST", headers: { authorization: "Bearer good", "x-forwarded-for": `10.2.0.${seq % 250}` }, body: form,
   }));

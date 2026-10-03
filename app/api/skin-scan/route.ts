@@ -4,7 +4,8 @@ import { FieldValue } from "firebase-admin/firestore";
 import { checkRequestRate, consumeDailyQuota, SKIN_SCAN_ROUTE_LIMITS } from "@/lib/rate-limit";
 import { AdminNotConfiguredError, adminDb, bearerToken, verifyFirebaseIdToken } from "@/lib/firebase/admin";
 import { isValidScanId } from "@/lib/s3-key";
-import { scanAgeGate } from "@/app/api/account/_ledger";
+import { appendConsent, scanAgeGate, withLedgerTimeout } from "@/app/api/account/_ledger";
+import { PROCESSING_CONSENT_COPY, PROCESSING_CONSENT_VERSION } from "@/lib/consent";
 import {
   buildScanAnalysisRecord,
   MAX_RECORD_BYTES,
@@ -395,8 +396,34 @@ export async function POST(request: NextRequest) {
   const persistAttempt = formData.get("persistAttempt") === "recovery" ? "recovery" : undefined;
   // C01, client-asserted: an invalid value is dropped, never a reason to refuse the scan.
   const captureQuality = parseCaptureQuality(formData.get("captureQuality"), captureMethod);
+  // R4 (D-16, D-03a): without the current processing-consent version the user
+  // still gets the result, but no analysis record is written.
+  if (formData.get("processingConsentVersion") !== PROCESSING_CONSENT_VERSION) {
+    return NextResponse.json({ ok: true, result: parsed.data, persisted: false, reason: "consent_missing" });
+  }
+  // The background recovery re-send carries the same consent; one entry per scan is enough.
+  if (!persistAttempt) await recordProcessingConsent(uid, scanId);
   const persisted = await persistScanAnalysis(uid, scanId, image, parsed.data, captureMethod, persistAttempt, captureQuality);
   return NextResponse.json({ ok: true, result: parsed.data, persisted });
+}
+
+/** Best-effort (D-03): a failed ledger write is logged and the scan goes on. */
+async function recordProcessingConsent(uid: string, scanId: string): Promise<void> {
+  try {
+    await withLedgerTimeout(
+      appendConsent(uid, {
+        purpose: "processing",
+        granted: true,
+        version: PROCESSING_CONSENT_VERSION,
+        copy: PROCESSING_CONSENT_COPY,
+        scanId,
+        source: "scan",
+      })
+    );
+  } catch (err) {
+    // Name and code only: Firestore messages embed the doc path (the uid).
+    console.error("skin-scan: processing consent not recorded:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
+  }
 }
 
 const isAlreadyExists = (err: unknown) => {

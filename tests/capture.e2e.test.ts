@@ -6,6 +6,7 @@
 // tests/local-stack.e2e.test.ts.
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { PROCESSING_CONSENT_VERSION } from "@/lib/consent";
 
 const WEB = process.env.LOCAL_STACK_WEB;
 const AUTH_HOST = process.env.FIREBASE_AUTH_EMULATOR_HOST;
@@ -51,6 +52,7 @@ describe.skipIf(!WEB)("capture lane end to end", () => {
       form.append("scanId", scanId);
       form.append("captureMethod", "native");
       form.append("captureQuality", captureQuality);
+      form.append("processingConsentVersion", PROCESSING_CONSENT_VERSION); // privacy step 14 (R4)
       const res = await fetch(`${WEB}/api/skin-scan`, { method: "POST", headers: bearer, body: form });
       expect(res.status).toBe(200);
       expect(await res.json()).toMatchObject({ ok: true, persisted: true });

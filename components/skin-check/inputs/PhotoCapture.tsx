@@ -9,6 +9,9 @@ import { OVERLAY_CATEGORIES } from "@/lib/skin-check-skus";
 import {
   IMAGE_RETENTION_CONSENT_COPY,
   IMAGE_RETENTION_CONSENT_VERSION,
+  PROCESSING_CONSENT_COPY,
+  PROCESSING_CONSENT_TERMS_LABEL,
+  PROCESSING_CONSENT_VERSION,
   PRIVACY_POLICY_LINK_TEXT,
   PRIVACY_POLICY_URL,
 } from "@/lib/consent";
@@ -65,6 +68,9 @@ function isMobileCaptureDevice(): boolean {
 // or, worse, succeeds against the wrong pixels and silently mislabels which
 // region is which. The stored original (originalBlobRef) is the untouched
 // File itself, not this bitmap, so its EXIF tag is never altered.
+// R3: the checkbox shows PROCESSING_CONSENT_COPY exactly, with the terms label as a link.
+const [PROCESSING_TERMS_BEFORE, PROCESSING_TERMS_AFTER] = PROCESSING_CONSENT_COPY.split(PROCESSING_CONSENT_TERMS_LABEL);
+
 async function downscaleToJpeg(file: Blob, maxDimension: number, quality: number): Promise<Blob> {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   try {
@@ -314,6 +320,8 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
       retentionConsent: hasRetentionConsent,
       overlays: OVERLAY_CATEGORIES,
       captureQuality: quality,
+      // canAnalyze() above requires the processing checkbox.
+      processingConsentVersion: PROCESSING_CONSENT_VERSION,
     })
       .then(({ result, originalStored }) =>
         onScanChange(
@@ -326,6 +334,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
             originalStored,
             retentionConsentVersion,
             quality,
+            processingConsentVersion: PROCESSING_CONSENT_VERSION,
           },
           scanId
         )
@@ -361,6 +370,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           retentionConsentVersion,
           quality,
           retakeReason,
+          processingConsentVersion: PROCESSING_CONSENT_VERSION,
         }, scanId);
       });
   }, [flow, hasRetentionConsent, onChange, onCommit, onScanChange, isMobile, user, scanId]);
@@ -494,7 +504,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
               className="mt-0.5 h-4 w-4 shrink-0 rounded border-text/30 text-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
             />
             <span>
-              I agree to the{" "}
+              {PROCESSING_TERMS_BEFORE}
               {TERMS_URL ? (
                 <a
                   href={TERMS_URL}
@@ -502,12 +512,12 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
                   rel="noopener noreferrer"
                   className="underline underline-offset-2 hover:text-text"
                 >
-                  Terms &amp; Conditions
+                  {PROCESSING_CONSENT_TERMS_LABEL}
                 </a>
               ) : (
-                <span className="underline underline-offset-2">Terms &amp; Conditions</span>
-              )}{" "}
-              and consent to my photo being collected and processed for this skin analysis.
+                <span className="underline underline-offset-2">{PROCESSING_CONSENT_TERMS_LABEL}</span>
+              )}
+              {PROCESSING_TERMS_AFTER}
             </span>
           </label>
 

@@ -43,6 +43,14 @@ export const AI_SHARE_CONSENT_VERSION = "ai share DRAFT version 1";
 export const AI_SHARE_CONSENT_COPY =
   "DRAFT: Share my skin check with the AI assistant (processed by Google, outside India).";
 
+// D-16 processing consent, recorded per scan (privacy step 14, R3/R4). The
+// checkbox wording is unchanged. "DRAFT" is in the version because D-16 needs
+// new copy that also covers storing measurements; the owner supplies it
+// (decision 7a) before production, and the version is bumped with it.
+export const PROCESSING_CONSENT_VERSION = "processing DRAFT version 1";
+export const PROCESSING_CONSENT_TERMS_LABEL = "Terms & Conditions";
+export const PROCESSING_CONSENT_COPY = `I agree to the ${PROCESSING_CONSENT_TERMS_LABEL} and consent to my photo being collected and processed for this skin analysis.`;
+
 // R-1 A (routine lane, D-16): the purpose of the user's own routine record.
 // Shown on /routine; not a ledger purpose (nothing to grant or revoke).
 export const ROUTINE_PURPOSE_COPY =

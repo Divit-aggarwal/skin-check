@@ -152,8 +152,11 @@ export type CaptureMethod = "native" | "canvas";
 // client-asserted (D-26): shown and stored for provenance, never used for
 // comparability. `retakeReason` is set when the engine refused the photo for
 // a reason a retake can fix (lib/capture-quality/retake.ts).
+// `processingConsentVersion` (D-16, R3) is the processing consent this photo
+// was analyzed under; the scan route writes no analysis record without it. It
+// is not draft-persisted, so a restored scan's retry is not recorded (fails closed).
 export type SkinScanState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "success"; result: SkinScanResult; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined }
-  | { status: "error"; message: string; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined; retakeReason?: RetakeReason | undefined };
+  | { status: "success"; result: SkinScanResult; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined; processingConsentVersion?: string | undefined }
+  | { status: "error"; message: string; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined; retakeReason?: RetakeReason | undefined; processingConsentVersion?: string | undefined };

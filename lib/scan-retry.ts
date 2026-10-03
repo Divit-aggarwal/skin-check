@@ -20,7 +20,7 @@ export function canRetrySamePhoto(scan: ErrorScan): boolean {
  * draft does not lose it.
  */
 export async function retrySkinScan(scan: ErrorScan, scanId: string, run = runSkinScan): Promise<SkinScanState> {
-  const { message, photo, original, captureMethod, originalStored, retentionConsentVersion, quality } = scan;
+  const { message, photo, original, captureMethod, originalStored, retentionConsentVersion, quality, processingConsentVersion } = scan;
   try {
     // Same sequence as the capture step: store the original first (unless
     // it's already up, or the bytes didn't survive a draft restore), then
@@ -37,6 +37,8 @@ export async function retrySkinScan(scan: ErrorScan, scanId: string, run = runSk
       alreadyStored: originalStored ?? false,
       overlays: OVERLAY_CATEGORIES,
       captureQuality: quality,
+      // The consent this photo was taken under; absent after a draft restore.
+      processingConsentVersion,
     });
     return {
       status: "success",
@@ -47,6 +49,7 @@ export async function retrySkinScan(scan: ErrorScan, scanId: string, run = runSk
       originalStored: retried.originalStored,
       retentionConsentVersion,
       quality,
+      processingConsentVersion,
     };
   } catch (err) {
     console.error("Skin scan retry failed:", err);
@@ -74,6 +77,7 @@ export async function retrySkinScan(scan: ErrorScan, scanId: string, run = runSk
       retentionConsentVersion,
       quality,
       retakeReason,
+      processingConsentVersion,
     };
   }
 }

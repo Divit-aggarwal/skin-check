@@ -28,6 +28,9 @@ const SkinScanResponseSchema = z.object({
   // C2: whether the server wrote users/{uid}/scanAnalyses. Absent when no
   // scanId was sent (or from an older route) — unknown, treated as fine.
   persisted: z.boolean().optional(),
+  // R4: persisted:false because the processing consent was missing. Not a
+  // write failure, so the recovery re-send would only be refused again.
+  reason: z.literal("consent_missing").optional(),
 });
 
 // Delay before the one background re-request after persisted:false — long
@@ -82,8 +85,9 @@ async function requestSkinScan(
   scanId: string | undefined,
   captureMethod?: CaptureMethod,
   persistAttempt?: "recovery",
-  captureQuality?: CaptureQuality
-): Promise<{ result: SkinScanResult; persisted?: boolean | undefined }> {
+  captureQuality?: CaptureQuality,
+  processingConsentVersion?: string
+): Promise<{ result: SkinScanResult; persisted?: boolean | undefined; reason?: "consent_missing" | undefined }> {
   // PHASE 1 fast path — a signed-out caller is stopped before a request is
   // even built. Every route that can put a facial image on the wire funnels
   // through here.
@@ -106,6 +110,9 @@ async function requestSkinScan(
   if (persistAttempt) formData.append("persistAttempt", persistAttempt);
   // C01 capture gate result for `photo`, client-asserted; the route validates or drops it.
   if (captureQuality) formData.append("captureQuality", JSON.stringify(captureQuality));
+  // R3/R4 (D-16): the processing consent this photo was taken under. Without
+  // it the route still analyzes but writes no analysis record.
+  if (processingConsentVersion) formData.append("processingConsentVersion", processingConsentVersion);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), SKIN_SCAN_CLIENT_TIMEOUT_MS);
@@ -152,7 +159,7 @@ async function requestSkinScan(
     throw new ApiError(0, "Unexpected skin-scan response shape.");
   }
 
-  return { result: parsed.data.result, persisted: parsed.data.persisted };
+  return { result: parsed.data.result, persisted: parsed.data.persisted, reason: parsed.data.reason };
 }
 
 // ─── Original image upload (private S3) ────────────────────────────────────
@@ -269,8 +276,9 @@ export async function runSkinScan(opts: {
   alreadyStored?: boolean;
   overlays?: string | string[] | null;
   captureQuality?: CaptureQuality | undefined;
+  processingConsentVersion?: string | undefined;
 }): Promise<{ result: SkinScanResult; originalStored: boolean; persisted?: boolean | undefined }> {
-  const { scanId, photo, captureMethod, original, retentionConsent = false, alreadyStored = false, overlays, captureQuality } = opts;
+  const { scanId, photo, captureMethod, original, retentionConsent = false, alreadyStored = false, overlays, captureQuality, processingConsentVersion } = opts;
 
   let originalStored = alreadyStored;
   if (original && retentionConsent && !alreadyStored) {
@@ -278,8 +286,8 @@ export async function runSkinScan(opts: {
     originalStored = true;
   }
 
-  const { result, persisted } = await requestSkinScan(photo, overlays, scanId, captureMethod, undefined, captureQuality);
-  if (persisted === false) {
+  const { result, persisted, reason } = await requestSkinScan(photo, overlays, scanId, captureMethod, undefined, captureQuality, processingConsentVersion);
+  if (persisted === false && reason !== "consent_missing") {
     // The server's analysis-record write failed, and nothing else would ever
     // retry it. Re-send the same bytes under the same scanId ONCE so the
     // SERVER re-analyzes and re-writes; the doc id is (scanId, sha256(bytes)),
@@ -289,7 +297,7 @@ export async function runSkinScan(opts: {
     // Fire-and-forget: the user already has `result`, and the retry's result
     // is never applied. The browser never writes measurements itself.
     setTimeout(() => {
-      requestSkinScan(photo, null, scanId, captureMethod, "recovery", captureQuality)
+      requestSkinScan(photo, null, scanId, captureMethod, "recovery", captureQuality, processingConsentVersion)
         .then((retry) => {
           if (retry.persisted === false) console.warn("skin-scan: analysis record still not persisted after retry.");
         })
