@@ -103,6 +103,11 @@ export function adminDb(): Firestore {
  * inspecting why; the reason stays server-side.
  */
 export async function verifyFirebaseIdToken(idToken: string): Promise<string> {
+  // With FIREBASE_AUTH_EMULATOR_HOST set, firebase-admin accepts UNSIGNED
+  // tokens. Never in a production build: fail closed as misconfigured.
+  if (process.env.NODE_ENV === "production" && process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+    throw new AdminNotConfiguredError(["FIREBASE_AUTH_EMULATOR_HOST must be unset in production"]);
+  }
   const decoded = await getAuth(adminApp()).verifyIdToken(idToken, true);
   return decoded.uid;
 }

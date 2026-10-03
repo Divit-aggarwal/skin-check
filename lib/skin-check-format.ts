@@ -33,10 +33,14 @@ function describeStepAnswer(step: StepConfig, value: StepAnswerValue | undefined
     case "multi-select-cards":
     case "body-map": {
       if (!Array.isArray(value)) return null;
-      return value.map((v) => step.options.find((o) => o.value === v)?.label ?? v).join(", ");
+      // Unknown values are dropped, never echoed: answers are browser-written
+      // (users/{uid}/skinChecks) and this text lands in Echo's systemInstruction
+      // (gate 02). Only option labels from our own config reach the prompt.
+      const labels = value.flatMap((v) => step.options.find((o) => o.value === v)?.label ?? []);
+      return labels.length > 0 ? labels.join(", ") : null;
     }
     case "scale-1-5":
-      return typeof value === "string" ? step.reflections[value] ?? value : null;
+      return typeof value === "string" ? step.reflections[value] ?? null : null;
     case "segmented-slider": {
       const option = step.options.find((o) => o.value === value);
       return option ? `${option.label} (${option.sublabel})` : null;

@@ -173,7 +173,9 @@ describe("skinstate-1: malformed raw data → invalid, never patched", () => {
 
   it("rejects a non-object and a record that is neither server nor legacy", () => {
     expect(toSkinState(null, REF, UID).kind).toBe("invalid");
-    expect(toSkinState({ source: "client" }, REF, UID).kind).toBe("invalid");
+    // A complete record whose ONLY defect is its source — so this fails on the source check alone.
+    const result = toSkinState({ ...productionRecord(), source: "client" }, REF, UID);
+    expect(result).toEqual({ kind: "invalid", reasons: ['scanAnalyses record source is not "server"'] });
   });
 });
 
@@ -259,11 +261,23 @@ describe("skinstate-1: trust comes from the path, not record.source (gate 02)", 
     expect((result as { reasons: string[] }).reasons).toContain("record.inputSha256: not 64 lowercase hex");
   });
 
+  // Built around the valid docId with uid === expectedUid, so the ONLY thing
+  // wrong is the ref's shape — the uid and docId-binding checks can't mask a
+  // weakened path parser.
+  const D = "SYNTHSCAN01_aaaaaaaaaaaaaaaa";
   it.each([
-    "", "users/u/scanAnalyses", "users/u/scanAnalyses/a/b", "users//scanAnalyses/x", "users/../scanAnalyses/x",
-    "/users/u/scanAnalyses/x", "users/u/scanAnalyses/x ", "other/u/scanAnalyses/x", "users/u/otherCollection/x",
-  ])("malformed analysisRef %j → invalid", (ref) => {
-    invalid(toSkinState(productionRecord(), ref, "u"));
+    "", `users/u/scanAnalyses`, `users/u/scanAnalyses/${D}/b`, `users//scanAnalyses/${D}`, `users/../scanAnalyses/${D}`,
+    `/users/u/scanAnalyses/${D}`, `users/u/scanAnalyses/${D} `, `other/u/scanAnalyses/${D}`, `users/u/scanAnalyses/${D}/`,
+    `users/u/scan%41nalyses/${D}`, `users/u/scanAnalyses/${D}\u200b`, `users/u/scanAnalyses/..`,
+  ])("malformed analysisRef %j → invalid (shape)", (ref) => {
+    const result = toSkinState(productionRecord(), ref, "u");
+    expect(result.kind).toBe("invalid");
+    expect((result as { reasons: string[] }).reasons).toContain("analysisRef: not of the form users/{uid}/{collection}/{docId}");
+  });
+
+  it.each(["otherCollection", "ScanAnalyses", "scananalyses"])("collection %j is never a SkinState source", (c) => {
+    const result = toSkinState(productionRecord(), `users/u/${c}/${D}`, "u");
+    expect((result as { reasons: string[] }).reasons).toContain(`analysisRef: collection "${c}" is not a SkinState source`);
   });
 
   it("a cross-user reference is invalid", () => {

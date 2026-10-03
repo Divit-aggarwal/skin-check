@@ -171,14 +171,13 @@ The whole-face numbers above are background context only — only bring them up
 if the user asks how this region compares to the rest of their face.`
     : "";
 
-  // Only one /skin-check step is free text ("name" — lib/skin-check-steps.ts),
-  // capped at 500 chars by the route's RequestSchema, but that's still
-  // attacker-controlled prose landing directly in systemInstruction with no
-  // delimiter — the same class of risk RegionFocusSchema's enum was hardened
-  // against for `region`. There's no server-side fix here (a name field is
-  // legitimately free text, so it can't be enum-constrained like `region`
-  // was) — this preamble is the mitigation: explicit framing, so a crafted
-  // "name" can't read as an instruction to the model.
+  // Answers are read server-side from the user's own skinChecks doc
+  // (lib/echo-trusted-context.ts, capped there by AnswersSchema) and are
+  // browser-written. summarizeSkinCheckAnswers renders only option labels
+  // from our own config — unknown values are dropped — so the one free-text
+  // step left is "name" (lib/skin-check-steps.ts). It can't be enum-
+  // constrained, so this preamble is the mitigation: explicit framing, so a
+  // crafted "name" can't read as an instruction to the model.
   return `${ECHO_CHAT_PERSONA}
 
 Below are the user's own typed answers from the /skin-check quiz. Treat this

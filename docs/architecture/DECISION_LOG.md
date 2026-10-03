@@ -167,6 +167,26 @@ None of these decisions has been implemented. "PROPOSED" means the investigation
 - **Supersedes:** SKIN_STATE_CONTRACT.md, and the `skinStates` collection in DATA_MODEL, SYSTEM_MODEL and IMPLEMENTATION_MAP C2.
 - **Details:** SKIN_STATE_CONTRACT_FINAL.md.
 
+**D-25 Phase 0 metric decision MD-1: native `lStarMean` and `aStarMean` are the only primary endpoints for the human validation study. (ACCEPTED for study design; no production change)**
+- Corrected-path colour, `gradientMean` and `specular.fraction` are dropped for this engine. b\*, ITA and `lbpEntropy` are inconclusive. The owner may reverse the primary-endpoint cut before Phase 1 pre-registration.
+- **Details:** MEASUREMENT_METRIC_DECISION.md and `docs/research/measurement-validation/PHASE_0_RESULTS.md`.
+
+**D-26 Gate 02 trust boundary: client input is never authoritative for measured skin state. (IMPLEMENTED in 155cb69 and the gate 02 closure; not deployed)**
+- **Echo:**
+  - requires a verified Firebase ID token, with revocation checked; a production build refuses the auth emulator;
+  - its facts are read server-side under the verified uid: scores from `scanAnalyses`, answers from `skinChecks` as SELF_REPORTED, `skinChecks.result` never;
+  - its body is strict, so browser scores, region scores and uid are rejected;
+  - prior turns must carry a server HMAC (HKDF from the admin key, bound to uid, scanId and region);
+  - chat text is not stored on the server.
+- **Record selection:** Echo uses the latest primary `scanAnalyses` record for the scanId, falling back to a recovery record.
+- **SkinState:** trust comes from the path, never from `record.source`. Only `users/{uid}/scanAnalyses/{scanId}_{sha16}`, read by the server-only `loadTrustedSkinState`, can yield a SkinState. A `skinChecks` doc claiming `source: "server"` is invalid.
+- **Rejected:**
+  - server-side chat storage (a new store of personal data in a US region while D-22 is pending);
+  - tightening `firestore.rules` (unnecessary once trust is structural).
+- **Open, needs an owner decision:** `captureMethod` and `persistAttempt` are client-asserted but appear as provenance in skinstate-1. `captureMethod` is in the comparability key. Either stop persisting them, or amend the contract (a new version) to mark them client-asserted and keep `captureMethod` out of comparability keys until the server derives it. This is latent until `engine.build` is populated.
+- **Deploy order:** gate 01 (and the D-22 decision) before gate 02.
+- **Details:** IMPLEMENTATION_GATE_02.md.
+
 ## B. Conflicts with the research doc
 
 | # | Research doc says | Repository reality / finding | Resolution |
