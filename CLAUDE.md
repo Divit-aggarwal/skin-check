@@ -20,7 +20,8 @@ All architectural decisions must be documented.
 
 - The tracker in docs/ (PROJECT_SKIN_EXECUTION_TRACKER.md) is the source of
   truth. Update it after every finished task.
-- A task is done only when it has a commit and a test result.
+- A code task is done only when it has a commit and a test result.
+- A document task is done when the document is committed. No test is needed.
 - Never run terraform apply.
 - Never delete or reset a database.
 - Never deploy to production. Prepare the command and stop. The owner runs it.

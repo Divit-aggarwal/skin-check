@@ -66,3 +66,4 @@ ui-debug.log
 database-debug.log
 !CLAUDE.md
 !.claude/agents/*.md
+!docs/PHASE_0_RUNBOOK.md
