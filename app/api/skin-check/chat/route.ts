@@ -10,6 +10,7 @@ import { loadTrustedEchoContext } from "@/lib/echo-trusted-context";
 import { signHistory, verifyHistory } from "@/lib/echo-history-token";
 import { bandScores } from "@/lib/skin-check-rules";
 import { summarizeConcerns } from "@/lib/skin-check-score";
+import { ageStatus, withLedgerTimeout, type AgeStatus } from "@/app/api/account/_ledger";
 
 // firebase-admin needs Node APIs and hard-fails on the Edge runtime — same
 // explicit opt-in as /api/skin-scan.
@@ -142,6 +143,27 @@ export async function POST(request: NextRequest) {
       { error: "This conversation couldn't be verified.", code: "CHAT_HISTORY_INVALID" },
       { status: 400 }
     );
+  }
+
+  // H02a (D-19): Gemini's terms require 18+. Chat may hard-reject (D-03a:
+  // the attestation UI ships with this lane). It fails closed: a ledger it
+  // can't read is a 503, never a pass. Before the quota, so a refusal
+  // doesn't spend it.
+  let age: AgeStatus;
+  try {
+    age = await withLedgerTimeout(ageStatus(uid));
+  } catch (err) {
+    console.error("skin-check chat: consent ledger unavailable:", err instanceof Error ? err.message : String(err));
+    return NextResponse.json(
+      { error: "Echo can't check your settings right now. Please try again.", code: "CONSENT_CHECK_UNAVAILABLE" },
+      { status: 503 }
+    );
+  }
+  if (age === "under18") {
+    return NextResponse.json({ error: "Echo is only available to people aged 18 or over.", code: "UNDER_18" }, { status: 403 });
+  }
+  if (age === "missing") {
+    return NextResponse.json({ error: "Please confirm your age to use Echo.", code: "ATTESTATION_REQUIRED" }, { status: 403 });
   }
 
   const quotaLimited = consumeDailyQuota(request, GEMINI_ROUTE_LIMITS);
