@@ -12,6 +12,8 @@ const LOCAL = {
   FIREBASE_CLIENT_EMAIL: "local-dev@demo-skin-check.iam.gserviceaccount.com",
   SKIN_SCAN_API_URL: "http://127.0.0.1:3107",
   S3_SKIN_IMAGES_BUCKET: "skin-originals-dev",
+  S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID: "local-dev-erase",
+  S3_SKIN_IMAGES_ERASE_SECRET_ACCESS_KEY: "local-dev-erase",
 };
 const names = (env: Record<string, string>) => findProductionTargets(env).map((h: { name: string }) => h.name);
 
@@ -32,6 +34,10 @@ describe("dev env guard", () => {
     ["S3_SKIN_IMAGES_BUCKET", "projectskin-skin-originals-prod"],
     ["NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", "projectskin-a202c.firebaseapp.com"],
     ["SOME_OTHER_NAME", "gs://projectskin-skin-originals-prod/x"],
+    // R5: a real AWS key shape for the erase pair (made-up values).
+    ["S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID", "AKIAABCDEFGHIJKLMNOP"],
+    ["S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID", " ASIAABCDEFGHIJKLMNOP "],
+    ["S3_SKIN_IMAGES_ERASE_SECRET_ACCESS_KEY", "abcdEFGHijklMNOPqrstUVWXyz0123456789/+ab"],
   ])("refuses %s = %s", (name, value) => {
     expect(names({ ...LOCAL, [name]: value })).toEqual([name]);
     expect(() => assertDevEnvSafe({ ...LOCAL, [name]: value })).toThrow(name);
