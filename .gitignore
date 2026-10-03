@@ -49,6 +49,9 @@ next-env.d.ts
 
 # Local working docs and leftovers — kept on disk, not in the repo
 *.md
+# Architecture planning docs and the research they are built on ARE tracked.
+!docs/architecture/*.md
+!docs/Longitudinal skin platform architecture.md
 /scan-response.json
 /supabase/
 /.mcp.json
