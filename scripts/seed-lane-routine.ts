@@ -49,12 +49,15 @@ async function main() {
     for (let i = 0; i < events.length; i++) {
       const e = events[i]!;
       const input = RoutineEventInputSchema.parse({ ...e, eventId: id(), timeZone: "Asia/Kolkata" });
-      await db.collection("users").doc(uid).collection("routineEvents").doc(input.eventId).set({
+      // create(), never set(): events are never rewritten, even if emulator data survived a restart.
+      await db.collection("users").doc(uid).collection("routineEvents").doc(input.eventId).create({
         ...input,
         schemaVersion: ROUTINE_EVENT_SCHEMA_VERSION,
         catalogVersion: CATALOG_VERSION,
         recordedAt: Timestamp.fromMillis(Date.now() - (events.length - i) * 60_000),
         source: "user",
+      }).catch((err: { code?: unknown }) => {
+        if (err?.code !== 6) throw err; // 6 = ALREADY_EXISTS: already seeded
       });
     }
     console.log(`seed-lane-routine: ${events.length} routine events for ${uid}`);

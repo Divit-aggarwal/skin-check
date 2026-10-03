@@ -1,8 +1,12 @@
 import { RoutinePage } from "@/components/routine/RoutinePage";
 import { ROUTINE_COPY as C } from "@/lib/routine/copy";
 
+// description and openGraph are set here so the root description, which links
+// a routine to results, is not inherited (D-12, R-4 A).
 export const metadata = {
   title: "Routine — The Project SKIN",
+  description: C.purpose,
+  openGraph: { title: "Routine — The Project SKIN", description: C.purpose },
 };
 
 // Reached by URL only: no link from the scan dashboard until G02 is reviewed

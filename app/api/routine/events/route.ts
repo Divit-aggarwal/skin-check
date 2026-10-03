@@ -25,8 +25,23 @@ import { adherence } from "@/lib/routine/adherence";
 // here reads scans or calls Gemini.
 export const runtime = "nodejs";
 
+// Per-IP burst only (checkRequestRate); perDay is required by the type but
+// not enforced there. The per-user cap below is what bounds volume.
 const LIMITS: PublicRouteLimits = { scope: "routine", perMinute: 30, perDay: 1000 };
 const MAX_BODY_BYTES = 4_000;
+
+// Per verified uid, so rotating X-Forwarded-For does not help. ponytail:
+// in-memory and per instance, like lib/rate-limit.ts; move to a shared store
+// if routine writes ever need a hard global cap.
+const WRITES_PER_UID_PER_DAY = 200;
+const writes = new Map<string, { day: string; n: number }>();
+function overUserCap(uid: string): boolean {
+  const day = new Date().toISOString().slice(0, 10);
+  const w = writes.get(uid);
+  const n = w?.day === day ? w.n + 1 : 1;
+  writes.set(uid, { day, n });
+  return n > WRITES_PER_UID_PER_DAY;
+}
 
 const fail = (status: number, code: string) => NextResponse.json({ error: code, code }, { status });
 
@@ -64,16 +79,40 @@ function inputProblem(e: RoutineEventInput): string | null {
   return null;
 }
 
+/** The body as text, or null once it passes `max` bytes (reading stops there). */
+async function readCapped(request: NextRequest, max: number): Promise<string | null> {
+  if (!request.body) return "";
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > max) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString("utf8");
+}
+
 export async function POST(request: NextRequest) {
   const limited = checkRequestRate(request, LIMITS);
   if (limited) return limited;
   const uid = await verifiedUid(request);
   if (uid instanceof NextResponse) return uid;
 
-  if (Number(request.headers.get("content-length") ?? "0") > MAX_BODY_BYTES) return fail(413, "too_large");
+  if (overUserCap(uid)) return fail(429, "too_many_events");
+
+  // Content-Length can be absent (chunked) or wrong, so the body itself is
+  // read with a hard cap and parsed only after.
+  const text = await readCapped(request, MAX_BODY_BYTES);
+  if (text === null) return fail(413, "too_large");
   let body: unknown;
   try {
-    body = await request.json();
+    body = JSON.parse(text);
   } catch {
     return fail(400, "invalid_event");
   }

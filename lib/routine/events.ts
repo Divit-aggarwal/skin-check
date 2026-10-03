@@ -52,7 +52,7 @@ export const ScheduleSchema = z.strictObject({
 });
 
 const common = {
-  eventId: z.uuidv4(),
+  eventId: z.uuidv4().refine((s) => s === s.toLowerCase(), "lowercase only"),
   productId: ProductId,
   effectiveDate: IsoDate,
   timeZone: z.string().refine(isTimeZone, "not an IANA time zone").default(DEFAULT_TIME_ZONE),

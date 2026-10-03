@@ -26,7 +26,10 @@ function filesUnder(...dirs: string[]): string[] {
 function sourceText(src: string): string[] {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
   const literals = Array.from(code.matchAll(/"([^"\n]*)"|'([^'\n]*)'|`([^`]*)`/g)).map((m) => m[1] ?? m[2] ?? m[3]!);
-  const jsx = Array.from(code.matchAll(/>([^<>{}]+)</g)).map((m) => m[1]!.trim()).filter(Boolean);
+  // Text between tags, with {expressions} blanked, so "Results {n}" is still seen.
+  const jsx = Array.from(code.matchAll(/>([^<]+)</g))
+    .map((m) => m[1]!.replace(/\{[^}]*\}/g, " ").trim())
+    .filter(Boolean);
   return [...literals, ...jsx];
 }
 
@@ -40,6 +43,8 @@ describe("routine copy (D-12)", () => {
     expect(bannedWordsIn("use before moisturiser")).toEqual([]);
     expect(bannedWordsIn("Since 2026-10-03")).toEqual([]);
     expect(bannedWordsIn("lowercase")).toEqual([]);
+    const planted = sourceText("<p>Results {n}</p><span>{x} improved</span>");
+    expect(planted.flatMap(bannedWordsIn)).toEqual(expect.arrayContaining(["results", "improve*"]));
   });
 
   it("no string in lib/routine/copy.ts has a banned word", () => {
@@ -49,7 +54,9 @@ describe("routine copy (D-12)", () => {
   });
 
   it("no string or JSX text in the routine UI has a banned word", () => {
-    for (const f of filesUnder(...UI_DIRS)) {
+    const files = filesUnder(...UI_DIRS);
+    expect(files.length).toBeGreaterThanOrEqual(2);
+    for (const f of files) {
       for (const s of sourceText(readFileSync(f, "utf8"))) expect(bannedWordsIn(s), `${f}: ${s}`).toEqual([]);
     }
   });
@@ -77,6 +84,14 @@ describe("routine import boundaries", () => {
   });
 
   it("no routine UI file references claims", () => {
-    for (const f of filesUnder(...UI_DIRS)) expect(readFileSync(f, "utf8"), f).not.toMatch(/\bclaims\b/);
+    const files = filesUnder(...UI_DIRS);
+    expect(files.length).toBeGreaterThanOrEqual(2);
+    for (const f of files) expect(readFileSync(f, "utf8"), f).not.toMatch(/\bclaims\b/);
+  });
+
+  it("the page sets its own description, so the root one (which links routine to results) is not inherited", () => {
+    const src = readFileSync("app/(marketing)/routine/page.tsx", "utf8");
+    expect(src).toMatch(/\bdescription:\s*C\.purpose/);
+    expect(src).toMatch(/openGraph:\s*\{[^}]*description:\s*C\.purpose/);
   });
 });

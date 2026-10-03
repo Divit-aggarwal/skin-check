@@ -106,6 +106,24 @@ describe("POST /api/routine/events", () => {
     expect((await post(sub)).status).toBe(201);
   });
 
+  it("a body over 4 KB gives 413 even without a Content-Length", async () => {
+    const big = new ReadableStream({
+      start(c) {
+        c.enqueue(new TextEncoder().encode(JSON.stringify({ ...start, pad: "x".repeat(5000) })));
+        c.close();
+      },
+    });
+    const r = await POST(
+      new NextRequest("http://localhost/api/routine/events", { method: "POST", headers: headers(), body: big, duplex: "half" } as never)
+    );
+    expect(r.status).toBe(413);
+    expect(store.size).toBe(0);
+  });
+
+  it("an upper-case eventId is rejected, so one event has one spelling", async () => {
+    expect((await post({ ...start, eventId: ID1.toUpperCase() })).status).toBe(400);
+  });
+
   it("toProductId === productId gives 400", async () => {
     expect((await post({ ...start, type: "substitute", toProductId: start.productId })).status).toBe(400);
   });
@@ -189,5 +207,13 @@ describe("GET /api/routine/events", () => {
   it("an invalid tz gives 400 bad_time_zone; a valid tz moves today", async () => {
     expect(await code(await get("?tz=Mars/Olympus"))).toBe("bad_time_zone");
     expect((await (await get("?tz=UTC")).json()).today).toBe("2026-10-02");
+  });
+});
+
+describe("per-user write cap", () => {
+  it("the 201st POST in a day from one uid gives 429, whatever its IP", async () => {
+    verifyFirebaseIdToken.mockResolvedValue("busy-uid");
+    for (let i = 0; i < 200; i++) expect((await post({})).status).toBe(400);
+    expect(await code(await post(start))).toBe("too_many_events");
   });
 });

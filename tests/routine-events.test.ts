@@ -131,6 +131,15 @@ describe("E03 currentRoutine", () => {
     expect(currentRoutine(events, "2026-10-03")).toEqual([{ productId: "a", schedule: SCHED, since: "2026-10-01" }]);
   });
 
+  it("a second start of OTHER_PRODUCT_ID while active is ignored", () => {
+    const pm = { slot: "PM" as const, days: [1] };
+    const events = [
+      ev({ type: "start", productId: OTHER_PRODUCT_ID, effectiveDate: "2026-10-01" }),
+      ev({ type: "start", productId: OTHER_PRODUCT_ID, effectiveDate: "2026-10-02", schedule: pm }),
+    ];
+    expect(currentRoutine(events, "2026-10-03")).toEqual([{ productId: OTHER_PRODUCT_ID, schedule: SCHED, since: "2026-10-01" }]);
+  });
+
   it("same-day order is recordedAt, then eventId", () => {
     const start = ev({ type: "start", recordedAt: "2026-10-01T10:00:00.000Z" });
     const stop = ev({ type: "stop", recordedAt: "2026-10-01T09:00:00.000Z" });
