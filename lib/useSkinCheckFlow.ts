@@ -2,7 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { SECTIONS } from "@/lib/skin-check-steps";
-import { defaultAnswerFor, isStepAnswerValid, PER_SCAN_SECTION_IDS, reusableAnswers } from "@/lib/skin-check-validation";
+import {
+  defaultAnswerFor,
+  isStepAnswerValid,
+  PER_SCAN_SECTION_IDS,
+  RECONFIRM_EACH_SCAN_IDS,
+  reusableAnswers,
+} from "@/lib/skin-check-validation";
+import { reconfirmHints } from "@/lib/skin-check-format";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
 import { useAuth } from "@/lib/auth-context";
 import { latestSkinCheckAnswers } from "@/lib/firebase/skin-checks";
@@ -45,10 +52,18 @@ export function revealCountFor(section: SectionConfig, answers: SkinCheckAnswers
 // eligibleStepsFor has no way to guarantee that for every future section, so
 // this stays as the general-purpose guard.
 // When a previous questionnaire is being reused, its sections are skipped as
-// well, leaving only the per-scan ones: verify → photo → results.
+// well, leaving only the per-scan ones: verify → photo → results — plus any
+// section holding a question re-confirmed on every scan (D-19), which is
+// shown with its other answers already filled in and that one blank.
 function isSkipped(idx: number, answers: SkinCheckAnswers, reusing: boolean): boolean {
   const section = SECTIONS[idx]!;
-  return eligibleStepsFor(section, answers).length === 0 || (reusing && !PER_SCAN_SECTION_IDS.has(section.id));
+  const eligible = eligibleStepsFor(section, answers);
+  return (
+    eligible.length === 0 ||
+    (reusing &&
+      !PER_SCAN_SECTION_IDS.has(section.id) &&
+      !eligible.some((step) => RECONFIRM_EACH_SCAN_IDS.includes(step.id)))
+  );
 }
 
 export function nextEligibleIndex(fromIndex: number, answers: SkinCheckAnswers, reusing: boolean): number {
@@ -200,6 +215,11 @@ export function useSkinCheckFlow() {
   // True when this scan reuses a questionnaire the user already answered, so
   // only verify, photo and results are left to go through.
   const [reusing, setReusing] = useState(false);
+  // Decision 10(a): "Last time you said: …" for each re-confirmed step, from
+  // the previous scan's answers. Display text only — kept out of `answers`,
+  // so it is never saved to the draft or to Firestore. Rendering it is
+  // SkinCheckFlow's job (request R9).
+  const [lastAnswerHints, setLastAnswerHints] = useState<Record<string, string>>({});
   const [revealCount, setRevealCount] = useState(() => revealCountFor(SECTIONS[0]!, {}));
   // Bumped on every commit (not just the section's last step — an edit to
   // an earlier answer while reviewing a completed section must be able to
@@ -340,6 +360,7 @@ export function useSkinCheckFlow() {
         if (!reuse) return;
         setAnswers((prev) => ({ ...reuse, ...prev }));
         setReusing(true);
+        setLastAnswerHints(reconfirmHints(previous));
         if (now.sectionIndex === 0 && Object.keys(now.answers).length === 0) {
           setSectionIndex(VERIFY_INDEX);
           setRevealCount(revealCountFor(SECTIONS[VERIFY_INDEX]!, reuse));
@@ -412,6 +433,7 @@ export function useSkinCheckFlow() {
     setScanId(newScanId());
     setAnswers(reuse ?? {});
     setReusing(reuse !== null);
+    setLastAnswerHints(reuse ? reconfirmHints(answers) : {});
     setScan({ status: "idle" });
     setSectionIndex(idx);
     setRevealCount(revealCountFor(SECTIONS[idx]!, reuse ?? {}));
@@ -536,5 +558,6 @@ export function useSkinCheckFlow() {
     direction,
     complete,
     blocked,
+    lastAnswerHints,
   };
 }
