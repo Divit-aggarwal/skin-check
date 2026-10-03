@@ -66,6 +66,18 @@ service cloud.firestore {
                || img.get('stored', false) != true
                || img.get('key', '') == 'users/' + uid + '/scans/' + checkId + '/original.jpg';
       }
+
+      // ── lane:routine ──
+      // E03 routine events (docs/lanes/routine-design.md, R-6 A). Written ONLY
+      // by /api/routine/events through the Admin SDK, which bypasses these
+      // rules; the route builds the path from the verified uid and creates,
+      // never updates. The owner may read; no client may create, change or
+      // delete an event, so the history is append-only.
+      match /routineEvents/{eventId} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+      // ── end lane:routine ──
     }
   }
 }
