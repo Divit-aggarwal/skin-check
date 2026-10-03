@@ -29,7 +29,7 @@ describe.skipIf(!WEB)("local stack end to end", () => {
 
     // 1. Sign in seeded user Asha: the emulator issues the code, the real SDK signs in.
     const idp = `http://${AUTH_HOST}/identitytoolkit.googleapis.com/v1`;
-    const phoneNumber = "+15555550101";
+    const phoneNumber = "+919999900001";
     const sent = await fetch(`${idp}/accounts:sendVerificationCode?key=demo-api-key`, {
       method: "POST",
       headers: { "content-type": "application/json" },

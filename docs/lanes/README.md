@@ -45,13 +45,18 @@ Port = `PORT_BASE` + offset. Three lanes and the main checkout can run at the sa
 
 ## File ownership
 
-Found by grepping each task's concerns (consent, age, captureMethod, retake, products, erasure, Gemini prompt fields) across `app/`, `components/`, `lib/`, `hooks/`, `types/` and `firestore.rules`.
+Found by grepping each lane's terms across `app/`, `components/`, `lib/`, `hooks/`, `types/` and `firestore.rules`:
+- capture: captureMethod, retake, camera, quality;
+- routine: SKU, routine, catalogue, recommend;
+- privacy: consent, under-18, attestation, erasure, retention, Gemini prompt, `female_skin_context`, `current_products`, `phone_verify`.
+
+A file matched by two or more lanes is in the shared table below.
 
 | Lane | Owns (may edit) |
 |---|---|
 | capture | `components/skin-check/inputs/PhotoCapture.tsx`, `hooks/useCameraStream.ts`, `lib/scan-analysis-record.ts`, new `lib/capture-quality/**`, new `lib/comparability.ts`, new tests `tests/capture-*.test.ts`, `tests/comparability*.test.ts`, new seed `scripts/seed-lane-capture.ts` |
 | routine | `lib/skin-check-skus.ts`, `components/skin-check/SkinCheckDashboard.tsx`, new `lib/routine/**`, new `lib/catalog/**`, new `app/api/routine/**`, new `app/(marketing)/routine/**`, new `components/routine/**`, new tests `tests/routine-*.test.ts`, `tests/catalog-*.test.ts`, `tests/firestore-rules-routine.test.ts`, new seed `scripts/seed-lane-routine.ts` |
-| privacy | `lib/consent.ts`, `app/api/skin-scan/upload/route.ts`, `lib/s3.ts`, `lib/s3-key.ts`, `app/(marketing)/account/page.tsx`, new `app/api/account/**`, `lib/useSkinCheckFlow.ts`, `lib/skin-check-steps.ts`, `lib/skin-check-validation.ts`, `lib/skin-check-draft.ts`, `lib/gemini.ts`, `lib/gemini-key.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-format.ts`, `app/api/skin-check/chat/route.ts`, new tests `tests/privacy-*.test.ts`, `tests/firestore-rules-privacy.test.ts`, new seed `scripts/seed-lane-privacy.ts` |
+| privacy | `lib/consent.ts`, `app/api/skin-scan/upload/route.ts`, `lib/s3.ts`, `lib/s3-key.ts`, `app/(marketing)/account/page.tsx`, new `app/api/account/**`, `lib/skin-check-steps.ts`, `lib/skin-check-validation.ts`, `components/skin-check/inputs/PhoneAuthStep.tsx`, `app/(marketing)/echo/page.tsx`, `components/skin-check/EchoPage.tsx`, `lib/gemini.ts`, `lib/gemini-key.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-format.ts`, `app/api/skin-check/chat/route.ts`, new tests `tests/privacy-*.test.ts`, `tests/firestore-rules-privacy.test.ts`, new seed `scripts/seed-lane-privacy.ts` |
 
 **No lane edits:**
 - `lib/skin-state.ts`, `lib/skin-state-loader.ts` (D-23 frozen).
@@ -72,7 +77,13 @@ These are the files more than one lane needs to change.
 | `lib/firebase/skin-checks.ts` | privacy (consent fields), capture (optional capture-quality summary) | Additive only. capture adds one optional `capture` field to the saved document. privacy owns the `consent` block and its rules. Neither renames or removes fields. Merge capture first. |
 | `types/skin-scan.ts` | capture (quality result on `SkinScanState`), privacy (consent/attestation types if needed) | New optional fields or new types only. No change to `SkinScanResultSchema`, which is the engine contract. |
 | `components/skin-check/inputs/PhotoCapture.tsx` | capture (owner), privacy (consent UI lives in it) | capture owns the file. privacy changes consent **copy and versions in `lib/consent.ts`** (already imported by PhotoCapture). If privacy needs a layout change in PhotoCapture, it writes the request in its report; capture makes it, or it is done after both lanes merge. |
-| `.env.development.example` | any lane that adds a variable | Append only, one block per lane with a `# lane:<name>` comment. Every new variable gets a safe local value. If a new variable could point at production, the guard (`lib/dev-env-guard.cjs`) must learn it. That file is not lane-owned, so the lane writes a request in its report. |
+| `lib/useSkinCheckFlow.ts` | privacy (18+ gate, per-scan re-confirmation, answers), capture (scan state on retake, quality result) | privacy owns the answers, sections and age-gate code. capture edits only the scan-state handling (the photo → `SkinScanState` path and the retake reset). Merge capture first. |
+| `lib/api.ts` (client helpers for scan and upload) | capture (send quality fields), privacy (send attestation, consent) | Additive only: new optional parameters on the existing helpers. No signature or behaviour change for current callers. Merge capture first. |
+| `lib/skin-check-draft.ts` | privacy (draft answers and consent), capture (draft scan state incl. `captureMethod`) | privacy owns the answers and consent parts. capture may add an optional quality field to the stored scan state only. |
+| `lib/skin-check-session-context.tsx` | capture, privacy | New optional context fields only. No renames. |
+| `components/skin-check/SkinCheckDashboard.tsx` | routine (owner: products, routine), capture (low-quality notice), privacy (consent and retention display) | routine owns it. capture and privacy write the change they need in their report; routine makes it, or it is done after both merge. |
+| `lib/skin-check-skus.ts` | routine (owner); its exports are used by PhotoCapture (capture), EchoPage (privacy) and the dashboard | routine keeps the names and shapes of `METRIC_LABELS`, `BAND_STYLE`, `OVERLAY_CATEGORIES` and `resolveStatedConcern`. New catalogue data goes in `lib/catalog/**`. |
+| `.env.development.example` | any lane that adds a variable | Append only, one block per lane with a `# lane:<name>` comment. Add the same name to your own `.env.development.local`: the stack script refuses to start when a name in the example is missing from the copy. Every new variable gets a safe local value. If a new variable could point at production, the guard (`lib/dev-env-guard.cjs`) must learn it. That file is not lane-owned, so the lane writes a request in its report. |
 | `scripts/seed-local.ts` | all | Not edited. Each lane adds `scripts/seed-lane-<lane>.ts`. The stack script runs it automatically after the base seed. |
 | `scripts/local-stack-e2e.sh` | all | Not edited. It already runs every `tests/firestore-rules*.test.ts` and every `tests/*.e2e.test.ts`. |
 | `package.json`, `package-lock.json` | any lane needing a dependency | Not edited without owner approval (rule 6). At merge, the lockfile is regenerated once, by whoever merges. |

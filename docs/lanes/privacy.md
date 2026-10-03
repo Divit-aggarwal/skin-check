@@ -14,7 +14,8 @@ Branch `lane/privacy`, worktree `../skin-check-privacy`, `PORT_BASE=3400`. Read 
 
 - `lib/consent.ts`, `app/api/skin-scan/upload/route.ts`, `lib/s3.ts`, `lib/s3-key.ts`
 - `app/(marketing)/account/page.tsx`, new `app/api/account/**`
-- `lib/useSkinCheckFlow.ts`, `lib/skin-check-steps.ts`, `lib/skin-check-validation.ts`, `lib/skin-check-draft.ts`
+- `lib/skin-check-steps.ts`, `lib/skin-check-validation.ts`, `components/skin-check/inputs/PhoneAuthStep.tsx`
+- `app/(marketing)/echo/page.tsx`, `components/skin-check/EchoPage.tsx`
 - `lib/gemini.ts`, `lib/gemini-key.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-format.ts`, `app/api/skin-check/chat/route.ts`
 - new tests: `tests/privacy-*.test.ts`, `tests/firestore-rules-privacy.test.ts`, and optionally `tests/privacy.e2e.test.ts` (erasure against the local stack)
 - new seed: `scripts/seed-lane-privacy.ts` (consent ledger entries for the seed users)
@@ -24,6 +25,10 @@ Branch `lane/privacy`, worktree `../skin-check-privacy`, `PORT_BASE=3400`. Read 
 - `firestore.rules`: new `match` blocks only, between `// ── lane:privacy ──` and `// ── end lane:privacy ──`. The consent ledger is **server-written**: clients may read their own entries, and `write: if false` for clients.
 - `app/api/skin-scan/route.ts`: only the request preamble, before `request.formData()`, for the server-side 18+ attestation check.
 - `lib/firebase/skin-checks.ts`: the `consent` block only. Do not touch the capture lane's `capture` field.
+- `lib/useSkinCheckFlow.ts`: the answers, sections, age gate and per-scan re-confirmation. The scan-state and retake handling belong to capture.
+- `lib/skin-check-draft.ts`: the answers and consent parts. `lib/skin-check-session-context.tsx`: new optional fields only.
+- `lib/api.ts`: new optional parameters (attestation, consent) on the existing helpers only.
+- `components/skin-check/SkinCheckDashboard.tsx` (routine owns it): for a consent or retention display, write the request in your report.
 - `components/skin-check/inputs/PhotoCapture.tsx`: owned by the capture lane. Change consent copy and versions in `lib/consent.ts`. For a layout change, write the request in your report.
 
 ## Do not touch

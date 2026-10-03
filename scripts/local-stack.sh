@@ -26,6 +26,10 @@ STATE=.local-stack
 mkdir -p "$STATE"
 
 [ -f .env.development.local ] || { cp .env.development.example .env.development.local; echo "created .env.development.local from the example"; }
+# A name in the example but not in the copy would fall back to .env.local's
+# production value in `next dev`. Refuse, naming the missing variables.
+MISSING="$(comm -23 <(grep -oE '^[A-Z_0-9]+=' .env.development.example | sort -u) <(grep -oE '^[A-Z_0-9]+=' .env.development.local | sort -u) | tr -d = | tr '\n' ' ')"
+[ -z "$MISSING" ] || { echo "add these to .env.development.local (see .env.development.example): $MISSING" >&2; exit 1; }
 
 # Unit tests first, outside the emulators: with emulator variables set, the
 # Admin tests would take the emulator path.

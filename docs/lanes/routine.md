@@ -12,8 +12,8 @@ Branch `lane/routine`, worktree `../skin-check-routine`, `PORT_BASE=3300`. Read 
 
 ## Files you own
 
-- `lib/skin-check-skus.ts`
-- `components/skin-check/SkinCheckDashboard.tsx`
+- `lib/skin-check-skus.ts`: keep the names and shapes of `METRIC_LABELS`, `BAND_STYLE`, `OVERLAY_CATEGORIES` and `resolveStatedConcern` (PhotoCapture, EchoPage and the dashboard import them)
+- `components/skin-check/SkinCheckDashboard.tsx` (capture and privacy may send change requests through their reports)
 - new: `lib/routine/**`, `lib/catalog/**`, `app/api/routine/**`, `app/(marketing)/routine/**`, `components/routine/**`
 - new tests: `tests/routine-*.test.ts`, `tests/catalog-*.test.ts`, `tests/firestore-rules-routine.test.ts`, and optionally `tests/routine.e2e.test.ts`
 - new seed: `scripts/seed-lane-routine.ts` (routines and events for the two seed users)

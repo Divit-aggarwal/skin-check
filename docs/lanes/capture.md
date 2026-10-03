@@ -23,6 +23,10 @@ Branch `lane/capture`, worktree `../skin-check-capture`, `PORT_BASE=3200`. Read 
 - `app/api/skin-scan/route.ts`: only the `persistScanAnalysis` call and the form fields it reads, after `request.formData()`. Never the auth or rate-limit preamble.
 - `lib/firebase/skin-checks.ts`: add one optional `capture` field. Do not touch `consent`.
 - `types/skin-scan.ts`: new optional fields or types only. `SkinScanResultSchema` is the engine contract; leave it.
+- `lib/useSkinCheckFlow.ts`: only the scan-state handling (photo → `SkinScanState`, the retake reset). The answers, sections and age gate belong to privacy.
+- `lib/api.ts`: new optional parameters on the scan and upload helpers only.
+- `lib/skin-check-draft.ts`, `lib/skin-check-session-context.tsx`: new optional quality fields only.
+- `components/skin-check/SkinCheckDashboard.tsx` (routine owns it): for a low-quality notice, write the request in your report.
 
 ## Do not touch
 

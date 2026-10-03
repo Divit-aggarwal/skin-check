@@ -19,8 +19,8 @@ if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_
 }
 
 const SEED_USERS = [
-  { uid: "seed-user-asha", phoneNumber: "+15555550101", displayName: "Asha (seed)" },
-  { uid: "seed-user-ravi", phoneNumber: "+15555550102", displayName: "Ravi (seed)" },
+  { uid: "seed-user-asha", phoneNumber: "+919999900001", displayName: "Asha (seed)" },
+  { uid: "seed-user-ravi", phoneNumber: "+919999900002", displayName: "Ravi (seed)" },
 ];
 const DAYS_AGO = [21, 9, 2];
 
