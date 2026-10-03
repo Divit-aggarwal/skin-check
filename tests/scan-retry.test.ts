@@ -38,6 +38,13 @@ describe("refused photo: retake, not retry", () => {
     // The record for this scanId is already saved (create-only): a retake is a new scan.
     expect(flow).toContain("onRetake={startNewScan}");
   });
+
+  it("the button that resends the same photo never says it takes another one", () => {
+    const src = readFileSync("components/skin-check/SkinCheckDashboard.tsx", "utf8");
+    const retry = src.slice(src.indexOf("onClick={handleRetry}"), src.indexOf("</Button>", src.indexOf("onClick={handleRetry}")));
+    expect(retry).toContain("Try again with this photo");
+    expect(src).not.toMatch(/take another photo/i);
+  });
 });
 
 describe("retrySkinScan", () => {

@@ -125,8 +125,9 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
         <div className="flex flex-col gap-3 rounded border border-border bg-canvas p-4">
           <p className="text-body text-text/70">{message}</p>
           {canRetrySamePhoto(scan) ? (
+            // Resends the same photo, so it must not promise a new one.
             <Button type="button" variant="outlineLight" size="sm" onClick={handleRetry} className="self-start">
-              Take another photo
+              Try again with this photo
             </Button>
           ) : (
             // The engine refused this photo; re-sending it can only fail again.
