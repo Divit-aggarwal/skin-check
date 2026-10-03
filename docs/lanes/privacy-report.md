@@ -23,7 +23,7 @@ The owner approved the design on 2026-10-03, with decisions 2–12 (design §0).
 | 4 | `userPrefix` and `eraseUserPrefix` with a separate erase credential pair; env block | done | `bbaa10a` |
 | 5 | Erase route, admin.ts R2 (add-only), seed, unit tests and e2e | done | `2155645` |
 | 6 | Delete-account section on `/account` (R1) | done | `f8f2b64`, test added in `72b293d` |
-| 7 | Attestation route and the call from PhoneAuthStep | done | `743c24c`, under-18 memory in `72b293d` |
+| 7 | Attestation route and the call from PhoneAuthStep | done | `743c24c`; under-18 memory `72b293d`, cleared once the server holds the record `d46d6a5`, tab-scoped `f15c24a` |
 | 8 | 18+ gate on chat | **held** on `lane/privacy-held` | held: "HELD - 18+ gate on Echo chat (step 8)" |
 | 9 | 18+ gate on upload and in the scan preamble | upload **done** (`4464282`); scan preamble **held** | held: "HELD - 18+ gate in the scan-route preamble" |
 | 10 | Phone stored as `"verified"` | done | `a9719a2` |
@@ -43,25 +43,30 @@ The owner approved the design on 2026-10-03, with decisions 2–12 (design §0).
 - the server would only ever see 18+.
 
 The fix keeps the gate itself but adds a side effect. When the browser blocks an under-18 answer:
-- the device remembers it (`localStorage`);
+- the tab remembers it (`sessionStorage`);
 - if the user is signed in, `"under-18"` is posted at once;
-- the phone step attests `"under-18"` if it was ever chosen on that device.
+- the phone step attests `"under-18"` if it was chosen in that tab;
+- the marker is cleared once the server accepts the under-18 record (`d46d6a5`, `f15c24a`).
 
-This is still self-attestation: clearing browser storage defeats it.
+What you are deciding:
+- **(A)** Within one tab, the marker applies to whichever account signs in next. A new tab starts clean. On a shared, already signed-in browser, choosing "<18" records it against the signed-in account.
+- **(B)** An adult who mis-taps "<18" and corrects it is blocked until support clears the record, as decision 4 already says for any under-18 entry. No support-clear tool exists yet (row T17).
+
+This is still self-attestation: a new tab defeats the marker, but the server record, once written, is sticky. Design §0 records it as PENDING.
 
 ## 2. Test results
 
-All runs are on `lane/privacy` after the final fixes (`72b293d`).
+All runs are on `lane/privacy` at `f15c24a`, after the last code change.
 
 | Check | Result |
 |---|---|
-| `npm run test:local`, unit part | **342 passed**, 31 skipped (emulator-only tests, run in the next row), 33 files |
+| `npm run test:local`, unit part | **346 passed**, 31 skipped (emulator-only tests, run in the next row), 33 files |
 | `npm run test:local`, stack part (emulators, engine 0.1.6, S3Mock) | **31/31**: `firestore-rules` 24, `firestore-rules-privacy` 5, `privacy.e2e` 1, `local-stack.e2e` 1 |
 | `npm run typecheck` | clean |
 | `npm run lint` | clean |
 | `npm run build` | green; `/api/account/{attestation,consent,erase}` built as dynamic routes |
-| `lane/privacy-held`, privacy tests | 113/113 (all `tests/privacy-*`, including `privacy-chat-gate` 10 and `privacy-scan-gate` 3) |
-| `lane/privacy-held`, full unit suite | **16 failures**, all in the three unowned files in R-A. All pass with the R-A patch |
+| `lane/privacy-held`, privacy tests | 117/117 (all `tests/privacy-*`, including `privacy-chat-gate` 10 and `privacy-scan-gate` 3) |
+| `lane/privacy-held`, full unit suite | **16 failures**, all in the three unowned files in R-A. With the R-A patch (checked on copies at the held tip after `d46d6a5`), all 54 tests in those files pass |
 
 Baseline before any change: 242 passed, typecheck and lint clean.
 
@@ -89,7 +94,7 @@ New test files: `privacy-gemini-inventory`, `privacy-ledger`, `firestore-rules-p
 | # | Finding | Action |
 |---|---|---|
 | 1 | Step 6 had no test | Added `privacy-delete-account` (source-pinned) |
-| 2 | The app never wrote an under-18 record (bypass by going Back) | Fixed: under-18 memory plus an immediate post when signed in; `privacy-age-memory` added. Owner to confirm (§1) |
+| 2 | The app never wrote an under-18 record (bypass by going Back) | Fixed: under-18 memory plus an immediate post when signed in (`72b293d`); cleared once the server holds the record (`d46d6a5`); tab-scoped (`f15c24a`). `privacy-age-memory` added. Owner to confirm (§1) |
 | 3 | The inventory test claimed uid and scanId checks the call can't exercise | Claim removed; comment explains why |
 | 4 | Re-confirm completeness was not tested | Section-completeness test added |
 | 5 | Phone payload checked at the source only | Accepted limit (§2) |
@@ -113,6 +118,16 @@ New test files: `privacy-gemini-inventory`, `privacy-ledger`, `firestore-rules-p
 | Low | No uid shape check before building paths | **Fixed:** `isPlainUid` in `userPrefix` and the erase preflight |
 | Low | `summarizeSkinCheckAnswers` defaults to "send everything" | Not changed: a required parameter breaks the unowned `echo-prompt-answers` test. The only Gemini caller passes the allowlist. Proposed row T10 |
 | Record only | Gender can be inferred from `male_skin_context`; "Dryness" still arrives as a *self-reported* answer (`primary_concerns`, `skin_type`); erasure resets the sticky under-18 state (D-17 vs decision 4); the account routes share the scan rate-limit bucket | Owner items: rows T7–T9, T11 |
+
+**Re-review of the fix commits (both reviewers, fresh brief).**
+- **Verifier: code PASS on (a)–(c)** (all 11 findings fixed or recorded; new behaviour documented and tested; ownership holds). It FAILed (d) only because this report lagged the commits; fixed here.
+- **Security reviewer:**
+  - **Fixed and confirmed:** the fixed-size `ageStatus` (sticky, no flood fail-open); the erase preflight (`_` and `-` in uids are safe); the trigger answer hidden; log cleanup in the lane routes.
+  - **New, medium: the device marker was in `localStorage`,** so it could land on a later person on a shared device. **Fixed** in `f15c24a` (moved to `sessionStorage`; tested).
+  - **The pregnancy inference is narrowed, not closed.** With the flag on and a female user who uses no products, Gemini can still guess. Added "Never guess at or mention a reason for this." (`f15c24a`). Fully closing it means dropping the flag or the pregnancy trigger from the prompt, which is an owner/E05 decision (row T12).
+  - **Two chat-route `err.message` logs.** **Fixed** in `f15c24a` (the held branch carries it).
+  - **Still open:** `lib/echo-history-token.ts` is still `v1`. It is not lane-owned (R-F).
+  - **Recorded:** `latestGrant` still reads every ai_share entry, but it fails closed, so a user can only slow their own account (row T11). Uids outside `[A-Za-z0-9_-]` can't be erased (only seed or test uids today).
 
 ## 4. Requests to other lanes or to main
 
@@ -201,12 +216,14 @@ There is one `generateContent` call (`lib/gemini.ts`). The pin test is `tests/pr
 | T8 | Decision 8 scope: confirm that self-reported "Dryness" answers (`primary_concerns`, `skin_type`) may still go to Gemini; only the measured band was removed | owner |
 | T9 | Gender can be inferred from `male_skin_context`: accept, or drop that step from Gemini too | owner |
 | T10 | After R-A, make `summarizeSkinCheckAnswers`'s allowlist required, and update `echo-prompt-answers` | cleanup |
-| T11 | Give the account routes their own rate-limit bucket (today they share the scan bucket, 5 per minute per IP) | cleanup |
-| T12 | E05 clinical review of `EXTRA_CAUTION_TRIGGERS` and of the caution sentence | clinical |
+| T11 | Give the account routes their own rate-limit bucket (today they share the scan bucket, 5 per minute per IP), and cap ledger appends per purpose (`latestGrant` reads them all; it fails closed) | cleanup |
+| T12 | E05 clinical review of `EXTRA_CAUTION_TRIGGERS` and of the caution sentence. Decide whether the residual pregnancy inference is acceptable, or drop the flag or the pregnancy trigger from the prompt | clinical |
 | T13 | `REQUIRE_AGE_ATTESTATION` → true once old bundles are gone (decision 3a), with R8 | later |
 | T14 | Step 14, processing consent at scan time, after the capture lane merges (R3, R4) | lane |
 | T15 | §5.1 row 17: confirm the engine writes no image to disk or S3 | verify |
 | T16 | A DOM test renderer, so UI flows can be tested beyond source pins (needs approval for a new dependency) | test |
+| T17 | A support tool to clear a mistaken under-18 record (decision 4 says support clears it; no tool exists) | new |
+| T18 | Shared-device caveat: on a signed-in shared browser, choosing "<18" records it against the signed-in account | owner |
 
 ## Open owner items
 
@@ -214,7 +231,7 @@ There is one `generateContent` call (`lib/gemini.ts`). The pin test is `tests/pr
 - Retention period (decision 5): not decided. No number is used anywhere.
 - G1, the Gemini key project and tier (decision 6).
 - Final AI-share copy (decision 7a).
-- Confirm the under-18 memory added in §1.
+- Confirm the under-18 memory added in §1 (effects A and B).
 
 ## 7. Commits
 
@@ -235,7 +252,11 @@ On `lane/privacy` (oldest first):
 - `bae775f` step 12
 - `4b47292` step 13, owned part
 - `72b293d` review fixes
-- this report (step 15)
+- `767ee43` this report (step 15)
+- `429b83d` report: held commits by title
+- `d46d6a5` under-18 marker cleared once the server holds the record; design §0 additions
+- `f15c24a` security re-review fixes (tab-scoped marker, no-guess line, chat log)
+- the final report update (this commit)
 
 On `lane/privacy-held`, local only and always rebased on the tip of `lane/privacy`. Listed by title, because every rebase changes the IDs (`git log lane/privacy..lane/privacy-held`):
 - "HELD - 18+ gate on Echo chat (step 8)"
