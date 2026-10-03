@@ -52,6 +52,7 @@ next-env.d.ts
 # Architecture planning docs and the research they are built on ARE tracked.
 !docs/architecture/*.md
 !docs/Longitudinal skin platform architecture.md
+!docs/research/**/*.md
 /scan-response.json
 /supabase/
 /.mcp.json
