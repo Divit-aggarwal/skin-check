@@ -88,7 +88,7 @@ mention a reason for this.`;
 // With the flag on, the trigger answers are hidden too (e.g. "A prescription
 // product" under current_products). Otherwise a caution sentence with no
 // visible reason would point straight at the hidden one.
-function withoutTriggerValues(answers: SkinCheckAnswers): SkinCheckAnswers {
+export function withoutTriggerValues(answers: SkinCheckAnswers): SkinCheckAnswers {
   const out: SkinCheckAnswers = { ...answers };
   for (const [stepId, values] of Object.entries(EXTRA_CAUTION_TRIGGERS)) {
     const answer = out[stepId];
