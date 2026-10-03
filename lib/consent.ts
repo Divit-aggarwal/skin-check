@@ -71,6 +71,19 @@ export function markUnder18Chosen(): void {
   }
 }
 
+/**
+ * Cleared once the server holds the under-18 record. The server record is
+ * sticky (decision 4), so the device no longer needs to remember, and a later
+ * account signed in on this device (a parent after a child) is not marked.
+ */
+export function clearUnder18Chosen(): void {
+  try {
+    localStorage.removeItem(UNDER18_CHOSEN_KEY);
+  } catch {
+    // Storage blocked: nothing was stored either.
+  }
+}
+
 export function under18ChosenOnThisDevice(): boolean {
   try {
     return localStorage.getItem(UNDER18_CHOSEN_KEY) === "1";
@@ -85,11 +98,16 @@ export function attestedAgeBucket(answered: unknown): string | null {
   return typeof answered === "string" && answered ? answered : null;
 }
 
-/** Posts the 18+ attestation. Best-effort: callers never wait on it (D-03a). */
-export async function postAgeAttestation(idToken: string, ageBucket: string): Promise<void> {
-  await fetch("/api/account/attestation", {
+/**
+ * Posts the 18+ attestation. Best-effort: callers never wait on it (D-03a).
+ * After an under-18 answer is recorded, the device marker is cleared.
+ */
+export async function postAgeAttestation(idToken: string, ageBucket: string): Promise<boolean> {
+  const res = await fetch("/api/account/attestation", {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${idToken}` },
     body: JSON.stringify({ ageBucket, version: AGE_ATTESTATION_VERSION }),
   });
+  if (res.ok && ageBucket === "under-18") clearUnder18Chosen();
+  return res.ok;
 }
