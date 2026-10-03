@@ -24,12 +24,12 @@ The owner approved the design on 2026-10-03, with decisions 2–12 (design §0).
 | 5 | Erase route, admin.ts R2 (add-only), seed, unit tests and e2e | done | `2155645` |
 | 6 | Delete-account section on `/account` (R1) | done | `f8f2b64`, test added in `72b293d` |
 | 7 | Attestation route and the call from PhoneAuthStep | done | `743c24c`, under-18 memory in `72b293d` |
-| 8 | 18+ gate on chat | **held** on `lane/privacy-held` | `05cbc18` |
-| 9 | 18+ gate on upload and in the scan preamble | upload **done** (`4464282`); scan preamble **held** | `38fe247` |
+| 8 | 18+ gate on chat | **held** on `lane/privacy-held` | held: "HELD - 18+ gate on Echo chat (step 8)" |
+| 9 | 18+ gate on upload and in the scan preamble | upload **done** (`4464282`); scan preamble **held** | held: "HELD - 18+ gate in the scan-route preamble" |
 | 10 | Phone stored as `"verified"` | done | `a9719a2` |
 | 11 | Re-confirm `current_products` and `female_skin_context` on every scan (R6 applied) | done | `a22a317` |
 | 12 | Gemini minimisation and the extra-caution flag | done | `bae775f`, hardened in `72b293d` |
-| 13 | AI-share consent: route and Echo prompt **done**; chat gate **held**. **Local only** (decision 6) | partly held | `4b47292`; held `0dda9b9` |
+| 13 | AI-share consent: route and Echo prompt **done**; chat gate **held**. **Local only** (decision 6) | partly held | `4b47292`; held: "HELD - AI-share consent gate on Echo chat" |
 | 14 | Processing consent at scan time | **skipped** on the owner's instruction: it waits for the capture lane to merge. Also blocked on R3 and R4 | — |
 | 15 | This report | done | this commit |
 
@@ -237,8 +237,8 @@ On `lane/privacy` (oldest first):
 - `72b293d` review fixes
 - this report (step 15)
 
-On `lane/privacy-held`, local only and rebased on `72b293d`:
-- `05cbc18` step 8
-- `38fe247` step 9, scan part
-- `0dda9b9` step 13, chat part
-- `e7f4769` log fix
+On `lane/privacy-held`, local only and always rebased on the tip of `lane/privacy`. Listed by title, because every rebase changes the IDs (`git log lane/privacy..lane/privacy-held`):
+- "HELD - 18+ gate on Echo chat (step 8)"
+- "HELD - 18+ gate in the scan-route preamble (step 9, scan part)"
+- "HELD - AI-share consent gate on Echo chat (step 13, chat part)"
+- "HELD - chat gate logs name and code only"
