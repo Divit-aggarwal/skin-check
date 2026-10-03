@@ -14,10 +14,18 @@ export function defaultAnswerFor(step: StepConfig): StepAnswerValue {
   return step.type === "multi-select-cards" || step.type === "body-map" ? [] : "";
 }
 
+/**
+ * What a phone step stores once Firebase has verified the number (D-19): a
+ * marker, never the number. The number lives in Firebase Auth and
+ * users/{uid}.phoneNumber only.
+ */
+export const PHONE_VERIFIED = "verified";
+
 export function isStepAnswerValid(step: StepConfig, value: StepAnswerValue): boolean {
   if (Array.isArray(value)) return value.length > 0;
   if (!value.trim()) return false;
-  if (step.type === "phone") return isValidPhone(value);
+  // A legacy number still validates, so drafts saved before D-19 restore.
+  if (step.type === "phone") return value === PHONE_VERIFIED || isValidPhone(value);
   return true;
 }
 

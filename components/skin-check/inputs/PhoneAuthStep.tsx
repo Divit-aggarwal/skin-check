@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import { canSaveScan, completeSave, withTimeout } from "@/lib/useSkinCheckFlow";
 import { Button } from "@/components/ui/button";
 import { AGE_ATTESTATION_VERSION } from "@/lib/consent";
+import { PHONE_VERIFIED } from "@/lib/skin-check-validation";
 
 const SAVE_TIMEOUT_MS = 15_000;
 
@@ -77,10 +78,10 @@ export function PhoneAuthStep({
     // path calls this directly.
     if (step.savesScan && !canSaveScan(scan, answers)) return;
     committed.current = true;
-    // Firebase's verified number is the authoritative one — the typed value
-    // is never promoted to an answer, so there is only ever one phone
-    // identity for this session.
-    const verified = user.phoneNumber ?? "";
+    // D-19: the answer is a marker, never the number. Firebase's verified
+    // number stays in Firebase Auth and users/{uid}.phoneNumber, so the
+    // phone is not copied into every questionnaire.
+    const verified = PHONE_VERIFIED;
     if (!step.savesScan) {
       // H02a (D-19): the server keeps its own record of the age answer, now
       // that there is a verified uid to attach it to. Best-effort: the scan
@@ -148,7 +149,7 @@ export function PhoneAuthStep({
     return (
       <div className="flex flex-col gap-3">
         <p className="text-body text-text/70">
-          Verified <span className="whitespace-nowrap text-text">{value}</span>.
+          Verified{activeUser?.phoneNumber ? <> <span className="whitespace-nowrap text-text">{activeUser.phoneNumber}</span></> : null}.
         </p>
         {/* The flow has no Continue button — forward motion comes only from
             `advanceSignal`, which `commitStep` ticks. Every other section is
