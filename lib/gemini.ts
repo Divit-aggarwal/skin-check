@@ -25,6 +25,36 @@ function getClient(): GoogleGenAI {
   return client;
 }
 
+// ─── H03 field inventory ────────────────────────────────────────────────────
+
+/**
+ * Every /skin-check step id, and whether its answer reaches Gemini (H03,
+ * docs/lanes/privacy-design.md §2.4). tests/privacy-gemini-inventory.test.ts
+ * pins the real generateContent call against this, and fails on a step id
+ * that has no entry, so a new question is never sent by accident.
+ */
+export const GEMINI_FIELD_INVENTORY: Record<string, "sent" | "not_sent"> = {
+  name: "sent",
+  age: "sent",
+  gender: "sent",
+  phone_verify: "not_sent",
+  skin_photo: "not_sent",
+  primary_concerns: "sent",
+  skin_type: "sent",
+  breakout_pattern: "sent",
+  acne_areas: "sent",
+  pih_scar_tendency: "sent",
+  skin_tone: "sent",
+  current_products: "sent",
+  female_skin_context: "sent",
+  male_skin_context: "sent",
+  skin_factors: "sent",
+  diet: "sent",
+  water_intake: "sent",
+  sunscreen_habit: "sent",
+  final_phone: "not_sent",
+};
+
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
 const RETRYABLE_STATUSES = new Set([429, 503]);
