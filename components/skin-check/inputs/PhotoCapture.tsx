@@ -15,7 +15,7 @@ import {
 import { saveDraftScan } from "@/lib/skin-check-draft";
 import { frameFromBlob } from "@/lib/capture-quality/frame";
 import { canAnalyze, canOverride, captureFlowReducer, initialCaptureFlow, runCaptureGate } from "@/lib/capture-quality/gate";
-import { RETAKE_COPY } from "@/lib/capture-quality/retake";
+import { isRetakeError, RETAKE_COPY, retakeReasonFromServerCode } from "@/lib/capture-quality/retake";
 import { Button } from "@/components/ui/button";
 import type { PhotoCaptureStep } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanState } from "@/types/skin-scan";
@@ -331,6 +331,8 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
       )
       .catch((err) => {
         console.error("Skin scan failed:", err);
+        // The engine refused the photo for a reason a retake fixes (O-5).
+        const retakeReason = isRetakeError(err) ? retakeReasonFromServerCode(err.code) ?? undefined : undefined;
         onScanChange({
           status: "error",
           // An expired/refused session is not a photo problem, and telling
@@ -339,7 +341,9 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           // before the scan resolves), and the results view has no verify
           // step to send them to — so it points at the one action that does
           // work there: a refresh, which re-runs Firebase auth restoration.
-          message: isAuthError(err)
+          message: retakeReason
+            ? RETAKE_COPY[retakeReason]
+            : isAuthError(err)
             ? "Your session expired before we could read your photo. Refresh the page to sign in again, then retry."
             : isUploadError(err)
               // Upload failed, so the analysis never ran — retrying is the
@@ -355,6 +359,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           originalStored: !isUploadError(err) && Boolean(original) && hasRetentionConsent,
           retentionConsentVersion,
           quality,
+          retakeReason,
         }, scanId);
       });
   }, [flow, hasRetentionConsent, onChange, onCommit, onScanChange, isMobile, user, scanId]);
@@ -392,7 +397,11 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
             <img src={thumbSrc} alt="Captured photo" className="h-14 w-14 rounded-md object-cover" />
           )}
           <p className="text-sm text-text/70">
-            {scan.status === "loading" ? "Analyzing your photo…" : "Photo saved for this scan."}
+            {scan.status === "loading"
+              ? "Analyzing your photo…"
+              : scan.status === "error" && scan.retakeReason
+                ? RETAKE_COPY[scan.retakeReason]
+                : "Photo saved for this scan."}
           </p>
         </div>
         <button

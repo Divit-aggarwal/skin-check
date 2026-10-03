@@ -132,7 +132,14 @@ async function requestSkinScan(
     if (response.status === 401) {
       throw new ApiError(401, "Your session expired. Please verify your phone number again.", "auth/required");
     }
-    throw new ApiError(response.status, "Failed to analyze photo.");
+    // The route's own error `code` (e.g. NO_FACE_DETECTED) is passed through
+    // so the capture step can name a retake reason (owner O-5). Same status
+    // and message as before. The client-only codes are never taken from the
+    // server, so isAuthError / isUploadError keep their meaning.
+    const body: unknown = await response.json().catch(() => null);
+    const code = body && typeof body === "object" ? (body as { code?: unknown }).code : undefined;
+    const passThrough = typeof code === "string" && code !== "auth/required" && code !== "upload/failed" ? code : undefined;
+    throw new ApiError(response.status, "Failed to analyze photo.", passThrough);
   }
 
   const parsed = SkinScanResponseSchema.safeParse(await response.json());
