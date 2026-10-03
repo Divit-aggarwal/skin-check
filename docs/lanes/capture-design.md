@@ -1,41 +1,101 @@
 # Capture lane design: C01 capture quality gate, C02 comparability
 
-Branch `lane/capture`, worktree `../skin-check-capture`. The rules are in [README.md](README.md), the brief in [capture.md](capture.md).
+Branch `lane/capture`, worktree `../skin-check-capture`. Read [README.md](README.md) for the lane rules and [capture.md](capture.md) for the brief.
 
-Status: **design only. No app code until the owner approves this design (README rule 3).** "Needs no owner decision" in part 6 means no decision beyond approving this design.
+**Status: design only.**
+- No app code is written until the owner approves this design (README rule 3).
+- `capture-report.md` will link to this file and record the approval (capture.md exit conditions).
+- In part 6, "needs no owner decision" means no decision beyond approving this design.
 
-Sources read: CLAUDE.md, DECISION_LOG (D-03, D-03a, D-12, D-13, D-18, D-23, D-26), SKIN_STATE_CONTRACT_FINAL §7–§8, LONGITUDINAL_METHOD §3, `docs/research/measurement-validation/PHASE_0_RESULTS.md` §3–§4, and the tracker rows C01, C02, C07 and R05. Code read: `lib/skin-state.ts`, `lib/scan-analysis-record.ts`, `app/api/skin-scan/route.ts`, `components/skin-check/inputs/PhotoCapture.tsx`, `hooks/useCameraStream.ts`, `lib/api.ts`, `types/skin-scan.ts`, `lib/firebase/skin-checks.ts`.
+**Sources read**
+- Decisions and specs:
+  - CLAUDE.md
+  - DECISION_LOG: D-03, D-03a, D-12, D-13, D-18, D-23, D-25, D-26
+  - SKIN_STATE_CONTRACT_FINAL §7–§8
+  - LONGITUDINAL_METHOD §2–§3
+  - `docs/research/measurement-validation/PHASE_0_RESULTS.md` §3–§5
+  - tracker rows C01, C02, C07 and R05
+- Code:
+  - `lib/skin-state.ts`, `lib/scan-analysis-record.ts`, `lib/api.ts`
+  - `app/api/skin-scan/route.ts`
+  - `components/skin-check/inputs/PhotoCapture.tsx`
+  - `hooks/useCameraStream.ts`
+  - `types/skin-scan.ts`
+  - `lib/firebase/skin-checks.ts`
+  - `firestore.rules`
+  - `scripts/local-stack.sh`
 
 ---
 
 ## 1. What will be built
 
-**C01: guided capture quality gate.** After the user takes a photo, and before "Analyze my skin" can send it, the app runs a few checks on the exact bytes it is about to send to the engine. It runs them on the ~1280 px JPEG (`capturedBlobRef`), not the full-size original, so the checks describe the image whose hash is `inputSha256`. Without any new library, the checks are:
+**C01: guided capture quality gate.**
+
+When it runs:
+- After the user takes a photo, and before "Analyze my skin" can send it, the app checks the exact bytes it will send to the engine (`capturedBlobRef`), so the result describes the image whose hash becomes `inputSha256`.
+- On **mobile** that is the ~1280 px JPEG made from the camera file.
+- On **desktop** it is the full webcam canvas frame (`videoWidth × videoHeight`, usually 1280×720). On desktop the same blob is also the stored original.
+- The two capture paths give images of different sizes, so a size-dependent setting (blur) has its own value for each path.
+
+What it checks without a new library:
 - **exposure**, built first because Phase 0 found it is the largest risk: how much of the frame is crushed to black or blown to white, and the overall brightness;
-- **blur**: the sharpness of the frame;
+- **blur**: sharpness of the frame;
 - **resolution**: whether the image is big enough for the engine.
 
-Each check returns `pass`, `fail` or `not_measured`. A check that could not run is `not_measured`, never `pass`. Pose, expression and framing need a face-landmark library, and none is installed. They stay `not_measured` until the owner decides on a dependency (decision O-3).
+How results are reported:
+- Each check returns `pass`, `fail` or `not_measured`. A check that could not run is `not_measured`, never `pass`.
+- The brief also lists **pose, expression, distance and framing**. These need a face-landmark library, and none is installed. They stay `not_measured` until the owner decides on a dependency (O-3).
 
-If a check fails, the user sees one named retake reason with a short instruction ("Your photo is too dark. Face a window or a lamp"). The Analyze button stays blocked until they retake. Whether a "use this photo anyway" path exists is decision O-4. Retake keeps today's behaviour: both consent boxes are cleared and the scan state resets.
+What the user sees:
+- If a check fails, one named retake reason with a short instruction (for example "Your photo is too dark. Face a window or a lamp.").
+- Analyze stays disabled while the checks are still running, and stays blocked after a failure. Whether "use this photo anyway" exists is O-4.
+- If exposure itself could not be measured (the image would not decode), the photo is marked `unchecked`, never `pass`.
 
-The engine's own refusals (`NO_FACE_DETECTED`, `IMAGE_UNPARSEABLE`, `IMAGE_TOO_SMALL`, `IMAGE_DIMENSIONS_TOO_LARGE`) map to the same retake-reason list. Today the client throws the server's error code away (`lib/api.ts:135` throws a bare "Failed to analyze photo."). The lane passes the code through so the user is told why.
+Retake keeps today's consent behaviour: both consent boxes are cleared. A retake from the committed "done" view also resets the scan state, as `handleRetakeFromDone` does today.
 
-The gate is a guard against bad photos. It does not make two photos comparable. Phase 0 showed a half-stop exposure change (0.5 EV) moves native L\* by 5.9–9.0 units, about as much as the whole −8 L\* change the study injected. A photo that passes the gate is therefore "not obviously broken", nothing more.
+The engine's own refusals map onto the same list of retake reasons:
+- `NO_FACE_DETECTED`
+- `IMAGE_UNPARSEABLE`
+- `IMAGE_TOO_SMALL`
+- `IMAGE_DIMENSIONS_TOO_LARGE`
+- `IMAGE_TOO_LARGE` (sent by the route's own 5 MB check and by the engine)
 
-**C02: per-scan comparability.** A pure function answers one question: can field F in region R of scan A be compared with the same field and region of scan B? The answer is `comparable` or `not_comparable`, always with named reasons. It never outputs a difference, a percentage or a direction. It reads only SkinState (`skinstate-1`) and never the raw record, because trust comes from the SkinState path (D-23, D-26). It has two parts:
-- `comparabilityKey(state, field, region)` pulls the frozen key out of one SkinState;
-- `compareKeys(a, b)` decides on two keys.
+Today the client throws the server's error code away (`lib/api.ts:135` throws a bare "Failed to analyze photo."). Passing the code through is a change to a shared file outside capture's allowed part, so it is owner decision O-5.
 
-**Today every real pair returns `not_comparable` with reason `engine_build_unknown`.** skinstate-1 always maps `engine.build` to `null` (`lib/skin-state.ts:301`), even though the raw record now stores `engine_build`. Only a new contract version can change that, and the lane may not edit `lib/skin-state.ts`. This is correct behaviour, not a bug: the contract says a null key part means not comparable (§7.1). Per-metric noise thresholds stay `unknown` until C07 produces a calibration table. The function has a slot for that table and fails closed when it is missing.
+The gate is a guard against bad photos. It does not make two photos comparable:
+- Phase 0 found that half a stop of exposure (0.5 EV) moves native L\* by 5.9–9.0 units. That is about as much as the whole −8 L\* change the study injected.
+- A photo that passes is "not obviously broken", nothing more.
 
-**Seed.** `scripts/seed-lane-capture.ts` writes a few synthetic `scanAnalyses` records to the local emulator only. They are pairs that differ by pipeline version, by statsPath and by an absent region, so the local UI and the e2e test have data to read. No real faces.
+**C02: per-scan comparability.**
+
+The question: may field F in region R of scan A be compared with the same field and region of scan B?
+- The answer is `comparable` or `not_comparable`, always with named reasons.
+- It never outputs a difference, a percentage or a direction.
+- It reads only SkinState (`skinstate-1`), never the raw record, because trust comes from the SkinState path (D-23, D-26).
+
+It has three parts:
+- `comparabilityKey(state, field, region)` extracts the frozen key;
+- `compareKeys(a, b, table)` decides on two keys;
+- the **comparable-quantity table**, passed in by the caller.
+
+The table and why it exists:
+- LONGITUDINAL_METHOD §2–§3 says the gates apply only to quantities listed in a COMPARABLE table, and that table is **empty today**. A field enters it only after test–retest (C05–C07).
+- So "the engine gave a value" and "the value is safe to compare" stay separate. A field that is not in the table gives `quantity_not_validated`, whatever the keys say.
+- The production table is an empty constant. Only tests pass in a table with entries.
+
+**Today every real pair returns `not_comparable`**, with at least two reasons:
+- `quantity_not_validated`, because the table is empty;
+- `engine_build_unknown`, because skinstate-1 always maps `engine.build` to `null` (`lib/skin-state.ts:314`). That happens even though the raw record now stores `engine_build` (`lib/scan-analysis-record.ts:78-79`).
+
+Only a new contract version can change the second reason, and the lane may not edit `lib/skin-state.ts`. Both answers are correct behaviour: the contract says a null key part means not comparable (§7.1). Per-metric noise thresholds stay `unknown` until C07.
+
+**Seed.** `scripts/seed-lane-capture.ts` writes a few synthetic `scanAnalyses` records to the local emulator only. They are pairs that differ by pipeline version, by statsPath and by an absent region, so the local UI has data to read. There are no real faces.
 
 ---
 
 ## 2. Data shapes
 
-All new types live in `lib/capture-quality/types.ts` and `lib/comparability.ts`. `SkinScanResultSchema` (the engine contract) and `lib/skin-state.ts` are not changed.
+New types go in `lib/capture-quality/types.ts` and `lib/comparability.ts`. `SkinScanResultSchema` (the engine contract) and `lib/skin-state.ts` are not changed.
 
 ### 2.1 Frame input for checks (pure, no DOM)
 
@@ -46,9 +106,11 @@ interface Frame {
   data: Uint8ClampedArray;     // RGBA, length = width*height*4 (ImageData layout)
 }
 ```
-In the browser, the frame comes from `createImageBitmap(capturedBlob)` drawn to a canvas, then `getImageData`. Tests build synthetic frames directly. vitest runs in node and has no canvas, and adding one would be a new dependency.
 
-### 2.2 Settings (every number named, every number provisional)
+- In the browser, a frame comes from `createImageBitmap(capturedBlob)`, drawn to a canvas and read with `getImageData`.
+- Tests build frames directly. vitest runs in node with no canvas, and adding one would be a new dependency.
+
+### 2.2 Settings (every threshold named, every threshold provisional)
 
 ```ts
 interface QualitySetting {
@@ -56,7 +118,7 @@ interface QualitySetting {
   value: number;
   unit: string;                // "fraction of pixels", "8-bit luma", "px", "variance"
   status: "provisional";       // the only allowed value until R05 / C07 data exists
-  source: string;              // why this value: "placeholder; replace after R05 exposure sweep"
+  source: string;              // why this value, e.g. "placeholder; replace after R05 exposure sweep"
 }
 
 const CAPTURE_QUALITY_SETTINGS: Record<SettingId, QualitySetting>;
@@ -69,49 +131,60 @@ const CAPTURE_QUALITY_SETTINGS: Record<SettingId, QualitySetting>;
 | `exposure.clipLowFracMax` | largest allowed fraction of crushed pixels | provisional |
 | `exposure.clipHighFracMax` | largest allowed fraction of blown pixels | provisional |
 | `exposure.meanLumaMin` / `exposure.meanLumaMax` | allowed band for mean luma | provisional |
-| `blur.laplacianVarMin` | smallest allowed variance of the Laplacian on luma | provisional |
+| `blur.laplacianVarMin.native` / `blur.laplacianVarMin.canvas` | smallest allowed Laplacian variance on luma, per capture path (the two paths have different scales) | provisional |
 | `resolution.minShortSidePx` | smallest allowed short side | provisional |
-| `gate.maxSoftOverrides` | only if O-4 allows "use anyway": retakes before the override appears | provisional |
+| `gate.retakesBeforeOverride` | only if O-4 = soft block: retakes before "use anyway" appears | provisional |
 
-- No value is written into this document. The values are chosen in step S2, from the synthetic test frames and the Phase 0 sweep levels, and each one is labelled `provisional` with its source.
-- The R05 real-device exposure sweep replaces them later. That needs no code change, only a new `settingsVersion`.
-- A test fails if any setting has a status other than `provisional`.
+Rules for the values:
+- This document writes no values. Step S1 sets them from the synthetic frames and the Phase 0 sweep levels, and each records its `source`.
+- The R05 real-device sweep later replaces them. That is a settings-only change plus a new `settingsVersion`.
+- Fixed standard constants are not thresholds and are not settings. One example is the Rec.601 luma weights. They live in `lib/capture-quality/luma.ts` as `LUMA_REC601`, with their source named.
 
 ### 2.3 Check result
 
 ```ts
-type CheckId = "exposure" | "blur" | "resolution" | "pose" | "expression" | "framing";
+type CheckId = "exposure" | "blur" | "resolution" | "pose" | "expression" | "distance" | "framing";
 type CheckStatus = "pass" | "fail" | "not_measured";
 
 interface CheckResult {
   id: CheckId;
   status: CheckStatus;
-  measured: Record<string, number> | null;   // e.g. { clipLowFrac: 0.03, clipHighFrac: 0.0, meanLuma: 118 }; null when not_measured
+  measured: Record<string, number> | null;   // e.g. { clipLowFrac: 0.03, clipHighFrac: 0, meanLuma: 118 }; null when not_measured
   retakeReason: RetakeReason | null;         // non-null exactly when status === "fail"
   notMeasuredWhy?: "no_landmark_model" | "decode_failed" | "frame_empty";
 }
 ```
+
+The fixed order of checks, used everywhere (the result list and the choice of primary reason):
+
+`exposure, blur, resolution, distance, framing, pose, expression`
+
+`distance` corresponds to contract `quality.faceScale`, and `framing`/`pose` to `quality.pose`. That link is for a future server-side producer only. The client result never fills those contract fields (§2.5).
 
 ### 2.4 Retake reasons (one named enum)
 
 ```ts
 type RetakeReason =
   // on-device
-  | "too_dark"            // exposure: clipLowFrac or meanLuma below band
-  | "too_bright"          // exposure: clipHighFrac or meanLuma above band
-  | "blurry"              // blur
-  | "too_small"           // resolution
-  | "face_turned"         // pose (only once O-3 is approved)
+  | "too_dark"               // exposure: clipLowFrac or meanLuma below band
+  | "too_bright"             // exposure: clipHighFrac or meanLuma above band
+  | "blurry"                 // blur
+  | "too_small"              // resolution
+  | "too_far_or_close"       // distance (only once O-3 is approved)
+  | "face_not_centred"       // framing (only once O-3 is approved)
+  | "face_turned"            // pose (only once O-3 is approved)
   | "expression_not_neutral" // expression (only once O-3 is approved)
-  | "face_not_centred"    // framing (only once O-3 is approved)
-  // from the engine via /api/skin-scan
-  | "no_face_found"       // NO_FACE_DETECTED
-  | "unreadable_image"    // IMAGE_UNPARSEABLE
-  | "engine_too_small"    // IMAGE_TOO_SMALL
-  | "engine_too_large";   // IMAGE_DIMENSIONS_TOO_LARGE / IMAGE_TOO_LARGE
+  // from the engine or route via /api/skin-scan (needs O-5 to reach the client)
+  | "no_face_found"          // NO_FACE_DETECTED
+  | "unreadable_image"       // IMAGE_UNPARSEABLE
+  | "engine_too_small"       // IMAGE_TOO_SMALL
+  | "engine_too_large";      // IMAGE_DIMENSIONS_TOO_LARGE, IMAGE_TOO_LARGE
 ```
 
-Each reason has one line of user copy in `RETAKE_COPY: Record<RetakeReason, string>`. The copy is instruction only, with no number, score or comparison in it. Every rejected capture carries exactly one reason. When several checks fail, the first in the order `exposure > blur > resolution > pose > framing > expression` is shown. All failed reasons are kept in the result.
+- Each reason has one line of user copy in `RETAKE_COPY: Record<RetakeReason, string>`.
+- The copy is instruction only, with no number, score or comparison in it.
+- Every rejected capture carries exactly one primary reason: the first failed check in the fixed order. All failed reasons are kept.
+- `retakeReasonFromServerCode(code)` and `isRetakeError(err)` live in owned `lib/capture-quality/retake.ts`. `isRetakeError` uses the exported `ApiError`. `lib/api.ts` gets no new export.
 
 ### 2.5 Gate result (one per captured photo)
 
@@ -121,33 +194,43 @@ interface CaptureQuality {
   producerVersion: "cq-1";
   settingsVersion: string;             // e.g. "cq-settings-0-provisional"
   assertedBy: "client";                // D-26: never authoritative
+  captureMethod: "native" | "canvas";  // selects the per-path blur setting
   frame: { width: number; height: number };
-  checks: CheckResult[];               // always all six ids, in fixed order
-  verdict: "pass" | "retake" | "override"; // "override" only if O-4 allows it
-  retakeReasons: RetakeReason[];       // empty when verdict is "pass"
+  checks: CheckResult[];               // always all seven ids, in the fixed order
+  verdict: "pass" | "retake" | "unchecked" | "override"; // "override" only if O-4 allows it
+  retakeReasons: RetakeReason[];       // empty unless verdict is "retake" or "override"
   retakeCount: number;                 // retakes in this attempt before this photo
 }
 ```
 
-The rules for this shape:
-- Separate from the engine output and from SkinState. It **never fills skinstate-1's `quality` block**: the contract fixes those fields to `null`, and filling them is a new contract version.
-- `verdict: "pass"` means only "the gate did not reject this photo". C02 does not read it (see 2.7).
+How the verdict is set:
+- `unchecked`: exposure, the one required check, is `not_measured` (decode failed or empty frame). It never counts as `pass`. O-4 decides whether Analyze is allowed.
+- `retake`: at least one check is `fail`.
+- `pass`: exposure was measured, and no check is `fail`. It means only "the gate did not reject this photo". It does not mean "checked for pose" or "safe to compare".
+- `override` (soft block only): the user chose to continue after a `retake`.
 
-Where it is kept:
-- `SkinScanState` (`types/skin-scan.ts`) gets an optional `quality?: CaptureQuality` on the `success` and `error` variants. The `error` variant also gets an optional `retakeReason?: RetakeReason`.
-- The draft scan state (`lib/skin-check-draft.ts`) gets an optional `quality`. It is dropped on retake.
-- Persisting it to Firestore is decision O-2. Until then it lives only in memory and in the draft.
+The result is kept apart from the engine output and from SkinState:
+- It **never fills skinstate-1's `quality` block**. The contract fixes those fields to null, and filling them needs a new contract version.
+- C02 does not read it. Under D-26 a client-asserted value cannot decide comparability (see Q-2).
+
+Where it is held:
+- `SkinScanState` (`types/skin-scan.ts`) gets an optional `quality?: CaptureQuality` on the `success` and `error` variants.
+- The `error` variant also gets an optional `retakeReason?: RetakeReason`.
+- The draft scan state (`lib/skin-check-draft.ts`) gets an optional `quality`, which is dropped on retake.
+- Whether it is stored in Firestore is O-2. Until then it lives only in memory and in the draft.
 
 ### 2.6 If O-2 is approved: persisted shape
 
-- **Option A, `scanAnalyses`:**
-  - a flat optional field `captureQuality: CaptureQuality` on the record, written by `buildScanAnalysisRecord` from a form field;
-  - the server validates the shape with zod and **drops** it if invalid, never rejecting the scan (D-03a);
-  - `schemaVersion` stays **1**, because `toSkinState` rejects any other value (`lib/skin-state.ts:173`);
-  - the field name does not end in `_json`, because `toSkinState` refuses records with such keys.
-- **Option B, `skinChecks`:**
-  - one optional field `capture: { quality: CaptureQuality }` on the client-written skinChecks doc (README shared-file plan);
-  - no `firestore.rules` change is needed, because skinChecks accepts additional fields today.
+**Option A: on `scanAnalyses`**
+- A flat optional field `captureQuality: CaptureQuality`, written by `buildScanAnalysisRecord` from a form field.
+- The server validates it with zod. If it is invalid, the server **drops** it and never rejects the scan (D-03a).
+- `schemaVersion` stays **1**, because `toSkinState` rejects any other value (`lib/skin-state.ts:198`).
+- The field name does not end in `_json`, because `toSkinState` refuses records with such keys (`lib/skin-state.ts:202-203`).
+
+**Option B: on `skinChecks`**
+- One optional field, `capture: { quality: CaptureQuality }`.
+- `firestore.rules` needs no change. The create rule does not restrict extra fields (`firestore.rules:24-26`).
+- The documents are create-only (`firestore.rules:27`), so each saved document is just as permanent as under A.
 
 ### 2.7 Comparability shapes
 
@@ -156,7 +239,7 @@ type ColourPath = "corrected" | "native";
 
 interface ComparabilityKey {
   contractVersion: "skinstate-1";
-  fieldPath: string;                 // e.g. "colour.native.lStarMean", "texture.lbpEntropy"
+  fieldPath: string;                 // e.g. "colour.native.lStarMean"
   region: SkinStateRegionKey;
   pipelineVersion: string | null;
   engineBuild: string | null;        // always null under skinstate-1
@@ -168,32 +251,39 @@ interface ComparabilityKey {
   lowPixelCount: boolean;
 }
 
+/** LONGITUDINAL_METHOD §2 COMPARABLE table. Empty in production until C05–C07. */
+interface ComparableQuantity { fieldPath: string; pipelineVersion: string; calibrationId: string | null }
+export const COMPARABLE_QUANTITIES: readonly ComparableQuantity[] = [];
+
 type NotComparableReason =
-  | "engine_build_unknown"           // either key has engineBuild null
-  | "engine_build_differs"
+  | "quantity_not_validated"         // (fieldPath, pipelineVersion) not in the table
+  | "engine_build_unknown" | "engine_build_differs"
   | "pipeline_version_unknown" | "pipeline_version_differs"
   | "input_variant_unknown" | "input_variant_differs"
-  | "capture_method_unknown"         // either side null
-  | "capture_method_differs"         // see O-1 and open question Q-1
+  | "capture_method_unknown" | "capture_method_differs"   // see O-1, Q-1
   | "native_stats_missing"           // native field, statsPath !== "both" on either side
   | "region_absent"                  // absent_region on either side
   | "region_low_pixel_count"         // lowPixelCount on either side
   | "lr_cheek_cross_capture_method"  // cheek_image_left/right across methods (METHOD §3)
-  | "field_not_defined"              // fieldPath not a skinstate-1 field
+  | "field_not_defined"              // fieldPath is not a skinstate-1 field
   | "contract_version_differs"
-  | "different_user";                // analysisRef uid differs
+  | "different_user";                // compareStates only: analysisRef uid differs
 
 type ComparabilityVerdict =
   | { verdict: "comparable"; key: ComparabilityKey; noiseThreshold: { status: "unknown"; calibrationId: null } }
-  | { verdict: "not_comparable"; reasons: NotComparableReason[] };   // at least one reason, all collected
+  | { verdict: "not_comparable"; reasons: NotComparableReason[] };   // at least one; all collected, fixed order
 ```
 
-How the functions behave:
-- `comparabilityKey(state: SkinState, fieldPath, region): ComparabilityKey`. Pure; copies values and never infers one.
-- `compareKeys(a, b): ComparabilityVerdict`. Pure; every null key part gives a reason.
-- `compareStates(a, b, fieldPath, region) = compareKeys(comparabilityKey(a, …), comparabilityKey(b, …))`, plus the different-user check.
-- There is no "comparable-with-caveats" verdict. See Q-1.
-- `noiseThreshold` is always `{ status: "unknown", calibrationId: null }` until C07 delivers a versioned table keyed on field × region × tone band × engine build. That is a later step, not in this lane.
+The functions:
+- `comparabilityKey(state: SkinState, fieldPath, region): ComparabilityKey` is pure. It copies values and never infers one.
+- `compareKeys(a, b, table = COMPARABLE_QUANTITIES): ComparabilityVerdict` is pure. Every null key part and every missing table entry adds a reason.
+- `compareStates(a, b, fieldPath, region, table?)` checks the uid, then calls `compareKeys`.
+
+Behaviour to note:
+- With the production table, `comparable` cannot be reached.
+- There is no "comparable-with-caveats" verdict (Q-1).
+- The only stand-ins for "quality" are the server-derived `regionStatus` and `lowPixelCount` (Q-2).
+- `noiseThreshold` stays `unknown` until C07 delivers a versioned table keyed by field × region × tone band × engine build.
 
 ---
 
@@ -205,164 +295,221 @@ How the functions behave:
 |---|---|
 | `lib/capture-quality/types.ts` | Types from §2.1–2.5 |
 | `lib/capture-quality/settings.ts` | `CAPTURE_QUALITY_SETTINGS`, `settingsVersion` |
-| `lib/capture-quality/exposure.ts` | `checkExposure(frame, settings)`: luma histogram, clip fractions, mean |
-| `lib/capture-quality/blur.ts` | `checkBlur(frame, settings)`: variance of a 3×3 Laplacian on luma |
+| `lib/capture-quality/luma.ts` | `LUMA_REC601` and `lumaOf(frame)`. A fixed standard, not a threshold |
+| `lib/capture-quality/exposure.ts` | `checkExposure(frame, settings)`: clip fractions and mean luma |
+| `lib/capture-quality/blur.ts` | `checkBlur(frame, captureMethod, settings)`: variance of a 3×3 Laplacian on luma |
 | `lib/capture-quality/resolution.ts` | `checkResolution(frame, settings)` |
-| `lib/capture-quality/gate.ts` | `runCaptureGate(frame, ctx): CaptureQuality`. Runs all checks, puts in `not_measured` for pose, expression and framing, and picks the verdict and primary reason |
-| `lib/capture-quality/retake.ts` | `RetakeReason`, `RETAKE_COPY`, `retakeReasonFromServerCode(code)` |
-| `lib/capture-quality/frame.ts` | Browser-only: `frameFromBlob(blob): Promise<Frame>` (createImageBitmap + canvas). Kept apart so the pure modules never import DOM |
+| `lib/capture-quality/gate.ts` | `runCaptureGate(frame, ctx): CaptureQuality`, plus the pure retake/pending reducer that PhotoCapture uses |
+| `lib/capture-quality/retake.ts` | `RetakeReason`, `RETAKE_COPY`, `retakeReasonFromServerCode`, `isRetakeError` |
+| `lib/capture-quality/frame.ts` | Browser only: `frameFromBlob(blob): Promise<Frame>`. Kept apart so the pure modules never import DOM code |
+| `lib/capture-quality/synthetic-frames.ts` | Synthetic frame builders (flat, gradient, checkerboard, clipped, blurred) for the tests. No faces. Imported only by tests |
 | `lib/comparability.ts` | §2.7 |
 | `tests/capture-exposure.test.ts`, `tests/capture-blur.test.ts`, `tests/capture-resolution.test.ts`, `tests/capture-gate.test.ts`, `tests/capture-retake.test.ts`, `tests/capture-settings.test.ts` | §4 |
+| `tests/capture-api-code.test.ts` | Only if O-5 is approved |
 | `tests/comparability.test.ts`, `tests/comparability-wording.test.ts` | §4 |
-| `tests/capture.e2e.test.ts` | Only if O-2 is approved: round trip through the local stack |
-| `tests/capture-fixtures.ts` | Synthetic frame builders (flat, gradient, checkerboard, clipped). No real faces |
+| `tests/capture.e2e.test.ts` | Only if O-2 is approved: a round trip through the local stack |
 | `scripts/seed-lane-capture.ts` | §1 |
 
 ### Change
 
 | File | Owner | Change |
 |---|---|---|
-| `components/skin-check/inputs/PhotoCapture.tsx` | capture | Run the gate after each capture, on both paths. Show the retake reason. Block Analyze on `retake`. Map server codes to retake reasons in the existing `.catch`. Consent behaviour is unchanged: the two boxes are still reset on retake, and the copy still comes from `lib/consent.ts` |
-| `hooks/useCameraStream.ts` | capture | No change planned. A live exposure hint on the desktop preview is out of scope (§5) |
-| `lib/scan-analysis-record.ts` | capture | Only if O-2 = A: an optional `captureQuality` in `ScanAnalysisMeta`, written as is. `schemaVersion` stays 1 |
-| `types/skin-scan.ts` | shared, additive | Optional `quality?` on the success and error variants, optional `retakeReason?` on error. `SkinScanResultSchema` untouched |
-| `lib/api.ts` | shared, additive | 1) `requestSkinScan` reads `code` from a non-OK JSON body and passes it to the existing `ApiError(status, message, code)`. Same status and message; callers that ignore `code` see no change. 2) Add `isRetakeError(err)`. 3) Only if O-2 = A: optional `captureQuality` on `runSkinScan`, appended as a form field |
-| `app/api/skin-scan/route.ts` | shared, capture part only | Only if O-2 = A: read the optional `captureQuality` form field after `formData`, validate it, and pass it to `persistScanAnalysis`. An invalid value is dropped, never rejected. The preamble is untouched |
+| `components/skin-check/inputs/PhotoCapture.tsx` | capture | Run the gate after each capture, on both paths. Disable Analyze until a result exists, and on `retake` (and on `unchecked`, per O-4). Show the retake reason. With O-5, map server codes to reasons in the existing `.catch`. Consent behaviour is unchanged: the two boxes are still reset on retake, and the copy still comes from `lib/consent.ts` |
+| `hooks/useCameraStream.ts` | capture | No change planned |
+| `lib/scan-analysis-record.ts` | capture | Only if O-2 = A: optional `captureQuality` in `ScanAnalysisMeta`. `schemaVersion` stays 1 |
+| `types/skin-scan.ts` | shared, additive | Optional `quality?` on the success and error variants, and `retakeReason?` on error. `SkinScanResultSchema` is untouched |
+| `lib/api.ts` | shared | Without O-5: only, if O-2 = A, an optional `captureQuality` parameter on `runSkinScan`, appended as a form field. With O-5: also read `code` from a non-OK JSON body into the existing `ApiError(status, message, code)` |
+| `app/api/skin-scan/route.ts` | shared, capture part only | Only if O-2 = A: read the optional `captureQuality` form field after `formData`, validate it, and pass it to `persistScanAnalysis`. This adds one optional parameter to that private function in the same file (`route.ts:400`). That is outside "the call and the form fields it reads" by one parameter; the report will say so. The preamble is untouched |
 | `lib/skin-check-draft.ts` | shared, additive | Optional `quality` on the stored scan state |
-| `lib/useSkinCheckFlow.ts` | shared, scan-state part only | Carry `quality` through the photo → `SkinScanState` path and drop it on the retake reset. Answers, sections and age gate are untouched |
+| `lib/useSkinCheckFlow.ts` | shared, scan-state part only | Carry `quality` along the photo → `SkinScanState` path, and drop it on the retake reset. Answers, sections and the age gate are untouched |
 | `lib/firebase/skin-checks.ts` | shared, additive | Only if O-2 = B: one optional `capture` field |
-| `lib/skin-check-session-context.tsx` | shared | No change expected. Touched only if the dashboard request below needs `quality` in context |
+| `lib/skin-check-session-context.tsx` | shared | No change expected |
 
 ### Requests to other lanes (go into `capture-report.md`; not edited here)
 
-- **routine** (owns `SkinCheckDashboard.tsx`): when `scan.status === "error"` and `scan.retakeReason` is set, show the existing message plus a "Retake photo" action. The message text is already set by PhotoCapture, so without this change the dashboard still shows the right words.
-- **owner / main session**: none for `firestore.rules`. Option B needs no rule change, and Option A is server-written.
+- **routine** (owns `SkinCheckDashboard.tsx`): when `scan.status === "error"` and `scan.retakeReason` is set, show the existing message with a "Retake photo" action. PhotoCapture already sets the message text, so even without this change the dashboard shows the right words.
+- **firestore.rules**: no request. Option B needs no rule change, and Option A is written by the server.
 
 ---
 
 ## 4. Tests
 
-All tests are vitest unit tests that run in `npm run test:local`, except the e2e file. They use synthetic frames only.
+All tests are vitest unit tests that run in `npm run test:local`, except the e2e file. Frames are synthetic only.
 
 **Exposure (`capture-exposure.test.ts`)**
 - A mid-grey frame passes.
-- An all-black frame fails with `too_dark`; an all-white frame fails with `too_bright`.
-- Boundary: clipped fraction exactly at `clipLowFracMax` passes, one pixel over fails. The same for high, and for the mean band edges.
-- A frame that is half black and half white fails. The reason is the larger clip fraction; a tie goes to `too_dark`.
+- An all-black frame fails with `too_dark`. An all-white frame fails with `too_bright`.
+- Boundaries:
+  - a clipped fraction exactly at `clipLowFracMax` passes, and one pixel over fails;
+  - the same holds for the high-side fraction and for both edges of the mean band.
+- A frame that is half black and half white fails. The larger clip fraction gives the reason; a tie goes to `too_dark`.
 - Failure cases:
   - a zero-size frame gives `not_measured` (`frame_empty`), never `pass`;
-  - a `data` length that does not equal `width*height*4` gives `not_measured`;
+  - `data.length !== width*height*4` gives `not_measured`;
   - alpha is ignored.
 
 **Blur (`capture-blur.test.ts`)**
 - A checkerboard passes.
-- A flat frame and a Gaussian-blurred checkerboard fail with `blurry`.
-- Boundary: variance at `laplacianVarMin` passes, below it fails.
+- A flat frame and a blurred checkerboard fail with `blurry`.
+- The boundary is tested per capture method: at `laplacianVarMin.<method>` passes, below it fails.
+- The same frame can pass for one method and fail for the other.
 - A frame smaller than 3×3 gives `not_measured`.
 
 **Resolution (`capture-resolution.test.ts`)**
-- Short side at the minimum passes; one pixel below fails with `too_small`.
+- A short side at the minimum passes. One pixel below fails with `too_small`.
 
 **Gate (`capture-gate.test.ts`)**
-- Always six checks, in fixed order.
-- pose, expression and framing are `not_measured` with `no_landmark_model`.
-- The verdict is `pass` only if no check is `fail`. `not_measured` never makes `pass` on its own: with every check `not_measured`, the verdict is still `pass`, but the result records it, and a test pins that behaviour so it is visible.
-- When several checks fail, the primary reason follows the fixed order and all reasons are listed.
-- `assertedBy` is always `"client"`, `producerVersion` is `cq-1`, and `settingsVersion` matches the settings module.
-- Every `fail` has a non-null `retakeReason`, and every non-fail has a null one.
+
+The result:
+- Always seven checks, in the fixed order.
+- pose, expression, distance and framing are `not_measured` with `no_landmark_model`.
+
+The verdict:
+- It is `pass` only when exposure was measured and nothing failed.
+- If exposure is `not_measured`, it is `unchecked`. This is a failure case.
+- When several checks fail, the primary reason follows the fixed order and every reason is listed.
+
+The fields:
+- `assertedBy` is always `client`.
+- `producerVersion` is always `cq-1`.
+- `settingsVersion` matches the settings module.
+- Every `fail` has a reason, and every non-fail has none.
+
+The reducer:
+- Analyze is disabled while the gate is pending.
+- A `retake` verdict blocks the scan request.
+- Retake clears both consent booleans and the quality result.
+- After a retake, a passing photo unblocks Analyze.
+- A late gate result for a photo that has since been retaken is ignored.
 
 **Settings (`capture-settings.test.ts`)**
 - Every setting has `status: "provisional"` and a non-empty `source`.
-- Every number used by a check is read from settings. A grep-style test checks that `lib/capture-quality/{exposure,blur,resolution}.ts` contain no numeric literal other than 0, 1, 2, 3, 4 and 255.
+- `exposure.ts`, `blur.ts` and `resolution.ts` contain no numeric literal other than 0, 1, 2, 3, 4 and 255. `luma.ts` is excluded, because it holds the named standard weights.
 
 **Retake (`capture-retake.test.ts`)**
 - Every `RetakeReason` has copy.
-- Copy has no digit (`\p{Nd}`) and no comparative or causal word (the same lexicon as the wording test below).
-- `retakeReasonFromServerCode` maps the four engine codes.
-- Failure case: an unknown code, `SCAN_TIMEOUT`, `SCAN_CAPACITY_EXCEEDED` or `AUTH_REQUIRED` gives `null`. Not a photo problem, so no retake is asked.
-- The retake loop, tested on the pure state reducer extracted from PhotoCapture:
-  - a `retake` verdict blocks the scan request;
-  - a retake clears both consent booleans and the quality result, as today;
-  - after a retake, a passing photo unblocks Analyze.
+- No copy contains a digit (`\p{Nd}`) or a comparative or causal word (the same lexicon as the wording test).
+- `retakeReasonFromServerCode` maps all **five** codes. `IMAGE_TOO_LARGE` and `IMAGE_DIMENSIONS_TOO_LARGE` both map to `engine_too_large`.
+- Failure case: these codes give `null`, because they are not photo problems and must not ask for a retake:
+  - an unknown code
+  - `SCAN_TIMEOUT`
+  - `SCAN_CAPACITY_EXCEEDED`
+  - `SCAN_SERVICE_ERROR`
+  - `auth/required`
+- `isRetakeError` returns false for a plain `Error`, and for an `ApiError` without a code.
 
-**api.ts**, extended in a new file `tests/capture-api-code.test.ts` (owned prefix):
-- A 400 with `{code:"NO_FACE_DETECTED"}` throws an `ApiError` whose `code` is that value and whose message is unchanged.
-- A non-JSON error body still throws as before.
-- 401 still gives `auth/required`.
+**api.ts code pass-through (`capture-api-code.test.ts`, only with O-5)**
+- A 400 with `{code:"NO_FACE_DETECTED"}` throws an `ApiError` with that code and the same message as today.
+- A non-JSON error body throws exactly as today.
+- A 401 still gives `auth/required`.
+- `isAuthError` and `isUploadError` stay false for every server code.
 
 **Comparability (`comparability.test.ts`)**
-- A table of key pairs with the expected verdict and exact reasons:
-  - identical keys with non-null build → `comparable`, noise `unknown`;
-  - build null on either side → `engine_build_unknown`;
-  - builds differ → `engine_build_differs`;
-  - pipeline differs; variant differs;
-  - capture method null → `capture_method_unknown`;
-  - capture method differs → `capture_method_differs`;
-  - native field with `statsPath: "corrected"` → `native_stats_missing`;
-  - absent region → `region_absent`;
-  - low pixel count → `region_low_pixel_count`;
-  - `cheek_image_left` with native vs canvas → both `capture_method_differs` and `lr_cheek_cross_capture_method`;
-  - an unknown fieldPath → `field_not_defined`;
-  - different uid → `different_user`.
-- Several failures at once → all reasons are listed, in a fixed order.
-- **Real SkinState pairs** built with `toSkinState` from `tests/synthetic-scan.ts` give `not_comparable` with `engine_build_unknown`, even when `captureMethod` is the same. This pins today's honest answer.
-- Purity: the same input gives deep-equal output, and the inputs are not mutated.
+
+Key-pair table (each row lists the verdict and its exact reasons):
+
+| Case | Table | Result |
+|---|---|---|
+| identical keys, non-null build | a test table **with** the entry | `comparable`, noise `unknown` |
+| identical keys | the **production** (empty) table | `quantity_not_validated` |
+| entry for another pipeline version | test table | `quantity_not_validated` |
+| build null on either side | — | `engine_build_unknown` |
+| builds differ | — | `engine_build_differs` |
+| pipeline versions differ | — | `pipeline_version_differs` |
+| input variants differ | — | `input_variant_differs` |
+| capture method null | — | `capture_method_unknown` |
+| capture methods differ | — | `capture_method_differs` |
+| native field with `statsPath: "corrected"` | — | `native_stats_missing` |
+| absent region | — | `region_absent` |
+| low pixel count | — | `region_low_pixel_count` |
+| `cheek_image_left` native vs canvas | — | `capture_method_differs` and `lr_cheek_cross_capture_method` |
+| unknown fieldPath | — | `field_not_defined` |
+| several failures at once | — | every reason, in fixed order |
+
+State-pair tests:
+- Different uid gives `different_user`. This is checked in `compareStates`, because the key has no uid.
+- **Real SkinState pairs** built with `toSkinState` from `tests/synthetic-scan.ts` give `not_comparable`, with `quantity_not_validated` and `engine_build_unknown`, even when `captureMethod` matches. This pins today's honest answer.
+- A gate result of `pass` or `override` changes nothing, because comparability never reads it.
+
+Purity:
+- The same input gives deep-equal output.
+- Inputs are not mutated.
+- `COMPARABLE_QUANTITIES` is empty.
 
 **Wording (`comparability-wording.test.ts`)**
-- Serialise every verdict from the table. No output contains `%`, a digit next to a change word, or any of: improve, worse, better, reduce, increase, decrease, because, caused, due to, effect, works.
+- Every verdict from the table is serialised and checked.
+- No output contains `%`, a digit next to a change word, or any of these words: improve, worse, better, reduce, increase, decrease, because, caused, due to, effect, works.
 - No exported function returns a number derived from two scans.
 
-**e2e (`capture.e2e.test.ts`, only if O-2 is approved)**
-- Against the local stack, post a synthetic scan with a `captureQuality` field.
-- Read back `scanAnalyses` (A) or `skinChecks` (B) and check the field round-trips unchanged.
-- `toSkinState` still returns `kind: "skinstate"` with `quality.*` still null.
-- A malformed `captureQuality` is dropped and the scan still returns `ok: true`.
+**Seed**
+- `scripts/seed-lane-capture.ts` runs without error inside `npm run test:local`, after the base seed.
+- The unit tests do **not** read seeded data. They run first, with no emulator (`scripts/local-stack.sh:34-38`). They build their own pairs.
+
+**e2e (`capture.e2e.test.ts`, only with O-2)**
+- A synthetic scan posted with `captureQuality` reads back unchanged:
+  - Option A: from `scanAnalyses`;
+  - Option B: from `skinChecks`.
+- `toSkinState` still returns `kind: "skinstate"`, with `quality.*` still null.
+- A malformed `captureQuality` is dropped, and the scan still returns `ok: true`.
 
 ---
 
 ## 5. Not built in this lane
 
-- **No engine change** (D-18). This includes returning a build or digest; the C12 path is separate.
-- **No change to `lib/skin-state.ts`** or to the skinstate-1 contract. No `skinstate-2`. Mapping `engine_build` and filling `quality.*` is a new contract version, owned by the main session.
-- **No change output of any kind:** no deltas, %, trends, baselines, tiers or "different from your starting checks" copy (D-12, D-13; LONGITUDINAL_METHOD tier 1 needs C07).
-- **No noise thresholds.** `noiseThreshold` is always `unknown` until C07.
-- **No pose, expression or framing checks** without O-3. No new npm dependency without approval.
-- **No live, per-frame exposure overlay** on the desktop preview. The checks run once, on the captured frame. A live hint can be added later on the same pure functions.
-- **No device-family detection** and no use of EXIF or device model. The contract keeps `quality.device` null.
-- **No `firestore.rules` change.**
-- **No dashboard edit.** That is a request to routine.
-- **No consent change.** Consent belongs to the privacy lane; the reset-on-retake stays as is.
-- **Not used for comparability:** the client gate result. It is client-asserted (D-26).
+**No engine or contract changes**
+- No engine change (D-18), including returning a build or digest. That path is C12.
+- No change to `lib/skin-state.ts` or to skinstate-1, and no `skinstate-2`. Mapping `engine_build` and filling `quality.*` belong to the main session.
+
+**No change output or calibration**
+- No deltas, percentages, trends, baselines or tiers, and no "different from your starting checks" copy (D-12, D-13). Tier 1 needs C07.
+- No noise thresholds, and no entries in `COMPARABLE_QUANTITIES`. Both wait for C05–C07.
+
+**No features the owner has not cleared**
+- No pose, expression, distance or framing check without O-3.
+- No new npm dependency without approval.
+- No live per-frame exposure overlay on the desktop preview. A later step can reuse the same pure functions.
+- No device-family detection, and no use of EXIF or the device model.
+
+**No edits outside the lane**
+- No `firestore.rules` change.
+- No dashboard edit (that is a request to routine).
+- No consent change.
+- No tracker or DECISION_LOG edit.
+
+**Never used for comparability:** the client gate result, because it is client-asserted (D-26).
 
 ---
 
 ## 6. Steps
 
-Every step ends with `npm run test:local` green, plus typecheck and lint, and one commit. All steps wait for the owner to approve this design.
+All steps wait for the owner to approve this design. Every code step ends with:
+- `npm run test:local` green;
+- typecheck and lint green;
+- one commit.
 
-**Needs no further owner decision**
+**Steps that need no further owner decision**
 
 | Step | Work | Tests | Commit |
 |---|---|---|---|
-| S1 | `lib/capture-quality/types.ts`, `settings.ts` (values `provisional`, with sources), `retake.ts` (enum, copy, server-code map) | capture-settings, capture-retake (enum, copy, map) | `feat(capture): quality types, provisional settings, retake reasons` |
-| S2 | `exposure.ts` (first: the dominant Phase 0 risk), plus synthetic frame fixtures | capture-exposure | `feat(capture): exposure check` |
-| S3 | `blur.ts`, `resolution.ts` | capture-blur, capture-resolution | `feat(capture): blur and resolution checks` |
-| S4 | `gate.ts`: all six checks, pose, expression and framing `not_measured`, verdict, primary reason | capture-gate | `feat(capture): capture gate over pure checks` |
-| S5 | `lib/api.ts`: pass the server `code` into `ApiError`; `isRetakeError` | capture-api-code | `feat(capture): surface scan error codes to the client` |
-| S6 | `lib/comparability.ts`: key extractor, `compareKeys`, `compareStates`, noise `unknown` | comparability, comparability-wording | `feat(capture): key-based comparability (C02), fails closed` |
-| S7 | `scripts/seed-lane-capture.ts`: synthetic pairs | Seed runs inside `test:local`; comparability test reads seeded shapes | `chore(capture): local seed for comparability pairs` |
+| S1 | `types.ts`, `settings.ts` (values `provisional`, with sources), `luma.ts`, `retake.ts` (enum, copy, server-code map, `isRetakeError`), `synthetic-frames.ts` | capture-settings, capture-retake | `feat(capture): quality types, provisional settings, retake reasons` |
+| S2 | `exposure.ts` (first, as the dominant Phase 0 risk) | capture-exposure | `feat(capture): exposure check` |
+| S3 | `blur.ts` (per-path setting), `resolution.ts` | capture-blur, capture-resolution | `feat(capture): blur and resolution checks` |
+| S4 | `gate.ts`: seven checks, the four landmark checks `not_measured`, verdict incl. `unchecked`, primary reason, pending/retake reducer | capture-gate | `feat(capture): capture gate and retake reducer` |
+| S5 | `lib/comparability.ts`: empty `COMPARABLE_QUANTITIES`, key extractor, `compareKeys`, `compareStates` | comparability, comparability-wording | `feat(capture): key-based comparability (C02), fails closed` |
+| S6 | `scripts/seed-lane-capture.ts`: synthetic pairs | the seed runs inside `test:local` | `chore(capture): local seed for comparability pairs` |
 
-**Needs an owner decision**
+**Steps that need an owner decision**
 
-| Step | Work | Blocked by | Commit |
-|---|---|---|---|
-| S8 | PhotoCapture wiring: `frame.ts`; run the gate on both paths; block Analyze; retake copy; map server codes in `.catch`; `quality` and `retakeReason` on `SkinScanState`, the draft and the flow's scan state | **O-4** (hard or soft block) | `feat(capture): retake loop in PhotoCapture` |
-| S9 | Persist `CaptureQuality` (A: record field plus route form field; B: `skinChecks.capture`) and `capture.e2e.test.ts` | **O-2** | `feat(capture): persist client capture quality` |
-| S10 | Pose, expression and framing checks with a landmark model | **O-3** (dependency) | `feat(capture): pose, expression, framing checks` |
-| S11 | Remove `captureMethod` from the key, or mark it client-asserted, per D-26's outcome. If the owner keeps it, S11 is empty | **O-1** | `fix(capture): comparability key per D-26` |
-| S12 | `capture-report.md`: what was built, commits, test results, requests to routine, open questions | none (last) | `docs(lanes): capture report` |
+| Step | Work | Blocked by | Tests | Commit |
+|---|---|---|---|---|
+| S7 | PhotoCapture wiring: `frame.ts`; gate on both paths; Analyze pending/blocked; retake copy; `quality` and `retakeReason` on `SkinScanState`, the draft and the flow's scan state | **O-4** | capture-gate reducer cases for the chosen O-4 option; typecheck covers the wiring | `feat(capture): retake loop in PhotoCapture` |
+| S8 | `lib/api.ts` code pass-through; map server codes in PhotoCapture's `.catch` | **O-5** (and S7) | capture-api-code; capture-retake mapping | `feat(capture): surface scan error codes as retake reasons` |
+| S9 | Persist `CaptureQuality` (A: record field and route form field; B: `skinChecks.capture`) | **O-2** | capture.e2e | `feat(capture): persist client capture quality` |
+| S10 | Pose, expression, distance and framing checks | **O-3** | capture-gate cases for the four checks | `feat(capture): landmark-based checks` |
+| S11 | Adjust the `captureMethod` part of the key to the O-1 outcome. Empty if the frozen contract is kept | **O-1** | comparability table rows for capture method | `fix(capture): comparability key per D-26` |
+| S12 | `capture-report.md`: link to this design, owner approval, what was built, commits, test results, requests, open questions | none (last) | none (document task) | `docs(lanes): capture report` |
 
-S6 is fully buildable now. If O-1 later removes `captureMethod`, only the extractor and a few table rows change.
+S5 can be built entirely now, to the frozen contract. If O-1 removes `captureMethod`, only the extractor and a few table rows change.
 
 ---
 
@@ -370,91 +517,143 @@ S6 is fully buildable now. If O-1 later removes `captureMethod`, only the extrac
 
 ### O-1. Can the browser's own claim about how the photo was taken be part of the comparability check? (D-26 open item)
 
-**In plain words.**
-- The browser tells the server whether the photo came from the phone camera app (`native`) or the desktop webcam (`canvas`). The server stores what the browser says without checking it.
-- The frozen contract uses this value as part of the comparability check: two scans taken different ways are never compared.
-- D-26 says the browser is never trusted for measured skin state. So either we accept this one unchecked value in the check, or we stop using it.
-- `persistAttempt` ("was this a background retry?") is also browser-sent, but it is not in the comparability key. It only affects which record is chosen.
+**In plain words**
+- The browser tells the server whether the photo came from the phone camera app (`native`) or the desktop webcam (`canvas`). The server stores that claim without checking it.
+- The frozen contract puts this value in the comparability key, so two scans taken different ways are never compared.
+- D-26 says the browser is never trusted for measured skin state. It lists two ways out:
+  1. stop storing the value;
+  2. amend the contract to mark it client-asserted, **and keep it out of the key** until the server can derive it.
+- `persistAttempt` ("was this a background retry?") is also sent by the browser. It is not in the key, so it only affects which record is chosen. D-26 option 2 covers it.
 
-**Options.**
-- **A. Keep it in the key, marked client-asserted.** A new contract version records it as client-asserted. Nothing measured is forged: the value only labels how the photo was taken.
-- **B. Drop it from the key** until the server can tell for itself (for example from EXIF in the original, or from image dimensions). More scans would pass the check, including desktop-vs-phone pairs, which Phase 0 suggests differ a lot.
-- **C. Stop persisting it.** Simplest, but we lose the stratification the dataset needs.
+**Options**
+- **A. Keep it in the key, marked client-asserted.** This is a third option, not one of D-26's two.
+- **B. D-26 option 2.** Mark it client-asserted and drop it from the key until the server derives it (for example from EXIF in the stored original, or from image dimensions).
+- **C. D-26 option 1.** Stop storing it.
 
-**Recommendation: A.**
-- In the key, an honest value can only remove pairs, never add them. A forged value can make a webcam scan and a phone scan look like the same method. The pair must still match on engine build, pipeline version and input variant, and no change is ever shown before C07. So the damage is bounded, and the contract amendment should say so.
-- Dropping the value (B) removes the only signal that separates the two very different camera paths. Every honest desktop-vs-phone pair would then pass this part of the check.
-- A keeps the most conservative behaviour while keeping the data.
+**Recommendation: A, departing from D-26's listed options on purpose.**
+- With the value in the key, an honest value can only remove pairs, never add them.
+- A forged value can make a webcam scan and a phone scan look like the same method. The pair must still match on engine build, pipeline version, input variant and the validated-quantity table, and nothing is shown before C07. The damage is bounded, and the amendment should say so.
+- B makes every honest desktop-vs-phone pair pass this part of the check. Phase 0 points to large differences between the two paths, so B is less safe than A.
+- C loses the stratification the dataset needs.
+- D-26 is an open item, not a frozen decision, so the owner may choose A.
 
-**Blocks:** S11 only. **Can start without it:** S1–S10. S6 is built to the frozen contract (captureMethod in the key) and adjusted in S11 if needed.
+**Blocks:** S11 only.
+**Can start without it:** S1–S10. S5 follows the frozen contract (capture method in the key).
 
 ### O-2. Do we save the on-device quality result, and where?
 
-**In plain words.** The app will compute "was this photo too dark, too blurry" for every capture. Today nothing like that is saved. If we save it, it can later explain why a scan looked odd, and the R05 exposure study can use it to set real thresholds. The analysis record is immutable, so a badly shaped field saved there stays forever.
+**In plain words**
+- For every capture the app will work out "was this photo too dark, too blurry". Today nothing like that is saved.
+- If it is saved, it can later explain why a scan looked odd, and the R05 exposure study can use it to set real thresholds.
+- Both possible places are write-once, so a badly shaped field stays as it is in every document already written.
 
-**Options.**
+**Options**
 - **A. On the server-written analysis record (`scanAnalyses`)**, as an optional field marked client-asserted.
   - It sits next to the exact bytes it describes (same `inputSha256`).
-  - The schema version stays 1.
-  - The server validates the shape and drops it if invalid.
+  - Schema version stays 1.
+  - The server drops an invalid value.
+  - Cost: it adds a **third client-asserted field** to the server record, after `captureMethod` and `persistAttempt`. That widens the D-26 open item. The field must be named in the same contract amendment as client-asserted, and never used for comparability.
 - **B. On the browser-written questionnaire record (`skinChecks.capture`).**
-  - It is easy to change later.
-  - It is written at save time, not scan time, so it is lost when the user does not finish the questionnaire.
-  - It is not tied to the exact image hash.
+  - Written at save time, so it is lost when the user does not finish the questionnaire.
+  - Not tied to the image hash.
+  - Also create-only: only future documents can take a new shape.
 - **C. Don't save it.** Show it to the user only.
 
-**Recommendation: A.** The quality result describes one exact image. The only record keyed on that image's hash is the analysis record. Scan-time writing also survives abandoned questionnaires, which is the D-02 lesson. The risk of a permanent wrong shape is handled by:
-- the shape being fixed in this design (§2.5);
-- `producerVersion` letting a later shape coexist;
-- the server dropping anything that does not validate.
+**Recommendation: A.**
+- The result describes one exact image, and only the analysis record is keyed by that image's hash.
+- Scan-time writes survive abandoned questionnaires, which is the lesson of D-02.
+- The cost to D-26 is small if the result is labelled `assertedBy: "client"` and kept out of comparability.
+- The risk of a wrong permanent shape is limited three ways: the shape is fixed in §2.5, `producerVersion` lets a later shape coexist, and the server drops anything invalid.
 
-**Blocks:** S9. **Can start without it:** S1–S8, S10–S12.
+**Blocks:** S9.
+**Can start without it:** S1–S8, S10–S12.
 
-### O-3. Can we add a face-landmark library for the pose, expression and framing checks?
+### O-3. Can we add a face-landmark library for the pose, expression, distance and framing checks?
 
-**In plain words.** Exposure, blur and size can be checked by counting pixels. "Is the face turned?", "is the person smiling?" and "is the face centred?" need a model that finds the face's key points in the browser. No such library is installed, and the lane rules forbid adding one without approval. Until then, those three checks report "not measured". The engine still refuses photos with no face at all (`NO_FACE_DETECTED`), but only after upload.
+**In plain words**
+- Exposure, blur and size can be checked by counting pixels.
+- These need a model that finds the face's key points in the browser:
+  - "Is the face turned?"
+  - "Is the person smiling?"
+  - "Is the face too near or too far?"
+  - "Is the face centred?"
+- None is installed, and the lane rules forbid adding one without approval.
+- Until then those four checks report "not measured". The engine still refuses a photo with no face (`NO_FACE_DETECTED`), but only after upload.
 
-**Options.**
+**Options**
 - **A. `@mediapipe/tasks-vision` (Face Landmarker).**
-  - The same model family as the engine (mediapipe face mesh).
+  - Same model family as the engine (mediapipe face mesh).
   - Runs in the browser with WASM.
-  - The model file is a few MB, loaded only on the capture step.
-- **B. The browser's built-in `FaceDetector` (Shape Detection API).** No dependency, but it is not available on iOS Safari or most browsers, so most users would get `not_measured` anyway.
-- **C. None for now.** Ship exposure, blur and resolution only.
+  - The model is a few MB, loaded only on the capture step.
+- **B. The browser's built-in `FaceDetector`.** No dependency, but it is missing on iOS Safari and most browsers, so most users would get `not_measured` anyway.
+- **C. None for now.** Ship exposure, blur and resolution.
 
 **Recommendation: C now, A as a follow-up.**
-- Exposure is the dominant measured risk. The pixel checks cover it with no new dependency.
-- A adds a few MB of download to every capture and a model version that must be pinned and recorded. Decide that once the R05 sweep shows how often pose actually fails in real captures.
-- If chosen, A should be pinned to the engine's mediapipe line (0.10.x), and its version recorded in `producerVersion`.
+- Exposure is the dominant measured risk, and the pixel checks cover it with no dependency.
+- A adds a few MB to every capture, plus a model version that must be pinned and recorded. Decide after the R05 sweep shows how often pose and distance fail in real captures.
+- If A is chosen, pin it to the engine's mediapipe 0.10.x line and bump `producerVersion`.
 
-**Blocks:** S10. **Can start without it:** everything else.
+**Blocks:** S10.
+**Can start without it:** everything else.
 
 ### O-4. When a check fails, must the user retake, or can they continue anyway?
 
-**In plain words.** If the photo is too dark, we can either refuse to analyse it until they retake (hard block), or warn them and offer "use this photo anyway" after a set number of tries (soft block). A hard block is safer for data quality, but on a poor phone camera in a dim room a user may never pass and gives up. The thresholds are still provisional guesses, so a hard block might reject good photos.
+**In plain words**
+- When a photo is too dark, there are two ways to respond:
+  - refuse to analyse it until the user retakes (hard block);
+  - warn them, and after a set number of tries offer "use this photo anyway" (soft block).
+- A hard block protects data quality. But a user with a poor phone camera in a dim room may never pass, and gives up.
+- The thresholds are still provisional guesses, so a hard block may reject good photos.
+- The same question applies to `unchecked`, when the image could not be checked at all.
 
-**Options.**
-- **A. Hard block.** Analyze stays disabled until every measured check passes.
-- **B. Soft block.** Analyze stays disabled on the first failure. After `gate.maxSoftOverrides` retakes (a provisional setting), a "Use this photo anyway" button appears. The result is recorded as `verdict: "override"`.
-- **C. Warn only.** Show the reason; never block.
+**Options**
+- **A. Hard block.** Analyze stays disabled until nothing fails. `unchecked` is also blocked.
+- **B. Soft block.** Analyze is disabled on a failure. After `gate.retakesBeforeOverride` retakes (a provisional setting), "Use this photo anyway" appears and the result is recorded as `override`. `unchecked` is allowed and recorded as `unchecked`.
+- **C. Warn only.** Never block.
 
 **Recommendation: B.**
-- The thresholds are provisional until R05, and a hard block on guessed numbers can lock real users out.
-- An override is recorded as `override`, never as `pass`, so the data stays honest.
-- Comparability does not read the gate result anyway (D-26), so an override cannot make a pair comparable.
+- Thresholds stay provisional until R05, and a hard block based on guessed numbers can lock real users out of the product.
+- B still stops the common case (one dark photo) and keeps the data honest: an override is stored as `override` and a failed decode as `unchecked`, never as `pass`.
 
-**Blocks:** S8. **Can start without it:** S1–S7, S9–S12. S9 can save `verdict` once S8 has merged.
+**Blocks:** S7, which also blocks S8.
+**Can start without it:** S1–S6, S9–S12. If O-4 lands later, S9 can save the verdict once S7 is in.
 
-### Blockers outside this lane (C02 can never say "comparable" for real data until these land)
+### O-5. May the scan helper pass the server's error code through to the app?
 
-- **A new SkinState contract version that maps `engine_build`.** skinstate-1 hard-codes `engine.build: null`. The raw record already stores `engine_build` from 0.1.6, but the frozen contract cannot read it. This belongs to the main session and the owner (D-23), not the lane. Until it lands, C02 truthfully returns `engine_build_unknown` for every pair.
+**In plain words**
+- When the engine refuses a photo ("no face found", "unreadable"), the server already sends a named code. The browser helper in `lib/api.ts` discards it and reports a generic "Failed to analyze photo".
+- Without the code, the app cannot tell the user *why* to retake.
+- The lane rules let capture add optional parameters to that shared file, but not change its behaviour.
+- The change: a failed scan's error object would carry the server's code. The status and message stay the same.
+
+**Options**
+- **A. Allow it** as a one-function exception for the capture lane.
+- **B. Make it a request in the capture report**, done by the main session after merge.
+- **C. Don't do it.** Engine refusals keep the generic message.
+
+**Recommendation: A.**
+- No current caller depends on the code being missing. `isAuthError` and `isUploadError` match only `auth/required` and `upload/failed`, which the server never sends as a scan code. A test pins that.
+- It is the only way the engine's refusals get a named retake reason, which the lane rules require.
+
+**Blocks:** S8.
+**Can start without it:** S1–S7, S9–S12.
+
+### Blockers outside this lane
+
+Until these land, C02 can never say "comparable" for real data.
+- **The COMPARABLE quantity table (C05–C07).** Until then, `COMPARABLE_QUANTITIES` stays empty and `noiseThreshold` stays `unknown`.
+- **A new SkinState contract version that maps `engine_build`.** skinstate-1 hard-codes `engine.build: null`. This belongs to the main session and the owner (D-23), not to this lane.
 - **Deploy of 0.1.6 and gate 04 (A12, A13).** Paused under TD-04.
-- **C07 noise tables.** Until they exist, `noiseThreshold` stays `unknown`, and no change is ever shown even for a comparable pair.
 
-### Open question to record (not a lane decision)
+### Open questions to record (not lane decisions)
 
-**Q-1. Capture method: different key, or a caveat?**
-- LONGITUDINAL_METHOD §3 step 2 lists a different capture method as "comparable-with-caveats".
-- The frozen contract (§7.1) and D-13 put `captureMethod` in the key, which makes it "not comparable".
-- This design follows the frozen contract: a difference means not comparable, and there is no caveats tier.
-- The owner may want LONGITUDINAL_METHOD corrected to match.
+**Q-1. Capture method: a different key, or a caveat?**
+- LONGITUDINAL_METHOD §3 step 2 calls a different capture method "comparable-with-caveats".
+- The frozen contract (§7.1) and D-13 put it in the key, which makes it "not comparable".
+- This design follows the frozen contract and has no caveats tier.
+
+**Q-2. The quality gate in comparability.**
+- LONGITUDINAL_METHOD §3 says a quality failure means "not comparable" (step 2), and that "both scans must pass the quality gate" (step 5). The capture brief also puts "quality" in the C02 key.
+- Under D-26, a client-asserted gate result cannot decide comparability. So steps 2 and 5 stay unmet until a **server-side** quality producer exists (engine-side or server-side checks, D-18).
+- Until then, the server-derived `regionStatus` and `lowPixelCount` are the only quality inputs.
+- The owner may want LONGITUDINAL_METHOD and the brief to say so.
