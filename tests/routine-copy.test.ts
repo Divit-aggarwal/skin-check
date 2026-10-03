@@ -2,6 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ROUTINE_COPY } from "@/lib/routine/copy";
+import { ROUTINE_PURPOSE_COPY } from "@/lib/consent";
 import { CATALOGUE, PRODUCT_NAME_EXCEPTIONS } from "@/lib/catalog/catalogue";
 import { bannedWordsIn, nameIsExcepted } from "@/lib/catalog/wording";
 
@@ -45,6 +46,12 @@ describe("routine copy (D-12)", () => {
     expect(bannedWordsIn("lowercase")).toEqual([]);
     const planted = sourceText("<p>Results {n}</p><span>{x} improved</span>");
     expect(planted.flatMap(bannedWordsIn)).toEqual(expect.arrayContaining(["results", "improve*"]));
+  });
+
+  it("the purpose comes from lib/consent.ts and passes the word check", () => {
+    expect(ROUTINE_COPY.purpose).toBe(ROUTINE_PURPOSE_COPY);
+    expect(bannedWordsIn(ROUTINE_PURPOSE_COPY)).toEqual([]);
+    expect(readFileSync("lib/routine/copy.ts", "utf8")).not.toContain("So you can keep a record");
   });
 
   it("no string in lib/routine/copy.ts has a banned word", () => {

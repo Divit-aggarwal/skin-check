@@ -2,11 +2,12 @@
 // can check them all against the D-12 word list (lib/catalog/wording.ts).
 // The routine page shows the user's own record only: no skin data, no product
 // claims (R-4 A).
+import { ROUTINE_PURPOSE_COPY } from "@/lib/consent";
+
 export const ROUTINE_COPY = {
   title: "My routine",
-  // R-1 A purpose. Moves to lib/consent.ts when the privacy lane takes it (D-16).
-  purpose:
-    "So you can keep a record of your own routine and see it back. Only you see it. It is not used for analytics, not sent to Gemini and not joined to your scans.",
+  // R-1 A purpose; the text lives with the other purposes in lib/consent.ts (D-16).
+  purpose: ROUTINE_PURPOSE_COPY,
   signIn: "Sign in to see your routine.",
   loading: "Loading…",
   error: "Something went wrong. Please try again.",

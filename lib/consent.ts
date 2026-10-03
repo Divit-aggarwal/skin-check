@@ -43,6 +43,11 @@ export const AI_SHARE_CONSENT_VERSION = "ai share DRAFT version 1";
 export const AI_SHARE_CONSENT_COPY =
   "DRAFT: Share my skin check with the AI assistant (processed by Google, outside India).";
 
+// R-1 A (routine lane, D-16): the purpose of the user's own routine record.
+// Shown on /routine; not a ledger purpose (nothing to grant or revoke).
+export const ROUTINE_PURPOSE_COPY =
+  "So you can keep a record of your own routine and see it back. Only you see it. It is not used for analytics, not sent to Gemini and not joined to your scans.";
+
 /**
  * How long original photos are kept, in days. Decision 5 is NOT made: no
  * number is invented here. While this is null, no copy states a period and
