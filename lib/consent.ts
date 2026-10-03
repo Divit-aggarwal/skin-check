@@ -57,15 +57,17 @@ export const ERASE_CONFIRMATION = "DELETE MY DATA";
 export const ERASE_MAX_AUTH_AGE_SECONDS = 300;
 
 // H02a: an under-18 answer is blocked in the browser BEFORE sign-in, so there
-// is no uid to record it against yet. This device remembers that it was
-// chosen, and the attestation sent after sign-in says "under-18" even if the
-// user went back and picked another bucket. Self-attestation: clearing
-// browser storage defeats it; a server-side record is the stronger check.
+// is no uid to record it against yet. This tab remembers that it was chosen,
+// and the attestation sent after sign-in says "under-18" even if the user went
+// back and picked another bucket. sessionStorage, not localStorage: the
+// marker must not outlive the tab and land on a different person who signs
+// in later on a shared device (a parent after a child). Self-attestation: a
+// new tab or cleared storage defeats it; the server record is the strong check.
 const UNDER18_CHOSEN_KEY = "skin-check-under18-chosen";
 
 export function markUnder18Chosen(): void {
   try {
-    localStorage.setItem(UNDER18_CHOSEN_KEY, "1");
+    sessionStorage.setItem(UNDER18_CHOSEN_KEY, "1");
   } catch {
     // Storage blocked: the server-side record (when signed in) still applies.
   }
@@ -78,7 +80,7 @@ export function markUnder18Chosen(): void {
  */
 export function clearUnder18Chosen(): void {
   try {
-    localStorage.removeItem(UNDER18_CHOSEN_KEY);
+    sessionStorage.removeItem(UNDER18_CHOSEN_KEY);
   } catch {
     // Storage blocked: nothing was stored either.
   }
@@ -86,7 +88,7 @@ export function clearUnder18Chosen(): void {
 
 export function under18ChosenOnThisDevice(): boolean {
   try {
-    return localStorage.getItem(UNDER18_CHOSEN_KEY) === "1";
+    return sessionStorage.getItem(UNDER18_CHOSEN_KEY) === "1";
   } catch {
     return false;
   }

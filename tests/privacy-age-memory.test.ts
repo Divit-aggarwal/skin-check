@@ -21,7 +21,7 @@ function fakeStorage() {
 }
 
 beforeEach(() => {
-  vi.stubGlobal("localStorage", fakeStorage());
+  vi.stubGlobal("sessionStorage", fakeStorage());
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -39,7 +39,7 @@ describe("under-18 memory", () => {
   });
 
   it("blocked storage never throws and falls back to the answer", () => {
-    vi.stubGlobal("localStorage", {
+    vi.stubGlobal("sessionStorage", {
       getItem: () => {
         throw new Error("blocked");
       },
@@ -52,6 +52,13 @@ describe("under-18 memory", () => {
     });
     expect(() => markUnder18Chosen()).not.toThrow();
     expect(attestedAgeBucket("25-34")).toBe("25-34");
+  });
+
+  it("the marker is tab-scoped (sessionStorage), never localStorage", () => {
+    const src = readFileSync("lib/consent.ts", "utf8");
+    const block = src.slice(src.indexOf("const UNDER18_CHOSEN_KEY"), src.indexOf("export function attestedAgeBucket"));
+    expect(block).not.toContain("localStorage.");
+    expect(block).toContain("sessionStorage.");
   });
 
   it("postAgeAttestation sends the bucket and the current version with the bearer token", async () => {

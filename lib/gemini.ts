@@ -82,7 +82,8 @@ export function extraCautionFor(answers: SkinCheckAnswers): boolean {
 // standard pregnancy list). This advises Gemini only; its output is not
 // checked, and deterministic safety rules are E05's job.
 export const EXTRA_CAUTION_INSTRUCTION = `Extra caution applies to this user. Do not suggest any active ingredients.
-Advise them to ask a doctor before starting anything new.`;
+Advise them to ask a doctor before starting anything new. Never guess at or
+mention a reason for this.`;
 
 // With the flag on, the trigger answers are hidden too (e.g. "A prescription
 // product" under current_products). Otherwise a caution sentence with no
