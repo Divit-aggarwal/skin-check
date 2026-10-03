@@ -43,6 +43,10 @@ for name, rows in tables:
             i = head.index(col)
             bad = [(r[0], r[i]) for r in rows[1:] if r[i] not in allowed]
             assert not bad, f"{name}: bad {col}: {bad}"
+    if "Blocker" in head and "Commit" in head:
+        b, blk, com = head.index("Build status"), head.index("Blocker"), head.index("Commit")
+        assert all(r[blk] for r in rows[1:] if r[b] == "BLOCKED"), f"{name}: BLOCKED row without blocker"
+        assert all(r[com] for r in rows[1:] if r[b] == "DONE"), f"{name}: DONE row without commit"
 
 wb = Workbook()
 wb.remove(wb.active)

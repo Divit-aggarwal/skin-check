@@ -24,7 +24,8 @@
       "Bash(vc promote *)",
       "mcp__plugin_firebase_firebase__firebase_deploy",
       "Bash(firebase deploy *)",
-      "Bash(* firebase deploy *)"
+      "Bash(* firebase deploy *)",
+      "Bash(vc --prod*)"
     ]
   }
 }
