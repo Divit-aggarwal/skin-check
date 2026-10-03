@@ -3,8 +3,8 @@ import { getIdToken } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
 import { SkinScanResultSchema } from "@/types/skin-scan";
-import type { CaptureMethod, SkinScanResult, SkinScanScores } from "@/types/skin-scan";
-import type { SkinCheckAnswers } from "@/types/skin-check";
+import type { CaptureMethod, SkinScanResult } from "@/types/skin-scan";
+import type { EchoRegion } from "@/lib/echo-regions";
 
 class ApiError extends Error {
   constructor(
@@ -314,6 +314,7 @@ export interface EchoChatMessage {
 const SkinCheckChatResponseSchema = z.object({
   ok: z.literal(true),
   reply: z.string(),
+  historyToken: z.string(),
 });
 
 // The route's error responses (both the upfront CHAT_MISCONFIGURED check and
@@ -325,31 +326,32 @@ const ChatErrorResponseSchema = z.object({
   code: z.string().optional(),
 });
 
-export interface SkinCheckRegionFocus {
-  region: string;
-  scores: SkinScanScores;
-}
-
 // Above lib/gemini.ts's worst-case retry budget for one call (3 attempts at
 // GEMINI_REQUEST_TIMEOUT_MS=10s each, plus backoff — roughly 32s), so this
 // only fires on a request that never got a response at all.
 const CHAT_CLIENT_TIMEOUT_MS = 40_000;
 
-// `composite` is not sent — the server recomputes it from `scores` itself
-// (app/api/skin-check/chat/route.ts), since it's a pure function of scores
-// and trusting a client-supplied summaryLine string used to be a
-// prompt-injection path into Gemini's systemInstruction.
+// Gate 02: only the scan's identity, the region, and the thread are sent —
+// scores, region scores, and quiz answers are loaded server-side under the
+// verified uid (app/api/skin-check/chat/route.ts). `history` is the thread
+// BEFORE `message`; non-empty history must carry the historyToken the
+// previous reply returned, and the reply comes back with the next one.
 //
 // `signal` is optional and caller-supplied (EchoPage.tsx aborts it on
 // unmount, e.g. the user navigates away from /echo mid-request) — it
 // composes with, rather than replaces, this function's own timeout abort.
 export async function getSkinCheckChatReply(
-  messages: EchoChatMessage[],
-  answers: SkinCheckAnswers,
-  scores: SkinScanScores | null,
-  regionFocus: SkinCheckRegionFocus | null = null,
+  scanId: string,
+  region: EchoRegion,
+  history: EchoChatMessage[],
+  historyToken: string | null,
+  message: string,
   signal?: AbortSignal
-): Promise<string> {
+): Promise<{ reply: string; historyToken: string }> {
+  // Gate 02: the route verifies this itself. No user → ApiError auth/required
+  // before a request is built.
+  const idToken = await freshIdToken();
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), CHAT_CLIENT_TIMEOUT_MS);
   const onExternalAbort = () => controller.abort();
@@ -359,8 +361,8 @@ export async function getSkinCheckChatReply(
   try {
     response = await fetch("/api/skin-check/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages, answers, scores, regionFocus }),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ scanId, region, history, historyToken, message }),
       signal: controller.signal,
     });
   } catch (err) {
@@ -371,6 +373,11 @@ export async function getSkinCheckChatReply(
   } finally {
     clearTimeout(timeoutId);
     signal?.removeEventListener("abort", onExternalAbort);
+  }
+
+  // Same code as freshIdToken's, so isAuthError covers a token the server refused.
+  if (response.status === 401) {
+    throw new ApiError(401, "Echo requires a verified phone number.", "auth/required");
   }
 
   if (!response.ok) {
@@ -385,7 +392,7 @@ export async function getSkinCheckChatReply(
     throw new ApiError(0, "Unexpected skin-check chat response shape.");
   }
 
-  return parsed.data.reply;
+  return { reply: parsed.data.reply, historyToken: parsed.data.historyToken };
 }
 
 export { ApiError };

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanResult } from "@/types/skin-scan";
 import type { CompositeScore } from "@/lib/skin-check-score";
@@ -13,6 +13,8 @@ export interface EchoThreadMessage {
 }
 
 export interface SkinCheckSession {
+  /** The displayed result's scanId — Echo names it; the server loads the facts. */
+  scanId: string;
   answers: SkinCheckAnswers;
   result: SkinScanResult;
   composite: CompositeScore;
@@ -25,16 +27,23 @@ export interface SkinCheckSession {
   captureMethod: CaptureMethod;
 }
 
-type EchoThreads = Record<EchoRegion, EchoThreadMessage[]>;
+export interface EchoThread {
+  messages: EchoThreadMessage[];
+  /** Server MAC over `messages` (lib/echo-history-token.ts); null until Echo first replies. */
+  historyToken: string | null;
+}
 
-const EMPTY_THREADS: EchoThreads = { forehead: [], cheeks: [], nose: [], chin: [] };
+type EchoThreads = Record<EchoRegion, EchoThread>;
+
+const EMPTY_THREAD: EchoThread = { messages: [], historyToken: null };
+const EMPTY_THREADS: EchoThreads = { forehead: EMPTY_THREAD, cheeks: EMPTY_THREAD, nose: EMPTY_THREAD, chin: EMPTY_THREAD };
 
 interface SkinCheckSessionContextValue {
   session: SkinCheckSession | null;
   /** null clears the session — used when starting a new scan. */
   setSession: (session: SkinCheckSession | null) => void;
   threads: EchoThreads;
-  setThreadMessages: (region: EchoRegion, messages: EchoThreadMessage[]) => void;
+  setThread: (region: EchoRegion, thread: EchoThread) => void;
 }
 
 const SkinCheckSessionContext = createContext<SkinCheckSessionContextValue | null>(null);
@@ -47,12 +56,17 @@ export function SkinCheckSessionProvider({ children }: { children: ReactNode }) 
   const [session, setSession] = useState<SkinCheckSession | null>(null);
   const [threads, setThreads] = useState<EchoThreads>(EMPTY_THREADS);
 
-  function setThreadMessages(region: EchoRegion, messages: EchoThreadMessage[]) {
-    setThreads((prev) => ({ ...prev, [region]: messages }));
+  // Threads belong to one scan: Echo's facts and each thread's historyToken
+  // are bound to scanId server-side, so a new scan starts every thread fresh.
+  const sessionScanId = session?.scanId;
+  useEffect(() => setThreads(EMPTY_THREADS), [sessionScanId]);
+
+  function setThread(region: EchoRegion, thread: EchoThread) {
+    setThreads((prev) => ({ ...prev, [region]: thread }));
   }
 
   return (
-    <SkinCheckSessionContext.Provider value={{ session, setSession, threads, setThreadMessages }}>
+    <SkinCheckSessionContext.Provider value={{ session, setSession, threads, setThread }}>
       {children}
     </SkinCheckSessionContext.Provider>
   );

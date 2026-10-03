@@ -7,6 +7,8 @@
 // photo statistics. Uncertainty is "unknown" until a calibration table exists.
 // Changing ANY mapping below requires a new contract version; old mappings stay.
 
+import { scanAnalysisDocId } from "./scan-analysis-record";
+
 export const SKIN_STATE_CONTRACT_VERSION = "skinstate-1";
 
 /** Region keys defined by skinstate-1 (§4). Anything else needs a new contract version. */
@@ -159,14 +161,36 @@ function legacyReading(record: Obj): LegacyReading {
   };
 }
 
+// One Firestore path segment: conservative charset, never "." / "..".
+const SEGMENT = /^[A-Za-z0-9._-]{1,128}$/;
+export const isSegment = (v: unknown): v is string => typeof v === "string" && SEGMENT.test(v) && !/^\.+$/.test(v);
+const SHA256_HEX = /^[0-9a-f]{64}$/;
+const invalid = (reason: string): SkinStateResult => ({ kind: "invalid", reasons: [reason] });
+
 /**
- * skinstate-1. `analysisRef` is the scanAnalyses document path (the record
- * does not contain its own uid/path). Pure: same input → same output.
+ * skinstate-1. `analysisRef` is the document path the record was read from
+ * (the record does not contain its own uid/path); `expectedUid` is the
+ * authenticated owner. Trust comes from the PATH, never from `record.source`:
+ * a browser-written skinChecks doc can claim anything. This function cannot
+ * prove where the bytes came from — lib/skin-state-loader.ts can.
+ * Pure: same input → same output.
  */
-export function toSkinState(record: unknown, analysisRef: string): SkinStateResult {
+export function toSkinState(record: unknown, analysisRef: string, expectedUid: string): SkinStateResult {
+  if (!isSegment(expectedUid)) return invalid("expectedUid: missing or not a valid path segment");
+  const segs = typeof analysisRef === "string" ? analysisRef.split("/") : [];
+  if (segs.length !== 4 || segs[0] !== "users" || !segs.every(isSegment)) {
+    return invalid("analysisRef: not of the form users/{uid}/{collection}/{docId}");
+  }
+  const [, uid, collection, docId] = segs as [string, string, string, string];
+  if (uid !== expectedUid) return invalid("analysisRef: belongs to a different user");
   if (!isObj(record)) return { kind: "invalid", reasons: ["record is not an object"] };
-  if (isLegacy(record)) return legacyReading(record);
-  if (record.source !== "server") return { kind: "invalid", reasons: ["source is not \"server\" and no legacy result present"] };
+  if (collection === "skinChecks") {
+    // Client-written: shown as a legacy display at most, never a SkinState.
+    if (record.source === "server") return invalid("skinChecks record claims source \"server\" (forged)");
+    return isLegacy(record) ? legacyReading(record) : invalid("skinChecks record has no legacy result");
+  }
+  if (collection !== "scanAnalyses") return invalid(`analysisRef: collection "${collection}" is not a SkinState source`);
+  if (record.source !== "server") return { kind: "invalid", reasons: ["scanAnalyses record source is not \"server\""] };
   if (record.schemaVersion !== 1) return { kind: "invalid", reasons: [`unsupported record schemaVersion ${String(record.schemaVersion)}`] };
   // The gate-01 builder writes `<field>_json` only if a field had nested
   // arrays — never for valid engine output. Its presence means the record
@@ -179,9 +203,12 @@ export function toSkinState(record: unknown, analysisRef: string): SkinStateResu
   const requestId = rd.str(record, "requestId", "record");
   const sha = rd.str(record, "inputSha256", "record");
   const pipelineVersion = rd.str(record, "pipeline_version", "record");
+  if (sha && !SHA256_HEX.test(sha)) rd.reasons.push("record.inputSha256: not 64 lowercase hex");
+  else if (scanId && sha && docId !== scanAnalysisDocId(scanId, sha)) {
+    rd.reasons.push("analysisRef: docId does not match scanAnalysisDocId(scanId, inputSha256)");
+  }
   const analyzedAt = toIso(record.createdAt);
   if (!analyzedAt) rd.reasons.push("record.createdAt: missing or not a timestamp");
-  if (!analysisRef) rd.reasons.push("analysisRef: missing");
 
   const regionKeys = record.regions;
   if (!Array.isArray(regionKeys) || !regionKeys.every((k) => typeof k === "string")) {

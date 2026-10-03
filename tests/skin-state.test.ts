@@ -3,7 +3,8 @@ import { toSkinState, type SkinState } from "@/lib/skin-state";
 
 import { A_EDGES, CLIP, COUNTS, CV_EDGES, regionHist, regionRaw, syntheticAnalysis } from "./synthetic-scan";
 
-const REF = "users/SYNTH_UID/scanAnalyses/SYNTHSCAN01_aaaaaaaaaaaaaaaa";
+const UID = "SYNTH_UID";
+const REF = `users/${UID}/scanAnalyses/SYNTHSCAN01_aaaaaaaaaaaaaaaa`;
 
 /** Shaped exactly like a gate-01 `scanAnalyses` record today: corrected path only, aliases present. */
 function productionRecord(): Record<string, unknown> {
@@ -39,7 +40,7 @@ const availableRegion = (px: number) => ({
 
 describe("skinstate-1: complete / current production scan", () => {
   it("matches the frozen contract exactly (§3–§8, example 11.1 shape)", () => {
-    const state = ok(toSkinState(productionRecord(), REF));
+    const state = ok(toSkinState(productionRecord(), REF, UID));
     expect(state).toEqual({
       contractVersion: "skinstate-1",
       identity: { analysisRef: REF, scanId: "SYNTHSCAN01" },
@@ -73,8 +74,8 @@ describe("skinstate-1: complete / current production scan", () => {
   it("is deterministic and does not mutate its input", () => {
     const record = productionRecord();
     const before = JSON.stringify(record);
-    const a = JSON.stringify(toSkinState(record, REF));
-    const b = JSON.stringify(toSkinState(record, REF));
+    const a = JSON.stringify(toSkinState(record, REF, UID));
+    const b = JSON.stringify(toSkinState(record, REF, UID));
     expect(a).toBe(b);
     expect(JSON.stringify(record)).toBe(before);
   });
@@ -82,7 +83,7 @@ describe("skinstate-1: complete / current production scan", () => {
   it("never turns proxies into measurements: no score/band/skin-concept keys or score values in the output", () => {
     const record = productionRecord();
     record.scores = { redness: 0.7777, oiliness: 0.7777, texture: 0.7777, pores: 0.7777, blemishes: 0.7777, hydration: 0.7777, pigment: 0.7777 };
-    const state = ok(toSkinState(record, REF));
+    const state = ok(toSkinState(record, REF, UID));
     expect(JSON.stringify(state)).not.toContain("0.7777");
     // Metric NAMES legitimately appear in provenance (engine.scoreTypes,
     // deprecatedSourceFields); the measurement sections must carry none.
@@ -95,14 +96,14 @@ describe("skinstate-1: complete / current production scan", () => {
   it("preserves provenance: recovery marker, Firestore Timestamp, capture method", () => {
     const record = { ...productionRecord(), persistAttempt: "recovery", captureMethod: "canvas",
       createdAt: { toDate: () => new Date("2026-10-11T00:00:00Z") } };
-    const state = ok(toSkinState(record, REF));
+    const state = ok(toSkinState(record, REF, UID));
     expect(state.provenance.persistAttempt).toBe("recovery");
     expect(state.provenance.analyzedAt).toBe("2026-10-11T00:00:00.000Z");
     expect(state.input.captureMethod).toBe("canvas");
   });
 
   it("does not trust unknown capture methods or markers", () => {
-    const state = ok(toSkinState({ ...productionRecord(), captureMethod: "screenshot", persistAttempt: "forged" }, REF));
+    const state = ok(toSkinState({ ...productionRecord(), captureMethod: "screenshot", persistAttempt: "forged" }, REF, UID));
     expect(state.input.captureMethod).toBeNull();
     expect(state.provenance.persistAttempt).toBe("primary");
   });
@@ -112,7 +113,7 @@ describe("skinstate-1: missing region", () => {
   it("pixelCount 0 → absent_region with null values, never the engine's 0.0 stats", () => {
     const record = productionRecord();
     (record.region_raw_corrected as Record<string, unknown>).chin = { ...regionRaw(0), lab_a_mean: 0, specular_frac: 0 };
-    const state = ok(toSkinState(record, REF));
+    const state = ok(toSkinState(record, REF, UID));
     expect(state.regions.chin).toEqual({ status: "absent_region", pixelCount: 0, colour: null, texture: null, specular: null });
     expect(state.quality.lowPixelCount.chin).toBe(true);
     expect(state.regions.forehead?.status).toBe("available");
@@ -121,7 +122,7 @@ describe("skinstate-1: missing region", () => {
   it("low pixel count is DERIVED in quality, never a reason to drop or alter values", () => {
     const record = productionRecord();
     (record.region_raw_corrected as Record<string, unknown>).nose = regionRaw(1500);
-    const state = ok(toSkinState(record, REF));
+    const state = ok(toSkinState(record, REF, UID));
     expect(state.quality.lowPixelCount.nose).toBe(true);
     expect(state.regions.nose).toEqual(availableRegion(1500));
   });
@@ -133,7 +134,7 @@ describe("skinstate-1: legacy scan", () => {
       schemaVersion: 1, scanId: "LEGACY01", status: "completed", answers: { name: "x" },
       result: { scores: { redness: 0.5 }, region_scores: { cheeks: { redness: 0.5 } }, regions: ["cheeks"], pipeline_version: "scan-0.1.3-provisional" },
     };
-    expect(toSkinState(legacy, "users/U/skinChecks/LEGACY01")).toEqual({
+    expect(toSkinState(legacy, "users/U/skinChecks/LEGACY01", "U")).toEqual({
       kind: "legacy_display", pipelineVersion: "scan-0.1.3-provisional",
       scores: { redness: 0.5 }, region_scores: { cheeks: { redness: 0.5 } },
       label: "client-reported legacy reading; not a SkinState",
@@ -142,7 +143,7 @@ describe("skinstate-1: legacy scan", () => {
 
   it("is never silently upgraded, even if the legacy result happens to carry raw fields", () => {
     const legacy = { schemaVersion: 1, result: { ...productionRecord(), source: undefined } };
-    expect(toSkinState(legacy, "users/U/skinChecks/X").kind).toBe("legacy_display");
+    expect(toSkinState(legacy, "users/U/skinChecks/X", "U").kind).toBe("legacy_display");
   });
 });
 
@@ -165,21 +166,21 @@ describe("skinstate-1: malformed raw data → invalid, never patched", () => {
   it.each(cases)("%s", (_name, mutate, reason) => {
     const record = structuredClone(productionRecord());
     mutate(record);
-    const result = toSkinState(record, REF);
+    const result = toSkinState(record, REF, UID);
     expect(result.kind).toBe("invalid");
     expect((result as { reasons: string[] }).reasons.join("\n")).toMatch(reason);
   });
 
   it("rejects a non-object and a record that is neither server nor legacy", () => {
-    expect(toSkinState(null, REF).kind).toBe("invalid");
-    expect(toSkinState({ source: "client" }, REF).kind).toBe("invalid");
+    expect(toSkinState(null, REF, UID).kind).toBe("invalid");
+    expect(toSkinState({ source: "client" }, REF, UID).kind).toBe("invalid");
   });
 });
 
 describe("skinstate-1: unknown uncertainty", () => {
   it("is always unknown — never derived from pixel counts, scores or anything in the record", () => {
     const record = { ...productionRecord(), uncertainty: { sem: 1 }, region_low_confidence: { forehead: true } };
-    const state = ok(toSkinState(record, REF));
+    const state = ok(toSkinState(record, REF, UID));
     expect(state.uncertainty).toEqual({ policy: "unknown", calibrationId: null, fields: { "*": { status: "unknown" } } });
   });
 });
@@ -196,7 +197,7 @@ describe("skinstate-1: future engine version", () => {
       region_raw_native: native, region_hist_native: hist,
       region_hist_bin_edges_native: { lab_a_hist: A_EDGES, color_var_hist: CV_EDGES },
     });
-    const state = ok(toSkinState(record, REF));
+    const state = ok(toSkinState(record, REF, UID));
     expect(state.engine).toMatchObject({ pipelineVersion: "scan-0.2.0", build: null, landmarkModel: null, opencvVersion: null, statsPath: "both" });
     expect(Object.keys(state.regions)).toEqual(["forehead", "nose", "chin", "cheek_image_left", "cheek_image_right"]);
     const left = state.regions.cheek_image_left;
@@ -216,7 +217,7 @@ describe("skinstate-1: gate-04 fields (engine_build, captureMethod, native stats
     delete absent.region_hist_native;
     delete absent.region_hist_bin_edges_native;
     for (const record of [productionRecord(), absent]) {
-      const state = ok(toSkinState(record, REF));
+      const state = ok(toSkinState(record, REF, UID));
       expect(state.engine).toMatchObject({ build: null, statsPath: "corrected" });
       expect(state.input.captureMethod).toBeNull();
       expect(state.regions.cheeks?.status === "available" && state.regions.cheeks.colour.native).toBeNull();
@@ -225,6 +226,52 @@ describe("skinstate-1: gate-04 fields (engine_build, captureMethod, native stats
 
   it("a stored engine_build is NOT surfaced: skinstate-1 is frozen with no source key for engine.build", () => {
     const withBuild = { ...productionRecord(), engine_build: "sha-synthetic0000" };
-    expect(toSkinState(withBuild, REF)).toEqual(toSkinState(productionRecord(), REF));
+    expect(toSkinState(withBuild, REF, UID)).toEqual(toSkinState(productionRecord(), REF, UID));
+  });
+});
+
+describe("skinstate-1: trust comes from the path, not record.source (gate 02)", () => {
+  const invalid = (r: ReturnType<typeof toSkinState>) => expect(r.kind).toBe("invalid");
+
+  it("a skinChecks doc claiming source \"server\" with full raw fields is invalid, never a SkinState", () => {
+    const result = toSkinState(productionRecord(), `users/${UID}/skinChecks/SYNTHSCAN01_aaaaaaaaaaaaaaaa`, UID);
+    expect(result).toEqual({ kind: "invalid", reasons: [expect.stringMatching(/forged/)] });
+  });
+
+  it("a skinChecks doc without a legacy result is invalid", () => {
+    invalid(toSkinState({ schemaVersion: 1, scanId: "X", status: "pending" }, `users/${UID}/skinChecks/X`, UID));
+  });
+
+  it("a legacy record passed with a scanAnalyses-looking ref is invalid", () => {
+    const legacy = { schemaVersion: 1, scanId: "LEGACY01", result: { scores: { redness: 0.5 } } };
+    invalid(toSkinState(legacy, `users/${UID}/scanAnalyses/LEGACY01_aaaaaaaaaaaaaaaa`, UID));
+  });
+
+  it("a server record under a docId for a different scanId or input is invalid", () => {
+    for (const docId of ["OTHERSCAN_aaaaaaaaaaaaaaaa", "SYNTHSCAN01_bbbbbbbbbbbbbbbb"]) {
+      const result = toSkinState(productionRecord(), `users/${UID}/scanAnalyses/${docId}`, UID);
+      expect((result as { reasons: string[] }).reasons).toContain("analysisRef: docId does not match scanAnalysisDocId(scanId, inputSha256)");
+    }
+  });
+
+  it("rejects an inputSha256 that is not 64 lowercase hex", () => {
+    const result = toSkinState({ ...productionRecord(), inputSha256: "A".repeat(64) }, `users/${UID}/scanAnalyses/SYNTHSCAN01_AAAAAAAAAAAAAAAA`, UID);
+    expect((result as { reasons: string[] }).reasons).toContain("record.inputSha256: not 64 lowercase hex");
+  });
+
+  it.each([
+    "", "users/u/scanAnalyses", "users/u/scanAnalyses/a/b", "users//scanAnalyses/x", "users/../scanAnalyses/x",
+    "/users/u/scanAnalyses/x", "users/u/scanAnalyses/x ", "other/u/scanAnalyses/x", "users/u/otherCollection/x",
+  ])("malformed analysisRef %j → invalid", (ref) => {
+    invalid(toSkinState(productionRecord(), ref, "u"));
+  });
+
+  it("a cross-user reference is invalid", () => {
+    invalid(toSkinState(productionRecord(), "users/user-b/scanAnalyses/SYNTHSCAN01_aaaaaaaaaaaaaaaa", "user-a"));
+  });
+
+  it("an empty or malformed expectedUid is invalid", () => {
+    invalid(toSkinState(productionRecord(), REF, ""));
+    invalid(toSkinState(productionRecord(), "users/../scanAnalyses/SYNTHSCAN01_aaaaaaaaaaaaaaaa", ".."));
   });
 });

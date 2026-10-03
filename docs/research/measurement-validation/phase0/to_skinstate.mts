@@ -3,6 +3,7 @@
 // The record wrapper mirrors the gate-01 scanAnalyses shape; identity fields are bench placeholders.
 import { readFileSync, writeFileSync } from "node:fs";
 import { toSkinState } from "../../../../lib/skin-state";
+import { scanAnalysisDocId } from "../../../../lib/scan-analysis-record";
 
 const dir = "docs/research/measurement-validation/phase0/results";
 const { rows } = JSON.parse(readFileSync(`${dir}/matrix.json`, "utf8"));
@@ -13,7 +14,7 @@ const out = rows.map((r: any) => {
     inputSha256: r.transmittedSha256, captureMethod: "native", createdAt: "2026-10-03T00:00:00.000Z",
     ...resp,
   };
-  const s = toSkinState(record, `bench/${r.variant}`);
+  const s = toSkinState(record, `users/bench/scanAnalyses/${scanAnalysisDocId(record.scanId, record.inputSha256)}`, "bench");
   if (s.kind !== "skinstate") throw new Error(`${r.variant}: ${JSON.stringify(s)}`);
   return { variant: r.variant, skinState: s.state };
 });

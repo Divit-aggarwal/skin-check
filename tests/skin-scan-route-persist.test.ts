@@ -196,7 +196,7 @@ describe("gate 04: native stats, engine build and capture method reach the recor
     });
 
     // createdAt is a serverTimestamp() sentinel here; Firestore returns a Timestamp.
-    const result = toSkinState({ ...data, createdAt: new Date("2026-10-10T10:00:00Z") }, path);
+    const result = toSkinState({ ...data, createdAt: new Date("2026-10-10T10:00:00Z") }, path, "verified-uid");
     if (result.kind !== "skinstate") throw new Error(JSON.stringify(result));
     expect(result.state.input.captureMethod).toBe("native");
     expect(result.state.engine.statsPath).toBe("both");

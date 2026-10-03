@@ -50,6 +50,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, answers }: Skin
     if (scan.status !== "success") return;
     const { bands } = runSkinCheckRules(scan.result);
     setSession({
+      scanId,
       answers,
       result: scan.result,
       composite: summarizeConcerns(scan.result.scores, bands),
@@ -59,7 +60,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, answers }: Skin
       retentionConsentVersion: scan.retentionConsentVersion,
       captureMethod: scan.captureMethod,
     });
-  }, [scan, answers, setSession]);
+  }, [scan, scanId, answers, setSession]);
 
   // Picks the initial tab once per scan, then leaves it alone — the user's
   // own clicks own it after that. Resets on retake/error so a stale category

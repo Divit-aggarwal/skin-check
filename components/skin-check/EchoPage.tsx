@@ -8,7 +8,7 @@ import { ChevronLeft } from "lucide-react";
 import { TypingIndicator } from "@/components/primitives/TypingIndicator";
 import { EchoBubble } from "./EchoBubble";
 import { EchoMark } from "./EchoMark";
-import { useSkinCheckSession, type EchoThreadMessage } from "@/lib/skin-check-session-context";
+import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getSkinCheckChatReply, ApiError } from "@/lib/api";
 import { bandScores } from "@/lib/skin-check-rules";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
@@ -46,7 +46,7 @@ let messageSeq = 0;
 // Echo in, so this shows a way back to /skin-check instead of a blind chat.
 export function EchoPage() {
   const searchParams = useSearchParams();
-  const { session, threads, setThreadMessages } = useSkinCheckSession();
+  const { session, threads, setThread } = useSkinCheckSession();
 
   const regionParam = searchParams.get("region");
   const [activeRegion, setActiveRegion] = useState<EchoRegion>(isEchoRegion(regionParam) ? regionParam : "forehead");
@@ -56,12 +56,14 @@ export function EchoPage() {
   // request, not a message Echo said. The old version pushed a role:"echo"
   // error string into thread history, which meant it got replayed back to
   // Gemini as a model turn on the next send (context pollution) and gave the
-  // user no way to retry without retyping. `retryMessages` is the exact
-  // history that failed to send, so Retry resends it verbatim instead of
-  // reconstructing it (which could silently drop or reorder the failed turn).
+  // user no way to retry without retyping. `retryBefore` (the thread and its
+  // historyToken from BEFORE the failed turn) plus `retryMessage` are exactly
+  // what failed to send, so Retry resends them verbatim instead of
+  // reconstructing them (which could silently drop or reorder the failed turn).
   const [sendError, setSendError] = useState<{
     region: EchoRegion;
-    retryMessages: EchoThreadMessage[];
+    retryBefore: EchoThread;
+    retryMessage: EchoThreadMessage;
     retryable: boolean;
   } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -69,7 +71,7 @@ export function EchoPage() {
   // Aborts any in-flight /api/skin-check/chat request when this page
   // unmounts (user taps "Back to Skin Check", or navigates away entirely,
   // while Echo is still thinking) — without this, the fetch resolves after
-  // unmount and calls setThreadMessages/setSendError on a component that's
+  // unmount and calls setThread/setSendError on a component that's
   // gone. One controller at a time matches sendingRegion's own one-in-flight
   // invariant (sendToEcho refuses to start a second request).
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -77,7 +79,7 @@ export function EchoPage() {
     return () => abortControllerRef.current?.abort();
   }, []);
 
-  const messages = threads[activeRegion];
+  const messages = threads[activeRegion].messages;
   const isThinking = sendingRegion === activeRegion;
   const activeError = sendError?.region === activeRegion ? sendError : null;
 
@@ -109,11 +111,11 @@ export function EchoPage() {
   const regionBands = regionScores ? bandScores(regionScores).bands : null;
   const activeSession = session; // fresh const so the closure below keeps the non-null narrowing
 
-  // Shared by a fresh send and a Retry — `nextMessages` already has the
-  // user's turn appended (or, on retry, is exactly what failed last time),
+  // Shared by a fresh send and a Retry — `before` is the thread (and its
+  // historyToken) prior to `userMessage`, which the caller has already shown,
   // so this never re-adds a user message and never duplicates a request:
   // sendingRegion gates both entry points the same way.
-  async function sendToEcho(region: EchoRegion, nextMessages: EchoThreadMessage[]) {
+  async function sendToEcho(region: EchoRegion, before: EchoThread, userMessage: EchoThreadMessage) {
     if (sendingRegion) return;
     setSendError(null);
     setSendingRegion(region);
@@ -122,22 +124,32 @@ export function EchoPage() {
     abortControllerRef.current = controller;
 
     try {
-      const history = nextMessages.map((m) => ({ role: m.role, text: m.text }));
-      const focusScores = activeSession.result.region_scores[region];
-      const reply = await getSkinCheckChatReply(
+      // Only the scan's id and the thread go up — the server loads this
+      // scan's scores and answers itself.
+      const history = before.messages.map((m) => ({ role: m.role, text: m.text }));
+      const { reply, historyToken } = await getSkinCheckChatReply(
+        activeSession.scanId,
+        region,
         history,
-        activeSession.answers,
-        activeSession.result.scores,
-        focusScores ? { region: ECHO_REGION_LABELS[region], scores: focusScores } : null,
+        before.historyToken,
+        userMessage.text,
         controller.signal
       );
       if (controller.signal.aborted) return; // unmounted mid-request — nothing left to update
-      setThreadMessages(region, [...nextMessages, { id: messageSeq++, role: "echo", text: reply }]);
+      setThread(region, {
+        messages: [...before.messages, userMessage, { id: messageSeq++, role: "echo", text: reply }],
+        historyToken,
+      });
     } catch (err) {
       if (controller.signal.aborted) return;
       console.error("Echo region chat failed:", err instanceof Error ? err.message : err);
-      const misconfigured = err instanceof ApiError && err.code === "CHAT_MISCONFIGURED";
-      setSendError({ region, retryMessages: nextMessages, retryable: !misconfigured });
+      const code = err instanceof ApiError ? err.code : undefined;
+      // The server no longer vouches for this thread's history (e.g. a key
+      // rotation) — start the thread over from the failed turn so Retry can
+      // succeed instead of failing the same way forever.
+      const retryBefore = code === "CHAT_HISTORY_INVALID" ? { messages: [], historyToken: null } : before;
+      if (retryBefore !== before) setThread(region, { messages: [userMessage], historyToken: null });
+      setSendError({ region, retryBefore, retryMessage: userMessage, retryable: code !== "CHAT_MISCONFIGURED" });
     } finally {
       if (!controller.signal.aborted) setSendingRegion(null);
       if (abortControllerRef.current === controller) abortControllerRef.current = null;
@@ -149,15 +161,16 @@ export function EchoPage() {
     if (!text || sendingRegion) return;
 
     const region = activeRegion;
-    const nextMessages: EchoThreadMessage[] = [...threads[region], { id: messageSeq++, role: "user", text }];
-    setThreadMessages(region, nextMessages);
+    const before = threads[region];
+    const userMessage: EchoThreadMessage = { id: messageSeq++, role: "user", text };
+    setThread(region, { ...before, messages: [...before.messages, userMessage] });
     setDraft("");
-    void sendToEcho(region, nextMessages);
+    void sendToEcho(region, before, userMessage);
   }
 
   function handleRetry() {
     if (!activeError || sendingRegion) return;
-    void sendToEcho(activeError.region, activeError.retryMessages);
+    void sendToEcho(activeError.region, activeError.retryBefore, activeError.retryMessage);
   }
 
   return (
