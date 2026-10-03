@@ -45,8 +45,13 @@ describe("longitudinal tables are test-only", () => {
   });
 
   it("no file outside tests/ and the shared shape writes a noise-table row", () => {
-    const rows = SOURCES.filter((f) => !f.startsWith(join("lib", "contracts")) && readFileSync(f, "utf8").includes("mdc95ByToneBand:"));
+    const rows = SOURCES.filter((f) => !f.startsWith(join("lib", "contracts")) && /mdc95ByToneBand\s*:/.test(readFileSync(f, "utf8")));
     expect(rows).toEqual([]);
+  });
+
+  it("while nothing is wired, no file outside lib/longitudinal imports the engine (closes alias, spread and .call bypasses)", () => {
+    const importers = SOURCES.filter((f) => !f.startsWith(join("lib", "longitudinal")) && /longitudinal\/engine/.test(readFileSync(f, "utf8")));
+    expect(importers).toEqual([]);
   });
 
   it("the argument counter sees a fourth argument (positive control)", () => {

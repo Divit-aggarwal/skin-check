@@ -3,7 +3,7 @@
 // Answers one question: may field F in region R of scan A be compared with
 // the same field and region of scan B? The answer is "comparable" or
 // "not_comparable" with named reasons. It never outputs a difference, a
-// percentage or a direction, and it reads only SkinState (skinstate-1).
+// percentage or a direction, and it reads only SkinState (skinstate-1 or skinstate-2).
 //
 // Fails closed: a null key part is a reason, and a quantity not listed in the
 // COMPARABLE table (LONGITUDINAL_METHOD §2) is a reason. The client capture

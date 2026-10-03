@@ -108,12 +108,14 @@ export function longitudinalResult(
   region: SkinStateRegionKey,
   tables: Tables = {},
 ): LongitudinalResult {
-  const noiseTable = tables.noise ?? NOISE_TABLE;
+  // Own properties only: a polluted Object.prototype can never supply a table.
+  const own = <K extends keyof Tables>(k: K): Tables[K] | undefined => (Object.prototype.hasOwnProperty.call(tables, k) ? tables[k] : undefined);
+  const noiseTable = own("noise") ?? NOISE_TABLE;
   // ponytail: tests/comparability.test.ts lets no file outside tests/ hand a table to compareStates/compareKeys,
   // so the engine always calls them with the production default and applies a TEST-ONLY comparable table
   // here: it can only lift quantity_not_validated, by the same rule as lib/comparability.ts. Request to main:
   // allow this file to forward `tables.comparable`, then delete `reasonsOf`'s table check.
-  const testComparable = tables.comparable ?? [];
+  const testComparable = own("comparable") ?? [];
   const reasonsOf = (v: ComparabilityVerdict, a: ComparabilityKey, b: ComparabilityKey): NotComparableReason[] => {
     const reasons = v.verdict === "comparable" ? [] : v.reasons;
     const validated = a.pipelineVersion !== null && a.pipelineVersion === b.pipelineVersion &&
@@ -145,7 +147,9 @@ export function longitudinalResult(
 
   // 1. Bad raw data: no partial answer.
   const noPair = (k: ComparabilityKey): Comparability => asComparability(reasonsOf(compareKeys(k, k), k, k), k);
-  if (series.some((e) => e.kind === "invalid")) {
+  // The same record twice would let one physical scan fill the baseline: refuse it as bad input.
+  const refs = series.flatMap((e) => (e.kind === "skinstate" ? [e.state.identity.analysisRef] : []));
+  if (series.some((e) => e.kind === "invalid") || new Set(refs).size !== refs.length) {
     return notEnough(new Set<NotEnoughEvidenceReasonCode>(["bad_raw_data"]), insufficient(0), noPair(unknownKey(quantity, region)), unknownFloor, emptyDetail());
   }
 
@@ -199,7 +203,7 @@ export function longitudinalResult(
     if (noise.value !== null && Math.max(...(baseValues as number[])) - Math.min(...(baseValues as number[])) > noise.value) codes.add("conflicting_scans");
   } else if (established && !isHistogram(quantity)) {
     // Comparable states with an unreadable scalar: refuse rather than guess.
-    return notEnough(new Set<NotEnoughEvidenceReasonCode>(["bad_raw_data"]), baseline, comparability, unknownFloor, emptyDetail());
+    return notEnough(new Set<NotEnoughEvidenceReasonCode>(["bad_raw_data"]), insufficient(0), noPair(unknownKey(quantity, region)), unknownFloor, emptyDetail());
   }
 
   // 11. Pairwise only when nothing above stood in the way.
@@ -207,10 +211,10 @@ export function longitudinalResult(
   if (blocking || !established || comparability.verdict !== "comparable" || noise.floor.status !== "known" || noise.value === null || detail.difference === null) {
     return notEnough(codes, baseline, comparability, noise.floor, detail);
   }
-  const refs = detail.baselineAnalysisRefs as [string, string, ...string[]];
+  const baselineRefs = detail.baselineAnalysisRefs as [string, string, ...string[]];
   const pairwise = {
     ...common, evidence: "pairwise" as const, confounders: [...CONFOUNDERS] as [ConfounderCode, ...ConfounderCode[]],
-    detail: { ...detail, baselineAnalysisRefs: refs },
+    detail: { ...detail, baselineAnalysisRefs: baselineRefs },
     compared: { baseline: { rule: "first_3_comparable_scans" as const, status: "established" as const, scans: 3 as const }, latest: "latest_comparable_scan" as const },
     comparability, noiseFloor: noise.floor,
   };

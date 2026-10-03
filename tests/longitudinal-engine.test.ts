@@ -117,7 +117,12 @@ describe("the brief's cases, with test-only tables", () => {
     expect(r).toMatchObject({ evidence: "pairwise", change: "beyond_noise", passedNoiseFloor: true });
     expect(codes(r)).toEqual(["beyond_noise", "persistence_not_available"]);
     if (r.evidence !== "pairwise") throw new Error("pairwise expected");
-    expect(r.confounders).toEqual([...CONFOUNDERS]);
+    // LONGITUDINAL_METHOD §5, in that order (a literal, so a dropped or reordered code fails).
+    expect(r.confounders).toEqual([
+      "lighting_or_background", "device_or_capture_path", "camera_distance", "makeup", "occlusion",
+      "menstrual_cycle", "season", "stress_or_sleep", "regression_to_the_mean", "settling_after_starting",
+    ]);
+    expect(CONFOUNDERS).toEqual(r.confounders);
     expect(r.noiseFloor).toEqual({ status: "known", calibrationId: "cal-test", noiseTableVersion: "noise-test", toneBandPolicy: "most_conservative" });
     expect(r.compared.baseline).toEqual({ rule: "first_3_comparable_scans", status: "established", scans: 3 });
     expect(r.comparability.key).toMatchObject({ contractVersion: "skinstate-2", engineBuild: A, captureMethod: "native" });
@@ -218,6 +223,51 @@ describe("the brief's cases, with test-only tables", () => {
     expect(codes(run(CASES.beyond!.s(), { ...TEST, noise: [zero] }))).toEqual(["noise_table_empty"]);
   });
 
+  it.each([["px: 0", { px: 0 }], ["low pixel count", { px: 1000 }], ["unknown capture method", { capture: null }], ["no native stats", { native: false }]] as const)(
+    "a baseline scan unusable on its own (%s) is skipped and the next one is used", (_, bad) => {
+      const s = [scan({ day: 1, value: 55 }), scan({ day: 2, value: 55, ...bad }), scan({ day: 3, value: 55 }), scan({ day: 4, value: 55 }), scan({ day: 10, value: 60 })];
+      const r = run(s, TEST);
+      expect(r).toMatchObject({ evidence: "pairwise", change: "beyond_noise" });
+      expect(r.detail.baselineAnalysisRefs.map((ref) => ref.match(/scan-\d+/)![0])).toEqual(["scan-1", "scan-3", "scan-4"]);
+    });
+
+  it("a baseline scan with a different capture method is not skipped: not_comparable", () => {
+    const s = [scan({ day: 1 }), scan({ day: 2, capture: "canvas" }), scan({ day: 3 }), scan({ day: 4 }), scan({ day: 10 })];
+    const r = run(s, TEST);
+    expect(codes(r)).toContain("not_comparable");
+    expect(ncReasons(r)).toContain("capture_method_differs");
+  });
+
+  it("the same record twice is bad input: one physical scan never fills the baseline", () => {
+    const one = scan({ day: 1, value: 55 });
+    const r = run([one, one, one, scan({ day: 10, value: 60 })], TEST);
+    expect(codes(r)).toEqual(["bad_raw_data"]);
+  });
+
+  it("comparable states with an unreadable scalar give bad_raw_data in the step-1 shape", () => {
+    const s = CASES.beyond!.s();
+    const broken = JSON.parse(JSON.stringify(s[3])) as SkinState2Result;
+    if (broken.kind !== "skinstate") throw new Error("fixture");
+    (broken.state.regions.forehead as unknown as { colour: { native: Record<string, unknown> } }).colour.native.lStarMean = "x";
+    const r = run([LEGACY, s[0]!, s[1]!, s[2]!, broken], TEST);
+    expect(codes(r)).toEqual(["bad_raw_data"]);
+    expect(r.compared.baseline).toEqual({ rule: "first_3_comparable_scans", status: "insufficient", scans: 0 });
+    expect(r.comparability.verdict).toBe("not_comparable");
+    expect(r.detail.baselineAnalysisRefs).toEqual([]);
+  });
+
+  it("a polluted Object.prototype cannot supply a table", () => {
+    const proto = Object.prototype as Record<string, unknown>;
+    proto.noise = TEST.noise;
+    proto.comparable = TEST.comparable;
+    try {
+      expect(run(CASES.beyond!.s()).evidence).toBe("not_enough_evidence");
+    } finally {
+      delete proto.noise;
+      delete proto.comparable;
+    }
+  });
+
   it("leading unknown-build scans are skipped as unusable, not counted and not a boundary", () => {
     const s = [scan({ day: 0, build: null }), ...CASES.beyond!.s()];
     expect(run(s, TEST)).toMatchObject({ evidence: "pairwise", change: "beyond_noise" });
@@ -315,6 +365,13 @@ describe("with the production (empty) tables every series is 'not enough evidenc
 describe("output wording and determinism", () => {
   // GEMINI_BOUNDARY §5 rules 3 and 4 (\p{Nd} digits; the change lexicon), plus a few more direction words.
   const BANNED = new RegExp(String.raw`\p{Nd}|%|\b(improv\w*|better|worse\w*|lower|higher|less|more|reduc\w*|increas\w*|decreas\w*|fade\w*|clear\w*|calm\w*|brighten\w*|even out|repair\w*|restor\w*|down|up|last time|before|since|progress\w*|pehle|kam|zyada|behtar|accha|gain\w*|loss|healthier|rise|drop\w*)\b`, "iu");
+
+  it("reason output order is the LongitudinalReasonCode declaration order", () => {
+    expect(Object.keys(REASON_TEXT)).toEqual([
+      "identical_scan", "within_noise", "beyond_noise", "noise_table_empty", "not_comparable", "engine_boundary",
+      "legacy_record", "bad_raw_data", "too_few_scans_for_baseline", "conflicting_scans", "persistence_not_available",
+    ]);
+  });
 
   it("no reason text contains a digit, a percentage or a direction word", () => {
     for (const text of Object.values(REASON_TEXT)) expect(text).not.toMatch(BANNED);

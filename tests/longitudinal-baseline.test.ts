@@ -51,6 +51,10 @@ describe("D01 baseline window", () => {
     expect(pickBaseline([st(1), st(2), st(3), st(4, "A", "scan-0.1.7-provisional")]).engineBoundary).toBe(true);
     const p = pickBaseline([st(1), st(2), st(3), st(4), st(5)], (s) => s.identity.scanId !== "s2");
     expect(days(p)).toEqual(["s1", "s3", "s4"]);
+    expect(p.engineBoundary).toBe(false);
+    // Skipping the A scans does not let the baseline start on B: B scans are candidates only by time.
+    const q = pickBaseline([st(1), st(2), st(3, "B"), st(4, "B"), st(5, "B"), st(6, "B")], (s) => s.engine.build !== "A");
+    expect(days(q)).toEqual(["s3", "s4", "s5"]);
   });
 
   it("ties on analyzedAt are ordered by analysisRef", () => {
