@@ -401,8 +401,9 @@ export async function POST(request: NextRequest) {
   if (formData.get("processingConsentVersion") !== PROCESSING_CONSENT_VERSION) {
     return NextResponse.json({ ok: true, result: parsed.data, persisted: false, reason: "consent_missing" });
   }
-  // The background recovery re-send carries the same consent; one entry per scan is enough.
-  if (!persistAttempt) await recordProcessingConsent(uid, scanId);
+  // Also on the recovery re-send: persistAttempt is client-asserted, so skipping
+  // here would let a record exist with no entry. A duplicate entry is harmless.
+  await recordProcessingConsent(uid, scanId);
   const persisted = await persistScanAnalysis(uid, scanId, image, parsed.data, captureMethod, persistAttempt, captureQuality);
   return NextResponse.json({ ok: true, result: parsed.data, persisted });
 }

@@ -91,9 +91,9 @@ describe("scan route: processing consent (R4)", () => {
     expect(String(create.mock.calls[0]![0])).toBe("users/verified-uid/consentLedger/auto");
   });
 
-  it("the recovery re-send writes the record but no second ledger entry", async () => {
+  it("a recovery re-send (client-asserted) still writes its ledger entry before the record", async () => {
     await post({ scanId: SCAN_ID, captureMethod: "native", processingConsentVersion: PROCESSING_CONSENT_VERSION, persistAttempt: "recovery" });
-    expect(writes("consentLedger")).toHaveLength(0);
+    expect(writes("consentLedger")).toHaveLength(1);
     expect(writes("scanAnalyses")).toHaveLength(1);
   });
 
