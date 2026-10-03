@@ -101,6 +101,32 @@ describe("under-18 memory", () => {
     expect(block).toContain('postAgeAttestation(token, "under-18")');
   });
 
+  it("an under-18 answer is confirmed before anything is recorded", () => {
+    const hook = readFileSync("lib/useSkinCheckFlow.ts", "utf8");
+    const nextFn = hook.slice(hook.indexOf("const next = useCallback("), hook.indexOf("const back = useCallback("));
+    const branch = nextFn.slice(nextFn.indexOf('answers.age === "under-18") {'), nextFn.indexOf("return;"));
+    expect(branch).toContain("setConfirmingUnder18(true);");
+    expect(nextFn).not.toContain("markUnder18Chosen");
+    expect(nextFn).not.toContain("postAgeAttestation");
+    expect(nextFn).not.toContain("setBlocked(true)");
+    // The only recording path is confirmUnder18(true); "No" clears the answer and returns first.
+    expect(hook.match(/markUnder18Chosen\(\);/g)).toHaveLength(1);
+    const confirm = hook.slice(hook.indexOf("const confirmUnder18 = useCallback("), hook.indexOf("const next = useCallback("));
+    const no = confirm.slice(confirm.indexOf("if (!confirmed) {"), confirm.indexOf("setDirection(1);"));
+    expect(no).toContain("delete rest.age;");
+    expect(no).toContain("return;");
+    expect(confirm.indexOf("if (!confirmed) {")).toBeLessThan(confirm.indexOf("markUnder18Chosen();"));
+  });
+
+  it("the flow asks the question and wires both answers", () => {
+    const flow = readFileSync("components/skin-check/SkinCheckFlow.tsx", "utf8");
+    expect(flow).toContain('<EchoBubble message="You chose under 18. Is that right?" />');
+    expect(flow).toContain("onClick={() => confirmUnder18(true)}");
+    expect(flow).toContain("onClick={() => confirmUnder18(false)}");
+    // Auto-advance must not re-enter next() while the question is open.
+    expect(flow).toContain("!s.confirmingUnder18 && s.isSectionComplete");
+  });
+
   it("the phone step attests through attestedAgeBucket", () => {
     const src = readFileSync("components/skin-check/inputs/PhoneAuthStep.tsx", "utf8");
     expect(src).toContain("attestedAgeBucket(answered)");

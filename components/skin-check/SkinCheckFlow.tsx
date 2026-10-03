@@ -51,6 +51,8 @@ export function SkinCheckFlow() {
     direction,
     complete,
     blocked,
+    confirmingUnder18,
+    confirmUnder18,
   } = useSkinCheckFlow();
 
   // Keyed by step id so a freshly revealed question can be scrolled into
@@ -98,14 +100,14 @@ export function SkinCheckFlow() {
   // reactStrictMode on) — cleanup fires, the effect re-enters, and an
   // identical `advanceSignal` short-circuits it, so the advance silently
   // never happens. Keeping `advanceSignal` as the only dependency avoids that.
-  const latest = useRef({ isSectionComplete, complete, blocked, next });
-  latest.current = { isSectionComplete, complete, blocked, next };
+  const latest = useRef({ isSectionComplete, complete, blocked, confirmingUnder18, next });
+  latest.current = { isSectionComplete, complete, blocked, confirmingUnder18, next };
 
   useEffect(() => {
     if (advanceSignal === 0) return;
     const t = setTimeout(() => {
       const s = latest.current;
-      if (!s.complete && !s.blocked && s.isSectionComplete) s.next();
+      if (!s.complete && !s.blocked && !s.confirmingUnder18 && s.isSectionComplete) s.next();
     }, AUTO_ADVANCE_DELAY_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -144,7 +146,28 @@ export function SkinCheckFlow() {
       </div>
 
       <AnimatePresence mode="wait" initial={false} custom={direction}>
-        {blocked ? (
+        {confirmingUnder18 ? (
+          <motion.div
+            key="confirm-under-18"
+            custom={direction}
+            variants={sectionSlideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
+            className="mx-auto flex max-w-xl flex-col gap-5 px-6 pb-10 pt-10"
+          >
+            <EchoBubble message="You chose under 18. Is that right?" />
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button type="button" variant="ink" size="lg" onClick={() => confirmUnder18(true)} className="flex-1">
+                Yes, I&apos;m under 18
+              </Button>
+              <Button type="button" variant="outlineLight" size="lg" onClick={() => confirmUnder18(false)} className="flex-1">
+                No, change my answer
+              </Button>
+            </div>
+          </motion.div>
+        ) : blocked ? (
           <motion.div
             key="blocked"
             custom={direction}

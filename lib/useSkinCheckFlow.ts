@@ -213,6 +213,9 @@ export function useSkinCheckFlow() {
   // every later universal-core question, from rendering at all for that
   // bucket; it is not a substitute for a real consent flow.
   const [blocked, setBlocked] = useState(false);
+  // An under-18 answer is sticky once recorded (decision 4), so the user
+  // confirms it first; a mis-tap is otherwise only fixable by support.
+  const [confirmingUnder18, setConfirmingUnder18] = useState(false);
   // True when this scan reuses a questionnaire the user already answered, so
   // only verify, photo and results are left to go through.
   const [reusing, setReusing] = useState(false);
@@ -442,6 +445,7 @@ export function useSkinCheckFlow() {
     setRevealCount(revealCountFor(SECTIONS[idx]!, reuse ?? {}));
     setComplete(false);
     setBlocked(false);
+    setConfirmingUnder18(false);
     setDirection(1);
     setSession(null);
   }, [answers, setSession, setScanId]);
@@ -506,15 +510,36 @@ export function useSkinCheckFlow() {
     return filled / eligibleSteps.length;
   }, [eligibleSteps, answers]);
 
+  /** The answer to "You chose under 18. Is that right?". No clears the age answer. */
+  const confirmUnder18 = useCallback(
+    (confirmed: boolean) => {
+      setConfirmingUnder18(false);
+      if (!confirmed) {
+        setAnswers((prev) => {
+          const rest = { ...prev };
+          delete rest.age;
+          return rest;
+        });
+        return;
+      }
+      setDirection(1);
+      if (answers.age === "under-18") {
+        // H02a: going back and picking another bucket must not undo this. The
+        // device remembers it for the attestation sent after sign-in, and a
+        // signed-in user's server record is written now (sticky, decision 4).
+        markUnder18Chosen();
+        if (user) void user.getIdToken().then((token) => postAgeAttestation(token, "under-18")).catch(() => undefined);
+        setBlocked(true);
+      }
+    },
+    [answers.age, user]
+  );
+
   const next = useCallback(() => {
     setDirection(1);
+    // Nothing is recorded until confirmUnder18(true).
     if (section.id === "about-you" && answers.age === "under-18") {
-      // H02a: going back and picking another bucket must not undo this. The
-      // device remembers it for the attestation sent after sign-in, and a
-      // signed-in user's server record is written now (sticky, decision 4).
-      markUnder18Chosen();
-      if (user) void user.getIdToken().then((token) => postAgeAttestation(token, "under-18")).catch(() => undefined);
-      setBlocked(true);
+      setConfirmingUnder18(true);
       return;
     }
     const idx = nextEligibleIndex(sectionIndex + 1, answers, reusing);
@@ -525,10 +550,14 @@ export function useSkinCheckFlow() {
     } else {
       setComplete(true);
     }
-  }, [section, sectionIndex, answers, reusing, user]);
+  }, [section, sectionIndex, answers, reusing]);
 
   const back = useCallback(() => {
     setDirection(-1);
+    if (confirmingUnder18) {
+      setConfirmingUnder18(false);
+      return;
+    }
     if (blocked) {
       setBlocked(false);
       return;
@@ -541,7 +570,7 @@ export function useSkinCheckFlow() {
     const prevSection = SECTIONS[idx]!;
     setSectionIndex(idx);
     setRevealCount(revealCountFor(prevSection, answers));
-  }, [blocked, complete, sectionIndex, answers, reusing]);
+  }, [confirmingUnder18, blocked, complete, sectionIndex, answers, reusing]);
 
   return {
     scanId,
@@ -560,12 +589,14 @@ export function useSkinCheckFlow() {
     revealTarget,
     isSectionComplete,
     sectionFill,
-    isFirst: sectionIndex === 0 && !complete && !blocked,
+    isFirst: sectionIndex === 0 && !complete && !blocked && !confirmingUnder18,
     next,
     back,
     direction,
     complete,
     blocked,
+    confirmingUnder18,
+    confirmUnder18,
     lastAnswerHints,
   };
 }
