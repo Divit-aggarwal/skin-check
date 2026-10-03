@@ -12,6 +12,7 @@ import type {
 import { inputSha256, matches, readInput, type Readings, type RulesInput } from "./input";
 import { safetyFrom } from "./safety";
 import {
+  ACTIVE_CLASSES,
   ACTIVE_PRODUCT,
   ACTIVE_TRIGGERS,
   BASE_CATEGORIES,
@@ -61,6 +62,8 @@ function unknownsFrom(readings: Readings): UnknownInput[] {
 
 export function recommend(input: RulesInput, catalogue: Catalogue): RecommendationResult {
   if (!RULES_ENABLED) throw new RulesDisabledError();
+  // Read the catalogue once, so the hash describes exactly what was used.
+  const { version: catalogVersion, products } = catalogue;
   const readings = readInput(input);
   const safety = safetyFrom(readings);
   const unknowns = unknownsFrom(readings);
@@ -108,9 +111,12 @@ export function recommend(input: RulesInput, catalogue: Catalogue): Recommendati
   const excluded: ExcludedOption[] = [];
   const filled = new Set<string>();
   const exclude = (p: Product, ruleId: string, reason: string) => excluded.push({ productId: p.id, ruleId, reason });
-  for (const p of catalogue.products) {
-    const isBase = (BASE_CATEGORIES as readonly string[]).includes(p.category);
-    const isActive = p.category === ACTIVE_PRODUCT.category && p.ingredientClasses.includes(ACTIVE_PRODUCT.ingredientClass);
+  for (const p of products) {
+    // The category alone is not trusted: a "moisturiser" with a retinoid is not base.
+    const activeClasses = p.ingredientClasses.filter((c) => (ACTIVE_CLASSES as readonly string[]).includes(c));
+    const isBase = (BASE_CATEGORIES as readonly string[]).includes(p.category) && p.active === null && activeClasses.length === 0;
+    const isActive =
+      p.category === ACTIVE_PRODUCT.category && activeClasses.length === 1 && activeClasses[0] === ACTIVE_PRODUCT.ingredientClass;
     if (p.availability !== "available") exclude(p, RULE_IDS.unavailable, COPY.excluded.unavailable);
     else if (p.contraindications.some((c) => matches(readings, CONTRAINDICATION_MATCH[c]!))) {
       exclude(p, RULE_IDS.contraindicated, COPY.excluded.contraindicated);
@@ -159,8 +165,8 @@ export function recommend(input: RulesInput, catalogue: Catalogue): Recommendati
 
   return {
     rulesetVersion: RULESET_VERSION,
-    catalogVersion: catalogue.version,
-    inputSha256: inputSha256(readings, RULESET_VERSION, catalogue),
+    catalogVersion,
+    inputSha256: inputSha256(readings, RULESET_VERSION, { version: catalogVersion, products }),
     reviewStatus: REVIEW_STATUS,
     fired,
     items,

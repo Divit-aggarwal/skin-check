@@ -36,6 +36,8 @@ const FIXTURE = CatalogueSchema.parse({
   products: [
     product("sunscreen", "sunscreen"),
     product("niacinamide", "serum", { ingredientClasses: ["niacinamide"], slot: "PM" }),
+    product("retinoid-moisturiser", "moisturiser", { ingredientClasses: ["emollient", "retinoid"] }),
+    product("mixed-serum", "serum", { ingredientClasses: ["niacinamide", "retinoid"] }),
     product("moisturiser", "moisturiser"),
     product("cleanser", "cleanser"),
     product("cleanser-2", "cleanser"),
@@ -43,6 +45,7 @@ const FIXTURE = CatalogueSchema.parse({
     product("old-moisturiser", "moisturiser", { availability: "discontinued" }),
     product("retinoid", "serum", { ingredientClasses: ["retinoid"], contraindications: ["pregnant_or_breastfeeding"] }),
     product("toner", "other"),
+    product("rx-cleanser", "cleanser", { contraindications: ["prescription_in_use"] }),
   ],
 });
 
@@ -63,6 +66,9 @@ const firedIds = (r: RecommendationResult) => r.fired.map((f) => f.ruleId);
 const BASE = ["cleanser", "moisturiser", "sunscreen"];
 const ALWAYS_EXCLUDED = {
   "cleanser-2": "base.one_per_step",
+  "rx-cleanser": "base.one_per_step",
+  "retinoid-moisturiser": "catalogue.not_in_ruleset",
+  "mixed-serum": "catalogue.not_in_ruleset",
   "old-moisturiser": "catalogue.unavailable",
   retinoid: "catalogue.not_in_ruleset",
   toner: "catalogue.not_in_ruleset",
@@ -126,6 +132,7 @@ const ROWS: Row[] = [
       niacinamide: "red_flag.deep_painful_breakouts",
       "niacinamide-2": "red_flag.deep_painful_breakouts",
       retinoid: "catalogue.contraindicated",
+      "rx-cleanser": "catalogue.contraindicated",
     },
   },
   {
@@ -136,7 +143,12 @@ const ROWS: Row[] = [
     limits: ["constraint.prescriber_routine", "extra_caution"],
     notices: [],
     unknowns: [],
-    excluded: { ...ALWAYS_EXCLUDED, niacinamide: "constraint.prescriber_routine", "niacinamide-2": "constraint.prescriber_routine" },
+    excluded: {
+      ...ALWAYS_EXCLUDED,
+      niacinamide: "constraint.prescriber_routine",
+      "niacinamide-2": "constraint.prescriber_routine",
+      "rx-cleanser": "catalogue.contraindicated",
+    },
   },
   {
     name: "pregnant with actives: extra caution, the notice, contraindicated product out",
@@ -212,9 +224,88 @@ const ROWS: Row[] = [
     limits: ["constraint.prescriber_routine", "extra_caution", "active.needs_answers"],
     notices: [],
     unknowns: [["current_products", COPY.unknownInvalid]],
-    excluded: { ...ALWAYS_EXCLUDED, niacinamide: "constraint.prescriber_routine", "niacinamide-2": "constraint.prescriber_routine" },
+    excluded: {
+      ...ALWAYS_EXCLUDED,
+      niacinamide: "constraint.prescriber_routine",
+      "niacinamide-2": "constraint.prescriber_routine",
+      "rx-cleanser": "catalogue.contraindicated",
+    },
+  },
+  {
+    name: "pregnant, female context reused: extra caution is the reason, ahead of confirmation",
+    answers: { ...FEMALE, female_skin_context: ["pregnant_or_breastfeeding"] },
+    confirmed: ALL.filter((f) => f !== "female_skin_context"),
+    items: BASE,
+    fired: ["extra_caution", "active.niacinamide", "base.routine"],
+    limits: ["extra_caution", "active.needs_confirmation", "active.needs_answers"],
+    notices: [],
+    unknowns: [["female_skin_context", COPY.unknownStale]],
+    excluded: { ...ALWAYS_EXCLUDED, niacinamide: "extra_caution", "niacinamide-2": "extra_caution", retinoid: "catalogue.contraindicated" },
+  },
+  {
+    name: "a missing answer with no triggering concern: needs answers, ahead of not triggered",
+    answers: { ...CLEAN, primary_concerns: ["redness"], pih_scar_tendency: "fades_no_trace", breakout_pattern: [] },
+    items: BASE,
+    fired: ["base.routine"],
+    limits: ["active.needs_answers"],
+    notices: [],
+    unknowns: [["breakout_pattern", COPY.unknownMissing]],
+    excluded: { ...ALWAYS_EXCLUDED, niacinamide: "active.needs_answers", "niacinamide-2": "active.needs_answers" },
+  },
+  {
+    name: "no gender and a reused female context: confirmation still needed",
+    answers: { ...CLEAN, gender: undefined, female_skin_context: ["none_not_sure"] },
+    confirmed: ALL.filter((f) => f !== "female_skin_context"),
+    items: BASE,
+    fired: ["active.niacinamide", "base.routine"],
+    limits: ["active.needs_confirmation", "active.needs_answers"],
+    notices: [],
+    unknowns: [
+      ["gender", COPY.unknownMissing],
+      ["female_skin_context", COPY.unknownStale],
+    ],
+    excluded: { ...ALWAYS_EXCLUDED, niacinamide: "active.needs_confirmation", "niacinamide-2": "active.needs_confirmation" },
+  },
+  {
+    name: "a male never needs the female context confirmed",
+    answers: { ...CLEAN, female_skin_context: ["none_not_sure"] },
+    confirmed: ["current_products"],
+    items: ["cleanser", "niacinamide", "moisturiser", "sunscreen"],
+    fired: ["active.niacinamide", "base.routine"],
+    limits: [],
+    notices: ["notice.one_at_a_time"],
+    unknowns: [],
+    excluded: { ...ALWAYS_EXCLUDED, "niacinamide-2": "active.one_only" },
   },
 ];
+
+// Literal design copy (rules-design §4.2), not COPY, so a swapped string fails.
+const REASON: Record<string, string> = {
+  "catalogue.unavailable": "Not available right now.",
+  "catalogue.contraindicated": "Not suitable with one of your answers.",
+  "base.one_per_step": "Another product already fills this step.",
+  "active.one_only": "Another product already fills this step.",
+  "catalogue.not_in_ruleset": "Not part of the current routine rules.",
+  "constraint.prescriber_routine": "Not added while you follow a prescriber's routine.",
+  extra_caution: "Not added while extra caution applies.",
+  "active.needs_confirmation": "Not added until your answers are confirmed on this check.",
+  "active.needs_answers": "Not added while some answers are missing.",
+  "active.not_triggered": "Not added: none of your stated concerns call for it.",
+};
+const reasonFor = (ruleId: string) =>
+  ruleId.startsWith("red_flag.") ? "Only the basic routine is shown for what you described." : REASON[ruleId];
+const TEXT: Record<string, string> = {
+  "red_flag.base_routine_only": "Only the basic daily routine is shown for now.",
+  "red_flag.referral": "What you described is worth showing a dermatologist.",
+  "constraint.prescriber_routine": "Keep following your prescriber's routine.",
+  extra_caution: "Ask a doctor before starting anything new.",
+  "active.needs_confirmation": "Confirm your answers on this check to see more options.",
+  "active.needs_answers": "Answer the remaining questions to see more options.",
+  "catalogue.gap": "No matching product is available right now.",
+  "notice.pregnancy_actives":
+    "If any of your current products contain a retinoid, check with your doctor while pregnant or breastfeeding.",
+  "notice.one_at_a_time": "Add one new product at a time.",
+};
 
 describe("recommend: answer sets to results", () => {
   it.each(ROWS.map((r) => [r.name, r] as const))("%s", (_name, row) => {
@@ -225,7 +316,8 @@ describe("recommend: answer sets to results", () => {
     expect(r.notices.map((n) => n.ruleId)).toEqual(row.notices);
     expect(r.unknowns.map((u) => [u.field, u.text])).toEqual(row.unknowns);
     expect(reasons(r)).toEqual(row.excluded);
-    expect(r.excluded.every((e) => e.reason.length > 0)).toBe(true);
+    for (const e of r.excluded) expect(e.reason).toBe(reasonFor(e.ruleId));
+    for (const x of [...r.limits, ...r.notices]) expect(x.text).toBe(TEXT[x.ruleId]);
   });
 
   it.each(ROWS.map((r) => [r.name, r] as const))("invariants: %s", (_name, row) => {
@@ -283,6 +375,16 @@ describe("recommend: details", () => {
     const noSun = { ...FIXTURE, products: FIXTURE.products.filter((p) => p.category !== "sunscreen") };
     const r = recommend({ answers: { ...CLEAN, breakout_pattern: ["deep_painful"] }, confirmedThisScan: ALL }, noSun);
     expect(r.limits.map((l) => l.ruleId)).toEqual(["red_flag.base_routine_only", "catalogue.gap"]);
+  });
+});
+
+describe("recommend: catalogue content is part of the hash", () => {
+  it("same catalogue version, different products: different inputSha256", () => {
+    const fewer = { ...FIXTURE, products: FIXTURE.products.slice(1) };
+    const a = recommend({ answers: CLEAN, confirmedThisScan: ALL }, FIXTURE);
+    const b = recommend({ answers: CLEAN, confirmedThisScan: ALL }, fewer);
+    expect(b.catalogVersion).toBe(a.catalogVersion);
+    expect(b.inputSha256).not.toBe(a.inputSha256);
   });
 });
 

@@ -45,23 +45,34 @@ export function readInput(input: RulesInput): Readings {
     throw new TypeError("rules: answers must be an object");
   }
   if (!Array.isArray(confirmedThisScan)) throw new TypeError("rules: confirmedThisScan must be a list");
+  // A saved questionnaire always has these. None at all means the caller
+  // passed the wrong object (a snapshot, a wrapper), not an empty quiz.
+  if (!RULE_INPUT_FIELDS.some((f) => Object.hasOwn(answers, f))) {
+    throw new TypeError("rules: answers has none of the rule fields");
+  }
 
   const partial = {} as Readings;
   for (const field of RULE_INPUT_FIELDS) {
     const step = stepFor(field);
     const raw = Object.hasOwn(answers, field) ? answers[field] : undefined;
     const list = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
-    const strings = list.filter((v): v is string => typeof v === "string").map((v) => v.trim().toLowerCase());
-    const values = Array.from(new Set(strings.filter((v) => v !== ""))).sort();
+    const strings = list.filter((v): v is string => typeof v === "string");
+    // Matching uses trimmed, lower-cased values, so a sloppy caution value
+    // still counts. Validity uses the exact strings, so a sloppy value can
+    // never make an answer readable enough to unlock the active.
+    const values = Array.from(new Set(strings.map((v) => v.trim().toLowerCase()).filter((v) => v !== ""))).sort();
+    const exact = Array.from(new Set(strings));
     const options = new Set<string>(step.options.map((o) => o.value));
     const exclusive = "exclusiveValue" in step ? step.exclusiveValue : undefined;
+    const max = "maxSelections" in step ? step.maxSelections : undefined;
     const present = values.length > 0;
     const valid =
       present &&
       strings.length === list.length &&
-      values.every((v) => options.has(v)) &&
-      (!SINGLE.has(step.type) || values.length === 1) &&
-      (exclusive === undefined || !values.includes(exclusive) || values.length === 1);
+      exact.every((v) => options.has(v)) &&
+      (!SINGLE.has(step.type) || exact.length === 1) &&
+      (max === undefined || exact.length <= max) &&
+      (exclusive === undefined || !exact.includes(exclusive) || exact.length === 1);
     partial[field] = {
       field,
       values,

@@ -41,11 +41,12 @@ interface RulesInput {
 - **Normalisation (`readInput`)**, per field:
   - Own properties only (`Object.hasOwn`); `__proto__` and inherited keys are never read.
   - A string becomes a one-item list. Non-string elements are dropped and make the field invalid.
+  - `values` (used only for matching rules) are trimmed, lower-cased, de-duplicated and sorted, so a sloppy caution value such as `" DEEP_PAINFUL "` still raises its rule. Validity uses the exact strings, so a sloppy value is never valid and can never unlock the active (review fix).
   - `present`: at least one string value. An empty list or blank string is "not answered" (same as `isStepAnswerValid`).
-  - `valid`: present, every value is an option of that step in `SECTIONS`, a single-select step has exactly one value, and an exclusive value (`none`, `none_not_sure`) is not combined with another.
+  - `valid`: present, every exact value is an option of that step in `SECTIONS`, a single-select step has exactly one value, no more than the step's `maxSelections`, and an exclusive value (`none`, `none_not_sure`) is not combined with another.
   - `asked`: the step's `condition` from `SECTIONS` (only `female_skin_context` has one: gender is female).
   - `fresh`: listed in `confirmedThisScan`.
-  - `answers` that is null or not an object throws. It never returns `redFlag: false`.
+  - `answers` that is null or not an object throws. So does an `answers` with none of the rule input fields as own keys: that is a wrapper or a snapshot passed by mistake, not a quiz. It never returns `redFlag: false` for such input (review fix).
 
 ### 3.2 Output
 
@@ -67,7 +68,7 @@ Exactly the contract shapes. `RecommendationResult.safety` is the `SafetyState` 
 ### 4.2 `recommend` (order is fixed)
 
 1. If `RULES_ENABLED` is false, throw `RulesDisabledError`.
-2. `safety = evaluateSafety(input)` (same readings, same function).
+2. `safety = evaluateSafety(input)` (same readings, same function). The catalogue's `version` and `products` are read once, and the hash uses those same values.
 3. **Unknowns.** Fields that are not asked (`female_skin_context` for a non-female gender) are skipped. For every other rule input field, including `female_skin_context` when gender is missing: not present → "Not answered."; present but invalid → "Could not be read."; a re-confirm field (`RECONFIRM_EACH_SCAN_IDS`, imported from `lib/skin-check-validation.ts`) that is present but not fresh → "Not confirmed on this check." Never guessed.
 4. **Fired rules** (audit, in this order, each with its triggers and their `fresh`): each red-flag rule that fired (its own id); `extra_caution` (triggers: the matching extra-caution values); `constraint.prescriber_routine`; `notice.pregnancy_actives`; `active.niacinamide` (when an active trigger matched, even if the active is then withheld); `base.routine` (always, no triggers).
 5. **Catalogue pass**, every product in catalogue order, first matching reason wins. Each exclusion carries a rule id and a fixed reason:
@@ -76,9 +77,9 @@ Exactly the contract shapes. `RecommendationResult.safety` is the `SafetyState` 
    |---|---|---|---|
    | 1 | `availability` is not `available` | `catalogue.unavailable` | "Not available right now." |
    | 2 | A product contraindication matches an answer (`pregnant_or_breastfeeding` ↔ `female_skin_context`; `prescription_in_use` ↔ `current_products` `prescription`) | `catalogue.contraindicated` | "Not suitable with one of your answers." |
-   | 3 | Base category (`cleanser`, `moisturiser`, `sunscreen`): the first eligible product per category is selected by `base.routine`; a later one is excluded | `base.one_per_step` | "Another product already fills this step." |
-   | 4 | The active (`category: "serum"` with ingredient class `niacinamide`), gated as below; a later eligible one | `active.one_only` | "Another product already fills this step." |
-   | 5 | Anything else | `catalogue.not_in_ruleset` | "Not part of the current routine rules." |
+   | 3 | Base product: a base category (`cleanser`, `moisturiser`, `sunscreen`), `active` is null, and no ingredient class in `ACTIVE_CLASSES`. The first eligible one per category is selected by `base.routine`; a later one is excluded | `base.one_per_step` | "Another product already fills this step." |
+   | 4 | The active: `category: "serum"` whose only class in `ACTIVE_CLASSES` is `niacinamide`, gated as below; a later eligible one | `active.one_only` | "Another product already fills this step." |
+   | 5 | Anything else, including a "moisturiser" with a retinoid and a serum with niacinamide plus another active (the category alone is not trusted; review fix) | `catalogue.not_in_ruleset` | "Not part of the current routine rules." |
 
    **Active gates**, checked in this order; the first failure is the exclusion for every active product:
 
@@ -150,9 +151,9 @@ The reviewer is also asked (tracker E05 note, 2026-10-04) to judge:
 
 Niacinamide serum, when any of: `primary_concerns` includes `pigment` ("Dark marks") or `blemishes` ("Breakouts"); `pih_scar_tendency` is `dark_mark_fades` or `dark_mark_lingers` (the latter is also a red flag, so it never reaches the active). Not triggers: `leaves_dark_marks`, `redness`, `texture`, `pores`, `hydration`, `oiliness`.
 
-### 5.5 Base routine (`BASE_CATEGORIES`)
+### 5.5 Base routine (`BASE_CATEGORIES`) and what counts as an active (`ACTIVE_CLASSES`)
 
-Cleanser, moisturiser, sunscreen for everyone, including under a red flag.
+Cleanser, moisturiser, sunscreen for everyone, including under a red flag. A product is base only if it declares no active and has none of the ingredient classes `niacinamide`, `retinoid`, `aha`, `bha`, `vitamin-c`. The reviewer should confirm this list of active classes.
 
 ### 5.6 Stale and missing answers
 

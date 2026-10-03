@@ -5,12 +5,26 @@ const read = (answers: Record<string, unknown>, confirmedThisScan: string[] = []
   readInput({ answers, confirmedThisScan });
 
 describe("readInput", () => {
-  it("accepts a string or a list, and sorts, trims, lower-cases and de-duplicates", () => {
+  it("accepts a string or a list, and sorts and de-duplicates", () => {
     expect(read({ breakout_pattern: "deep_painful" }).breakout_pattern).toMatchObject({ values: ["deep_painful"], valid: true });
-    expect(read({ breakout_pattern: [" Small_Bumps", "deep_painful", "deep_painful"] }).breakout_pattern).toMatchObject({
+    expect(read({ breakout_pattern: ["small_bumps", "deep_painful", "deep_painful"] }).breakout_pattern).toMatchObject({
       values: ["deep_painful", "small_bumps"],
       valid: true,
     });
+  });
+
+  it("a case or whitespace variant matches for caution but is never valid", () => {
+    expect(read({ breakout_pattern: [" Small_Bumps", "deep_painful"] }).breakout_pattern).toMatchObject({
+      values: ["deep_painful", "small_bumps"],
+      present: true,
+      valid: false,
+    });
+    expect(read({ primary_concerns: ["PIGMENT"] }).primary_concerns).toMatchObject({ values: ["pigment"], valid: false });
+  });
+
+  it("more than maxSelections is invalid", () => {
+    expect(read({ primary_concerns: ["redness", "texture", "pores"] }).primary_concerns.valid).toBe(true);
+    expect(read({ primary_concerns: ["redness", "texture", "pores", "pigment"] }).primary_concerns.valid).toBe(false);
   });
 
   it("an empty list or blank string is not answered", () => {
@@ -36,9 +50,13 @@ describe("readInput", () => {
   });
 
   it("reads own keys only", () => {
-    const answers = Object.create({ breakout_pattern: ["deep_painful"] });
+    const answers = Object.assign(Object.create({ breakout_pattern: ["deep_painful"] }), { gender: "male" });
     expect(read(answers).breakout_pattern.present).toBe(false);
-    expect(read(JSON.parse('{"__proto__": {"breakout_pattern": ["deep_painful"]}}')).breakout_pattern.present).toBe(false);
+  });
+
+  it("throws when none of the rule fields is present (a wrapper or snapshot, not answers)", () => {
+    expect(() => read({ answers: { breakout_pattern: "deep_painful" } })).toThrow(/none of the rule fields/);
+    expect(() => read({})).toThrow(TypeError);
   });
 
   it("freshness is opt-in: unlisted fields are reused", () => {
@@ -50,7 +68,7 @@ describe("readInput", () => {
   it("female_skin_context is asked only for female, unknown without a gender", () => {
     expect(read({ gender: "female" }).female_skin_context.asked).toBe(true);
     expect(read({ gender: "male" }).female_skin_context.asked).toBe(false);
-    expect(read({}).female_skin_context.asked).toBe("unknown");
+    expect(read({ primary_concerns: ["pigment"] }).female_skin_context.asked).toBe("unknown");
     expect(read({ gender: ["female", "male"] }).female_skin_context.asked).toBe("unknown");
   });
 

@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 const DIR = join(__dirname, "..", "lib", "rules");
 const FILES = readdirSync(DIR).filter((f) => f.endsWith(".ts"));
 const source = (f: string) => readFileSync(join(DIR, f), "utf8");
-const imports = (f: string) => Array.from(source(f).matchAll(/from\s+["']([^"']+)["']|import\(\s*["']([^"']+)["']/g), (m) => m[1] ?? m[2]!);
+const imports = (f: string) => Array.from(source(f).matchAll(/(?:from|import|require\()\s*\(?\s*["']([^"']+)["']/g), (m) => m[1]!);
 
 const ALLOWED = new Set([
   "node:crypto",
@@ -21,6 +21,11 @@ const ALLOWED = new Set([
 describe("lib/rules import boundary", () => {
   it("has the four files of the design", () => {
     expect(FILES.sort()).toEqual(["input.ts", "recommend.ts", "safety.ts", "settings.ts"]);
+  });
+
+  it("the import scan sees imports (so the next test cannot pass on an empty list)", () => {
+    expect(imports("input.ts")).toEqual(expect.arrayContaining(["node:crypto", "@/lib/skin-check-steps", "./settings"]));
+    expect(imports("recommend.ts")).toEqual(expect.arrayContaining(["@/lib/catalog/schema", "./safety"]));
   });
 
   it.each(FILES)("%s imports only allowed modules (no image bands, scans, routine, Gemini or other lanes)", (f) => {

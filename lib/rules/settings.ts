@@ -91,7 +91,10 @@ export const ACTIVE_TRIGGERS: readonly Condition[] = [
   { field: "pih_scar_tendency", anyOf: ["dark_mark_fades", "dark_mark_lingers"] },
 ];
 
-/** The conditional active: a serum with this ingredient class. */
+/** Ingredient classes that make a product an active. A base product has none of them and no declared active. */
+export const ACTIVE_CLASSES = ["niacinamide", "retinoid", "aha", "bha", "vitamin-c"] as const;
+
+/** The conditional active: a serum whose only active class is this one. */
 export const ACTIVE_PRODUCT = { category: "serum", ingredientClass: "niacinamide" } as const;
 
 /** Base routine for everyone, including under a red flag. */

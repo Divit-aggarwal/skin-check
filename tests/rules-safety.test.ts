@@ -55,8 +55,18 @@ describe("red flags (PROVISIONAL list, rules-design §5.1)", () => {
     expect(safety({ breakout_pattern: " DEEP_PAINFUL " }).redFlag).toBe(true);
   });
 
-  it("no answers: no red flag (nothing is guessed)", () => {
-    expect(safety({})).toEqual({ rulesetVersion: "rules-0-provisional", reviewStatus: "provisional", extraCaution: false, redFlag: false });
+  it("no red-flag answer: no red flag (nothing is guessed)", () => {
+    expect(safety({ primary_concerns: ["pigment"] })).toEqual({
+      rulesetVersion: "rules-0-provisional",
+      reviewStatus: "provisional",
+      extraCaution: false,
+      redFlag: false,
+    });
+  });
+
+  it("an empty or wrongly shaped answers object throws instead of answering redFlag false", () => {
+    expect(() => safety({})).toThrow(TypeError);
+    expect(() => safety({ answers: { breakout_pattern: "deep_painful" } })).toThrow(TypeError);
   });
 });
 

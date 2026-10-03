@@ -3,7 +3,10 @@ import { EXTRA_CAUTION_TRIGGERS as GEMINI_EXTRA_CAUTION } from "@/lib/gemini";
 import { bannedWordsIn } from "@/lib/catalog/wording";
 import { SECTIONS } from "@/lib/skin-check-steps";
 import {
+  ACTIVE_CLASSES,
+  ACTIVE_PRODUCT,
   ACTIVE_TRIGGERS,
+  BASE_CATEGORIES,
   CONTRAINDICATION_MATCH,
   COPY,
   EXTRA_CAUTION_TRIGGERS,
@@ -50,7 +53,7 @@ describe("production switch (tracker E05: off in production until clinical sign-
     const { evaluateSafety } = await import("@/lib/rules/safety");
     const { recommend } = await import("@/lib/rules/recommend");
     const { CATALOGUE } = await import("@/lib/catalog/catalogue");
-    const input = { answers: {}, confirmedThisScan: [] };
+    const input = { answers: { breakout_pattern: ["deep_painful"] }, confirmedThisScan: [] };
     expect(() => evaluateSafety(input)).toThrow(/clinical sign-off/);
     expect(() => recommend(input, CATALOGUE)).toThrow(/clinical sign-off/);
   });
@@ -96,6 +99,11 @@ describe("clinical lists", () => {
       prescriber: PRESCRIBER_RULE.when.map((c) => `${c.field}:${c.anyOf.join("|")}`),
       pregnancy: PREGNANCY_ACTIVES_RULE.when.map((c) => `${c.field}:${c.anyOf.join("|")}`),
       active: ACTIVE_TRIGGERS.map((c) => `${c.field}:${c.anyOf.join("|")}`),
+      contraindications: Object.entries(CONTRAINDICATION_MATCH).map(([k, c]) => `${k}=${c.field}:${c.anyOf.join("|")}`),
+      activeProduct: ACTIVE_PRODUCT,
+      activeClasses: ACTIVE_CLASSES,
+      baseCategories: BASE_CATEGORIES,
+      copy: COPY,
     }).toEqual({
       RULESET_VERSION: "rules-0-provisional",
       red: [
@@ -109,12 +117,53 @@ describe("clinical lists", () => {
       prescriber: ["current_products:prescription"],
       pregnancy: ["female_skin_context:pregnant_or_breastfeeding", "current_products:actives"],
       active: ["primary_concerns:pigment|blemishes", "pih_scar_tendency:dark_mark_fades|dark_mark_lingers"],
+      contraindications: [
+        "pregnant_or_breastfeeding=female_skin_context:pregnant_or_breastfeeding",
+        "prescription_in_use=current_products:prescription",
+      ],
+      activeProduct: { category: "serum", ingredientClass: "niacinamide" },
+      activeClasses: ["niacinamide", "retinoid", "aha", "bha", "vitamin-c"],
+      baseCategories: ["cleanser", "moisturiser", "sunscreen"],
+      copy: {
+        referral: "What you described is worth showing a dermatologist.",
+        baseOnly: "Only the basic daily routine is shown for now.",
+        prescriber: "Keep following your prescriber's routine.",
+        extraCaution: "Ask a doctor before starting anything new.",
+        pregnancyActives:
+          "If any of your current products contain a retinoid, check with your doctor while pregnant or breastfeeding.",
+        oneAtATime: "Add one new product at a time.",
+        needsConfirmation: "Confirm your answers on this check to see more options.",
+        needsAnswers: "Answer the remaining questions to see more options.",
+        gap: "No matching product is available right now.",
+        unknownMissing: "Not answered.",
+        unknownInvalid: "Could not be read.",
+        unknownStale: "Not confirmed on this check.",
+        excluded: {
+          redFlag: "Only the basic routine is shown for what you described.",
+          prescriber: "Not added while you follow a prescriber's routine.",
+          extraCaution: "Not added while extra caution applies.",
+          needsConfirmation: "Not added until your answers are confirmed on this check.",
+          needsAnswers: "Not added while some answers are missing.",
+          notTriggered: "Not added: none of your stated concerns call for it.",
+          activeOneOnly: "Another product already fills this step.",
+          onePerStep: "Another product already fills this step.",
+          unavailable: "Not available right now.",
+          contraindicated: "Not suitable with one of your answers.",
+          notInRuleset: "Not part of the current routine rules.",
+        },
+      },
     });
   });
 });
 
 describe("copy (D-12 word check)", () => {
-  const strings = Object.entries({ ...COPY, ...COPY.excluded }).filter(([, v]) => typeof v === "string") as [string, string][];
+  const strings = [
+    ...Object.entries(COPY).flatMap(([k, v]) => (typeof v === "string" ? [[k, v] as [string, string]] : [])),
+    ...Object.entries(COPY.excluded).map(([k, v]) => [`excluded.${k}`, v] as [string, string]),
+  ];
+  it("checks every constant", () => {
+    expect(strings).toHaveLength(Object.keys(COPY).length - 1 + Object.keys(COPY.excluded).length);
+  });
   it.each(strings)("%s passes", (_k, text) => {
     expect(bannedWordsIn(text)).toEqual([]);
   });
