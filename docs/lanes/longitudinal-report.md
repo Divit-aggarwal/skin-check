@@ -56,6 +56,7 @@ What was built:
 | `npm run test:local` at 8095b72 | exit 0. Unit 689 passed / 42 skipped. Stack 8 files, 42/42, including `tests/longitudinal-series.e2e.test.ts` (seed read back through both contract versions; "not enough evidence" for every quantity in every region) |
 | `npm run test:local` at 330991f (final) | exit 0. Unit 699 passed / 42 skipped. Stack 8 files, 42/42, including the longitudinal e2e test |
 | `npm run build` | exit 0 (at 330991f) |
+| Per-commit retro-check | The `npm test` run just before commits 1b0dd32 and 1d69f61 had one failure. Its cause was the capture-lane guard tripping on the then-uncommitted engine file, not anything in those commits. Afterwards each commit's tree was extracted and run on its own: 1b0dd32 626 passed / 41 skipped, tsc 0; 1d69f61 633 passed, tsc 0; 0bd5c08 640 passed, tsc 0 |
 | Frozen files | `lib/skin-state.ts`, `lib/skin-state-loader.ts`, their tests, `lib/contracts/**` and `tests/contracts.test.ts`: no diff against `longitudinal-platform` |
 | Existing tests | None edited. `tests/contracts.test.ts` and `tests/comparability.test.ts` are green unchanged |
 
@@ -143,7 +144,7 @@ The verifier tried to make the engine state a change for a real pair with the em
 
 | ID | Proposed status | Note |
 |---|---|---|
-| A20 | DONE (code), CHECKED LOCAL | skinstate-2 in `lib/skin-state-2.ts`, and contract text drafted for sign-off. Commits 1b0dd32, 1d69f61 |
+| A20 | OWNER ACTION (code done, CHECKED LOCAL) | skinstate-2 in `lib/skin-state-2.ts`, commits 1b0dd32 and 1d69f61. The row stays open until the owner signs off `SKIN_STATE_CONTRACT_2.md` |
 | C02 | stays BLOCKED on C07 only | A20 landed. Real pairs can now match on the build, and are still `quantity_not_validated` |
 | D01 | DONE (provisional), CHECKED LOCAL | `BASELINE_RULE` first 3 comparable scans, provisional. Commit 0bd5c08 |
 | D02 | DONE, CHECKED LOCAL; output is always "not enough evidence" until C07 | Commits 087fb2c, 330991f |
@@ -169,6 +170,6 @@ The verifier tried to make the engine state a change for a real pair with the em
 | 087fb2c | D02/D03 engine, guard test |
 | 8095b72 | Emulator seed and e2e test |
 | 330991f | Review fixes |
-| (this file) | Report |
+| 3ed996c | Report |
 
 `git diff --stat longitudinal-platform...HEAD` lists only lane-owned files, plus the design and report documents. The branch is based on bbe02da. `longitudinal-platform` is one tracker-only commit ahead.
