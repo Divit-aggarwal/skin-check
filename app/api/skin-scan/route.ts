@@ -4,6 +4,7 @@ import { FieldValue } from "firebase-admin/firestore";
 import { checkRequestRate, consumeDailyQuota, SKIN_SCAN_ROUTE_LIMITS } from "@/lib/rate-limit";
 import { AdminNotConfiguredError, adminDb, bearerToken, verifyFirebaseIdToken } from "@/lib/firebase/admin";
 import { isValidScanId } from "@/lib/s3-key";
+import { scanAgeGate } from "@/app/api/account/_ledger";
 import {
   buildScanAnalysisRecord,
   MAX_RECORD_BYTES,
@@ -115,6 +116,14 @@ export async function POST(request: NextRequest) {
     );
     return unauthorized();
   }
+
+  // ── lane:privacy (H02a, D-19) ── preamble only. An under-18 record is
+  // refused before the image is read or the engine called (the D-03a
+  // exception the owner approved). No record, or an unreadable ledger, goes
+  // ahead (decision 3a, D-03).
+  const ageRefusal = await scanAgeGate(uid, "skin-scan");
+  if (ageRefusal) return ageRefusal;
+  // ── end lane:privacy ──
 
   let formData: FormData;
   try {

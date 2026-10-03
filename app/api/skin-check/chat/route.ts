@@ -10,6 +10,8 @@ import { loadTrustedEchoContext } from "@/lib/echo-trusted-context";
 import { signHistory, verifyHistory } from "@/lib/echo-history-token";
 import { bandScores } from "@/lib/skin-check-rules";
 import { summarizeConcerns } from "@/lib/skin-check-score";
+import { ageStatus, latestGrant, withLedgerTimeout, type AgeStatus } from "@/app/api/account/_ledger";
+import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 
 // firebase-admin needs Node APIs and hard-fails on the Edge runtime — same
 // explicit opt-in as /api/skin-scan.
@@ -142,6 +144,34 @@ export async function POST(request: NextRequest) {
       { error: "This conversation couldn't be verified.", code: "CHAT_HISTORY_INVALID" },
       { status: 400 }
     );
+  }
+
+  // H02a (D-19): Gemini's terms require 18+. Chat may hard-reject (D-03a:
+  // the attestation UI ships with this lane). It fails closed: a ledger it
+  // can't read is a 503, never a pass. Before the quota, so a refusal
+  // doesn't spend it.
+  // H03c: and the user's AI-share consent at the current version (D-16,
+  // D-14). Same fail-closed read. LOCAL ONLY until decision 6 and final copy.
+  let age: AgeStatus;
+  let aiShare: boolean | null;
+  try {
+    [age, aiShare] = await withLedgerTimeout(Promise.all([ageStatus(uid), latestGrant(uid, "ai_share", AI_SHARE_CONSENT_VERSION)]));
+  } catch (err) {
+    // Name and code only: Firestore messages embed the doc path (the uid).
+    console.error("skin-check chat: consent ledger unavailable:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
+    return NextResponse.json(
+      { error: "Echo can't check your settings right now. Please try again.", code: "CONSENT_CHECK_UNAVAILABLE" },
+      { status: 503 }
+    );
+  }
+  if (age === "under18") {
+    return NextResponse.json({ error: "Echo is only available to people aged 18 or over.", code: "UNDER_18" }, { status: 403 });
+  }
+  if (age === "missing") {
+    return NextResponse.json({ error: "Please confirm your age to use Echo.", code: "ATTESTATION_REQUIRED" }, { status: 403 });
+  }
+  if (aiShare !== true) {
+    return NextResponse.json({ error: "Please agree to share your skin check with Echo.", code: "AI_CONSENT_REQUIRED" }, { status: 403 });
   }
 
   const quotaLimited = consumeDailyQuota(request, GEMINI_ROUTE_LIMITS);

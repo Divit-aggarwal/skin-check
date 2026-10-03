@@ -20,6 +20,9 @@ vi.mock("@/lib/firebase/admin", async () => {
   };
 });
 
+// Privacy lane (H02a): the 18+ preamble gate has its own suite
+// (tests/privacy-scan-gate.test.ts); here it always goes ahead.
+vi.mock("@/app/api/account/_ledger", () => ({ scanAgeGate: async () => null }));
 import { POST } from "@/app/api/skin-scan/route";
 import { AdminNotConfiguredError } from "@/lib/firebase/admin";
 import { NextRequest } from "next/server";

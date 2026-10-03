@@ -28,6 +28,12 @@ vi.mock("@/lib/rate-limit", async () => {
   return { ...actual, checkRequestRate: () => null, consumeDailyQuota };
 });
 
+// Privacy lane (H02a/H03c): this suite tests auth and trusted context, not the
+// consent gates (tests/privacy-chat-gate.test.ts), so the user is attested and consented.
+vi.mock("@/app/api/account/_ledger", async () => {
+  const actual = await vi.importActual<typeof import("@/app/api/account/_ledger")>("@/app/api/account/_ledger");
+  return { ...actual, ageStatus: async () => "over18", latestGrant: async () => true };
+});
 import { POST } from "@/app/api/skin-check/chat/route";
 import { AdminNotConfiguredError } from "@/lib/firebase/admin";
 import { NextRequest } from "next/server";
