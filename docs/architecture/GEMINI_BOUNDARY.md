@@ -33,7 +33,7 @@ Status: PLANNING. Gemini is a downstream explanation layer. It is never a source
 
 ```
 client → POST /api/skin-check/chat { scanId?, region?, message }        (Bearer ID token)
-  1. verifyFirebaseIdToken → uid; consent check (purpose "ai_assistant", current version) else 403 CONSENT_REQUIRED
+  1. verifyFirebaseIdToken → uid; consent check (purpose "ai_share", current version) else 403 AI_CONSENT_REQUIRED (CONSENT_REQUIRED already means image-retention consent on upload)
   2. uid-keyed daily quota (Firestore transaction on usage/{date}); IP burst check stays as pre-auth shield
   3. red-flag pre-filter on `message` (§6) → hit: fixed referral text, log ChatTurn{redFlag:true}, NO Gemini call
   3b. comparison-intent pre-filter (§6b) → hit: fixed "photos can't be compared yet" template, NO Gemini call
