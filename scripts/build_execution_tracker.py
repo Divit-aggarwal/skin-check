@@ -48,6 +48,16 @@ for name, rows in tables:
         assert all(r[blk] for r in rows[1:] if r[b] == "BLOCKED"), f"{name}: BLOCKED row without blocker"
         assert all(r[com] for r in rows[1:] if r[b] == "DONE"), f"{name}: DONE row without commit"
 
+overview = dict(r[:2] for name, rows in tables if name == "1. Overview" for r in rows[1:])
+master = next(rows for name, rows in tables if name == "2. Master tracker")
+b, k = master[0].index("Build status"), master[0].index("Check status")
+count = lambda i, v: sum(r[i] == v for r in master[1:])
+build = ", ".join(f"{v} {count(b, v)}" for v in ("DONE", "IN PROGRESS", "NOT STARTED", "BLOCKED", "OWNER ACTION", "LATER"))
+build += f" (total {len(master) - 1})"
+check = ", ".join(f"{v} {count(k, v)}" for v in ("CHECKED PROD", "CHECKED LOCAL", "NOT NEEDED", "NOT CHECKED"))
+assert overview.get("Build status counts") == build, f"overview Build status counts should be: {build}"
+assert overview.get("Check status counts") == check, f"overview Check status counts should be: {check}"
+
 wb = Workbook()
 wb.remove(wb.active)
 used = set()
