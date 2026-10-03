@@ -7,7 +7,7 @@ import type { SkinScanState } from "@/types/skin-scan";
 import { PhoneAuthForm } from "@/components/auth/PhoneAuthForm";
 import { saveSkinCheck } from "@/lib/firebase/skin-checks";
 import { useAuth } from "@/lib/auth-context";
-import { canSaveScan, withTimeout } from "@/lib/useSkinCheckFlow";
+import { canSaveScan, completeSave, withTimeout } from "@/lib/useSkinCheckFlow";
 import { Button } from "@/components/ui/button";
 
 const SAVE_TIMEOUT_MS = 15_000;
@@ -21,8 +21,11 @@ interface PhoneAuthStepProps {
   /** Stable id for this scan attempt — becomes the Firestore document id. */
   scanId: string;
   scan: SkinScanState;
-  /** Clears the local draft once the scan is safely persisted. */
-  onSaved: () => void;
+  /**
+   * Clears the local draft once the scan is safely persisted. False when the
+   * flow has since moved to another scan (a retake mid-save).
+   */
+  onSaved: (forScanId: string) => boolean;
 }
 
 // This component now serves the flow's TWO phone steps, which are the same
@@ -86,19 +89,22 @@ export function PhoneAuthStep({
     // leave a failed save with no retry (this step unmounts) and let "Take
     // a new scan" clear the only copy of an unsaved scan. A retry is safe:
     // a write that already landed comes back as permission-denied, which
-    // saveSkinCheck treats as saved. Offline, setDoc stays pending instead
-    // of rejecting, so the wait is capped; a write that lands after the
-    // timeout is covered by the same permission-denied rule on retry.
+    // saveSkinCheck treats as saved once it confirms the doc exists.
+    // Offline, setDoc stays pending instead of rejecting, so the wait is
+    // capped; a write that lands after the timeout is covered by the same
+    // permission-denied rule on retry.
     setSaving(true);
     setSaveFailed(false);
     withTimeout(saveSkinCheck(user.uid, scanId, { ...answers, [step.id]: verified }, scan), SAVE_TIMEOUT_MS)
       .then(() => {
         // The draft has served its purpose once the scan belongs to a real
         // uid. Cleared only on success, so a failed write leaves the user's
-        // answers recoverable rather than silently dropping them.
-        onSaved();
-        onChange(verified);
-        onCommit();
+        // answers recoverable rather than silently dropping them. A stale
+        // save (retake while it was in flight) leaves the new scan alone.
+        completeSave(onSaved, scanId, () => {
+          onChange(verified);
+          onCommit();
+        });
       })
       .catch((error) => {
         console.error("[skin-check] session association failed", error);

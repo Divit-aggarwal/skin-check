@@ -40,6 +40,9 @@ export interface ScanAnalysisMeta {
   inputSha256: string;
   requestId: string;
   captureMethod?: CaptureMethod | undefined;
+  // Set only by the client's one background re-request after persisted:false
+  // — the record then comes from a second CV run, not the one the user saw.
+  persistAttempt?: "recovery" | undefined;
 }
 
 function hasNestedArray(value: unknown): boolean {
@@ -69,6 +72,7 @@ export function buildScanAnalysisRecord(result: SkinScanResult, meta: ScanAnalys
     requestId: meta.requestId,
   };
   if (meta.captureMethod) record.captureMethod = meta.captureMethod;
+  if (meta.persistAttempt) record.persistAttempt = meta.persistAttempt;
 
   for (const field of ANALYSIS_FIELDS) {
     const value = source[field];

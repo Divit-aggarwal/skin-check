@@ -379,7 +379,8 @@ export async function POST(request: NextRequest) {
   const capture = formData.get("captureMethod");
   const captureMethod: CaptureMethod | undefined =
     capture === "native" || capture === "canvas" ? capture : undefined;
-  const persisted = await persistScanAnalysis(uid, scanId, image, parsed.data, captureMethod);
+  const persistAttempt = formData.get("persistAttempt") === "recovery" ? "recovery" : undefined;
+  const persisted = await persistScanAnalysis(uid, scanId, image, parsed.data, captureMethod, persistAttempt);
   return NextResponse.json({ ok: true, result: parsed.data, persisted });
 }
 
@@ -399,12 +400,13 @@ async function persistScanAnalysis(
   scanId: string,
   image: Blob,
   result: SkinScanResult,
-  captureMethod: CaptureMethod | undefined
+  captureMethod: CaptureMethod | undefined,
+  persistAttempt: "recovery" | undefined
 ): Promise<boolean> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
     const inputSha256 = createHash("sha256").update(Buffer.from(await image.arrayBuffer())).digest("hex");
-    const record = buildScanAnalysisRecord(result, { scanId, inputSha256, requestId: randomUUID(), captureMethod });
+    const record = buildScanAnalysisRecord(result, { scanId, inputSha256, requestId: randomUUID(), captureMethod, persistAttempt });
     const bytes = recordByteSize(record);
     if (bytes > MAX_RECORD_BYTES) {
       console.error(`skin-scan: analysis record too large (${bytes} bytes) — not persisted.`);

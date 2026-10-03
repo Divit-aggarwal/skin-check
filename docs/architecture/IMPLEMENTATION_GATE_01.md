@@ -1,187 +1,254 @@
-# IMPLEMENTATION_GATE_01: C2 (preserve raw analysis) + C5a (recoverable scan save)
+# IMPLEMENTATION_GATE_01: C2 (durable raw analysis) + C5a (recoverable scan lifecycle)
 
 | | |
 |---|---|
 | Branch | `longitudinal-platform` |
-| Implementation commit | **`6e9081dff7059bba3246a7e1608b8d095cc1f74f`** |
-| Base | `9078fd6` (docs); production is `1b39f88` |
-| Date | 2026-10-03 |
-| Deployed? | **No.** Nothing is pushed or deployed. Rules are not deployed |
-| Team | persistence-engineer (C2) and recovery-engineer (C5a) worked on disjoint file sets. The lead reviewed both and requested two changes (native fields; a save timeout) |
+| Round 1 commit | `6e9081dff7059bba3246a7e1608b8d095cc1f74f`: server-side raw preservation, save gate, restore, retake rotation, stale-response guard, blocking save with timeout |
+| Round 2 commit | see the commit that adds this revision (`fix(scan): make analysis persistence durable and recoverable`): recoverable server persistence, recovery provenance marker, rejected-save data-loss fix (O1), stale-save-after-retake fix |
+| Production base | `1b39f88` (PRODUCTION_BASELINE.md) |
+| Deployed? | **No.** Nothing is pushed or deployed. `firestore.rules` is not deployed |
+| Team | persistence-engineer and recovery-engineer, two rounds each, on disjoint file sets. The lead reviewed every diff and requested four changes: native fields, the save timeout, the recovery marker, and the O1 fix. One file-ownership exception was granted: a one-line prop type in `StepAnswer.tsx` |
 
-Out of scope and not implemented: SkinState contract, trends, dashboard changes, recommendations, Gemini, forecasting, capture quality, models.
+**Out of scope, not implemented:** SkinState, longitudinal comparison, recommendations, Echo/Gemini, dashboard changes beyond recovery, infrastructure.
 
 ---
 
-## 1. Exact problem
+## 1. Root cause: C2 (raw analysis lost)
 
-1. **Raw analysis was permanently discarded (D1).** The CV service returns `region_raw*`, `region_hist*` and bin edges: the fixed-edge data needed to rescore scans retroactively. The browser received them, and `persistableResult` (lib/firebase/skin-checks.ts:31-41) dropped them before the only Firestore write. Every stored scan was unrescorable.
-2. **The browser authored the only persisted analysis (D3).** The result reached Firestore only through the client SDK, after a user tap. Nothing server-side recorded what the CV service actually returned.
-3. **Refresh during analysis created a permanent wrong record (D4).** Sequence:
-   - The draft held no photo until analysis finished.
-   - Restore dropped `skin_photo` but kept the section index past the photo step.
-   - "Get my results" was guarded only against `loading`, so it could save an `idle` scan.
-   - That wrote `questionnaire_only` with `result:null`, and the rules deny `update`, so it was permanent.
-4. **Dashboard retry results were never persisted (D5).**
-5. **Retake reused the scanId (D6).** A second photo overwrote the first original in S3 under the same key.
-6. **Late responses could overwrite newer state.** A response from a superseded attempt (after a retake, or after "Take a new scan") was applied anyway.
-7. **Save failures were silent.** Failure went only to the console, the user went on to results, and "Take a new scan" cleared the only copy of the unsaved draft.
-8. **Restored drafts under-recorded the original (D11, partial).** They lost `originalStored` and `retentionConsentVersion`.
+**Where the raw data is produced (skin-scan, deployed `scan-0.1.5-provisional`):**
+- Each map's `_extract` returns per-region stats: `maps/redness.py:28-41`, `pigment.py:52-73`, `texture.py`, `oiliness.py`, `hydration.py`, `pores.py:111-122`.
+- `blemishes.py:242-278` is the only producer of `region_hist`.
+- `compose.py` merges the stats:
+  - into `region_raw_corrected` (`:230-240`, plus `region_px`);
+  - sets `region_hist_corrected` and its edges (`:252-253`);
+  - computes `*_native` only when `stats=both` (`:271-302`, `main.py:282`);
+  - aliases the un-suffixed keys (`:306-308`);
+  - returns everything at `:330-344`.
+- Overlays are rendered after all measurements are computed and do not affect them.
 
-## 2. Root cause
+**Where it was discarded:**
+- The only persistence path was the **browser**. `lib/firebase/skin-checks.ts:30-41` `persistableResult` keeps scores, region scores and the pipeline version, and drops `region_raw*`, `region_hist*` and the bin edges.
+- That write was a client-SDK `setDoc` made after a user tap.
+- `/api/skin-scan` verified the user but discarded the uid. The server never persisted anything.
 
-- **(1)(2)** The only persistence path was a client-side, create-only `setDoc`. It received a size-motivated allowlist and ran after the result had passed through the browser. `/api/skin-scan` verified the user but discarded the uid, so the server never wrote anything.
-- **(3)(5)(7)** A single client write, gated on UI state rather than scan state, combined with create-only rules. Anything that arrived after that write, or a write made too early, could never be corrected.
-- **(4)(6)** `scanId` was the only attempt identity, but it was rotated only by "Take a new scan". Async callbacks had no attempt token.
-- **(8)** `DraftScan` had no fields for the original's state.
+**Consequences:**
+- Every stored scan was unrescorable.
+- The only persisted measurement was a browser-supplied copy that the rules do not validate.
 
-## 3. Fix
+## 2. Root cause: C5a (permanent scan/result loss)
 
-### C2: server-side preservation (app/api/skin-scan/route.ts, lib/scan-analysis-record.ts, lib/firebase/admin.ts, lib/api.ts, firestore.rules)
+There was a single create-only client write, gated on UI state rather than scan state. `scanId` was the only identity of an attempt, and it was rotated only by "Take a new scan". Async callbacks carried no attempt token. Specifically:
 
-**Trigger**
-- The browser now sends `scanId` with the analysis request (`runSkinScan` → `getSkinScanResult`).
-- If `scanId` is valid (`isValidScanId`), the route writes the record after zod validation.
-- If it is absent or invalid, behaviour and response are byte-identical to before. This covers old bundles.
+- **Refresh mid-analysis.**
+  - The draft held no photo until the result arrived.
+  - Restore dropped `skin_photo` but kept the section index.
+  - The save button guarded only against `loading`.
+  - So the save wrote a permanent `questionnaire_only` record (rules deny update).
+- **A retake reused the scanId**, so the S3 original was overwritten.
+- **Late responses** from superseded attempts overwrote newer state.
+- **A failed save went only to the console.** The user advanced anyway, and "Take a new scan" cleared the only copy of the draft.
+- **A failed server persist was unrecoverable.** `persisted:false` was stripped by the client schema.
+- **Every `permission-denied` counted as "already saved" (O1).** That included genuine rule rejections: a stale consent version, version skew between rules and bundle, or no or another user's auth. The draft was cleared and no record existed: silent loss of the answers and the photo reference.
+- **A retake while a save was in flight let the old save finish the new scan.** It cleared the new scan's draft, stopped its draft writes, and stamped `final_phone` onto it, leaving it with no save button and no recovery.
 
-**Record**
-- Path: `users/{verifiedUid}/scanAnalyses/{scanId}_{sha256(analysed photo bytes)[0:16]}`.
-- The uid comes only from the verified ID token.
-- The record holds `scanId` and the full `inputSha256` as fields. Readers must never parse the document id.
+## 3. Exact changes
 
-**Write semantics**
-- Admin SDK `.create()` only; it never updates.
-- `ALREADY_EXISTS` counts as success. Same bytes always produce the same document (idempotent). A retake with different bytes produces a different document.
+### 3.1 Server persistence (C2)
 
-**Content: an explicit allowlist**
-- Analysis fields: `scores`, `region_scores`, `regions`, `score_types?`, `region_low_confidence?`, `pipeline_version`, `region_raw`, `region_raw_corrected?`, `region_hist`, `region_hist_corrected`, `region_hist_bin_edges`, `region_hist_bin_edges_corrected?`, `region_raw_native?`, `region_hist_native?`, `region_hist_bin_edges_native?`.
-- Provenance fields: `schemaVersion: 1`, `source: "server"`, `requestId`, `captureMethod?`, `createdAt` (server timestamp).
-- **Never stored:** `overlays` (base64 PNGs) or any unlisted passthrough key.
-- Any field containing an array of arrays (which Firestore rejects) is stored as a JSON string under `<field>_json`. None occur today.
-- Records over 900 KB are skipped and logged.
+Files: `app/api/skin-scan/route.ts`, `lib/scan-analysis-record.ts` (new), `lib/firebase/admin.ts`, `firestore.rules`.
 
-**Never breaks the scan**
-- One retry, with a 3 s total cap via `Promise.race`.
-- Any failure, including admin not configured, returns the normal result with `persisted:false` and HTTP 200. Success returns `persisted:true`.
-- Logs carry only the error name and code, never the message, because Firestore messages contain the document path and therefore the uid.
+- **Trigger.** The analysis request carries an optional `scanId` form field, validated with `isValidScanId`. Without it, behaviour and response are byte-identical to before. This covers old bundles.
+- **Record path.** `users/{verifiedUid}/scanAnalyses/{scanId}_{sha256(analysed bytes)[0:16]}`.
+  - The uid comes only from the verified ID token.
+  - Fields `scanId` and the full `inputSha256` are stored. Readers join on the **field**, never by parsing the document id.
+- **Write.** Admin SDK `.create()`. `ALREADY_EXISTS` counts as success. Other errors get one retry, with a 3 s cap over both attempts. Any failure returns HTTP 200 with the result and `persisted:false`; it never fails the scan.
+- **Content.** An explicit allowlist:
+  - `scores`, `region_scores`, `regions`, `score_types?`, `region_low_confidence?`, `pipeline_version`
+  - `region_raw`, `region_raw_corrected`, `region_hist`, `region_hist_corrected`, `region_hist_bin_edges`, `region_hist_bin_edges_corrected`
+  - `region_raw_native`, `region_hist_native`, `region_hist_bin_edges_native`
+  - provenance: `schemaVersion:1`, `source:"server"`, `scanId`, `inputSha256`, `requestId`, `captureMethod?`, `persistAttempt?`, `createdAt` (server timestamp)
 
-**Rules**
-- New block `match /scanAnalyses/{id}`: the owner may `get` and `list`; `write: if false`.
-- Existing rules are unchanged.
+  **Overlays are never stored.** A field containing nested arrays is stored as `<field>_json` (none do today). Records over 900 KB are skipped.
+- **Recovery marker (round 2).** The route accepts `persistAttempt` only if it equals exactly `"recovery"`. It is stored only on records created by the client's background re-request. Normal records are unchanged.
+- **Rules.** `match /scanAnalyses/{id}`: owner `get, list`; `write: if false`.
+- **Logs.** Error name and code only. Firestore messages contain the document path, which contains the uid.
 
-### C5a: recoverable save (lib/useSkinCheckFlow.ts, lib/skin-check-draft.ts, PhotoCapture.tsx, PhoneAuthStep.tsx, SkinCheckDashboard.tsx, StepAnswer.tsx)
+### 3.2 Recoverable server persistence (C2, round 2)
 
-**Save gate.** `canSaveScan(scan, answers)`: the save is allowed only when `scan.status ∈ {success, error}` **and** `answers.skin_photo === "done"`. It is checked both on the button and inside the handler, which covers the signed-out PhoneAuthForm path.
+File: `lib/api.ts`.
 
-**Capture-time draft**
-- On Analyze, the photo, `captureMethod`, `retentionConsentVersion` and `originalStored:false` are written to the IndexedDB draft before the request is sent.
-- After a refresh mid-analysis, the scan restores as a **retryable error** with its photo, so nothing is lost.
-- If IndexedDB is unavailable, `photoLostRestore` clamps back to the photo step, keeps the answers, and assigns a **fresh scanId**.
+- The client parses the optional `persisted` field.
+- If `persisted === false` on a successful analysis, it sends **one** background re-request after 5 s: same photo bytes, same `scanId`, no overlays, `persistAttempt=recovery`.
+- The re-request's result is never applied to the UI, and its failure is swallowed (warning without payload). The user's result is returned immediately and never waits on it.
+- `runSkinScan` additionally returns `persisted` (additive).
+- **The browser never writes analysis measurements.** Recovery means re-asking the trusted server path to analyse and persist.
 
-**Attempt identity**
-- `scanIdForUpdate` and a ref-backed `updateScan` handle this.
-- Async results carry the scanId they started under. A result from a superseded attempt is dropped.
-- A retake (scan returns to `idle`) mints a new scanId, so S3 originals are never overwritten. A pure retry keeps the id, which makes it idempotent on both S3 and C2.
+### 3.3 Recovery lifecycle (C5a)
 
-**Blocking, recoverable save**
-- Results open only after `saveSkinCheck` resolves, wrapped in `withTimeout(…, 15 s)`.
-- On failure or timeout, the user sees "We couldn't save your results. Check your connection and try again." and the same button retries.
-- A save that times out but lands late is harmless: the retry gets `permission-denied`, which `saveSkinCheck` already treats as "already saved".
-- The draft is cleared only after a successful save.
+Files: `lib/useSkinCheckFlow.ts`, `lib/skin-check-draft.ts`, `lib/firebase/skin-checks.ts`, `PhotoCapture.tsx`, `PhoneAuthStep.tsx`, `SkinCheckDashboard.tsx`, `StepAnswer.tsx` (prop type only).
 
-**Stop orphan draft writes.** `draftFinished` stops draft writes after the save. This covers a dashboard retry and a remount from /echo.
+| Mechanism | What it does |
+|---|---|
+| `canSaveScan` | Save is allowed only when `scan.status ∈ {success, error}` **and** `answers.skin_photo === "done"`. Checked on the button and inside the handler |
+| Capture-time draft | Photo, `captureMethod`, retention consent version and `originalStored:false` are written to IndexedDB before the request. A refresh restores a retryable error with its photo. The restore also brings back `originalStored` and `retentionConsentVersion` together |
+| `photoLostRestore` | If the draft photo is gone, clamp back to the photo step with answers kept, under a **fresh** scanId |
+| `scanIdForUpdate` / `updateScan` | Async results carry the scanId they started under, and results from superseded attempts are dropped. A return to `idle` (retake) mints a new scanId; a pure retry keeps it |
+| Blocking save | `withTimeout(saveSkinCheck, 15 s)`. On failure or timeout the user sees the retry message on the same button, and the draft is kept. The draft is cleared only after success. `draftFinished` stops later draft writes |
+| **O1 fix** (round 2, `skin-checks.ts`) | On `permission-denied`, `getDoc` the same path. It counts as saved **only if the document exists**. Otherwise, including when `getDoc` itself fails, the original error is rethrown, the retry message shows, and the draft is kept. The document shape is unchanged |
+| **Stale save** (round 2) | `finishDraftFor` / `completeSave`: a save that lands after the flow has moved to another scanId does nothing. No draft clear, no `draftFinished`, no `final_phone` commit |
 
-**Original-state restore.** `DraftScan` gains optional `originalStored` and `retentionConsentVersion`, which are restored together.
+## 4. State transitions (after this gate)
 
-### Dashboard retry (D5)
+Classes:
+- **SAFE:** no loss.
+- **RECOVERABLE:** recoverable by the stated mechanism.
+- **ORPHANED:** permanently unlinked, but data is not corrupted.
 
-- It reuses the scanId and calls `runSkinScan`, so its result is now preserved server-side by C2 at analysis time.
-- No second client persistence path was added. The `skinChecks` record remains as first written.
+| # | From → event | To | Class |
+|---|---|---|---|
+| 1 | idle → capture, Analyze | loading. Draft `{photo, result:null}` written first; flow advances | SAFE |
+| 2 | loading → upload OK + CV OK | success. Server `.create()` `scanAnalyses` (`persisted:true`); draft updated | SAFE |
+| 3 | loading → CV OK, persist fails | success, `persisted:false`. Background re-request at 5 s writes `scanAnalyses` with `persistAttempt:"recovery"`, or gets ALREADY_EXISTS if the first write landed late | RECOVERABLE (needs the tab open for 5 s) |
+| 4 | loading → upload fails | error, `stored:false`. If the PUT actually landed, the object is at the deterministic key | RECOVERABLE (dashboard retry re-uploads to the same key) |
+| 5 | loading → CV fails or times out (client 45 s, server upstream 30 s) | error | RECOVERABLE (dashboard retry) |
+| 6 | loading → presign hangs (no timeout) | stuck loading; save blocked | RECOVERABLE (refresh → row 7) |
+| 7 | loading → refresh / tab restart within 24 h | restored as error "didn't finish reading"; the server may still complete and persist | RECOVERABLE |
+| 8 | any → refresh with IndexedDB lost | photo step, fresh scanId. The old scanId's S3 object and `scanAnalyses` never get a `skinChecks` record | **ORPHANED (O2)** |
+| 9 | restored error → save | `skinChecks` = `analysis_failed` (immutable). A later dashboard retry creates `scanAnalyses` | RECOVERABLE by join on `scanAnalyses.scanId` |
+| 10 | terminal → Get my results → save OK | draft cleared; dashboard | SAFE |
+| 11 | save in flight → tab closed (memory cache drops the write) | reopen at the final step; save again | SAFE |
+| 12 | save → 15 s timeout → write lands later → retry | `permission-denied` → `getDoc` exists → saved | SAFE |
+| 13 | save → genuine rule rejection | **was ORPHANED (O1)**; now retry message, draft kept | RECOVERABLE |
+| 14 | saving → back → retake (X→Y) → X's save lands | **was ORPHANED**; now the stale save is ignored and Y continues | SAFE |
+| 15 | draft cleared → tab closed before the dashboard renders | record saved; reopen starts fresh with reused answers | SAFE |
+| 16 | dashboard → reload | record in Firestore, summary on /account; the dashboard view isn't rebuilt (overlays never stored) | SAFE (by design) |
+| 17 | dashboard error → retry → success | `skinChecks` stays `analysis_failed`; `scanAnalyses` written by the server | RECOVERABLE by join |
+| 18 | double-tap Analyze or save | ref guards + disabled button + rules deny duplicate create | SAFE |
+| 19 | late response after retake or new scan | dropped; the superseded attempt's S3 object and `scanAnalyses` remain | **ORPHANED (O3)**, by design |
+| 20 | retake during in-flight upload/CV (link not disabled) | as row 19 | **O3** |
+| 21 | two tabs on the same draft | second save refused; drafts share one slot, so a tab can lose its crash recovery | RECOVERABLE / degrades to O2 |
+| 22 | analysis done, user abandons, or returns after the 24 h TTL | S3 + `scanAnalyses`, no `skinChecks` | **ORPHANED (O2)** |
+| 23 | S3 stored but the record says `stored:false` | object findable by `scanImageKey(uid, scanId)` | RECOVERABLE. Deletion must use the prefix, never `image.stored` |
 
-## 4. Tests
+**Incomplete vs complete is decidable:**
+- **No `skinChecks` doc:** never finished.
+- **`completed` (result non-null):** finished.
+- **`analysis_failed` plus a `scanAnalyses` doc with that `scanId`:** the analysis succeeded later.
+- **`questionnaire_only`:** unreachable for new scans (legacy only).
 
-| Suite | Count | Covers |
+**Remaining permanently orphaned:**
+- O2: abandoned, TTL-expired, or IndexedDB-lost attempts.
+- O3: attempts superseded by a retake.
+
+Both leave data unlinked, never corrupted. Both need a server-side reconciler or retention GC, which is out of scope.
+
+## 5. Idempotency
+
+| Operation | Key | Duplicate behaviour |
 |---|---|---|
-| tests/scan-analysis-record.test.ts (new) | 6 | Allowlist: overlays and unknown keys excluded; native fields kept, `null` preserved; nested array → `_json`; undefined omitted; size guard; deterministic doc id |
-| tests/skin-scan-route-persist.test.ts (new) | 8 | No scanId → no write and unchanged response. Valid scanId → one `create` at `users/{verifiedUid}/scanAnalyses/{scanId}_{hash16}`. Body uid ignored. Same bytes → same id, and ALREADY_EXISTS → `persisted:true`. Different bytes → different id. `create` throws → 200 with `persisted:false`. Invalid scanId → no write. Admin not configured → `persisted:false`. Logs contain no uid |
-| tests/api-scan-id.test.ts (new) | 2 | Client sends `scanId` on the analysis path; still omits it when absent |
-| tests/scan-recovery.test.ts (new) | 5 (table-driven) | Save gate over 4 statuses × photo present/absent; restore clamp (index, dropped answer, new id); idle rotates the id while retry keeps it; stale responses dropped; `withTimeout` rejects a never-settling save and passes through a resolving one |
-| tests/firestore-rules.test.ts (extended) | +4 (24 total) | Owner can read `scanAnalyses`; another user cannot; client create refused for the owner and for another user's path |
+| Server analysis record | `{scanId}_{sha256[0:16]}`, `.create()` | Same bytes → ALREADY_EXISTS → `persisted:true`, the original record is kept unmarked. Different bytes (retake) → a separate record |
+| Background re-request | same key | If the first write landed late → ALREADY_EXISTS. Otherwise it creates the record with `persistAttempt:"recovery"`. At most one re-request |
+| Client questionnaire save | `skinChecks/{scanId}`, create-only rules | Second write → `permission-denied` → treated as saved only if the doc exists |
+| S3 original | `users/{uid}/scans/{scanId}/original.jpg` | Retry reuses the key. A retake now rotates the scanId, so no overwrite |
+| Async results | scanId tag | Superseded → dropped |
 
-**Results at commit 6e9081d**
-- `npx vitest run`: **81 passed**, 24 skipped. Baseline was 49 passed and 20 skipped. The skipped tests are the rules suite, which needs the emulator.
-- Rules suite, run under the local Firestore emulator (`firebase emulators:exec`, demo project, no production access): **24/24 passed**.
-- `npx tsc --noEmit`: clean.
-- `npx next lint`: no warnings or errors.
-- `npx next build`: succeeded.
+**Verified against the real Firestore emulator** (round-trip script, demo project, no production):
+- The record built from the real CV output fixture was accepted.
+- 10,117 bytes.
+- No overlays.
+- `createdAt` is a Timestamp.
+- Raw data read back identical.
+- A second `.create()` was refused with `code=6` (ALREADY_EXISTS).
 
-**Not covered by automated tests**
-- UI rendering of the retry message.
-- An end-to-end real-browser refresh mid-analysis.
-
-The logic behind both is covered by the pure-function tests above. A manual device test is recommended before deploy (§6).
-
-## 5. Migration and backward compatibility
-
-- **Existing scans stay readable.** `lib/firebase/skin-checks.ts`, `types/` and the `skinChecks` document shape are untouched (`git diff` empty). The skinChecks rules are unchanged, and the rules suite verifies them. `listSkinChecks` and `latestSkinCheckAnswers` read exactly as before.
-- **No backfill.** Existing scans have no `scanAnalyses` record and cannot get one: the raw data was never kept.
-- **Old bundles in the wild** send no `scanId`. They get the exact previous response, and no write happens. No rule rejects anything they send.
-- **Deploy order** (when approved):
-  1. Deploy `firestore.rules`. This is additive and safe on its own.
-  2. Deploy the frontend.
-
-  Persistence then starts for new bundles only.
-- **Precondition G2:** the production `FIREBASE_CLIENT_EMAIL` service account must hold `datastore.entities.create`. This is verified for the local service account and unknown for production (PREFLIGHT_AUDIT G2.2). If it is missing, every response has `persisted:false` and server logs show the error code. Scans are unaffected.
-- **User-visible changes**, both inside C5a's scope:
-  - "Get my results" now waits for the save, up to 15 s, and offers a retry on failure. This replaces "non-fatal by design".
-  - A refresh mid-analysis now restores the photo as "We didn't finish reading your photo. You can try again." instead of silently landing past the photo step.
-
-  Analysis semantics (scores, bands, display) are unchanged.
-- **Latency.** A normal Firestore write takes about 100 ms. The first call per instance also pays the Admin SDK's Firestore initialisation. The worst case is bounded at 3 s.
-- **Data residency.** The new record goes to the same Firestore database, `nam5` (US), as the existing `skinChecks` data. No new cross-border path is added, but PREFLIGHT_AUDIT G4.2 still stands.
-
-**Known gaps left open (documented, out of scope)**
-- After a refresh, the capture-time draft records `originalStored:false` even if the upload had already landed (under-claim).
-- If IndexedDB is unavailable after an upload, that original stays in S3 without a Firestore pointer. It is no longer overwritten.
-- The original blob is not kept in the draft. This is deliberate: a full-resolution EXIF original should not sit in local storage. So an original upload interrupted by a refresh is not retried.
-- No client sends `captureMethod` to the route yet. The field is accepted and validated.
-- Differences from IMPLEMENTATION_MAP's C2, following this gate's narrower scope:
-  - Collection is `scanAnalyses`, not `skinStates`.
-  - No server-minted id when `scanId` is missing.
-  - Hash-suffixed ids instead of `requestedScanId`.
-  - No `X-Request-ID` forwarded to CV.
-  - No `engineBuild`.
-
-  Folding this into the SkinState contract is a later gate. DECISION_LOG should record "D-21: gate 01 uses `scanAnalyses` as the raw-preservation record; SkinState semantics deferred."
-
-## 6. Before deploy (not done here)
-
-1. Resolve G2.2: confirm the production service account.
-2. Run a manual device test on iOS Safari and Android Chrome:
-   - refresh mid-analysis
-   - retake
-   - dashboard retry
-   - offline save, then retry
-3. Deploy the rules, then the frontend. Watch the logs for `analysis record not persisted`.
-
-## 7. Files changed (commit 6e9081d)
+## 6. Persisted document shape (inspected)
 
 ```
-app/api/skin-scan/route.ts                      C2 write path (verified uid, create, timeout, persisted flag)
-lib/scan-analysis-record.ts            (new)    C2 pure allowlist builder, doc id, size
+users/{uid}/scanAnalyses/{scanId}_{sha16}
+  schemaVersion: 1                    source: "server"          scanId: string
+  inputSha256: string (64 hex)        requestId: uuid           captureMethod?: "native"|"canvas"   (never sent today)
+  persistAttempt?: "recovery"         createdAt: Timestamp      pipeline_version: string
+  scores{7} · region_scores{4×7} · regions[4] · score_types{7} · region_low_confidence{4}
+  region_raw{4 regions × 22 stats}  ==  region_raw_corrected{…}          (alias kept; SKIN_STATE_CONTRACT_FINAL maps only _corrected)
+  region_hist{4 × {lab_a_hist[20], lab_a_hist_clip{4}, color_var_hist[20], color_var_hist_clip{4}}}  ==  region_hist_corrected
+  region_hist_bin_edges{lab_a_hist[21], color_var_hist[21]}  ==  …_corrected
+  region_raw_native / region_hist_native / region_hist_bin_edges_native: null   (stats=both never requested)
+```
+
+`users/{uid}/skinChecks/{scanId}` is **unchanged** (schemaVersion 1, same fields).
+
+## 7. Backward compatibility
+
+- **Old Firestore records stay readable.** The `skinChecks` shape, rules and read functions (`listSkinChecks`, `latestSkinCheckAnswers`) are unchanged. The rules suite covers them. The only change in skin-checks.ts is inside the error branch of the writer.
+- **Old bundles** send no `scanId`. They get the exact previous response, and nothing is written. No rule rejects anything they send.
+- **User-visible scores are unchanged.** Scores, bands and the dashboard are untouched.
+- **User-visible recovery changes:**
+  - "Get my results" waits for the save (up to 15 s) with a retry.
+  - A mid-analysis refresh restores the photo as retryable.
+  - A rejected save now shows the retry message instead of silently "succeeding".
+- **Deploy order** (when approved): rules, then frontend. Preconditions: PREFLIGHT_AUDIT G2.2 (production service account) and DATA_LOCALITY_DECISION / D-22 (Firestore location).
+
+## 8. Tests executed (lead, at the round-2 commit)
+
+| Check | Result |
+|---|---|
+| `npx vitest run` | **95 passed**, 24 skipped (the rules suite needs the emulator). Baseline before gate 01: 49 passed |
+| Rules suite under the Firestore emulator | **24/24 passed** (includes 4 `scanAnalyses` cases) |
+| `npx tsc --noEmit` | clean |
+| `npx next lint` | no warnings or errors |
+| `npx next build` | compiled successfully |
+| Emulator document round trip | pass (§5) |
+
+**New or extended test files:**
+
+| File | Count | Covers |
+|---|---|---|
+| `scan-analysis-record.test.ts` | 7 | Allowlist, native fields and nulls, nested-array guard, size guard, doc id, recovery marker |
+| `skin-scan-route-persist.test.ts` | 9 | No scanId → no write; verified-uid path; idempotent same bytes; distinct retake; failure → `persisted:false`; admin not configured; no uid in logs; marker clamping |
+| `api-scan-id.test.ts` | 2 | scanId sent only when given |
+| `api-persist-retry.test.ts` | 5 | `false` → exactly one delayed re-request (same scanId and bytes, no overlays, marker); `true` / absent → none; failures swallowed; result not delayed |
+| `scan-recovery.test.ts` | 5 | Save gate, restore clamp, id rotation, stale drop, `withTimeout` |
+| `save-recovery.test.ts` | 7 | permission-denied: exists → saved / missing → original error / getDoc fails → original error; other errors; timeout-then-retry; stale save after retake; current save |
+| `firestore-rules.test.ts` | +4 | `scanAnalyses` owner read; client writes denied |
+
+## 9. Known limitations (documented, not fixed)
+
+1. **O2 / O3 orphans** (rows 8, 19–22): unlinked S3 objects and `scanAnalyses` records. These need a server reconciler or retention GC.
+2. **`captureMethod` is never sent** by the client, so it is missing from every record. It is part of the SkinState comparability key (SKIN_STATE_CONTRACT_FINAL §7).
+3. **Background re-request:**
+   - It needs the tab open for 5 s.
+   - It consumes the per-IP rate-limit budget (5/min, 40/day), and a 429 there is swallowed.
+   - It is a second CV run, which is why it is marked `persistAttempt:"recovery"`. Its values may differ from what the user saw if CV output is not bit-identical or a deploy lands in between; `pipeline_version` is recorded.
+4. **The presign request has no timeout** (`lib/api.ts`). A refresh recovers from it.
+5. **No `maxDuration` on `/api/skin-scan`.** Whether the platform default covers the roughly 33 s worst case is unverified.
+6. **Under-claims:**
+   - The capture-time draft says `originalStored:false` even if the upload landed before a refresh.
+   - A record saved `analysis_failed` stays so (immutable) even when the server later stores the analysis. Readers must join.
+7. **"Retake photo" is enabled while analysis is loading**, which produces O3.
+8. **A restore IndexedDB race** (milliseconds) and a **two-tab single draft slot**.
+9. **UX dead end:** after a save, navigating back to the final step shows "Verified…" with no forward button. Data is safe.
+10. **Aliases stored twice:** `region_raw` and `region_hist` duplicate the `_corrected` versions, about 4 KB per record. This was kept to preserve the complete engine output; SkinState maps only `_corrected`.
+
+## 10. Files changed (both rounds)
+
+```
+app/api/skin-scan/route.ts                      verified uid; .create() scanAnalyses; persisted flag; persistAttempt clamp
+lib/scan-analysis-record.ts            (new)    allowlist builder, doc id, size, recovery marker
 lib/firebase/admin.ts                           adminDb()
-lib/api.ts                                      send scanId on the analysis request
+lib/api.ts                                      send scanId; parse persisted; one background recovery re-request
 firestore.rules                                 scanAnalyses: owner read, no client write
+lib/firebase/skin-checks.ts                     permission-denied counts as saved only if the doc exists (O1)
 lib/useSkinCheckFlow.ts                         canSaveScan, photoLostRestore, scanIdForUpdate, withTimeout,
-                                                updateScan (stale guard + rotate on retake), restore clamp, draftFinished
-lib/skin-check-draft.ts                         DraftScan.originalStored / retentionConsentVersion (optional)
-components/skin-check/inputs/PhotoCapture.tsx   capture-time draft write; results tagged with scanId
-components/skin-check/inputs/PhoneAuthStep.tsx  save gate, blocking save with 15 s timeout, retry message
+                                                updateScan, draftFinished, finishDraftFor, completeSave
+lib/skin-check-draft.ts                         DraftScan.originalStored / retentionConsentVersion
+components/skin-check/inputs/PhotoCapture.tsx   capture-time draft; results tagged with scanId
+components/skin-check/inputs/PhoneAuthStep.tsx  save gate; blocking save + timeout + retry; stale-save guard
 components/skin-check/SkinCheckDashboard.tsx    retry results tagged with scanId
-components/skin-check/StepAnswer.tsx            onScanChange prop type (scan, forScanId?)
-tests/scan-analysis-record.test.ts     (new)
-tests/skin-scan-route-persist.test.ts  (new)
-tests/api-scan-id.test.ts              (new)
-tests/scan-recovery.test.ts            (new)
-tests/firestore-rules.test.ts                   +4 scanAnalyses cases
+components/skin-check/StepAnswer.tsx            prop types only (onScanChange, onSaved)
+tests/scan-analysis-record.test.ts, tests/skin-scan-route-persist.test.ts, tests/api-scan-id.test.ts,
+tests/api-persist-retry.test.ts, tests/scan-recovery.test.ts, tests/save-recovery.test.ts,
+tests/firestore-rules.test.ts (+4)
 ```
+
+**Decisions to record in DECISION_LOG** (not edited in this gate, because another session holds uncommitted edits to it):
+- **D-21** (exists): `scanAnalyses` is the raw-preservation record.
+- **New:** the client may trigger exactly one server re-analysis to recover a failed persist, marked `persistAttempt:"recovery"`. The browser never writes measurements.

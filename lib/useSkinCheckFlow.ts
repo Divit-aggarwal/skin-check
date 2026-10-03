@@ -119,6 +119,26 @@ export function scanIdForUpdate(currentScanId: string, next: SkinScanState, forS
   return next.status === "idle" ? newScanId() : currentScanId;
 }
 
+/**
+ * The flow's onSaved: finishes the draft only if the save that just landed
+ * is for the CURRENT scan. A retake mid-save (back from "Saving…" to the
+ * photo step) has already moved the flow to a new scanId; finishing then
+ * would clear the NEW scan's draft and leave it unsaveable. Returns whether
+ * it finished.
+ */
+export function finishDraftFor(currentScanId: () => string, finish: () => void) {
+  return (savedScanId: string): boolean => {
+    if (currentScanId() !== savedScanId) return false;
+    finish();
+    return true;
+  };
+}
+
+/** What PhoneAuthStep does once its write lands: the answer and advance only for a current save. */
+export function completeSave(onSaved: (scanId: string) => boolean, scanId: string, commitAnswer: () => void): void {
+  if (onSaved(scanId)) commitAnswer();
+}
+
 export function useSkinCheckFlow() {
   // A completed scan already sitting in the shared (marketing)-layout
   // session (Step 4b) means this is a remount, not a first visit — e.g. the
@@ -401,11 +421,21 @@ export function useSkinCheckFlow() {
     setSession(null);
   }, [answers, setSession, setScanId]);
 
-  /** Called once the scan is safely in Firestore — the draft has no more use. */
-  const finishDraft = useCallback(() => {
-    setDraftFinished(true);
-    void clearDraft();
-  }, []);
+  /**
+   * Called once the scan is safely in Firestore — the draft has no more use.
+   * Does nothing for a superseded scan: see finishDraftFor.
+   */
+  const finishDraft = useMemo(
+    () =>
+      finishDraftFor(
+        () => scanIdRef.current,
+        () => {
+          setDraftFinished(true);
+          void clearDraft();
+        }
+      ),
+    []
+  );
 
   const activeIndex = complete ? SECTIONS.length - 1 : sectionIndex;
   const section = SECTIONS[activeIndex]!;

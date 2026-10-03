@@ -25,7 +25,7 @@ interface StepAnswerProps {
   /** Stable id for this scan attempt — the final step writes under it. */
   scanId: string;
   /** Clears the local draft once the scan is safely persisted. */
-  onSaved: () => void;
+  onSaved: (forScanId: string) => boolean;
 }
 
 export function StepAnswer({

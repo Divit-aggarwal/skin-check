@@ -63,6 +63,11 @@ describe("buildScanAnalysisRecord", () => {
     expect(record).not.toHaveProperty("captureMethod");
   });
 
+  it("persistAttempt is omitted by default and stored only when given", () => {
+    expect(buildScanAnalysisRecord(result(), META)).not.toHaveProperty("persistAttempt");
+    expect(buildScanAnalysisRecord(result(), { ...META, persistAttempt: "recovery" }).persistAttempt).toBe("recovery");
+  });
+
   it("JSON-strings a field that contains an array of arrays", () => {
     const record = buildScanAnalysisRecord(result({ region_hist_bin_edges_corrected: { h: [[0, 1], [1, 2]] } }), META);
     expect(record).not.toHaveProperty("region_hist_bin_edges_corrected");

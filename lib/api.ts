@@ -24,7 +24,15 @@ class ApiError extends Error {
 const SkinScanResponseSchema = z.object({
   ok: z.literal(true),
   result: SkinScanResultSchema,
+  // C2: whether the server wrote users/{uid}/scanAnalyses. Absent when no
+  // scanId was sent (or from an older route) — unknown, treated as fine.
+  persisted: z.boolean().optional(),
 });
+
+// Delay before the one background re-request after persisted:false — long
+// enough for a transient Firestore blip to clear, short enough that the tab
+// is very likely still open.
+const PERSIST_RETRY_DELAY_MS = 5_000;
 
 // Above the server route's own 30s upstream timeout (app/api/skin-scan/route.ts)
 // on purpose — that route always resolves (success, or a clean 502/504) within
@@ -64,6 +72,15 @@ export async function getSkinScanResult(
   overlay?: string | string[] | null,
   scanId?: string
 ): Promise<SkinScanResult> {
+  return (await requestSkinScan(photo, overlay, scanId)).result;
+}
+
+async function requestSkinScan(
+  photo: Blob,
+  overlay: string | string[] | null | undefined,
+  scanId: string | undefined,
+  persistAttempt?: "recovery"
+): Promise<{ result: SkinScanResult; persisted?: boolean | undefined }> {
   // PHASE 1 fast path — a signed-out caller is stopped before a request is
   // even built. Every route that can put a facial image on the wire funnels
   // through here.
@@ -80,6 +97,7 @@ export async function getSkinScanResult(
   // C2: lets the server persist the full analysis under this scan. Optional
   // — without it the route analyzes exactly as before and writes nothing.
   if (scanId) formData.append("scanId", scanId);
+  if (persistAttempt) formData.append("persistAttempt", persistAttempt);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), SKIN_SCAN_CLIENT_TIMEOUT_MS);
@@ -119,7 +137,7 @@ export async function getSkinScanResult(
     throw new ApiError(0, "Unexpected skin-scan response shape.");
   }
 
-  return parsed.data.result;
+  return { result: parsed.data.result, persisted: parsed.data.persisted };
 }
 
 // ─── Original image upload (private S3) ────────────────────────────────────
@@ -234,7 +252,7 @@ export async function runSkinScan(opts: {
   retentionConsent?: boolean;
   alreadyStored?: boolean;
   overlays?: string | string[] | null;
-}): Promise<{ result: SkinScanResult; originalStored: boolean }> {
+}): Promise<{ result: SkinScanResult; originalStored: boolean; persisted?: boolean | undefined }> {
   const { scanId, photo, original, retentionConsent = false, alreadyStored = false, overlays } = opts;
 
   let originalStored = alreadyStored;
@@ -243,8 +261,25 @@ export async function runSkinScan(opts: {
     originalStored = true;
   }
 
-  const result = await getSkinScanResult(photo, overlays, scanId);
-  return { result, originalStored };
+  const { result, persisted } = await requestSkinScan(photo, overlays, scanId);
+  if (persisted === false) {
+    // The server's analysis-record write failed, and nothing else would ever
+    // retry it. Re-send the same bytes under the same scanId ONCE so the
+    // SERVER re-analyzes and re-writes; the doc id is (scanId, sha256(bytes)),
+    // so this can't duplicate — and if the first write did land late,
+    // ALREADY_EXISTS keeps that original record unmarked. No overlays (never
+    // stored, costly to render). Marked persistAttempt=recovery for provenance.
+    // Fire-and-forget: the user already has `result`, and the retry's result
+    // is never applied. The browser never writes measurements itself.
+    setTimeout(() => {
+      requestSkinScan(photo, null, scanId, "recovery")
+        .then((retry) => {
+          if (retry.persisted === false) console.warn("skin-scan: analysis record still not persisted after retry.");
+        })
+        .catch(() => console.warn("skin-scan: analysis record persist retry failed."));
+    }, PERSIST_RETRY_DELAY_MS);
+  }
+  return { result, originalStored, persisted };
 }
 
 /** True when the ORIGINAL image upload failed — the analysis never ran. */

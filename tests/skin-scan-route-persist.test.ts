@@ -100,6 +100,15 @@ describe("C2 analysis persistence", () => {
     expect(data).toHaveProperty("createdAt");
   });
 
+  it("persistAttempt=recovery is stored; absent or unknown values are not", async () => {
+    await post({ scanId: SCAN_ID, persistAttempt: "recovery" });
+    await post({ scanId: SCAN_ID });
+    await post({ scanId: SCAN_ID, persistAttempt: "forged" });
+    expect(create.mock.calls[0]![1]).toMatchObject({ persistAttempt: "recovery" });
+    expect(create.mock.calls[1]![1]).not.toHaveProperty("persistAttempt");
+    expect(create.mock.calls[2]![1]).not.toHaveProperty("persistAttempt");
+  });
+
   it("same bytes twice → same doc id; ALREADY_EXISTS counts as persisted", async () => {
     await post({ scanId: SCAN_ID });
     create.mockRejectedValueOnce(Object.assign(new Error("exists"), { code: 6 }));
