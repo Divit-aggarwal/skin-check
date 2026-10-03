@@ -2,7 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { checkRequestRate, SKIN_SCAN_ROUTE_LIMITS } from "@/lib/rate-limit";
 import { AdminNotConfiguredError, bearerToken, verifyFirebaseIdToken } from "@/lib/firebase/admin";
 import { isValidScanId, ORIGINAL_CONTENT_TYPE, scanImageKey } from "@/lib/s3-key";
-import { IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
+import { IMAGE_RETENTION_CONSENT_COPY, IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
+import { appendConsent, withLedgerTimeout } from "@/app/api/account/_ledger";
 import { presignOriginalUpload, S3NotConfiguredError, UPLOAD_URL_TTL_SECONDS } from "@/lib/s3";
 
 // firebase-admin and the AWS SDK both need Node APIs.
@@ -85,6 +86,14 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // D-16: the server's own record of this consent, written before the URL is
+  // handed out, so an abandoned flow still leaves one (audit D11). Best-effort:
+  // one retry, then the URL is issued anyway. The client uploads before it
+  // scans and aborts the scan when the upload fails, so refusing here would
+  // break the live scan (D-03). The client-written skinChecks.consent block
+  // stays as the fallback record.
+  await recordRetentionConsent(uid, scanId);
+
   const key = scanImageKey(uid, scanId);
 
   let uploadUrl: string;
@@ -116,4 +125,26 @@ export async function POST(request: NextRequest) {
     expiresIn: UPLOAD_URL_TTL_SECONDS,
     contentType: ORIGINAL_CONTENT_TYPE,
   });
+}
+
+async function recordRetentionConsent(uid: string, scanId: string): Promise<void> {
+  const event = {
+    purpose: "image_retention" as const,
+    granted: true,
+    version: IMAGE_RETENTION_CONSENT_VERSION,
+    copy: IMAGE_RETENTION_CONSENT_COPY,
+    scanId,
+    source: "presign" as const,
+  };
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      await withLedgerTimeout(appendConsent(uid, event));
+      return;
+    } catch (err) {
+      // No uid in the log line: the failure is what matters, not whose.
+      if (attempt === 2) {
+        console.error("skin-scan/upload: consent ledger write failed; URL issued anyway:", (err as Error)?.message ?? "unknown");
+      }
+    }
+  }
 }
