@@ -52,7 +52,7 @@ npm ci                      # the worktree has no node_modules
 npm run test:local          # must pass before you change anything
 ```
 
-`.env.lane` (already in the worktree, gitignored) sets the lane's `PORT_BASE`. The worktree also has its own `.env.development.local` with local-only values.
+`.env.lane` (already in the worktree, gitignored) sets the lane's `PORT_BASE`. On the first run the stack script creates `.env.development.local` from `.env.development.example` (local-only values; nothing is copied from the main checkout).
 
 ## Ports
 
