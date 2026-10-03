@@ -9,6 +9,7 @@ import { saveSkinCheck } from "@/lib/firebase/skin-checks";
 import { useAuth } from "@/lib/auth-context";
 import { canSaveScan, completeSave, withTimeout } from "@/lib/useSkinCheckFlow";
 import { Button } from "@/components/ui/button";
+import { AGE_ATTESTATION_VERSION } from "@/lib/consent";
 
 const SAVE_TIMEOUT_MS = 15_000;
 
@@ -81,6 +82,10 @@ export function PhoneAuthStep({
     // identity for this session.
     const verified = user.phoneNumber ?? "";
     if (!step.savesScan) {
+      // H02a (D-19): the server keeps its own record of the age answer, now
+      // that there is a verified uid to attach it to. Best-effort: the scan
+      // never waits on it (D-03a), and chat refuses until it has landed.
+      void postAgeAttestation(user, answers.age);
       onChange(verified);
       onCommit();
       return;
@@ -203,4 +208,17 @@ export function PhoneAuthStep({
   const note = `${step.note} We'll send a verification code by SMS to confirm it — standard messaging rates may apply.`;
 
   return <PhoneAuthForm onAuthenticated={handleAuthenticated} note={note} sendLabel="Send verification code" />;
+}
+
+async function postAgeAttestation(user: User, ageBucket: unknown): Promise<void> {
+  if (typeof ageBucket !== "string" || !ageBucket) return;
+  try {
+    await fetch("/api/account/attestation", {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: `Bearer ${await user.getIdToken()}` },
+      body: JSON.stringify({ ageBucket, version: AGE_ATTESTATION_VERSION }),
+    });
+  } catch (error) {
+    console.warn("[skin-check] age attestation not recorded", error);
+  }
 }
