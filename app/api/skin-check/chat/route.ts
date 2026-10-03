@@ -157,7 +157,8 @@ export async function POST(request: NextRequest) {
   try {
     [age, aiShare] = await withLedgerTimeout(Promise.all([ageStatus(uid), latestGrant(uid, "ai_share", AI_SHARE_CONSENT_VERSION)]));
   } catch (err) {
-    console.error("skin-check chat: consent ledger unavailable:", err instanceof Error ? err.message : String(err));
+    // Name and code only: Firestore messages embed the doc path (the uid).
+    console.error("skin-check chat: consent ledger unavailable:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
     return NextResponse.json(
       { error: "Echo can't check your settings right now. Please try again.", code: "CONSENT_CHECK_UNAVAILABLE" },
       { status: 503 }
