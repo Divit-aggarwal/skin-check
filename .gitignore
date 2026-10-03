@@ -67,3 +67,9 @@ database-debug.log
 !CLAUDE.md
 !.claude/agents/*.md
 !docs/PHASE_0_RUNBOOK.md
+
+# Local stack (scripts/local-stack.sh): generated per checkout
+firebase.local.json
+.local-stack/
+.env.lane
+!docs/lanes/*.md

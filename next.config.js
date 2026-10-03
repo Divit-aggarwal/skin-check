@@ -1,3 +1,6 @@
+const { PHASE_DEVELOPMENT_SERVER } = require("next/constants");
+const { assertDevEnvSafe } = require("./lib/dev-env-guard.cjs");
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -54,4 +57,9 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+// `next dev` refuses to start when any variable points at production
+// (tracker B01). Builds and `next start` are unaffected.
+module.exports = (phase) => {
+  if (phase === PHASE_DEVELOPMENT_SERVER) assertDevEnvSafe(process.env);
+  return nextConfig;
+};

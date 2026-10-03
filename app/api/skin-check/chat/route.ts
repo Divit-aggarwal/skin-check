@@ -3,6 +3,7 @@ import { z } from "zod";
 import { checkRequestRate, consumeDailyQuota, GEMINI_ROUTE_LIMITS } from "@/lib/rate-limit";
 import { AdminNotConfiguredError, bearerToken, verifyFirebaseIdToken } from "@/lib/firebase/admin";
 import { getSkinCheckChatReply } from "@/lib/gemini";
+import { geminiApiKey } from "@/lib/gemini-key";
 import { ECHO_REGIONS, ECHO_REGION_LABELS } from "@/lib/echo-regions";
 import { isValidScanId } from "@/lib/s3-key";
 import { loadTrustedEchoContext } from "@/lib/echo-trusted-context";
@@ -99,8 +100,8 @@ export async function POST(request: NextRequest) {
   // block below and get flattened into the same 502 as a real Gemini outage
   // — same reasoning as /api/skin-scan's SCAN_MISCONFIGURED check. An unset
   // key is a deploy misconfiguration (500), not a provider failure (502).
-  if (!process.env.GEMINI_API_KEY) {
-    console.error("GEMINI_API_KEY is not set — refusing to call Gemini.");
+  if (!geminiApiKey()) {
+    console.error("Gemini API key is not set (GEMINI_API_KEY, or GEMINI_DEV_API_KEY in development) — refusing to call Gemini.");
     return NextResponse.json(
       { error: "Echo isn't configured yet.", code: "CHAT_MISCONFIGURED" },
       { status: 500 }

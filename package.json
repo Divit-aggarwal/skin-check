@@ -12,7 +12,9 @@
     "typecheck": "tsc --noEmit",
     "lint": "next lint",
     "test": "vitest run",
-    "test:rules": "npx -y firebase-tools@latest emulators:exec --only firestore --project demo-rules-check \"vitest run tests/firestore-rules.test.ts\""
+    "test:rules": "npx -y firebase-tools@latest emulators:exec --only firestore --project demo-rules-check \"vitest run tests/firestore-rules.test.ts\"",
+    "dev:local": "bash scripts/local-stack.sh up",
+    "test:local": "bash scripts/local-stack.sh test"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",

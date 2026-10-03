@@ -1,4 +1,5 @@
 import { GoogleGenAI } from "@google/genai";
+import { geminiApiKey } from "@/lib/gemini-key";
 import { summarizeSkinCheckAnswers, summarizeSkinScanScores } from "@/lib/skin-check-format";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import type { SkinScanScores } from "@/types/skin-scan";
@@ -17,8 +18,8 @@ let client: GoogleGenAI | null = null;
 
 function getClient(): GoogleGenAI {
   if (!client) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) throw new Error("GEMINI_API_KEY is not set.");
+    const apiKey = geminiApiKey();
+    if (!apiKey) throw new Error("The Gemini API key is not set.");
     client = new GoogleGenAI({ apiKey });
   }
   return client;

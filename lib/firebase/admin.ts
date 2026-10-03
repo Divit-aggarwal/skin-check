@@ -48,9 +48,25 @@ export class AdminNotConfiguredError extends Error {
 // getApps() keeps repeat calls and dev fast-refresh on one instance.
 const APP_NAME = "admin";
 
+export function usesEmulators(): boolean {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    !!process.env.FIREBASE_AUTH_EMULATOR_HOST &&
+    !!process.env.FIRESTORE_EMULATOR_HOST
+  );
+}
+
 function adminApp(): App {
   const existing = getApps().find((app) => app.name === APP_NAME);
   if (existing) return existing;
+
+  // Local stack only (npm run dev:local): both emulators set, never in
+  // production. firebase-admin then talks to the emulators and needs no
+  // credential; production keeps the fail-closed path below.
+  if (usesEmulators()) {
+    if (!PROJECT_ID) throw new AdminNotConfiguredError(["FIREBASE_PROJECT_ID (or NEXT_PUBLIC_FIREBASE_PROJECT_ID)"]);
+    return initializeApp({ projectId: PROJECT_ID }, APP_NAME);
+  }
 
   const missing: string[] = [];
   if (!PROJECT_ID) missing.push("FIREBASE_PROJECT_ID (or NEXT_PUBLIC_FIREBASE_PROJECT_ID)");

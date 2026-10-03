@@ -26,6 +26,10 @@ const REGION = process.env.S3_SKIN_IMAGES_REGION;
 const BUCKET = process.env.S3_SKIN_IMAGES_BUCKET;
 const ACCESS_KEY_ID = process.env.S3_SKIN_IMAGES_ACCESS_KEY_ID;
 const SECRET_ACCESS_KEY = process.env.S3_SKIN_IMAGES_SECRET_ACCESS_KEY;
+// Local stack only (S3Mock, npm run dev:local). Ignored in production, so a
+// stray variable can never send users' photos to another host.
+const ENDPOINT = process.env.NODE_ENV === "production" ? "" : process.env.S3_SKIN_IMAGES_ENDPOINT ?? "";
+const ENDPOINT_CONFIG = ENDPOINT ? { endpoint: ENDPOINT, forcePathStyle: true } : {};
 
 export const UPLOAD_URL_TTL_SECONDS = 300;
 
@@ -55,6 +59,7 @@ function s3(): S3Client {
   // execution role / Vercel-AWS OIDC if this ever moves to one.
   client ??= new S3Client({
     region: REGION!,
+    ...ENDPOINT_CONFIG,
     ...(ACCESS_KEY_ID && SECRET_ACCESS_KEY
       ? { credentials: { accessKeyId: ACCESS_KEY_ID, secretAccessKey: SECRET_ACCESS_KEY } }
       : {}),
