@@ -11,6 +11,8 @@ import {
   scanAnalysisDocId,
 } from "@/lib/scan-analysis-record";
 import { SkinScanResultSchema, type CaptureMethod, type SkinScanResult } from "@/types/skin-scan";
+import { parseCaptureQuality } from "@/lib/capture-quality/schema";
+import type { CaptureQuality } from "@/lib/capture-quality/types";
 
 // firebase-admin needs Node APIs and hard-fails on the Edge runtime. This is
 // already the App Router default; stated explicitly so a future edge opt-in
@@ -382,7 +384,9 @@ export async function POST(request: NextRequest) {
   const captureMethod: CaptureMethod | undefined =
     capture === "native" || capture === "canvas" ? capture : undefined;
   const persistAttempt = formData.get("persistAttempt") === "recovery" ? "recovery" : undefined;
-  const persisted = await persistScanAnalysis(uid, scanId, image, parsed.data, captureMethod, persistAttempt);
+  // C01, client-asserted: an invalid value is dropped, never a reason to refuse the scan.
+  const captureQuality = parseCaptureQuality(formData.get("captureQuality"), captureMethod);
+  const persisted = await persistScanAnalysis(uid, scanId, image, parsed.data, captureMethod, persistAttempt, captureQuality);
   return NextResponse.json({ ok: true, result: parsed.data, persisted });
 }
 
@@ -403,12 +407,13 @@ async function persistScanAnalysis(
   image: Blob,
   result: SkinScanResult,
   captureMethod: CaptureMethod | undefined,
-  persistAttempt: "recovery" | undefined
+  persistAttempt: "recovery" | undefined,
+  captureQuality: CaptureQuality | undefined
 ): Promise<boolean> {
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
     const inputSha256 = createHash("sha256").update(Buffer.from(await image.arrayBuffer())).digest("hex");
-    const record = buildScanAnalysisRecord(result, { scanId, inputSha256, requestId: randomUUID(), captureMethod, persistAttempt });
+    const record = buildScanAnalysisRecord(result, { scanId, inputSha256, requestId: randomUUID(), captureMethod, persistAttempt, captureQuality });
     const bytes = recordByteSize(record);
     if (bytes > MAX_RECORD_BYTES) {
       console.error(`skin-scan: analysis record too large (${bytes} bytes) — not persisted.`);

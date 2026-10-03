@@ -313,6 +313,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
       original,
       retentionConsent: hasRetentionConsent,
       overlays: OVERLAY_CATEGORIES,
+      captureQuality: quality,
     })
       .then(({ result, originalStored }) =>
         onScanChange(

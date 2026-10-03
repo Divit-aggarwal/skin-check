@@ -4,6 +4,7 @@ import { auth } from "@/lib/firebase/client";
 import { IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
 import { SkinScanResultSchema } from "@/types/skin-scan";
 import type { CaptureMethod, SkinScanResult } from "@/types/skin-scan";
+import type { CaptureQuality } from "@/lib/capture-quality/types";
 import type { EchoRegion } from "@/lib/echo-regions";
 
 class ApiError extends Error {
@@ -80,7 +81,8 @@ async function requestSkinScan(
   overlay: string | string[] | null | undefined,
   scanId: string | undefined,
   captureMethod?: CaptureMethod,
-  persistAttempt?: "recovery"
+  persistAttempt?: "recovery",
+  captureQuality?: CaptureQuality
 ): Promise<{ result: SkinScanResult; persisted?: boolean | undefined }> {
   // PHASE 1 fast path — a signed-out caller is stopped before a request is
   // even built. Every route that can put a facial image on the wire funnels
@@ -102,6 +104,8 @@ async function requestSkinScan(
   // analysis record. Absent only from callers that have no capture.
   if (captureMethod) formData.append("captureMethod", captureMethod);
   if (persistAttempt) formData.append("persistAttempt", persistAttempt);
+  // C01 capture gate result for `photo`, client-asserted; the route validates or drops it.
+  if (captureQuality) formData.append("captureQuality", JSON.stringify(captureQuality));
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), SKIN_SCAN_CLIENT_TIMEOUT_MS);
@@ -264,8 +268,9 @@ export async function runSkinScan(opts: {
   retentionConsent?: boolean;
   alreadyStored?: boolean;
   overlays?: string | string[] | null;
+  captureQuality?: CaptureQuality | undefined;
 }): Promise<{ result: SkinScanResult; originalStored: boolean; persisted?: boolean | undefined }> {
-  const { scanId, photo, captureMethod, original, retentionConsent = false, alreadyStored = false, overlays } = opts;
+  const { scanId, photo, captureMethod, original, retentionConsent = false, alreadyStored = false, overlays, captureQuality } = opts;
 
   let originalStored = alreadyStored;
   if (original && retentionConsent && !alreadyStored) {
@@ -273,7 +278,7 @@ export async function runSkinScan(opts: {
     originalStored = true;
   }
 
-  const { result, persisted } = await requestSkinScan(photo, overlays, scanId, captureMethod);
+  const { result, persisted } = await requestSkinScan(photo, overlays, scanId, captureMethod, undefined, captureQuality);
   if (persisted === false) {
     // The server's analysis-record write failed, and nothing else would ever
     // retry it. Re-send the same bytes under the same scanId ONCE so the
@@ -284,7 +289,7 @@ export async function runSkinScan(opts: {
     // Fire-and-forget: the user already has `result`, and the retry's result
     // is never applied. The browser never writes measurements itself.
     setTimeout(() => {
-      requestSkinScan(photo, null, scanId, captureMethod, "recovery")
+      requestSkinScan(photo, null, scanId, captureMethod, "recovery", captureQuality)
         .then((retry) => {
           if (retry.persisted === false) console.warn("skin-scan: analysis record still not persisted after retry.");
         })
