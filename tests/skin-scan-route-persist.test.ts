@@ -23,6 +23,8 @@ vi.mock("@/lib/firebase/admin", async () => {
 import { POST } from "@/app/api/skin-scan/route";
 import { AdminNotConfiguredError } from "@/lib/firebase/admin";
 import { NextRequest } from "next/server";
+import { toSkinState } from "@/lib/skin-state";
+import { syntheticAnalysis, syntheticNative } from "./synthetic-scan";
 
 const SCAN_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const SCORES = { redness: 1, oiliness: 1, texture: 1, pores: 0, blemishes: 1, hydration: 1, pigment: 1 };
@@ -158,5 +160,49 @@ describe("C2 analysis persistence", () => {
     const res = await post({ scanId: SCAN_ID });
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ok: true, result: RESULT, persisted: false });
+  });
+});
+
+describe("gate 04: native stats, engine build and capture method reach the record and skinstate-1", () => {
+  it("always requests stats=both upstream, with or without overlays", async () => {
+    await post({ overlay: "redness" });
+    await post();
+    const urls = vi.mocked(fetch).mock.calls.map(([url]) => new URL(String(url)));
+    expect(urls.map((u) => u.searchParams.get("stats"))).toEqual(["both", "both"]);
+    expect(urls[0]!.searchParams.get("overlays")).toBe("redness");
+    expect(urls[1]!.searchParams.has("overlays")).toBe(false);
+  });
+
+  it("request → response → persisted record → toSkinState", async () => {
+    const upstream: Record<string, unknown> = { ...syntheticAnalysis(), overlays: {}, ...syntheticNative(), engine_build: "sha-synthetic0000" };
+    vi.mocked(fetch).mockResolvedValueOnce(new Response(JSON.stringify(upstream), { status: 200 }));
+
+    const res = await post({ scanId: SCAN_ID, captureMethod: "native" });
+    const body = await res.json();
+    expect(body.persisted).toBe(true);
+    expect(body.result.engine_build).toBe("sha-synthetic0000");
+    expect(body.result.region_raw_native).toEqual(upstream.region_raw_native);
+    // Corrected output the UI reads is passed through untouched.
+    expect(body.result.scores).toEqual(upstream.scores);
+    expect(body.result.region_raw_corrected).toEqual(upstream.region_raw_corrected);
+
+    const [path, data] = create.mock.calls[0]!;
+    expect(data).toMatchObject({
+      engine_build: "sha-synthetic0000",
+      captureMethod: "native",
+      region_raw_native: upstream.region_raw_native,
+      region_hist_native: upstream.region_hist_native,
+      region_hist_bin_edges_native: upstream.region_hist_bin_edges_native,
+    });
+
+    // createdAt is a serverTimestamp() sentinel here; Firestore returns a Timestamp.
+    const result = toSkinState({ ...data, createdAt: new Date("2026-10-10T10:00:00Z") }, path);
+    if (result.kind !== "skinstate") throw new Error(JSON.stringify(result));
+    expect(result.state.input.captureMethod).toBe("native");
+    expect(result.state.engine.statsPath).toBe("both");
+    const cheeks = result.state.regions.cheeks;
+    expect(cheeks?.status === "available" && cheeks.colour.native).toMatchObject({ lStarMean: 55, lStarSd: 5 });
+    // Stored on the record, but skinstate-1 (frozen) has no mapping for it.
+    expect(result.state.engine.build).toBeNull();
   });
 });

@@ -63,6 +63,13 @@ describe("buildScanAnalysisRecord", () => {
     expect(record).not.toHaveProperty("captureMethod");
   });
 
+  it("engine_build is kept verbatim when a non-empty string, absent otherwise", () => {
+    expect(buildScanAnalysisRecord(result({ engine_build: "sha-0123abc" }), META).engine_build).toBe("sha-0123abc");
+    for (const engine_build of [undefined, null, "", 42]) {
+      expect(buildScanAnalysisRecord(result({ engine_build }), META)).not.toHaveProperty("engine_build");
+    }
+  });
+
   it("persistAttempt is omitted by default and stored only when given", () => {
     expect(buildScanAnalysisRecord(result(), META)).not.toHaveProperty("persistAttempt");
     expect(buildScanAnalysisRecord(result(), { ...META, persistAttempt: "recovery" }).persistAttempt).toBe("recovery");

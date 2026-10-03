@@ -107,6 +107,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, answers }: Skin
         const retried = await runSkinScan({
           scanId,
           photo,
+          captureMethod,
           original,
           // Carried from the capture step, never re-asserted here: this screen
           // shows no consent control, so a retry can only ever store what the

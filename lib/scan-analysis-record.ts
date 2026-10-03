@@ -28,8 +28,8 @@ const ANALYSIS_FIELDS = [
   "region_hist_corrected",
   "region_hist_bin_edges",
   "region_hist_bin_edges_corrected",
-  // Colour-measurement candidates if the CV service ever runs stats=both;
-  // null today, which Firestore stores fine.
+  // Colour-measurement candidates: the route requests stats=both (gate 04).
+  // Absent on records written before that.
   "region_raw_native",
   "region_hist_native",
   "region_hist_bin_edges_native",
@@ -73,6 +73,10 @@ export function buildScanAnalysisRecord(result: SkinScanResult, meta: ScanAnalys
   };
   if (meta.captureMethod) record.captureMethod = meta.captureMethod;
   if (meta.persistAttempt) record.persistAttempt = meta.persistAttempt;
+  // Exact CV build (skin-scan `engine_build`, the immutable image tag). Kept
+  // only as a non-empty string; anything else is absent, never guessed.
+  const engineBuild = source.engine_build;
+  if (typeof engineBuild === "string" && engineBuild) record.engine_build = engineBuild;
 
   for (const field of ANALYSIS_FIELDS) {
     const value = source[field];

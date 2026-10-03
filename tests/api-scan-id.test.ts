@@ -39,7 +39,7 @@ beforeEach(() => vi.unstubAllGlobals());
 describe("scanId on the analysis request", () => {
   it("runSkinScan sends its scanId", async () => {
     const bodies = stubScan();
-    await runSkinScan({ scanId: SCAN_ID, photo });
+    await runSkinScan({ scanId: SCAN_ID, photo, captureMethod: "native" });
     expect(bodies[0]!.get("scanId")).toBe(SCAN_ID);
   });
 

@@ -68,7 +68,7 @@ None of these decisions has been implemented. "PROPOSED" means the investigation
   - Users screenshot "62/100" one week and "41/100" the next and read it as improvement (Agent 6, attack 5).
 - The mandatory disclaimer next to the number does not neutralise that reading.
 
-**D-07 Request `?stats=both` and persist native stats. (NEEDS-APPROVAL: latency/cost; touches the engine call contract, not the engine)**
+**D-07 Request `?stats=both` and persist native stats. (APPROVED 2026-10-03 by the gate-04 brief; IMPLEMENTED in gate 04, not deployed — IMPLEMENTATION_GATE_04.md)**
 - **Evidence:** native L*/ITA is the only realistic colour-measurement candidate. Whole-frame gray-world plus CLAHE destroys absolute colour.
 - **Cost:** +43% p95, per PROJECT_CONTEXT.md.
 - **Alternative:** run native stats offline on retained scored bytes (needs D-11).

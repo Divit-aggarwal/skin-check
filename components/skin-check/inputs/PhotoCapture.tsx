@@ -283,6 +283,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     void runSkinScan({
       scanId,
       photo: blob,
+      captureMethod,
       original,
       retentionConsent: hasRetentionConsent,
       overlays: OVERLAY_CATEGORIES,

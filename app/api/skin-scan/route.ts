@@ -158,10 +158,12 @@ export async function POST(request: NextRequest) {
   const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
   // No overlay requested means no overlay returned — the cheapest path, not
-  // the most expensive one.
-  const scanUrl = overlay
-    ? `${SKIN_SCAN_API_URL}/scan?overlays=${encodeURIComponent(overlay)}`
-    : `${SKIN_SCAN_API_URL}/scan`;
+  // the most expensive one. stats=both (D-07, gate 04) adds the uncorrected
+  // "native" colour statistics the measurement-validation protocol needs;
+  // every corrected field the UI reads is unchanged by it.
+  const query = new URLSearchParams({ stats: "both" });
+  if (overlay) query.set("overlays", overlay);
+  const scanUrl = `${SKIN_SCAN_API_URL}/scan?${query}`;
 
   let upstreamResponse: Response;
   try {
