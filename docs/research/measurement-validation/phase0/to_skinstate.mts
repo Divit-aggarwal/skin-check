@@ -5,7 +5,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { toSkinState } from "../../../../lib/skin-state";
 import { scanAnalysisDocId } from "../../../../lib/scan-analysis-record";
 
-const dir = "docs/research/measurement-validation/phase0/results";
+const dir = `docs/research/measurement-validation/phase0/${process.env.RESULTS_DIR ?? "results"}`;
 const { rows } = JSON.parse(readFileSync(`${dir}/matrix.json`, "utf8"));
 const out = rows.map((r: any) => {
   const { overlays: _o, ...resp } = r.response;

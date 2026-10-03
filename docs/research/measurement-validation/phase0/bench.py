@@ -35,7 +35,7 @@ from pipeline.preprocess import preprocess  # noqa: E402
 ENGINE = os.environ.get("ENGINE_URL", "http://127.0.0.1:18000")
 SECRET = os.environ["SCAN_SECRET"]
 HERE = os.path.dirname(os.path.abspath(__file__))
-RESULTS = os.path.join(HERE, "results")
+RESULTS = os.path.join(HERE, os.environ.get("RESULTS_DIR", "results"))  # results_0_1_6 for the 0.1.6 re-run
 OUT_IMG = os.environ["OUT_IMG"]
 SOURCE = os.path.join(REPO, "fixtures", "input_face.png")
 

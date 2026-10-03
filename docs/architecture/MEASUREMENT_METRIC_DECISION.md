@@ -7,7 +7,7 @@
 | Decision | **MD-1**, 2026-10-03 |
 | Status | **ACCEPTED** for study design. It changes **no production behaviour and no contract**. The `skinstate-1` field names and classes are untouched |
 | Evidence | [PHASE_0_RESULTS.md](../research/measurement-validation/PHASE_0_RESULTS.md): a **partial** Phase 0, on one image, on the production digest `sha256:668b1f56…`. Determinism: 500/500 bit-identical |
-| Applies to | Engine `scan-0.1.5-provisional` (the deployed digest) only. Any engine change re-opens every row (ACCEPTANCE §G, PROTOCOL §8). **That includes gate 04's `scan-0.1.6`** (skin-scan `8dc37dc`, not deployed): Phase 0 must be re-run on its pinned digest |
+| Applies to | Engine `scan-0.1.5-provisional` (deployed digest `668b1f56…`) **and `scan-0.1.6-provisional`** at the bench digest `sha256:ce51ed2d…` (skin-scan `8dc37dc`, gate 04, not deployed). Re-confirmed by a full Phase 0 re-run: see the 0.1.6 addendum (§6). Any other engine build re-opens every row (ACCEPTANCE §G, PROTOCOL §8), **including CI's eventual build of `8dc37dc`**, whose digest will differ |
 | Supersedes | The P1–P5/D1 primary list in PROTOCOL §2.2, **for the human study only** (see §3). Only P5's removal is forced by a gate failure. Removing P2, P4 and D1 (all INCONCLUSIVE) follows the smallest-set instruction, and **the owner may reverse it before Phase 1 pre-registration** |
 | DECISION_LOG | Not edited here, because uncommitted entries D-22 and D-24 belong to another session. Add **D-25 → this file** when those are committed |
 
@@ -94,3 +94,21 @@
 - The `skinstate-1` contract: no rename, no reclassification, no new field. `texture.gradientMean`'s documented unit is now known to be wrong. That is recorded here for the **next** contract version, not edited.
 - Any production code, route, rule, prompt or engine setting.
 - Any user-facing threshold. **No longitudinal threshold is introduced.**
+
+## 6. Addendum A (2026-10-03): Phase 0 re-run on scan-0.1.6
+
+**Evidence:** [PHASE_0_0_1_6_RESULTS.md](../research/measurement-validation/PHASE_0_0_1_6_RESULTS.md). The rule was pre-registered in `phase0/CLASSIFICATION_RULE_0_1_6.md` (`fb9dfc2`) before any 0.1.6 response existed.
+
+- **Engine:** `scan-0.1.6-provisional`, a local bench build of skin-scan `8dc37dc` from a clean export, pinned at `sha256:ce51ed2dce3e2d4a3c3a00deadcd123e2f799ec785f348a4bd98802e2760088c`.
+  - `engine_build` is `bench-local-8dc37dc…`, because no CI or ECR artifact exists.
+  - It ran under the same emulated amd64 runtime and flags as the 0.1.5 run. No production call.
+- **Result: every class in §2 is unchanged.**
+  - For identical transmitted bytes, all 30 matrix responses and all 500 determinism submissions (5 fresh containers) are **bit-identical** to the 0.1.5 digest, apart from `pipeline_version` and the new `engine_build` key.
+  - The unchanged analysis reproduces the 0.1.5 summary byte for byte.
+  - Both declared DROP deviations were re-declared under their pre-registered conditions (mechanism code unchanged; signature reproduced).
+- **Premise correction:** 0.1.6 does not add native colour. `stats=both` already existed in 0.1.5, and the 0.1.5 bench used it. 0.1.6 adds only `engine_build` and the version string.
+- **Build drift, recorded:** a fresh build of the same pins resolved 11 transitive pip packages and one apt package differently from `668b1f56`. Every measurement-path package (numpy, opencv, mediapipe, scikit-image, pillow) was identical, and no measured value moved. Each future image still needs this replay.
+- **What the re-run does not add:** new evidence about any field. It is still one retouched image, n = 1; native KEEP is still close to guaranteed by construction; and A2, §4.5 and native hardware remain unrun. §4's conditions bind unchanged.
+- **One correction to the §2 wording,** from the same data: native `aStarMean` is also flat (non-increasing) on cheeks at +1 EV (+1.34 → +1.30), not only on forehead and nose.
+
+**FINAL 0.1.6 CANDIDATE SET: unchanged.** `colour.native.lStarMean` (cheeks, forehead) and `colour.native.aStarMean` (cheeks, nose), both KEEP FOR HUMAN VALIDATION. Neither is a validated skin measurement.

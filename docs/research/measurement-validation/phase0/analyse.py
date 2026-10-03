@@ -9,7 +9,7 @@ import os
 import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-R = os.path.join(HERE, "results")
+R = os.path.join(HERE, os.environ.get("RESULTS_DIR", "results"))
 matrix = json.load(open(os.path.join(R, "matrix.json")))
 states = {s["variant"]: s["skinState"] for s in json.load(open(os.path.join(R, "skinstates.json")))}
 rows = {r["variant"]: r for r in matrix["rows"]}
