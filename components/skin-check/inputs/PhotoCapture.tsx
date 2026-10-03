@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useReducer, useRef, useState, type ChangeEvent } from "react";
 import { Camera, RotateCcw } from "lucide-react";
 import { useCameraStream } from "@/hooks/useCameraStream";
 import { useAuth } from "@/lib/auth-context";
@@ -13,6 +13,9 @@ import {
   PRIVACY_POLICY_URL,
 } from "@/lib/consent";
 import { saveDraftScan } from "@/lib/skin-check-draft";
+import { frameFromBlob } from "@/lib/capture-quality/frame";
+import { canAnalyze, canOverride, captureFlowReducer, initialCaptureFlow, runCaptureGate } from "@/lib/capture-quality/gate";
+import { RETAKE_COPY } from "@/lib/capture-quality/retake";
 import { Button } from "@/components/ui/button";
 import type { PhotoCaptureStep } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanState } from "@/types/skin-scan";
@@ -113,19 +116,26 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   const originalBlobRef = useRef<Blob | null>(null);
   const hasCaptured = previewUrl !== null;
 
+  // The retake loop (C01) and both consent booleans, in one pure reducer
+  // (lib/capture-quality/gate.ts) so a retake clears the photo's gate result
+  // and both consents in the same transition.
+  //
   // Required data-collection consent (PART 11-15 of the redesign brief) —
-  // gates the scan request itself, not just the button's disabled look.
-  // Local, session-scoped state: re-mounting this step (e.g. navigating
-  // away and back) resets it, and retaking a photo resets it explicitly
-  // below, so consent never silently carries over to a different image.
-  const [hasConsented, setHasConsented] = useState(false);
-  // SEPARATE permission, separate boolean, deliberately never merged with the
-  // one above: that one allows this photo to be analyzed, this one allows the
-  // original to be RETAINED in private S3. Optional — declining it still gives
-  // the user their analysis, it just means nothing is stored. Local state
-  // only: never written to the draft, so a new scan (or a retake) has to ask
-  // again rather than inheriting an answer given for a different image.
-  const [hasRetentionConsent, setHasRetentionConsent] = useState(false);
+  // `hasConsented` gates the scan request itself, not just the button's
+  // disabled look. Local, session-scoped state: re-mounting this step (e.g.
+  // navigating away and back) resets it, and every retake resets it, so
+  // consent never silently carries over to a different image.
+  // `hasRetentionConsent` is a SEPARATE permission, separate boolean,
+  // deliberately never merged with the one above: that one allows this photo
+  // to be analyzed, this one allows the original to be RETAINED in private
+  // S3. Optional — declining it still gives the user their analysis, it just
+  // means nothing is stored. Never written to the draft, so a new scan (or a
+  // retake) has to ask again rather than inheriting an answer given for a
+  // different image.
+  const [flow, dispatch] = useReducer(captureFlowReducer, initialCaptureFlow);
+  const { hasConsented, hasRetentionConsent } = flow;
+  // Tags each capture so a gate result that arrives after a retake is dropped.
+  const photoSeqRef = useRef(0);
   // "Analyze my skin" is only disabled once `scan.status` flips to "loading",
   // which is a re-render away — two taps inside the same tick would both get
   // through and bill two upstream CV jobs for one photo. Reset on retake, so
@@ -165,6 +175,16 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     return () => URL.revokeObjectURL(url);
   }, [scan]);
 
+  // Checks the exact bytes the engine will receive (capturedBlobRef), so the
+  // result describes the image whose hash becomes inputSha256.
+  const startGate = useCallback((blob: Blob, captureMethod: CaptureMethod) => {
+    const photoId = ++photoSeqRef.current;
+    dispatch({ type: "captured", photoId });
+    void frameFromBlob(blob).then((frame) =>
+      dispatch({ type: "gateResult", photoId, quality: runCaptureGate(frame, { captureMethod, retakeCount: 0 }) })
+    );
+  }, []);
+
   const handleCapture = useCallback(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -183,13 +203,14 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
         // the CV blob and the stored "original" are the same bytes.
         capturedBlobRef.current = blob;
         originalBlobRef.current = blob;
+        startGate(blob, "canvas");
         setPreviewUrl(URL.createObjectURL(blob));
         stopCamera();
       },
       "image/jpeg",
       0.92
     );
-  }, [videoRef, stopCamera]);
+  }, [videoRef, stopCamera, startGate]);
 
   const handleNativeFileChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -203,8 +224,9 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     originalBlobRef.current = file;
     const cvBlob = await downscaleToJpeg(file, 1280, 0.92);
     capturedBlobRef.current = cvBlob;
+    startGate(cvBlob, "native");
     setPreviewUrl(URL.createObjectURL(file));
-  }, []);
+  }, [startGate]);
 
   const handleRetake = useCallback(() => {
     setPreviewUrl((prev) => {
@@ -214,8 +236,8 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     capturedBlobRef.current = null;
     originalBlobRef.current = null;
     scanRequestedRef.current = false;
-    setHasConsented(false);
-    setHasRetentionConsent(false);
+    // Clears both consents and the gate result; a late result for the old photo is ignored.
+    dispatch({ type: "retake" });
     if (isMobile) {
       fileInputRef.current?.click();
     } else {
@@ -235,7 +257,9 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   }, [handleRetake, onChange, onScanChange]);
 
   const handleConfirm = useCallback(() => {
-    if (!hasConsented || scanRequestedRef.current) return;
+    // Consent AND the gate (O-4 soft block): pending or an un-overridden
+    // retake verdict never reaches the request.
+    if (!canAnalyze(flow) || scanRequestedRef.current) return;
     // Belt to getSkinScanResult's braces (lib/api.ts throws on the same
     // condition). Here so an unauthenticated tap is a silent no-op rather
     // than a rejected promise rendered as "analysis failed".
@@ -245,6 +269,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     if (!blob || !original) return;
     scanRequestedRef.current = true;
     const captureMethod: CaptureMethod = isMobile ? "native" : "canvas";
+    const quality = flow.quality ?? undefined;
 
     // Unlock the next section immediately. The scan runs in the background
     // while the user answers the remaining sections; by the time they reach
@@ -267,6 +292,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
       captureMethod,
       originalStored: false,
       retentionConsentVersion,
+      quality,
     });
     // Request every traversable category's overlay in this one call — the
     // skin-scan service accepts a comma-separated `overlays` list and
@@ -298,6 +324,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
             captureMethod,
             originalStored,
             retentionConsentVersion,
+            quality,
           },
           scanId
         )
@@ -327,9 +354,10 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           // failed (case B), so the record must not claim otherwise.
           originalStored: !isUploadError(err) && Boolean(original) && hasRetentionConsent,
           retentionConsentVersion,
+          quality,
         }, scanId);
       });
-  }, [hasConsented, hasRetentionConsent, onChange, onCommit, onScanChange, isMobile, user, scanId]);
+  }, [flow, hasRetentionConsent, onChange, onCommit, onScanChange, isMobile, user, scanId]);
 
   // Firebase hasn't reported yet — holding the frame is the difference
   // between "we don't know" and "you're signed out" (failure case 6).
@@ -452,7 +480,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
             <input
               type="checkbox"
               checked={hasConsented}
-              onChange={(e) => setHasConsented(e.target.checked)}
+              onChange={(e) => dispatch({ type: "consent", analysis: e.target.checked })}
               className="mt-0.5 h-4 w-4 shrink-0 rounded border-text/30 text-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
             />
             <span>
@@ -482,7 +510,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
             <input
               type="checkbox"
               checked={hasRetentionConsent}
-              onChange={(e) => setHasRetentionConsent(e.target.checked)}
+              onChange={(e) => dispatch({ type: "consent", retention: e.target.checked })}
               className="mt-0.5 h-4 w-4 shrink-0 rounded border-text/30 text-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
             />
             <span>
@@ -497,6 +525,23 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
               </a>
             </span>
           </label>
+
+          {/* Gate status (C01). Instruction only: no score or number. */}
+          <div aria-live="polite" className="max-w-sm text-sm">
+            {flow.gate === "pending" && <p className="text-text/60">Checking your photo…</p>}
+            {flow.gate === "done" && flow.quality && flow.quality.retakeReasons.length > 0 && (
+              <p className="text-text/80">{RETAKE_COPY[flow.quality.retakeReasons[0]!]}</p>
+            )}
+          </div>
+          {canOverride(flow) && (
+            <button
+              type="button"
+              onClick={() => dispatch({ type: "override" })}
+              className="w-fit text-sm font-medium text-text underline underline-offset-4 hover:text-blush"
+            >
+              Use this photo anyway
+            </button>
+          )}
 
           <div className="flex gap-2">
             <Button
@@ -514,7 +559,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
               type="button"
               variant="ink"
               size="sm"
-              disabled={scan.status === "loading" || !hasConsented}
+              disabled={scan.status === "loading" || !canAnalyze(flow)}
               onClick={handleConfirm}
             >
               {scan.status === "loading" ? "Analyzing…" : "Analyze my skin"}

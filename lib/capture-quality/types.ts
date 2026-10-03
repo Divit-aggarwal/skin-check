@@ -4,9 +4,25 @@
 // and never copied into skinstate-1's `quality` block.
 
 import type { CaptureMethod } from "@/types/skin-scan";
-import type { RetakeReason } from "./retake";
 
-export type { RetakeReason };
+// One named list of retake reasons: on-device checks and engine refusals.
+export const RETAKE_REASONS = [
+  // on-device
+  "too_dark",
+  "too_bright",
+  "blurry",
+  "too_small",
+  "too_far_or_close",
+  "face_not_centred",
+  "face_turned",
+  "expression_not_neutral",
+  // from the engine or the route, via /api/skin-scan
+  "no_face_found",
+  "unreadable_image",
+  "engine_too_small",
+  "engine_too_large",
+] as const;
+export type RetakeReason = (typeof RETAKE_REASONS)[number];
 
 /** One decoded image, RGBA in ImageData layout: data.length === width * height * 4. */
 export interface Frame {

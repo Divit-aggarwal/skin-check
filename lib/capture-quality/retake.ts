@@ -1,23 +1,8 @@
 import { ApiError } from "@/lib/api";
 
-// One named list of retake reasons: on-device checks and engine refusals.
-export const RETAKE_REASONS = [
-  // on-device
-  "too_dark",
-  "too_bright",
-  "blurry",
-  "too_small",
-  "too_far_or_close",
-  "face_not_centred",
-  "face_turned",
-  "expression_not_neutral",
-  // from the engine or the route, via /api/skin-scan
-  "no_face_found",
-  "unreadable_image",
-  "engine_too_small",
-  "engine_too_large",
-] as const;
-export type RetakeReason = (typeof RETAKE_REASONS)[number];
+import { RETAKE_REASONS, type RetakeReason } from "./types";
+
+export { RETAKE_REASONS, type RetakeReason };
 
 /** Instruction only: no number, score or comparison. */
 export const RETAKE_COPY: Record<RetakeReason, string> = {

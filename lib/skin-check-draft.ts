@@ -2,6 +2,7 @@
 
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanResult } from "@/types/skin-scan";
+import type { CaptureQuality } from "@/lib/capture-quality/types";
 
 // Anonymous, pre-authentication draft storage for an in-progress Skin Check.
 //
@@ -132,6 +133,8 @@ export interface DraftScan {
    */
   originalStored?: boolean | undefined;
   retentionConsentVersion?: string | undefined;
+  /** The capture gate result for `photo` (C01). Absent on older drafts. */
+  quality?: CaptureQuality | undefined;
 }
 
 function openDb(): Promise<IDBDatabase | null> {

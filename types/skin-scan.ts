@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { CaptureQuality, RetakeReason } from "@/lib/capture-quality/types";
 
 // Matches the skin-scan service's POST /scan response exactly — the 7th key
 // is `pigment`, not `pigmentation`. Do not rename to match Gemini's vision
@@ -146,8 +147,13 @@ export type CaptureMethod = "native" | "canvas";
 // (lib/consent.ts); its absence is what stops the upload from happening at
 // all, and it is never carried over from another scan or restored from a
 // draft.
+//
+// `quality` is the on-device capture gate result for `photo` (C01). It is
+// client-asserted (D-26): shown and stored for provenance, never used for
+// comparability. `retakeReason` is set when the engine refused the photo for
+// a reason a retake can fix (lib/capture-quality/retake.ts).
 export type SkinScanState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "success"; result: SkinScanResult; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined }
-  | { status: "error"; message: string; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined };
+  | { status: "success"; result: SkinScanResult; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined }
+  | { status: "error"; message: string; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined; retakeReason?: RetakeReason | undefined };
