@@ -60,7 +60,8 @@ describe.skipIf(!WEB)("privacy: erasure end to end", () => {
     expect(await objects(A.uid)).toBe(2);
     expect(await objects(B.uid)).toBe(2);
     const bBefore = await tree(B.uid);
-    expect(bBefore).toEqual({ exists: true, collections: ["consentLedger", "scanAnalyses", "skinChecks"] });
+    expect(bBefore).toEqual({ exists: true, collections: ["consentLedger", "routineEvents", "scanAnalyses", "skinChecks"] });
+    expect((await db.collection("users").doc(A.uid).collection("routineEvents").get()).size).toBe(1);
 
     const signedIn = await emulatorPhoneSignIn(A.phoneNumber);
     expect(signedIn.localId).toBe(A.uid);

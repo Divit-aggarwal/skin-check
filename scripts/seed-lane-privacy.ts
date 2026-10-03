@@ -15,6 +15,8 @@ import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { AGE_ATTESTATION_COPY, AGE_ATTESTATION_VERSION, AI_SHARE_CONSENT_COPY, AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 import { sha256 } from "@/app/api/account/_ledger";
 import { scanImageKey } from "@/lib/s3-key";
+import { CATALOG_VERSION } from "@/lib/catalog/catalogue";
+import { ROUTINE_EVENT_SCHEMA_VERSION, RoutineEventInputSchema } from "@/lib/routine/events";
 
 const PROJECT = process.env.FIREBASE_PROJECT_ID ?? "";
 const S3_ENDPOINT = process.env.S3_SKIN_IMAGES_ENDPOINT ?? "";
@@ -73,6 +75,22 @@ async function main() {
   // Something in every place erasure must clear, for both erase users.
   for (const { uid } of [PRIVACY_SEED.eraseA, PRIVACY_SEED.eraseB]) {
     const userRef = db.collection("users").doc(uid);
+    // Routine lane request (H01): routine events live under users/{uid} too.
+    const event = RoutineEventInputSchema.parse({
+      eventId: "5eed0000-0000-4000-8000-00000000e1a5",
+      type: "start",
+      productId: "sample-cleanser",
+      effectiveDate: "2026-10-01",
+      schedule: { slot: "AM", days: [0, 1, 2, 3, 4, 5, 6] },
+      timeZone: "Asia/Kolkata",
+    });
+    await userRef.collection("routineEvents").doc(event.eventId).set({
+      ...event,
+      schemaVersion: ROUTINE_EVENT_SCHEMA_VERSION,
+      catalogVersion: CATALOG_VERSION,
+      recordedAt: Timestamp.now(),
+      source: "user",
+    });
     for (const scanId of ["privacy-scan-1", "privacy-scan-2"]) {
       await userRef.collection("skinChecks").doc(scanId).set({
         schemaVersion: 1,
