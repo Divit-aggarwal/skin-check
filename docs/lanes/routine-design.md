@@ -18,7 +18,7 @@ The owner approved this design with these answers. Where a decision changes the 
 | R-4 | **A.** No skin data and no claims on the routine page. | The wording and import tests apply to the page. |
 | R-5 | **B.** Our catalogue plus one unnamed entry, "other product (not ours)". No free text. | `OTHER_PRODUCT_ID` (§2.2). |
 | R-6 | **A.** The server writes the events. | Rules are read-only for clients (§2.4). |
-| Names | Real product names such as "Clear Seal" get an **exact-name exception** from the word check. The check still applies to usage text and all other wording. | `PRODUCT_NAME_EXCEPTIONS` (§4). |
+| Names | Real product names such as "Clear Seal" get an **exact-name exception** from the word check. The check still applies to usage text and all other wording. | `PRODUCT_NAME_EXCEPTIONS` (§4). Recorded as a proposed D-12 *clarification* ("a registered own-brand product name is not by itself a claim"), not a change: D-12 is LOCKED. |
 
 ## 1. What will be built
 
@@ -28,7 +28,7 @@ The owner approved this design with these answers. Where a decision changes the 
 
 **E04: adherence summary.** This is a pure function. It takes the events and a date range, and says for each product, day and slot whether the user reported **used**, reported **skipped**, or reported nothing, which is **unknown**. A missing log is always "unknown" and never "skipped". It returns counts only: no percentage, no score and no threshold. Days in the future are left out.
 
-**Routine page.** A simple page at `/routine` where a signed-in user sees their current routine, adds or stops a product, and logs used or skipped. It shows product names and the schedule only. It shows no scan, no skin reading, no band and no product claim. That keeps products and skin results apart (D-12).
+**Routine page.** A simple page at `/routine` where a signed-in user sees their current routine, adds or stops a product, and logs used or skipped. It shows product names, the schedule, and the user's own used / skipped / not-logged record for the last 7 days (E04 counts, no rate). It does not show `usageText`. It shows no scan, no skin reading, no band and no product claim. That keeps products and skin results apart (D-12).
 
 ## 2. Data shapes
 
@@ -47,7 +47,7 @@ Catalogue = {
 }
 
 Product = {
-  id: string,                    // stable slug, /^[a-z0-9-]+$/, never reused
+  id: string,                    // stable slug, /^[a-z0-9-]+$/, never reused; a row is never removed, only marked "discontinued"
   versionId: string,             // changes only on a real reformulation (RECOMMENDATION_MODEL §3, GS1 rule 263)
   dataSource: "synthetic" | "owner",
   name: string,
@@ -103,6 +103,10 @@ RoutineEventInput =
 eventId:       UUID v4, chosen by the client, used as the doc id (makes retries safe)
 productId:     a product id in the current CATALOGUE, or OTHER_PRODUCT_ID ("other-not-ours"; R-5 B)
 toProductId:   the same rule as productId
+               `start` and `substitute.toProductId` also need availability "available" (400 `product_not_available`);
+               `stop`, `schedule_change`, `usage` and `substitute.productId` accept any catalogue row, so a
+               user can always stop or log an out-of-stock or discontinued item. OTHER_PRODUCT_ID is always accepted.
+schedule.slot: not checked against Product.slot. The record is self-reported; judging use is E02, not this lane.
 effectiveDate: "YYYY-MM-DD", the user's local day the event applies to; not after "today" in timeZone
 timeZone:      IANA name (checked with Intl.DateTimeFormat), default "Asia/Kolkata"
                (no lower limit on effectiveDate, and the user may pick any valid zone: this is
@@ -127,6 +131,8 @@ There are no free-text fields. Stop reasons, notes and non-catalogue product nam
 // lib/routine/events.ts
 currentRoutine(events, onDate) -> RoutineItem[]
 RoutineItem = { productId, schedule: Schedule, since: string /* YYYY-MM-DD */ }
+// since = effectiveDate of the start (or substitute) that began the current active period;
+// schedule_change, and a substitute into an already-active product, do not move it.
 
 // lib/routine/adherence.ts
 adherence(events, { from, to, today }) -> {   // all three are YYYY-MM-DD
@@ -136,7 +142,7 @@ adherence(events, { from, to, today }) -> {   // all three are YYYY-MM-DD
 ```
 
 Meaning, fixed here so the tests can pin it:
-- `today` is computed by the caller (the route), in the time zone of the request (default `Asia/Kolkata`). `adherence()` itself never reads a clock. Event dates are used exactly as written; when a user's events carry different time zones, no conversion is done, because each date is the user's own local day.
+- `today` is computed by the caller: `GET /api/routine/events?tz=<IANA>` (checked with Intl, default `Asia/Kolkata`, 400 `bad_time_zone` if invalid). GET returns `{ today, events, routine: currentRoutine(events, today), adherence: adherence(events, { from: today − 6 days, to: today, today }) }`. `adherence()` itself never reads a clock. Event dates are used exactly as written; when a user's events carry different time zones, no conversion is done, because each date is the user's own local day.
 - Events are applied in order of `effectiveDate`, then `recordedAt`, then `eventId`. The tiebreak is deterministic.
 - `start` on day D: the product is in the routine **from D** (inclusive).
 - `stop` on day D: the product is **not** in the routine **on D** (exclusive).
@@ -162,17 +168,18 @@ This differs from the brief ("allow `create`") and from DATA_MODEL ("client, rul
 
 ## 3. Files
 
-### Add (all inside the routine ownership list)
+### Add (the routine ownership list, plus the owner-named design and report files)
 
 | File | Purpose |
 |---|---|
 | `lib/catalog/schema.ts` | zod schema, types, `CATALOG_SCHEMA_VERSION` |
-| `lib/catalog/catalogue.ts` | `CATALOG_VERSION`, `CATALOGUE` (synthetic until R-3), `getProduct(id)` |
+| `lib/catalog/catalogue.ts` | `CATALOG_VERSION`, `CATALOGUE` (synthetic until R-3), `getProduct(id)`, `PRODUCT_NAME_EXCEPTIONS` |
+| `lib/catalog/wording.ts` | The D-12 banned-word list and matcher, shared by the catalogue and copy tests |
 | `lib/catalog/catalogue-template.csv` | Owner fill-in template, one synthetic example row (**added with this design**) |
 | `lib/routine/events.ts` | Event schemas, `ROUTINE_EVENT_SCHEMA_VERSION`, `currentRoutine()` |
 | `lib/routine/adherence.ts` | `adherence()` |
 | `lib/routine/copy.ts` | Every user-facing routine string, in one place so one test can check them all |
-| `app/api/routine/events/route.ts` | `GET` (own events and current routine), `POST` (append one event) |
+| `app/api/routine/events/route.ts` | `GET ?tz=` (own events, current routine, 7-day adherence), `POST` (append one event) |
 | `app/(marketing)/routine/page.tsx` | Page shell |
 | `components/routine/RoutinePage.tsx` | Client component: list, add, stop, swap, log |
 | `scripts/seed-lane-routine.ts` | Routine events for the two seed users (local stack only) |
@@ -193,7 +200,7 @@ This differs from the brief ("allow `create`") and from DATA_MODEL ("client, rul
 
 ### Not changed
 
-- `lib/skin-check-skus.ts`: not needed. `SKU_DISPLAY` stays as it is; E02 or OPEN-R1 decides its fate.
+- `lib/skin-check-skus.ts`: not needed. `SKU_DISPLAY` stays as it is; E02 decides its fate (R-2 B: no cards).
 - `components/skin-check/SkinCheckDashboard.tsx`: no routine link (see §5).
 - `.env.development.example`: no new variable.
 - `package.json`: no new dependency. zod, vitest, firebase-admin and `@firebase/rules-unit-testing` are already installed.
@@ -218,8 +225,8 @@ All are unit tests (vitest) unless marked emulator. Emulator tests run under `np
 - Failure: an unknown `ingredientClass` is rejected.
 - Failure: `shopifyHandleVerified: true` with `shopifyHandle: null` is rejected.
 - Every row of `catalogue-template.csv` has exactly the header's column count. The test holds an explicit table mapping each CSV column to its schema field (for example `mrp_inr` → `price.mrpInr`, `claim_1_text` → `claims[0].text`, `shopify_handle_verified` yes/no → boolean). The test fails if a column has no mapping or a schema field has no column. This catches drift between the template and the schema.
-- Every user-visible catalogue field (`name`, `usageText`) passes the same D-12 word check as `routine-copy.test.ts`. An owner name such as "Brightening Serum" fails here, **unless** the full name is listed exactly in `PRODUCT_NAME_EXCEPTIONS` (`lib/catalog/catalogue.ts`; owner decision, for real brand names such as "Clear Seal"). The exception is exact and whole-name only: "Clear Seal Serum" is not excepted, and `usageText` never is.
-- `PRODUCT_NAME_EXCEPTIONS` has a self-check: the excepted name is skipped, and the same words in a usage text still fail.
+- The catalogue's wording fields (`name`, shown on the page, and `usageText`, the only usage wording anyone may repeat) pass the same D-12 word check as `routine-copy.test.ts`. A product name that contains a banned word fails, **unless** it is a registered own-brand name listed exactly in `PRODUCT_NAME_EXCEPTIONS` (`lib/catalog/catalogue.ts`), such as "Clear Seal". Each entry carries `{ name, approvedBy: "owner", date, reason }`. The exception applies only to a product with `dataSource: "owner"` whose whole `name` equals the entry (case-sensitive): "Clear Seal Serum" is not excepted, a synthetic product is never excepted, and `usageText` never is. A name that is itself an efficacy statement is not a brand name and needs explicit D-12 sign-off, not a list entry.
+- The exception rule takes the list as a parameter; its self-check passes a planted list (excepted owner name passes, longer name fails, synthetic product fails, the same words in usage text fail). Every real entry has an owner approval, a date and a reason.
 
 **`routine-events.test.ts` (E03, pure)**
 - Each event type parses.
@@ -272,7 +279,7 @@ All are unit tests (vitest) unless marked emulator. Emulator tests run under `np
 - Failure: the test's own self-check shows that a planted "your skin improved" string is caught.
 - No file under `lib/routine/**`, `lib/catalog/**`, `app/api/routine/**`, `components/routine/**` or `app/(marketing)/routine/**` imports `gemini`, `echo`, `skin-check-rules`, `skin-state` or `scanAnalyses`.
 - No routine UI file references `claims`.
-- The same check runs over `CATALOGUE[].name` (except an exact `PRODUCT_NAME_EXCEPTIONS` match) and `CATALOGUE[].usageText` (no exception), the catalogue fields the page shows.
+- The same check runs over `CATALOGUE[].name` (except an exact `PRODUCT_NAME_EXCEPTIONS` match) and `CATALOGUE[].usageText` (no exception).
 
 **`routine-route.test.ts` (route, with the Admin SDK mocked as in the existing route tests)**
 - Failure: no token gives 401.
@@ -281,12 +288,14 @@ All are unit tests (vitest) unless marked emulator. Emulator tests run under `np
 - Failure: an unknown `productId` gives 400 `unknown_product`.
 - `OTHER_PRODUCT_ID` is accepted as `productId` and as `toProductId`.
 - Failure: an unknown `toProductId` gives 400 `unknown_product`.
+- Failure: `start` of a product that is not "available" gives 400 `product_not_available`; `stop` and `usage` of it are accepted.
+- Failure: `GET` with an invalid `tz` gives 400 `bad_time_zone`; `GET` returns `routine` and `adherence` for the caller.
 - Failure: `toProductId === productId` gives 400.
 - POST writes to `users/{uid from the token}/routineEvents/{eventId}` and nowhere else. This is the owner-only write check, since under R-6 A only the route can write.
 - Failure: a future `effectiveDate` for the given time zone gives 400 `future_date`. Asia/Kolkata midnight is tested.
 - Failure: an invalid time zone gives 400.
 - A valid event is stored with `recordedAt` from the server, `catalogVersion`, `source: "user"` and `schemaVersion`.
-- A replay with the same `eventId` and an identical body gives 200 and no second write.
+- A replay with the same `eventId` and the same **input fields** gives 200 and no second write. Only the input fields are compared (not `recordedAt`, `catalogVersion` or `schemaVersion`), so a replay after a catalogue version bump still gives 200. The write is `docRef.create()`; on ALREADY_EXISTS the route reads the doc and compares, so two racing requests cannot both write.
 - Failure: the same `eventId` with a different body gives 409.
 - A substitution creates a new document and leaves the earlier start document byte-identical.
 - `GET` returns only the caller's events.
@@ -318,20 +327,28 @@ All are unit tests (vitest) unless marked emulator. Emulator tests run under `np
 - privacy (H01): add `users/{uid}/routineEvents/*` to the list of places user data lives. `recursiveDelete` on `users/{uid}` covers it, and the erasure test should seed one routine event.
 - privacy (D-16): R-1 A is approved. The purpose text for the routine record ("So you can keep a record of your own routine and see it back. Only you see it. It is not used for analytics, not sent to Gemini and not joined to your scans.") belongs in `lib/consent.ts`, which privacy owns. Until then the page shows the same sentence from `lib/routine/copy.ts`.
 
+**Proposed DECISION_LOG entries (the lane cannot edit DECISION_LOG; the owner records them):**
+- R-1 A: supersedes B14 for the user's own routine record only (purpose: the user keeps and sees their record; no analytics, no Gemini, no join to scans).
+- R-5 B: one unnamed "other product (not ours)" entry; no free text.
+- R-6 A: the server writes `users/{uid}/routineEvents/{eventId}`; clients read only. Replaces DATA_MODEL's client-written `events/{autoId}` and routine.md's "allow `create`".
+- D-12 clarification: a registered own-brand product name, listed with owner approval, is not by itself a claim. Usage text and all other wording stay under the word check.
+
 **Proposed tracker rows (the lane cannot edit the tracker):**
+- "Replace the synthetic CATALOGUE with owner data (R-3 A, lane step 9) before the Phase 0 deploy. The deploy is blocked while any product has `dataSource: 'synthetic'`."
+- "docs/lanes/routine.md: list `docs/lanes/routine-design.md` as owned, and replace 'allow `create`' with R-6 A."
 - "Purpose conflict: RECOMMENDATION_MODEL §8, DATA_MODEL (Events row), SYSTEM_MODEL C16 and DECISION_LOG B14 mark Routine, ProductUse and Adherence as LATER on purpose-limitation grounds. The tracker assigns E03 and E04 to the routine lane." This is R-1.
 - "RECOMMENDATION_MODEL §3 and IMPLEMENTATION_MAP C8 name `lib/catalog.ts`. The lane uses `lib/catalog/` (a folder). The product shape also changes: `inci` is always a list, `activeConcentrationPct` becomes `active | null`, and `dataSource`, `category`, `price`, `availability`, `regions`, `usageText` and `contraindications` are new. Update the docs at merge."
 
 ## 6. Steps
 
-Every step needs the owner's approval of this design first (README rule 3). Each step ends with `npx vitest run` green for its tests, then typecheck, then a commit. Step 1 needs no other owner decision. Steps 2 to 4 are pure code that stores nothing, but the tracker's operating rule 5 ("LATER stays LATER") means even E03/E04 code waits for R-1.
+Every step needs the owner's approval of this design first (README rule 3). Each step ends with `npx vitest run` green for its tests, then typecheck, then a commit. Step 1 needs no other owner decision. R-1 A is resolved, so steps 2 to 8 go ahead. Step 9 is skipped (R-3 A).
 
 | # | Step | Ends with | Needs |
 |---|---|---|---|
 | 1 | Catalogue schema, synthetic sample `CATALOGUE`, template column check (E01) | `catalog-schema.test.ts` green; commit | design approval |
-| 2 | Event schemas and `currentRoutine()` projection, pure (E03 model) | `routine-events.test.ts` green; commit | **R-1** (A or B), **R-5** |
-| 3 | `adherence()`, pure (E04) | `routine-adherence.test.ts` green; commit | **R-1** (A or B) |
-| 4 | `lib/routine/copy.ts` and the D-12 wording and import-boundary test | `routine-copy.test.ts` green; commit | **R-1** (A or B) |
+| 2 | Event schemas and `currentRoutine()` projection, pure (E03 model) | `routine-events.test.ts` green; commit | resolved: R-1, R-5 |
+| 3 | `adherence()`, pure (E04) | `routine-adherence.test.ts` green; commit | resolved: R-1 |
+| 4 | `lib/routine/copy.ts` and the D-12 wording and import-boundary test | `routine-copy.test.ts` green; commit | resolved: R-1 |
 | 5 | `firestore.rules` lane section and emulator rules tests | `firestore-rules-routine.test.ts` green under `npm run test:local`; commit | **R-1, R-6** |
 | 6 | `POST`/`GET /api/routine/events` | `routine-route.test.ts` green; commit | **R-1, R-6** |
 | 7 | `scripts/seed-lane-routine.ts` | `npm run test:local` green; commit | **R-1** |
@@ -339,7 +356,7 @@ Every step needs the owner's approval of this design first (README rule 3). Each
 | 9 | Replace the synthetic catalogue with owner data from the template | `catalog-schema.test.ts` green; commit | **R-3**. **Skipped** (R-3 A: no owner data yet) |
 | 10 | `routine-report.md`, full typecheck, lint and `npm run build` | all green; commit | none |
 
-R-2 (OPEN-R1) blocks no step. R-5 is best answered together with the design approval, because step 2 writes its schema.
+All decisions are resolved (§0).
 
 ## 7. Owner decisions
 
@@ -352,9 +369,9 @@ R-2 (OPEN-R1) blocks no step. R-5 is best answered together with the design appr
 - **B. Build the pure code only:** steps 1 to 4 (schema, model, adherence), with no rules, route or page. Nothing is stored until a real consumer exists (for example F01 Echo context, or an "irritation reported" event).
 - **C. Defer E03 and E04.** Do E01 (the catalogue schema) only.
 
-**Recommendation: A.** The user seeing their own record is a real, honest purpose. The design already keeps the data away from scans, Gemini and analytics, and it has no free text. If the owner is unsure, B is the safe middle: steps 2 to 4 are needed under A anyway.
+**Decision: A** (owner, 2026-10-03). The user seeing their own record is a real, honest purpose. The design already keeps the data away from scans, Gemini and analytics, and it has no free text. If the owner is unsure, B is the safe middle: steps 2 to 4 are needed under A anyway.
 
-**Blocks:** steps 2, 3 and 4 until the answer is A or B; steps 5, 6, 7 and 8 until the answer is A. Under C, steps 2 to 8 are dropped. **Does not block:** steps 1, 9 and 10.
+**Blocks:** resolved.
 
 ### R-2. Do product recommendation cards come back? (OPEN-R1, D-09)
 
@@ -364,7 +381,7 @@ R-2 (OPEN-R1) blocks no step. R-5 is best answered together with the design appr
 - **A. Cards return:** E02 builds `recommend(answers, catalog)` on this catalogue.
 - **B. No cards:** the catalogue serves the routine picker only, and later Echo's product facts.
 
-**Recommendation: B for now.** Cards would need E02 (eligibility) and E05 (red flags with clinical sign-off), and neither exists yet. Showing products without that safety gate is the larger risk. Reconsider A once E02 and E05 are done. Either way, keep products out of the scan dashboard until G02 is reviewed under D-12.
+**Decision: B** (owner, 2026-10-03). Cards would need E02 (eligibility) and E05 (red flags with clinical sign-off), and neither exists yet. Showing products without that safety gate is the larger risk. Reconsider A once E02 and E05 are done. Either way, keep products out of the scan dashboard until G02 is reviewed under D-12.
 
 **Blocks:** no step in this lane. **Does not block:** steps 1 to 10.
 
@@ -373,14 +390,14 @@ R-2 (OPEN-R1) blocks no step. R-5 is best answered together with the design appr
 **In plain words.** The lane ships a schema and a fake sample product. Real products must come from the owner. That means names, the verified Shopify handle, ingredient class, full INCI list, active ingredient and %, label warnings, who should avoid each product (pregnancy, prescription), MRP in rupees and pack size, availability, usage text, and each marketing claim with its evidence level, source and date. Claims need substantiation under the ASCI Code (RECOMMENDATION_MODEL §5).
 
 **Options.**
-- **A.** The owner fills `lib/catalog/catalogue-template.csv` (one row per product; up to 3 claims per row, add columns for more). An engineer copies it into `lib/catalog/catalogue.ts`. The schema test then checks it.
+- **A.** The owner fills `lib/catalog/catalogue-template.csv` (one row per product; up to 3 claims per row; add `claim_4_*` columns for more, and the test maps `claim_<n>_*` by pattern). An engineer copies it into `lib/catalog/catalogue.ts`. The schema test then checks it.
 - **B.** The owner sends the data in another form, and the engineer converts it.
 
-**Recommendation: A.** A test keeps the template's columns and the schema matched. There is no CSV parser at runtime and no new dependency.
+**Decision: A** (owner, 2026-10-03). A test keeps the template's columns and the schema matched. There is no CSV parser at runtime and no new dependency.
 
-How to fill the template: one row per product; lists (`ingredient_classes`, `inci`, `warnings`, `contraindications`, `regions`) are separated by `;`; a cell containing a comma goes in double quotes; `shopify_handle_verified` is `yes` or `no`; an empty cell means "none" or "not known yet"; `mrp_inr` is whole rupees. Product names and usage text must not contain efficacy words (the test in §4 checks them).
+How to fill the template: one row per product; lists (`ingredient_classes`, `inci`, `warnings`, `contraindications`, `regions`) are separated by `;`; a cell containing a comma goes in double quotes; `shopify_handle_verified` is `yes` or `no`; an empty cell means "none" or "not known yet"; `mrp_inr` is whole rupees. Product names and usage text must not contain efficacy words (the test in §4 checks them), except a registered brand name the owner lists exactly in `PRODUCT_NAME_EXCEPTIONS`; usage text has no exception.
 
-**Blocks:** step 9 only. **Does not block:** steps 1 to 8 and 10, which use the synthetic sample. The synthetic sample must be replaced before the final deploy. Every sample product has `dataSource: "synthetic"` and "SYNTHETIC" in its name, so it cannot be mistaken for a real product.
+**Blocks:** step 9 only (skipped). **Does not block:** steps 1 to 8 and 10, which use the synthetic sample. The synthetic sample must be replaced before the final deploy (proposed tracker row, §5). Every sample product has `dataSource: "synthetic"` and "SYNTHETIC" in its name, so it cannot be mistaken for a real product.
 
 ### R-4. Confirm that D-12 applies to the routine page
 
@@ -390,7 +407,7 @@ How to fill the template: one row per product; lists (`ingredient_classes`, `inc
 - **A.** Confirm. The routine page has no skin data and no claims; the wording test applies.
 - **B.** Allow skin readings on the routine page. That is a G02 feature and needs a separate D-12 review.
 
-**Recommendation: A.** It is the only option that cannot be read as "this product did that to your skin".
+**Decision: A** (owner, 2026-10-03). It is the only option that cannot be read as "this product did that to your skin".
 
 **Blocks:** step 8 (the page). **Does not block:** steps 1 to 7, 9 and 10.
 
@@ -403,9 +420,9 @@ How to fill the template: one row per product; lists (`ingredient_classes`, `inc
 - **B.** Catalogue products plus one generic "other product (not ours)" entry, with no name.
 - **C.** Catalogue products plus free-text names.
 
-**Decision: B** (owner, 2026-10-03). Recommendation was A for v1. It is the smallest amount of personal data. B can be added later as one catalogue row if the owner wants it. C is not recommended.
+**Decision: B** (owner, 2026-10-03). Recommendation was A for v1. It is the smallest amount of personal data. B is built as `OTHER_PRODUCT_ID` in `lib/routine/events.ts`, not as a catalogue row (§2.2). C is not built.
 
-**Blocks:** step 2, which writes the event schema. Please answer R-5 with the design approval; choosing B or C after step 2 means a schema change. **Does not block:** steps 1, 3, 4 and 9.
+**Blocks:** step 2, which writes the event schema. **Does not block:** steps 1, 3, 4 and 9.
 
 ### R-6. Who writes the events: the server, or the browser under Firestore rules?
 
@@ -415,6 +432,6 @@ How to fill the template: one row per product; lists (`ingredient_classes`, `inc
 - **A. Server writes (recommended).** One validator (zod, the same as everywhere else). The server stamps the time. The product id is checked against the catalogue. Retries are safe through `eventId`. The rules are one line, `allow write: if false`, the same pattern as `scanAnalyses`. It matches D-26's direction (the server decides what is stored).
 - **B. Client writes, rules validate** (as in the brief and DATA_MODEL). It needs no API route, but the schema must be written a second time in the rules language and kept in step with zod. The catalogue check cannot be done in rules unless the product ids are copied into `firestore.rules`. And `recordedAt` must be checked as `request.time`.
 
-**Recommendation: A.** It is less code, it has one source of truth for the schema, and the append-only guarantee is stronger (clients cannot write at all). The collection name `routineEvents` replaces DATA_MODEL's generic `events/` because only routine events exist. The DATA_MODEL row would be updated at merge.
+**Decision: A** (owner, 2026-10-03). It is less code, it has one source of truth for the schema, and the append-only guarantee is stronger (clients cannot write at all). The collection name `routineEvents` replaces DATA_MODEL's generic `events/` because only routine events exist. The DATA_MODEL row would be updated at merge.
 
 **Blocks:** steps 5 and 6. Under B, step 6 is dropped and step 5 grows. **Does not block:** steps 1 to 4 and 7 to 10. The seed (step 7) writes through the Admin SDK, which bypasses the rules, so it is the same under A or B.
