@@ -1,31 +1,23 @@
 {
   "permissions": {
     "deny": [
-      "Bash(terraform apply *)",
-      "Bash(terraform * apply *)",
-      "Bash(terraform destroy *)",
-      "Bash(terraform * destroy *)",
-      "Bash(firebase firestore:databases:delete *)",
-      "Bash(* firebase firestore:databases:delete *)",
-      "Bash(firebase firestore:delete *)",
-      "Bash(* firebase firestore:delete *)",
-      "Bash(gcloud firestore databases delete *)",
-      "Bash(gcloud * firestore databases delete *)",
+      "Bash(*terraform* apply*)",
+      "Bash(*terraform* destroy*)",
+      "Bash(*firestore:databases:delete*)",
+      "Bash(*firestore:delete*)",
+      "Bash(*firebase* deploy*)",
+      "Bash(*deploy --only*)",
+      "Bash(*gcloud* firestore databases delete*)",
       "mcp__plugin_firebase_firebase__firestore_delete_database",
-      "Bash(aws ecs update-service *)",
-      "Bash(aws * ecs update-service *)",
-      "Bash(aws ecs register-task-definition *)",
-      "Bash(aws * ecs register-task-definition *)",
-      "Bash(*vercel* --prod*)",
-      "Bash(*vercel* --target=production*)",
-      "Bash(*vercel* --target production*)",
-      "Bash(*vercel promote *)",
-      "Bash(vc * --prod*)",
-      "Bash(vc promote *)",
       "mcp__plugin_firebase_firebase__firebase_deploy",
-      "Bash(firebase deploy *)",
-      "Bash(* firebase deploy *)",
-      "Bash(vc --prod*)"
+      "Bash(*aws* ecs update-service*)",
+      "Bash(*aws* ecs register-task-definition*)",
+      "Bash(*vercel* --prod*)",
+      "Bash(*vercel* --target*production*)",
+      "Bash(*vercel* promote*)",
+      "Bash(*vc* --prod*)",
+      "Bash(*vc* --target*production*)",
+      "Bash(*vc* promote*)"
     ]
   }
 }
