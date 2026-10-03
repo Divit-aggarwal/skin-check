@@ -1,4 +1,5 @@
 import type { CaptureMethod, SkinScanResult } from "@/types/skin-scan";
+import type { CaptureQuality } from "@/lib/capture-quality/types";
 
 // Pure, SDK-free: builds the server-written `users/{uid}/scanAnalyses/{id}`
 // record (C2). Lives apart from the route so the allowlist is testable
@@ -43,6 +44,10 @@ export interface ScanAnalysisMeta {
   // Set only by the client's one background re-request after persisted:false
   // — the record then comes from a second CV run, not the one the user saw.
   persistAttempt?: "recovery" | undefined;
+  // The on-device capture gate result for these exact bytes (C01, owner O-2).
+  // CLIENT-ASSERTED (assertedBy: "client"), validated by the route, never
+  // used for comparability (D-26, Q-2) and never mapped into skinstate-1.
+  captureQuality?: CaptureQuality | undefined;
 }
 
 function hasNestedArray(value: unknown): boolean {
@@ -73,6 +78,7 @@ export function buildScanAnalysisRecord(result: SkinScanResult, meta: ScanAnalys
   };
   if (meta.captureMethod) record.captureMethod = meta.captureMethod;
   if (meta.persistAttempt) record.persistAttempt = meta.persistAttempt;
+  if (meta.captureQuality) record.captureQuality = meta.captureQuality;
   // Exact CV build (skin-scan `engine_build`, the immutable image tag). Kept
   // only as a non-empty string; anything else is absent, never guessed.
   const engineBuild = source.engine_build;

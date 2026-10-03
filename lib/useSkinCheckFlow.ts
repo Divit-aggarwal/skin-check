@@ -285,6 +285,7 @@ export function useSkinCheckFlow() {
       const originalFields = {
         originalStored: stored.originalStored,
         retentionConsentVersion: stored.retentionConsentVersion,
+        quality: stored.quality,
       };
       if (stored.result) {
         setScan({
@@ -373,6 +374,7 @@ export function useSkinCheckFlow() {
         captureMethod: scan.captureMethod,
         originalStored: scan.originalStored,
         retentionConsentVersion: scan.retentionConsentVersion,
+        quality: scan.quality,
       });
     }
   }, [restored, draftFinished, scanId, scan]);
