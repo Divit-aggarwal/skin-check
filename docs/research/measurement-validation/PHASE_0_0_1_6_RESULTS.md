@@ -94,7 +94,7 @@ The same code with a fresh build does **not** give the same image.
 - **Why a worktree:** during this run another session changed `lib/skin-state.ts` and `phase0/to_skinstate.mts`, adding a third `toSkinState` argument and a new `analysisRef` format. Those edits were later committed as gate 02 (`155cb69`).
   - A first mapping in the live working tree picked them up. It was **discarded**, because it was not the frozen contract.
 - **Proof:** the same worktree reproduced the committed 0.1.5 `skinstates.json` byte for byte.
-- **Cross-check against gate 02's view (`155cb69`):** mapping the same 30 responses gives identical `regions`, `quality` and `uncertainty`. Only `identity` differs (the `analysisRef` format). The measurement blocks do not depend on which of the two views is used.
+- **Cross-check against gate 02's view (`155cb69`):** mapping the same 30 responses gives identical `regions`, `quality` and `uncertainty`. Only `identity` differs, because gate 02's `toSkinState` validates `analysisRef` against the `users/{uid}/scanAnalyses/{docId}` grammar. The bench script therefore now **passes** a different ref string. The output shape is unchanged (IMPLEMENTATION_GATE_02: "skinstate-1 is still frozen"), and the measurement blocks do not depend on which view is used.
 - **0.1.6 vs 0.1.5 SkinStates:**
   - `regions`, `quality`, `uncertainty` and `input` are identical in all 30 rows.
   - Only `engine` differs:
@@ -178,6 +178,7 @@ Native colour moves ≤ 0.6 units under this compression change: an order of mag
   - `gradientMean`'s chroma-only spread is 20.7% (cheeks), 44.1% (forehead), 58.8% (nose) and 41.5% (chin). Every region is ≥ 20%; cheeks only narrowly.
   - A background-only cast moves `specular.fraction` 33.7% / 43.3% / 21.4% / 57.4%.
 - **Both declared deviations are therefore re-declared** under the pre-registered rule.
+- **Caveat on (b):** it is a reproduction check that H-EQ already implies, with thresholds (20%) set in view of the 0.1.5 values (cheeks `gradientMean` was 20.7%). It is not a test that could fail on its own. Classification is unaffected: neither field is in the candidate set under either class.
 
 ## 3. Classification (rule applied unchanged)
 
@@ -218,6 +219,7 @@ Native colour moves ≤ 0.6 units under this compression change: an order of mag
 - **The re-run adds no new evidence about any field.** It confirms only that 0.1.6 did not disturb what 0.1.5 showed, which was the purpose of the §8 restart.
 - **Native-path KEEP is still close to guaranteed by construction:** the native path only resizes, and the realised shift is measured the same way. The tests that can really fail L\* and a\* (§4.5, ACCEPTANCE C4) remain unrun.
 - **Exposure stays the dominant risk.** Half a stop moves native L\* by 5.9–9.0 units and ITA by 15–21°, against ≤ 0.6 units and ≤ 1.2° for JPEG q0.75 and ≤ 5% leakage for background casts.
+- **The deviation re-declarations add nothing independent.** Condition (b) follows from H-EQ, and its thresholds were set knowing the 0.1.5 values.
 - **Build drift is a real risk class.** Identical code did not produce an identical image. CI's eventual build of `8dc37dc` will have yet another digest. By PROTOCOL §8 it needs this replay again, and the result should be expected to hold only if the measurement-path packages are again identical.
 
 **NOT ESTABLISHED**
@@ -237,7 +239,10 @@ git -C ../skin-scan archive 8dc37dc | tar -x -C <scratch>/ss
 docker build --platform linux/amd64 --no-cache \
   --build-arg ENGINE_BUILD=bench-local-8dc37dc501ea974825427c665acd7019120c20ec \
   -t skin-scan-bench:0.1.6-8dc37dc <scratch>/ss
-#    expect Id sha256:ce51ed2dce3e…
+#    A rebuild will NOT reproduce Id sha256:ce51ed2dce3e… (§2.2: a --no-cache build of the
+#    same commit resolves different transitive packages). The pinned image exists only in this
+#    machine's local Docker store; keep it (or `docker save` it) if this evidence must stay
+#    re-runnable. Any rebuild is a new digest and needs the PROTOCOL §8 replay.
 # 2. Engine by ID, local only
 docker run -d --name p016-engine --platform linux/amd64 -p 127.0.0.1:18016:8000 \
   -e ENV=production -e SCAN_API_SECRET=<local> -e MAX_CONCURRENT_SCANS=4 -e SCAN_TIMEOUT_SECONDS=300 \
@@ -247,7 +252,11 @@ cd docs/research/measurement-validation/phase0
 RESULTS_DIR=results_0_1_6 ENGINE_URL=http://127.0.0.1:18016 SKIN_SCAN_REPO=../../../../../skin-scan \
   SCAN_SECRET=<local> OUT_IMG=<scratch> ../../../../../skin-scan/.venv/bin/python bench.py matrix
 RESTART_CMD=<recreate p016-engine by ID; wait for /health/ready> … bench.py determinism
-# 4. Map through the FROZEN skinstate-1 (a clean checkout of fb9dfc2, where lib/skin-state.ts == dd9a3fe), then analyse
+# 4. Map through the FROZEN skinstate-1, then analyse. The committed results_0_1_6/skinstates.json was produced by
+#    lib/skin-state.ts from fb9dfc2 (== dd9a3fe) plus fb9dfc2's to_skinstate.mts with ONLY the one-line
+#    RESULTS_DIR change (detached worktree of fb9dfc2 + that edit). Do NOT use HEAD's to_skinstate.mts:
+#    since gate 02 (155cb69) it passes a different analysisRef (required by gate 02's path validation).
+#    Running HEAD's script with the default directory would overwrite the committed 0.1.5 skinstates.json.
 RESULTS_DIR=results_0_1_6 npx vite-node docs/research/measurement-validation/phase0/to_skinstate.mts
 RESULTS_DIR=results_0_1_6 ../../../../../skin-scan/.venv/bin/python analyse.py > results_0_1_6/summary.md
 ```

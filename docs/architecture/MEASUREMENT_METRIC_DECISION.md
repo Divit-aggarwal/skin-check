@@ -109,6 +109,6 @@
 - **Premise correction:** 0.1.6 does not add native colour. `stats=both` already existed in 0.1.5, and the 0.1.5 bench used it. 0.1.6 adds only `engine_build` and the version string.
 - **Build drift, recorded:** a fresh build of the same pins resolved 11 transitive pip packages and one apt package differently from `668b1f56`. Every measurement-path package (numpy, opencv, mediapipe, scikit-image, pillow) was identical, and no measured value moved. Each future image still needs this replay.
 - **What the re-run does not add:** new evidence about any field. It is still one retouched image, n = 1; native KEEP is still close to guaranteed by construction; and A2, §4.5 and native hardware remain unrun. §4's conditions bind unchanged.
-- **One correction to the §2 wording,** from the same data: native `aStarMean` is also flat (non-increasing) on cheeks at +1 EV (+1.34 → +1.30), not only on forehead and nose.
+- **One correction to PHASE_0_RESULTS §3.3 and §4 Q2,** from the same data: native `aStarMean` is also flat (non-increasing) on cheeks at +1 EV (+1.34 → +1.30), not only on forehead and nose.
 
 **FINAL 0.1.6 CANDIDATE SET: unchanged.** `colour.native.lStarMean` (cheeks, forehead) and `colour.native.aStarMean` (cheeks, nose), both KEEP FOR HUMAN VALIDATION. Neither is a validated skin measurement.
