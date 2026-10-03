@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { clearDraft } from "@/lib/skin-check-draft";
-import { ERASE_CONFIRMATION, ERASE_MAX_AUTH_AGE_SECONDS } from "@/lib/consent";
+import { clearUnder18Chosen, ERASE_CONFIRMATION, ERASE_MAX_AUTH_AGE_SECONDS } from "@/lib/consent";
 import { Button } from "@/components/ui/button";
 
 // H01b: a signed-in user deletes their account and every copy of their data
@@ -40,6 +40,9 @@ export function DeleteAccount() {
       const body = (await res.json().catch(() => ({}))) as { code?: string };
       if (res.ok) {
         await clearDraft();
+        // The server erased the under-18 record with the account; this tab's
+        // marker goes too, or the next sign-in here would re-attest it.
+        clearUnder18Chosen();
         await signOut().catch(() => undefined);
         setState({ kind: "done" });
         return;

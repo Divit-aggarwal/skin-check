@@ -71,6 +71,12 @@ async function main() {
     .doc(PRIVACY_SEED.minor.uid)
     .collection("consentLedger")
     .add(entry("age_18_plus", false, AGE_ATTESTATION_VERSION, AGE_ATTESTATION_COPY, "attestation_route"));
+  // Erasure removes an under-18 record with the account (owner, 2026-10-03).
+  await db
+    .collection("users")
+    .doc(PRIVACY_SEED.eraseA.uid)
+    .collection("consentLedger")
+    .add(entry("age_18_plus", false, AGE_ATTESTATION_VERSION, AGE_ATTESTATION_COPY, "attestation_route"));
 
   // Something in every place erasure must clear, for both erase users.
   for (const { uid } of [PRIVACY_SEED.eraseA, PRIVACY_SEED.eraseB]) {

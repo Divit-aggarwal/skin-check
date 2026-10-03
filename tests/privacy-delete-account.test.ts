@@ -28,6 +28,8 @@ describe("DeleteAccount", () => {
     const ok = src.slice(src.indexOf("if (res.ok) {"), src.indexOf('setState({ kind: "done" })'));
     expect(ok.indexOf("await clearDraft();")).toBeGreaterThan(-1);
     expect(ok.indexOf("await signOut()")).toBeGreaterThan(ok.indexOf("await clearDraft();"));
+    // The tab's under-18 marker goes with the erased account's record.
+    expect(ok).toContain("clearUnder18Chosen();");
   });
 
   it("explains a stale sign-in using the shared limit, not a hard-coded number", () => {

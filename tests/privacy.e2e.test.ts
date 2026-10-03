@@ -62,6 +62,9 @@ describe.skipIf(!WEB)("privacy: erasure end to end", () => {
     const bBefore = await tree(B.uid);
     expect(bBefore).toEqual({ exists: true, collections: ["consentLedger", "routineEvents", "scanAnalyses", "skinChecks"] });
     expect((await db.collection("users").doc(A.uid).collection("routineEvents").get()).size).toBe(1);
+    const under18 = (uid: string) =>
+      db.collection("users").doc(uid).collection("consentLedger").where("purpose", "==", "age_18_plus").where("granted", "==", false).get();
+    expect((await under18(A.uid)).size).toBe(1);
 
     const signedIn = await emulatorPhoneSignIn(A.phoneNumber);
     expect(signedIn.localId).toBe(A.uid);
@@ -79,6 +82,7 @@ describe.skipIf(!WEB)("privacy: erasure end to end", () => {
     expect(await objects(A.uid)).toBe(0);
     expect(await tree(A.uid)).toEqual({ exists: false, collections: [] });
     await expect(auth.getUser(A.uid)).rejects.toMatchObject({ code: "auth/user-not-found" });
+    expect((await under18(A.uid)).size).toBe(0);
 
     // A's old token no longer opens a server route.
     const presign = await fetch(`${WEB}/api/skin-scan/upload`, {
