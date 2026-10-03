@@ -166,10 +166,10 @@ A score moves at least as much under a pure exposure change as under the injecte
 | 1 | Expected direction? | Native a\*, L\* and P90 (and exploratory b\*): yes, slope 0.97–1.05 everywhere. Corrected a\*, L\* and P90: right sign, 31–83% of the change | The native path passes injected colour straight through. The corrected path discards about half of a face-only a\* change | Any direction for texture or specular: no texture or shine change is pre-registered |
 | 2 | Monotone? | Every native colour field: yes. Corrected `aStarP90` is non-monotone on forehead and nose. Native `aStarMean` is non-monotone at +1 EV (forehead, nose) | Integer quantisation (P90 has a resolution of 1 unit) plus suppression breaks monotonicity on the corrected path. Highlight clipping breaks it at +1 EV | Monotonicity under real skin change |
 | 3 | Distinguishable from numerical instability? | **Determinism:** 500/500 bit-identical (§3.7). **Small-input sensitivity:** `gradientMean` (spread 21–59%) and `specular.fraction` (21–57%) are not; `lbpEntropy` (≈1%) and `laplacianVarMean` (2–7%) are, for blur (σ ≥ 1, except `lbpEntropy` chin), scale (`laplacianVarMean`; for `lbpEntropy`, scale 0.8 stays inside the chroma-only spread except on cheeks, and scale 0.6 just exceeds it on 3 of 4 regions with inconsistent sign) and JPEG | `gradientMean` is unstable **by definition**: one flat pixel adds 10⁶ | Between-capture, between-day noise. Bit-identity says nothing about re-positioning noise |
-| 4 | Stable across regions? | Native colour slopes are within 0.967–1.046 in all 4 regions. Corrected L\* ranges 0.31–0.83 | CLAHE is tile-local, so suppression depends on where the region sits | Regions on other faces, beards, or darker skin (one image, one tone) |
+| 4 | Stable across regions? | Native colour slopes are within 0.967–1.046 in all 4 regions. Corrected L\* ranges 0.31–0.83 | CLAHE is tile-local, so suppression depends on where the region sits | Regions on other faces, beards, or other tones (one image; MST not rated) |
 | 5 | Collapses under lighting or exposure? | Native colour does not collapse, but is **dominated**: 0.5 EV ≈ 5.9–9.0 L\* units, about the whole −8 L\* injection; 2.0–2.9 b\* units; 1.1–1.4 a\* units. `specular.fraction` collapses (−92% to −100% at −1 EV) | An unnoticed half-stop exposure difference between two captures exceeds the injected changes this bench used. C4 (illuminant and exposure) is the dominant risk for every surviving field | Real-illuminant behaviour (not run, §4.5). Whether phone auto-exposure holds face L\* stable |
 | 6 | Does the corrected path suppress the change? | Yes. About 50% of a face-only a\* shift is removed. The background cast is **subtracted** from the face (48–59% a\*, 57–71% b\*) | Whole-frame gray-world (the face is 35% of the frame here, versus 100% in CALIBRATION.md's 93% figure). Suppression therefore depends on how much of the frame the face fills, which is a framing confound | The exact suppression on other framings |
-| 7 | Does the uncorrected path behave differently? | Yes. Slope about 1, leakage ≤ 5%. It is far more exposure-sensitive than the corrected L\* | Native is responsive and scene-independent, but it carries the camera's exposure and white balance | Whether phones' own auto white balance re-introduces a gray-world-like effect (needs real capture, §4.5 and Phase 1) |
+| 7 | Does the uncorrected path behave differently? | Yes. Slope about 1, leakage ≤ 5%. It is far more exposure-sensitive than the corrected L\* | Native is scene-independent, but its slope of about 1 was **close to guaranteed by construction**: the native path only resizes, and the realised shift was measured with the same 8-bit Lab conversion. The bench shows nothing hidden (normalisation, mask coupling) breaks it, **not** that phones deliver face colour faithfully. It carries the camera's exposure and white balance | Whether phones' own auto white balance re-introduces a gray-world-like effect (needs real capture, §4.5 and Phase 1) |
 | 8 | `lbpEntropy` stable enough? | The smallest chroma-only spread of any texture field (≈1%). At scale 0.8, inside its chroma-only spread on 3 of 4 regions; at 0.6, just outside it on 3 of 4, with inconsistent sign. **JPEG +1.3% to +3.7% and −1 EV +1.8% to +5.0% everywhere.** The blur response is region-inconsistent, and inside the noise on chin. The dynamic range on this image is 2.26–2.91 bits | Stable to colour and scale. Sensitive to compression and exposure (noise adds micro-pattern). The source is retouched, so its texture is not representative | **That it responds to skin texture at all.** No pre-registered texture change exists. Its noise floor relative to between-person spread is unknown |
 
 ## 5. Per-field classification
@@ -223,6 +223,8 @@ Without these deviations, both fields would be INCONCLUSIVE. Neither is in the f
   - they respond strongly to global exposure.
 - The corrected path removes about half of a face-only change, and imports the background's colour with opposite sign.
 
+**Caveat on the KEEP result:** the native path only resizes, so slope ≈ 1 and near-zero leakage were close to guaranteed by construction. The informative Phase 0 results are the corrected-path DROPs and the size of the exposure effect. The tests that can really fail the KEEP fields are §4.5 (ColorChecker under real capture) and ACCEPTANCE C4.
+
 **INFERRED:**
 - Only the native colour path can carry a face colour change in this engine.
 - Exposure and illuminant control or detection (ACCEPTANCE C4) will decide whether even native fields survive real capture.
@@ -230,7 +232,7 @@ Without these deviations, both fields would be INCONCLUSIVE. Neither is in the f
 
 **NOT ESTABLISHED:**
 - Anything about skin.
-- Behaviour on other faces, on darker tones, or with beards.
+- Behaviour on other faces, on other tones (the subject's MST was not rated), or with beards.
 - Behaviour on real phones (A2, §4.5 not run).
 - Between-capture or between-day noise.
 - Whether any surviving field tracks a real physiological change (Phase 4).

@@ -7,8 +7,8 @@
 | Decision | **MD-1**, 2026-10-03 |
 | Status | **ACCEPTED** for study design. It changes **no production behaviour and no contract**. The `skinstate-1` field names and classes are untouched |
 | Evidence | [PHASE_0_RESULTS.md](../research/measurement-validation/PHASE_0_RESULTS.md): a **partial** Phase 0, on one image, on the production digest `sha256:668b1f56…`. Determinism: 500/500 bit-identical |
-| Applies to | Engine `scan-0.1.5-provisional` only. Any engine change re-opens every row (ACCEPTANCE §G, PROTOCOL §8) |
-| Supersedes | The P1–P5/D1 primary list in PROTOCOL §2.2, **for the human study only** (see §3) |
+| Applies to | Engine `scan-0.1.5-provisional` (the deployed digest) only. Any engine change re-opens every row (ACCEPTANCE §G, PROTOCOL §8). **That includes gate 04's `scan-0.1.6`** (skin-scan `8dc37dc`, not deployed): Phase 0 must be re-run on its pinned digest |
+| Supersedes | The P1–P5/D1 primary list in PROTOCOL §2.2, **for the human study only** (see §3). Only P5's removal is forced by a gate failure. Removing P2, P4 and D1 (all INCONCLUSIVE) follows the smallest-set instruction, and **the owner may reverse it before Phase 1 pre-registration** |
 | DECISION_LOG | Not edited here, because uncommitted entries D-22 and D-24 belong to another session. Add **D-25 → this file** when those are committed |
 
 **Nothing in this record is a skin measurement.** KEEP means "a photo statistic that passed bench screening and earns a human test–retest study". It does not mean valid, calibrated, comparable or showable.
@@ -68,6 +68,8 @@
 - Fewer primary endpoints means less multiplicity. ANALYSIS_PLAN §8's sample size was driven by the per-band ICC precision of each field, not by the number of fields, so n does not shrink.
 - **All raw fields are still captured**, because responses are stored verbatim. The excluded fields are analysed only as exploratory.
 
+**KEEP was close to guaranteed by construction.** The native path only resizes, so the bench mainly confirms that nothing hidden (normalisation, mask coupling) breaks these two fields. It does **not** show that phones deliver face colour faithfully. The tests that can really fail them are §4.5 (ColorChecker under real capture) and C4.
+
 **The central risk to the candidate set is exposure.**
 - Half a stop of global exposure moves native L\* by about the whole −8 L\* injected change, and a\* by about 1.3 units.
 - Production has no exposure or illuminant signal. So either ACCEPTANCE C4 passes in the COND block, or a versioned quality producer must exist before any calibration is published.
@@ -84,8 +86,8 @@
    - add a pre-registered **chroma-only spread** criterion for texture fields (§3.4 of the results), so that "indistinguishable from small-input instability" is a rule, not a judgement.
    - If native b\* then passes A3 and A4 on all 10 images, `bStarMean` (cheeks, forehead) and ITA (cheeks) may re-enter as primary.
 3. **Production prerequisites (unchanged, STATUS doc):**
-   - `stats=both` (D-07). Without it, every production record has `colour.native = null`, and **neither candidate exists in production**.
-   - `engine.build`, and `captureMethod`.
+   - `stats=both` (D-07), `engine.build` and `captureMethod`. All three are implemented in gate 04 (`1e4919d`, skin-scan `8dc37dc`), but **not deployed**.
+   - Until gate 04 is deployed, every production record has `colour.native = null`, and **neither candidate exists in production**.
 4. **Wording ceiling:** even after Phases 1–3 pass, at most "this photo measurement differs from your baseline by more than measurement noise". Anything about skin needs Phase 4 (ACCEPTANCE §E).
 
 ## 5. What this decision does NOT change
