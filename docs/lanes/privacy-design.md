@@ -21,12 +21,16 @@ The owner approved this design (decision 1) with these answers to §7.
 | 4 | **(a)** Sticky. | Any under-18 entry blocks the account, even after a later 18+ answer. |
 | 5 | **Not decided.** | The retention period is a named setting with **no value**: `IMAGE_RETENTION_PERIOD_DAYS = null` in `lib/consent.ts`. No number is invented. While it is null, the consent copy does not state a period. |
 | 6 | **The owner is checking** (G1). | Step 13 is built for **local use only**. It does not go to production until decision 6 is answered. |
-| 7 | **(b)** Draft wording, marked DRAFT. | `AI_SHARE_CONSENT_COPY` uses the GEMINI_BOUNDARY §8 draft, with `DRAFT` in its version string. Production waits for final copy. Processing-consent copy is not written: it belongs to step 14, which is skipped. |
-| 8 | **(a)** Remove `female_skin_context`, `gender` and the Dryness band, **with one addition: "extra caution".** | The server works out one yes/no flag, `extraCaution`, from the user's answers. Only the flag reaches Gemini, never the answers that set it. When the flag is on, the prompt tells Gemini, in one fixed sentence that gives no reason, not to suggest active ingredients and to advise asking a doctor. The answers that turn the flag on are a named setting, `EXTRA_CAUTION_TRIGGERS`, marked **provisional, waiting for clinical review (tracker E05)**. Provisional list: `female_skin_context: pregnant_or_breastfeeding` and `current_products: prescription`. |
-| 9 | **(b)** Receipt with no uid. | After a successful erase, the server writes `erasures/{auto-id}` with `erasedAt`, the step results and a `schemaVersion`. It holds no uid, no hash of a uid, and nothing else that links it to the person. No client rule is added: deny-by-default already blocks clients. |
-| 10 | **(a)** Blank, with "last time you said: …" shown under it. | Re-confirmed steps start blank. The hook exposes last time's answer as display text and never saves it into answers. Showing it needs `SkinCheckFlow.tsx`, which is not lane-owned (request R9). |
+| 7 | **(b)** Draft wording, marked DRAFT. | `AI_SHARE_CONSENT_COPY` uses the GEMINI_BOUNDARY §8 draft, with `DRAFT` in its version string. Production waits for final copy. Processing-consent copy is not written: it belongs to step 14, which is **deferred** on the owner's instruction (2026-10-03: step 14 waits until the capture lane is merged; it is still blocked on R3 and R4). |
+| 8 | **(a)** Remove `female_skin_context`, `gender` and the Dryness band, **with one addition: "extra caution".** | The server works out one yes/no flag, `extraCaution`, from the user's answers. Only the flag reaches Gemini, never the answers that set it. When the flag is on, the prompt tells Gemini, in one fixed sentence that gives no reason, not to suggest active ingredients and to advise asking a doctor. The answers that turn the flag on are a named setting, `EXTRA_CAUTION_TRIGGERS`, marked **provisional, waiting for clinical review (tracker E05)**. Provisional list: `female_skin_context: pregnant_or_breastfeeding` and `current_products: prescription` (option values at `lib/skin-check-steps.ts:227` and `:257`). **Home:** `EXTRA_CAUTION_TRIGGERS` and `extraCautionFor(answers)` live in `lib/gemini.ts`, and the flag is computed inside the system-instruction builder, so the chat route's call does not change. **Scope:** the flag only advises Gemini. Its output is not checked (the D-14 validator is out of scope), and deterministic safety rules stay a separate tracker item (E05). |
+| 9 | **(b)** Receipt with no uid. | After a successful erase (step 5), the server writes `erasures/{auto-id}` with `erasedAt`, the step results and a `schemaVersion`. It holds no uid, no hash of a uid, and nothing else that links it to the person. No client rule is added: deny-by-default already blocks clients. If the receipt write fails after the Auth delete, the failure is logged and the response is still `ok:true`, because the user's data is already gone and a retry is impossible (the Auth user no longer exists). |
+| 10 | **(a)** Blank, with "last time you said: …" shown under it. | Re-confirmed steps start blank. The hook keeps the previous scan's full answers (from `latestSkinCheckAnswers`, or the current answers in `startNewScan`) in separate state, *before* `reusableAnswers` strips the re-confirmed ids, and exposes `lastAnswerHints` (built by `reconfirmHints()` in `lib/skin-check-format.ts`). The hints are never written into answers or the draft. Showing it needs `SkinCheckFlow.tsx`, which is not lane-owned (request R9). |
 | 11 | **(a)** A separate erase IAM principal, **production only**. | The erase credentials are separate variables. Locally, S3Mock is used. |
-| 12 | **R1 and R6 approved. R2: the lane makes the one `admin.ts` edit itself, as a one-time exception.** | R1: new `app/(marketing)/account/DeleteAccount.tsx`. R6: update the two expectations in `tests/skin-check-flow-navigation.test.ts`. R2: add `adminAuth()` and `verifyFirebaseIdTokenClaims()` to `lib/firebase/admin.ts`, **add-only**, with nothing that exists changed, and a new test. The `getApp("admin")` fallback is not used. |
+| 12 | **R1 and R6 approved. R2: the lane makes the one `admin.ts` edit itself, as a one-time exception.** | R1: new `app/(marketing)/account/DeleteAccount.tsx`. R6: update the two expectations in `tests/skin-check-flow-navigation.test.ts`. R2: add `adminAuth()` and `verifyFirebaseIdTokenClaims()` to `lib/firebase/admin.ts`, **add-only**, with nothing that exists changed, and a new test, `tests/privacy-admin-auth.test.ts`. **Add-only means:** `verifyFirebaseIdToken`, `adminDb`, `bearerToken`, `usesEmulators` and `adminApp` stay byte-identical. The new verifier repeats the production-emulator guard and `checkRevoked: true` itself; it does not refactor the old function to call it. The `getApp("admin")` fallback is not used. |
+
+**Production blockers from decisions 6 and 7.** Step 13 (the `AI_CONSENT_REQUIRED` chat gate and the DRAFT copy) must not reach production before decision 6 and final copy (7a). Nothing in code stops it at deploy, so `privacy-report.md` records this as a **merge and deploy blocker**, with a proposed tracker row. A unit test pins that `AI_SHARE_CONSENT_VERSION` contains `DRAFT`, so whoever installs the final copy has to change that test on purpose.
+
+**Naming.** GEMINI_BOUNDARY.md:36 calls the purpose `ai_assistant` and the code `CONSENT_REQUIRED`. This lane uses `ai_share` and `AI_CONSENT_REQUIRED`, because `CONSENT_REQUIRED` already means image-retention consent on the upload route. Main should align GEMINI_BOUNDARY at merge.
 
 Effect on §2.4: rows 2, 3, 4, 13 and 19 are removed, and the Dryness parts of rows 20, 21 and 23 are removed. A new row 26 sends the `extraCaution` flag (computed server-side; boolean).
 
@@ -34,7 +38,7 @@ Effect on §2.4: rows 2, 3, 4, 13 and 19 are removed, and the Dryness parts of r
 
 ## 1. What will be built
 
-**H01a: Consent ledger (D-16, "consent ledger, server-written").** Today, consent lives only inside the client-written `skinChecks` document. The image-retention consent is recorded only if the user finishes the flow. This lane adds an append-only list of consent events per user, written only by the server. Clients can read their own entries and can never write them. The presign route writes an "image retention" entry before it hands out an upload URL, so an abandoned flow still has a record (audit finding D11). The write is best-effort: it is retried once, and if it still fails, the URL is issued anyway and the failure is logged without the uid. The reason is that the client uploads before it scans and aborts the scan when the upload fails (`lib/api.ts:251`, `runSkinScan`). A refused presign would therefore break the live scan, which D-03 ("persistence must never break the live scan") forbids. The client-written `skinChecks.consent` block stays as the fallback record. The same ledger also holds the 18+ attestation (H02) and the AI-share consent (H03).
+**H01a: Consent ledger (D-16, "consent ledger, server-written").** Today, consent lives only inside the client-written `skinChecks` document. The image-retention consent is recorded only if the user finishes the flow. This lane adds an append-only list of consent events per user, written only by the server. Clients can read their own entries and can never write them. The presign route writes an "image retention" entry before it hands out an upload URL, so an abandoned flow still has a record (audit finding D11). The write is best-effort: it is retried once, and if it still fails, the URL is issued anyway and the failure is logged without the uid. The reason is that the client uploads before it scans and aborts the scan when the upload fails (`lib/api.ts:252` `runSkinScan`, upload call at `:265`). A refused presign would therefore break the live scan, which D-03 ("persistence must never break the live scan") forbids. The client-written `skinChecks.consent` block stays as the fallback record. The same ledger also holds the 18+ attestation (H02) and the AI-share consent (H03).
 
 **H01b: User erasure (D-17, "erasure route: S3, then Firestore `recursiveDelete`, then Auth").** A signed-in user can delete their account from `/account`. The server first revokes the user's sessions. Revoking is not a deletion step: it only stops new uploads and scans during the erase. Then the server deletes, in order:
 1. every S3 object under `users/<uid>/`;
@@ -89,8 +93,9 @@ These are client-safe strings with no SDK import.
 - `AGE_ATTESTATION_VERSION: string`
 - `AGE_ATTESTATION_COPY: string`. Draft wording: "I confirm I am 18 or older." The owner approves the final copy.
 - `AI_SHARE_CONSENT_VERSION: string` and `AI_SHARE_CONSENT_COPY: string`. Copy pending (decision 7).
-- `PROCESSING_CONSENT_VERSION: string` and `PROCESSING_CONSENT_COPY: string`. D-16 requires new copy that covers storing measurements at scan time (decision 7). PhotoCapture's import of it is a capture-lane change (R3). Recording it at scan time is R4.
+- **Deferred with step 14:** `PROCESSING_CONSENT_VERSION: string` and `PROCESSING_CONSENT_COPY: string`. D-16 requires new copy that covers storing measurements at scan time (decision 7). PhotoCapture's import of it is a capture-lane change (R3). Recording it at scan time is R4.
 - `type ConsentPurpose` (the union above).
+- `IMAGE_RETENTION_PERIOD_DAYS: number | null = null` (decision 5: a named setting with no value).
 
 ### 2.3 Request and response shapes
 
@@ -99,9 +104,9 @@ These are client-safe strings with no SDK import.
 | `POST /api/account/attestation` (new) | Bearer token; body `{ ageBucket: "under-18"\|"18-24"\|"25-34"\|"35-44"\|"45-plus", version }`, strict | `{ ok: true, over18: boolean }` | 401 `AUTH_REQUIRED`, 400 `BAD_REQUEST`, 409 `VERSION_STALE`, 500 `LEDGER_UNAVAILABLE` |
 | `POST /api/account/consent` (new) | Bearer token; body `{ purpose: "ai_share", granted: boolean, version }`, strict | `{ ok: true }` | 401, 400, 409 `VERSION_STALE`, 500 |
 | `POST /api/account/erase` (new) | Bearer token, with `auth_time` no older than `ERASE_MAX_AUTH_AGE_SECONDS` (named setting, **provisional**); body `{ confirm: "DELETE MY DATA" }`, strict | `{ ok: true, steps: { revoke, s3, firestore, auth }: "done" }` | 401, 403 `REAUTH_REQUIRED`, 400, 500 `{ ok:false, failedStep, completedSteps }` |
-| `POST /api/skin-scan/upload` (changed) | unchanged body | unchanged | new: 403 `UNDER_18`. 403 `ATTESTATION_REQUIRED` only if decision 3 picks "refuse". A failed ledger write or read never refuses (D-03) |
-| `POST /api/skin-scan` (preamble changed) | unchanged | unchanged | new: 403 `UNDER_18` (exception to D-03a, decision 3). 403 `ATTESTATION_REQUIRED` only if decision 3 picks "refuse". A failed read never refuses |
-| `POST /api/skin-check/chat` (changed) | unchanged | unchanged | new: 403 `UNDER_18`, 403 `ATTESTATION_REQUIRED`, 403 `AI_CONSENT_REQUIRED` |
+| `POST /api/skin-scan/upload` (changed) | unchanged body | unchanged | new: 403 `UNDER_18`. 403 `ATTESTATION_REQUIRED` only while `REQUIRE_AGE_ATTESTATION` is true (false under decision 3a). A failed or timed-out ledger write or read never refuses (D-03) |
+| `POST /api/skin-scan` (preamble changed) | unchanged | unchanged | new: 403 `UNDER_18` (exception to D-03a, decision 3). 403 `ATTESTATION_REQUIRED` only while `REQUIRE_AGE_ATTESTATION` is true (false under decision 3a). A failed or timed-out read never refuses |
+| `POST /api/skin-check/chat` (changed) | unchanged | unchanged | new: 403 `UNDER_18`, 403 `ATTESTATION_REQUIRED`, 403 `AI_CONSENT_REQUIRED`, 503 `CONSENT_CHECK_UNAVAILABLE` (the ledger read failed; chat fails closed) |
 
 Field changes in stored answers (`users/{uid}/skinChecks/{scanId}.answers`):
 
@@ -126,7 +131,7 @@ The source is `lib/gemini.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-fo
 | 8 | `acne_areas` | answers | low | **needed** | Matches region threads |
 | 9 | `pih_scar_tendency` | answers | low | **needed** | Explains pigment readings |
 | 10 | `skin_tone` (sun response) | answers | low | **needed** | Explains pigment and redness wording |
-| 11 | `current_products` | answers (re-confirmed per scan after H02b) | medium ("a prescription product") | **needed** | Lets Echo describe the user's routine "as directed". Labels only, no product names. Any safety rule about actives or prescriptions belongs to deterministic code, never to Gemini (CLAUDE.md; GEMINI_BOUNDARY §2) |
+| 11 | `current_products` | answers (re-confirmed per scan after H02b) | medium ("a prescription product") | **needed** | Lets Echo describe the user's routine "as directed". Labels only, no product names. Any safety rule about actives or prescriptions belongs to deterministic code, never to Gemini (CLAUDE.md; GEMINI_BOUNDARY §2). The `extraCaution` flag (row 26) only advises Gemini; it is not a safety rule (§0, decision 8) |
 | 12 | `male_skin_context` | answers | low (shaving, sweat gear) | **needed** | Explains irritation patterns |
 | 13 | `female_skin_context` | answers | **high: pregnancy, contraception, menopause** | **remove** (contested, decision 8) | Reproductive-health data sent to a processor outside India. Pregnancy safety must come from deterministic rules, not from Gemini (Gemini is not the source of truth) |
 | 14 | `skin_factors` | answers | low | **needed** | Stress and sleep context |
@@ -166,7 +171,7 @@ The source is `lib/gemini.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-fo
 
 | File | Change | Task |
 |---|---|---|
-| `lib/consent.ts` | new version and copy constants (§2.2), `ConsentPurpose` type | H01a, H02a, H03c |
+| `lib/consent.ts` | new version and copy constants (§2.2), `ConsentPurpose` type, `IMAGE_RETENTION_PERIOD_DAYS = null` | H01a, H02a, H03c |
 | `app/api/skin-scan/upload/route.ts` | read attestation (refuse under 18; missing per decision 3; a read failure goes ahead); write the `image_retention` ledger entry before presigning (best-effort: one retry, then issue the URL anyway and log) | H01a, H02a |
 | `lib/s3.ts` | new server-only `eraseUserPrefix(uid)`: list `users/<uid>/` and batch-delete until empty, using **separate** erase credentials (`S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID` / `_SECRET_ACCESS_KEY`); fails closed if they are unset | H01b |
 | `lib/s3-key.ts` | new `userPrefix(uid)` → `users/${uid}/`, the one place a prefix is built | H01b |
@@ -175,7 +180,8 @@ The source is `lib/gemini.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-fo
 | `components/skin-check/inputs/PhoneAuthStep.tsx` | store `"verified"`, never `user.phoneNumber`, in both phone answers; after sign-in on `phone_verify`, call the attestation route | H02a, H02c |
 | `lib/gemini.ts` | `GEMINI_FIELD_INVENTORY` constant (step id → `"sent" \| "not_sent"`); drop the Dryness band from the scale note | H03a, H03b |
 | `lib/skin-check-format.ts` | `summarizeSkinCheckAnswers` renders only step ids marked `"sent"`; `summarizeSkinScanScores` skips the fields marked remove | H03b |
-| `lib/echo-trusted-context.ts` | none planned; re-checked when the inventory changes | H03 |
+| `lib/echo-trusted-context.ts` | none. It reads the answers on the server; the removals and `extraCaution` happen later, in `lib/gemini.ts` and `lib/skin-check-format.ts`, so all three fields stop at the prompt builder | H03 |
+| `lib/firebase/admin.ts` | **one-time exception (decision 12, R2), add-only:** `adminAuth()` and `verifyFirebaseIdTokenClaims()` | H01b |
 | `app/api/skin-check/chat/route.ts` | after auth: read the ledger; refuse `UNDER_18`, `ATTESTATION_REQUIRED` (only after the attestation UI ships, per D-03a) and `AI_CONSENT_REQUIRED`; build the composite without hydration if row 19 is removed | H02a, H03b, H03c |
 | `components/skin-check/EchoPage.tsx`, `app/(marketing)/echo/page.tsx` | AI-share consent prompt; on `AI_CONSENT_REQUIRED`, show it and post to `/api/account/consent` | H03c |
 
@@ -207,7 +213,7 @@ The source is `lib/gemini.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-fo
 | # | To | Request |
 |---|---|---|
 | R1 | owner | Ownership of a new client component `app/(marketing)/account/DeleteAccount.tsx`. `page.tsx` is a server component (it exports `metadata`), so the button needs its own `"use client"` file next to it. Only `page.tsx` is listed today |
-| R2 | owner / main (**approved in §0: the lane makes this edit, add-only**) | `admin.ts` exports no Auth getter, and `verifyFirebaseIdToken` returns only the uid. Erasure needs Admin Auth (`revokeRefreshTokens`, `deleteUser`) and the token's `auth_time`. Request: main adds `adminAuth()` and a `verifyFirebaseIdTokenClaims()` that returns the decoded token, with the same production-emulator guard and revocation check. Fallback until then: call `verifyFirebaseIdToken` first, so the guard runs, then `getAuth(getApp("admin"))`, relying on the private app name `"admin"` |
+| R2 | owner / main (**approved in §0: the lane makes this edit, add-only**) | `admin.ts` exports no Auth getter, and `verifyFirebaseIdToken` returns only the uid. Erasure needs Admin Auth (`revokeRefreshTokens`, `deleteUser`) and the token's `auth_time`. Request: main adds `adminAuth()` and a `verifyFirebaseIdTokenClaims()` that returns the decoded token, with the same production-emulator guard and revocation check. ~~Fallback via `getApp("admin")`~~: not used (§0, decision 12) |
 | R3 | capture lane | PhotoCapture: import `PROCESSING_CONSENT_COPY` and `_VERSION` from `lib/consent.ts`, and pass the version to the scan helper (`lib/api.ts` new param). Today the processing checkbox has no version (audit, CURRENT_SYSTEM_AUDIT §50) |
 | R4 | capture lane, or after merge | Processing consent at scan time (D-16, D-03a). After `formData()`, read the processing-consent version as a form field. Write the `processing` ledger entry with the scanId using the privacy `_ledger.ts` helper, best-effort. When the version is missing, skip `persistScanAnalysis` and return `persisted:false, reason:"consent_missing"`. This is entirely after `formData()`, so it is not privacy's part |
 | R5 | main (not lane-owned) | `lib/dev-env-guard.cjs` must learn the two new erase-credential names, because they could point at production |
@@ -261,7 +267,7 @@ Unit tests use vitest with the same fake-Firestore pattern as `skin-check-chat-t
 - Under 18: 403. Missing attestation: 403. No AI-share grant: 403 `AI_CONSENT_REQUIRED`.
 - A grant followed by a later `granted:false`: 403.
 - In every refused case, Gemini is not called and no quota is consumed.
-- The attestation read throws: 503, and Gemini is not called.
+- The attestation read throws: 503 `CONSENT_CHECK_UNAVAILABLE`, and Gemini is not called.
 
 **`tests/privacy-phone.test.ts`**
 - PhoneAuthStep's save payload: `answers.phone_verify` and `answers.final_phone` equal `"verified"`.
@@ -274,6 +280,7 @@ Unit tests use vitest with the same fake-Firestore pattern as `skin-check-chat-t
 - The reuse walk for a female user visits those two steps, and for a male user only `current_products`.
 - A reused scan can't reach `get-your-results` with either one unanswered.
 - An under-18 saved answer still returns null.
+- `reconfirmHints(previous)` returns "Last time you said: …" text for the re-confirmed steps, and `reusableAnswers(previous)` contains neither id, so the hint never becomes an answer (decision 10a).
 
 **`tests/privacy-gemini-inventory.test.ts`** (H03)
 - Mock `@google/genai`, call `getSkinCheckChatReply` with every step answered, and capture the real `generateContent` argument (`config.systemInstruction` and `contents`).
@@ -283,13 +290,22 @@ Unit tests use vitest with the same fake-Firestore pattern as `skin-check-chat-t
 - The category labels in the instruction equal the approved set exactly.
 - No uid, scanId or digit sequence ≥ 3 (numeric score) appears.
 - After H03b, if row 19 is removed: no "Dryness", "dryness" or "hydration" appears anywhere, including in topConcerns and summaryLine.
+- After step 12: `extraCaution` on (a trigger answer) puts the one fixed caution sentence in the instruction, and no trigger value, `female_skin_context` label, or pregnancy, breastfeeding, contraception, menopause or period word appears. Off: the sentence is absent.
+- `AI_SHARE_CONSENT_VERSION` contains `DRAFT` (pinned, decision 7b).
 - Before H03b ships, the test pins today's set (name, age, gender, female context and Dryness present). The minimisation commit changes the pinned set and the inventory together, so the diff shows exactly what was removed.
+
+**`tests/privacy-admin-auth.test.ts`** (R2, decision 12)
+- `verifyFirebaseIdTokenClaims` returns the decoded token, including `uid` and `auth_time`.
+- It calls `verifyIdToken(token, true)` (revocation checked).
+- It throws `AdminNotConfiguredError` in production with `FIREBASE_AUTH_EMULATOR_HOST` set, before any verification.
+- `adminAuth()` returns the Auth instance of the `admin` app.
 
 **`tests/privacy-erase.test.ts`** (unit, with fakes)
 - Order: revoke, then S3, then Firestore, then Auth.
 - An S3 failure means Firestore and Auth are not called, and the response is `failedStep:"s3"`.
 - A Firestore failure means Auth is not called.
 - Running again after a partial failure completes the remaining steps.
+- After success, one `erasures/{id}` receipt is written with no uid, no uid hash and no phone (decision 9b). A failed receipt write is logged and still returns `ok:true`.
 - The uid comes only from the token; a body `uid` gives 400.
 - A token older than `ERASE_MAX_AUTH_AGE_SECONDS` gives 403 `REAUTH_REQUIRED`.
 - Erase credentials unset: 500, and nothing is deleted.
@@ -317,7 +333,7 @@ Unit tests use vitest with the same fake-Firestore pattern as `skin-check-chat-t
 - **None of the rest of D-14's Gemini boundary:** the ContextPackage, fact-id schema, validator and pre-filters, the chatTurns store (D-15), safety settings, and the "digital twin" rename (D-20). These are other tracker rows. This lane only removes fields and adds the consent gate.
 - **No Vertex AI move.** The Gemini key and tier stay with the owner (G1).
 - **No erasure of Google-side Gemini logs, Vercel or CloudWatch logs, or other devices' local drafts.** These are listed as gaps in §5.1.
-- **No change** to `lib/skin-state.ts` (D-23), `lib/skin-check-rules.ts`, `lib/firebase/admin.ts` or `lib/firebase/client.ts`, `lib/auth-context.tsx`, `lib/dev-env-guard.cjs`, `package.json`, the tracker or `DECISION_LOG.md`.
+- **No change** to `lib/skin-state.ts` (D-23), `lib/skin-check-rules.ts`, `lib/firebase/client.ts` (and none to `lib/firebase/admin.ts` beyond the add-only R2 exception in §0), `lib/auth-context.tsx`, `lib/dev-env-guard.cjs`, `package.json`, the tracker or `DECISION_LOG.md`.
 - **No new npm dependency.** `firebase-admin` (Auth, `recursiveDelete`) and `@aws-sdk/client-s3` (`ListObjectsV2`, `DeleteObjects`) are already installed.
 
 ### 5.1 Every place user data lives, and what erasure does
@@ -363,16 +379,16 @@ Each step ends with passing tests (`npm run test:local`, typecheck, lint) and on
 | 2 | **Consent ledger + rules.** `app/api/account/_ledger.ts`, the privacy section in `firestore.rules`, constants in `lib/consent.ts` | `firestore-rules-privacy`, `privacy-ledger` | design approval |
 | 3 | **Presign writes the retention entry.** Upload route, best-effort; never refuses because of the ledger (D-03) | `privacy-upload-consent` (consent part) | design approval |
 | 4 | **Erasure helpers.** `userPrefix` in s3-key.ts, `eraseUserPrefix` in s3.ts, the env block in `.env.development.example` (S3Mock values only) | unit tests of the S3 helper against S3Mock | design approval. R5 (guard learns the names) must land before the lane merges |
-| 5 | **Erasure route + e2e, local only.** `app/api/account/erase/route.ts`, the seed script | `privacy-erase`, `privacy.e2e` | design approval (R2 fallback) |
+| 5 | **Erasure route + e2e, local only.** `app/api/account/erase/route.ts`, the seed script | `privacy-erase`, `privacy.e2e` | design approval, R2 admin.ts edit (approved, §0) |
 | 6 | **Delete button on /account** | e2e extended: the UI calls the route and clears local data | R1 |
 | 7 | **Attestation route** and the PhoneAuthStep call after sign-in | `privacy-attestation` | blocked: D-19 approval (decision 2), stickiness (decision 4) |
 | 8 | **Attestation gate on chat** | `privacy-chat-gate` (attestation part) | blocked: decision 2. Hard-reject only after step 7's UI ships (D-03a) |
 | 9 | **Attestation gate on upload and in the scan-route preamble** | `privacy-upload-consent` (attestation part), `privacy-scan-gate` | blocked: decision 3 (degrade or refuse; under-18 exception), and R8 if "refuse" |
 | 10 | **Phone stored as `"verified"`** | `privacy-phone` | blocked: decision 2 |
 | 11 | **Re-confirm `current_products` and `female_skin_context` per scan** | `privacy-reconfirm` | blocked: decision 2, decision 10 (prefill), R6 |
-| 12 | **Gemini minimisation:** remove the fields marked remove, allowlist rendering, update the pinned set | inventory test (new set) | blocked: decision 8 |
+| 12 | **Gemini minimisation:** remove the fields marked remove, allowlist rendering, the `extraCaution` flag (`EXTRA_CAUTION_TRIGGERS`, provisional, E05), update the pinned set | inventory test (new set, flag on/off) | decision 8 (a) + extra caution (§0) |
 | 13 | **AI-share consent:** consent route, chat gate, Echo prompt | `privacy-chat-gate` (consent part) | blocked: decision 6 (G1) and decision 7 (copy) |
-| 14 | **Processing consent at scan time** (with the capture lane, or after merge) | a test in the merged scan route | blocked: R3, R4, decision 7 (copy), merge order |
+| 14 | **Processing consent at scan time** (with the capture lane, or after merge). **Deferred on the owner's instruction until the capture lane is merged** | a test in the merged scan route | blocked: R3, R4, decision 7 (copy), merge order |
 | 15 | **`privacy-report.md`:** commits, test results, the H03 inventory, the open owner items | none (document) | none |
 
 ---
@@ -396,7 +412,7 @@ Each step ends with passing tests (`npm run test:local`, typecheck, lint) and on
 
 **Decision 3: When a scan or photo upload arrives with no 18+ record on file, refuse it or let it run? And may a recorded under-18 user be refused on the scan route?**
 - **What it means:** the lane brief says the server must refuse a scan or upload without attestation. D-03a ("a new server-side requirement on the scan route degrades, never rejects") says a missing attestation must not break the scan, because cached old app versions and existing users don't have one yet. These two disagree.
-- **Upload counts as the scan here.** The app uploads the photo first, and a failed upload stops the scan (`lib/api.ts:251`). Refusing the upload therefore refuses the scan for every user who ticked "keep my photo". Chat is different: D-03a allows chat to refuse once the attestation UI ships, and the design does that in every option.
+- **Upload counts as the scan here.** The app uploads the photo first, and a failed upload stops the scan (`lib/api.ts:265`). Refusing the upload therefore refuses the scan for every user who ticked "keep my photo". Chat is different: D-03a allows chat to refuse once the attestation UI ships, and the design does that in every option.
 - **The under-18 exception.** Separately, refusing a user with a recorded under-18 answer on the scan route is a rejection, which D-03a doesn't allow as written. Old bundles can't have such a record, so this harms no legitimate user. It still needs your explicit OK.
 - **Options:**
   - (a) **Degrade now, refuse later.** With no record, upload and scan run and the server logs it. A constant `REQUIRE_AGE_ATTESTATION` flips to refuse in a later commit, once old bundles are gone (then R8 applies). Under-18 records are refused from day one.
@@ -453,7 +469,7 @@ Each step ends with passing tests (`npm run test:local`, typecheck, lint) and on
 - **What it means:** after deletion, nothing proves the deletion happened. A receipt outside the user's tree (`erasures/{random}`: erasedAt, step results, and a salted hash of the uid) would let support answer "was I deleted?". But a hashed uid is still pseudonymous personal data.
 - **Options:** (a) no receipt; (b) a receipt without any uid, so it only counts erasures; (c) a receipt with a salted uid hash.
 - **Recommendation:** (b). It shows that erasures run, without keeping anything linked to the person.
-- **Blocks:** nothing (step 5 builds (a); (b) is a small addition). **Can start without it:** all steps.
+- **Blocks:** nothing (owner chose (b); step 5 builds it). **Can start without it:** all steps.
 
 **Decision 10: Re-confirmed questions: blank, or pre-filled with last time's answer?**
 - **What it means:** D-19 says "re-confirm". Pre-filled is faster, but users tap through, which keeps the stale-pregnancy problem D-19 exists to fix. Blank forces a real answer.
@@ -470,7 +486,7 @@ Each step ends with passing tests (`npm run test:local`, typecheck, lint) and on
 **Decision 12: Ownership requests R1, R2 and R6 (§3.4).**
 - **What it means:** three small edits outside the lane's file list:
   - a new delete-button component next to the account page (R1);
-  - an `adminAuth()` and a claims-returning token verifier in admin.ts, or permission to use the `getApp("admin")` fallback (R2);
+  - an `adminAuth()` and a claims-returning token verifier in admin.ts, (R2; approved as a lane edit, §0);
   - updating two expectations in an existing navigation test (R6).
 - **Options:** approve each, or route it to main or after merge.
 - **Recommendation:**
