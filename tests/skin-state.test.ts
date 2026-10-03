@@ -187,6 +187,18 @@ describe("skinstate-1: unknown uncertainty", () => {
   });
 });
 
+describe("skinstate-1: engine 0.1.6 (A17)", () => {
+  it("scan-0.1.6-provisional maps to the 8dc37dc stack; the rest of the state equals 0.1.5's", () => {
+    const v15 = ok(toSkinState(productionRecord(), REF, UID));
+    const v16 = ok(toSkinState({ ...productionRecord(), pipeline_version: "scan-0.1.6-provisional" }, REF, UID));
+    expect(v16.engine).toMatchObject({
+      pipelineVersion: "scan-0.1.6-provisional", build: null,
+      landmarkModel: "mediapipe-0.10.21-face_mesh", opencvVersion: "4.11.0",
+    });
+    expect({ ...v16, engine: null }).toEqual({ ...v15, engine: null });
+  });
+});
+
 describe("skinstate-1: future engine version", () => {
   it("unknown pipeline → engine metadata null (not guessed); split cheeks drop the union; native mapped", () => {
     const record = productionRecord();

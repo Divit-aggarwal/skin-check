@@ -23,9 +23,13 @@ const LOW_PIXEL_THRESHOLD = 2000;
  * verified are listed; any other version yields null (UNKNOWN), never a guess.
  * scan-0.1.5-provisional: deployed image sha-7f3695e, /health cv2 4.11.0,
  * requirements mediapipe==0.10.21 (PRODUCTION_BASELINE.md).
+ * scan-0.1.6-provisional (A17, owner-approved addition, not a mapping change):
+ * skin-scan 8dc37dc requirements.txt mediapipe==0.10.21 + opencv-contrib-python==4.11.0.86,
+ * face_mesh.py mp.solutions.face_mesh, main.py EXPECTED_CV2_VERSION "4.11.0".
  */
 const ENGINE_TABLE: Record<string, { landmarkModel: string; opencvVersion: string }> = {
   "scan-0.1.5-provisional": { landmarkModel: "mediapipe-0.10.21-face_mesh", opencvVersion: "4.11.0" },
+  "scan-0.1.6-provisional": { landmarkModel: "mediapipe-0.10.21-face_mesh", opencvVersion: "4.11.0" },
 };
 
 /** §5.5: present in the record, never exposed. Order is the contract's order. */
