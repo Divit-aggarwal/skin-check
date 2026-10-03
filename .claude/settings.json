@@ -19,7 +19,27 @@
       "Bash(*vercel* promote*)",
       "Bash(*vc* --prod*)",
       "Bash(*vc* --target*production*)",
-      "Bash(*vc* promote*)"
+      "Bash(*vc* promote*)",
+      "Bash(*gh* pr merge*)",
+      "Bash(*vercel* rollback*)",
+      "Bash(*vc* rollback*)",
+      "Bash(*aws* ecs deregister-task-definition*)",
+      "Bash(*aws* ecr batch-delete-image*)",
+      "Bash(*firestore:databases:update*)",
+      "Bash(*gcloud* firestore databases update*)",
+      "mcp__plugin_firebase_firebase__firestore_update_database",
+      "Bash(*git* push* master)",
+      "Bash(*git* push* master *)",
+      "Bash(*git* push* +master*)",
+      "Bash(*git* push*:master)",
+      "Bash(*git* push*:master *)",
+      "Bash(*git* push*refs/heads/master*)",
+      "Bash(*git* push*--all*)",
+      "Bash(*git* push*--mirror*)",
+      "Bash(*docker* push*550428926515.dkr.ecr.ap-south-1.amazonaws.com*)",
+      "Bash(*docker*--push*550428926515.dkr.ecr.ap-south-1.amazonaws.com*)",
+      "Bash(*docker*550428926515.dkr.ecr.ap-south-1.amazonaws.com*--push*)",
+      "Bash(*docker* push*$*)"
     ]
   }
 }

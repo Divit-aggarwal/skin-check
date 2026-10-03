@@ -461,5 +461,5 @@ production check) may start.
 
 ## Known gaps, recorded in the tracker, not fixed here
 
-- B06: the `.claude/settings.json` deny rules do not cover several other production-changing commands, among them `gh pr merge` (D2, the production deploy), `vercel rollback`, `git push`, `docker push`, `aws ecs deregister-task-definition`, `aws ecr batch-delete-image` and `firestore:databases:update`. Only the CLAUDE.md hard rules stop agents from running them.
-- Fixed: `ENGINE_TABLE` now lists `scan-0.1.6-provisional` (A17). The deny rules now match the `npx -y firebase-tools@latest …` and `F …` forms (B05).
+- Deny rules cannot read the current branch or expand variables. A bare `git push` or `git push origin HEAD` run while on `master`, and `git push origin "$BRANCH"` with `BRANCH=master`, are still allowed for agents. Only the CLAUDE.md hard rules stop those.
+- Fixed: `ENGINE_TABLE` now lists `scan-0.1.6-provisional` (A17). The deny rules now match the `npx -y firebase-tools@latest …` and `F …` forms (B05). They now also block `gh pr merge` (D2), `vercel rollback`, `aws ecs deregister-task-definition`, `aws ecr batch-delete-image`, `firestore:databases:update` in every Firebase form, `git push` to `master`, and `docker push` to this ECR registry, including any `docker push` whose target is a shell variable such as C1's `"$REPO:$TAG"` (B06). The owner runs these steps, so the rules do not affect them.
