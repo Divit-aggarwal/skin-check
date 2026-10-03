@@ -22,3 +22,30 @@ export const IMAGE_RETENTION_CONSENT_COPY =
 // must never have.
 export const PRIVACY_POLICY_URL = "https://theprojectskin.com/policies/privacy-policy";
 export const PRIVACY_POLICY_LINK_TEXT = "Read our Privacy Policy";
+
+// ─── Privacy lane (H01, H02, H03): docs/lanes/privacy-design.md ─────────────
+// Client-safe strings only, like everything above. The server-only ledger
+// helpers that record these live in app/api/account/_ledger.ts.
+
+/** One purpose per consent-ledger entry. Purposes are never combined. */
+export type ConsentPurpose = "image_retention" | "processing" | "ai_share" | "age_18_plus";
+
+/** Bump when the attestation copy below changes. */
+export const AGE_ATTESTATION_VERSION = "age 18 plus attestation version 1";
+/** Draft (design §2.2); the owner approves the final copy. */
+export const AGE_ATTESTATION_COPY = "I confirm I am 18 or older.";
+
+// Decision 7(b): the GEMINI_BOUNDARY §8 draft, for local use only. "DRAFT" is
+// in the version, so a ledger entry recorded against it can never pass for
+// the final wording. Production waits for the owner's copy (decision 7a) and
+// the Gemini key answer (decision 6).
+export const AI_SHARE_CONSENT_VERSION = "ai share DRAFT version 1";
+export const AI_SHARE_CONSENT_COPY =
+  "DRAFT: Share my skin check with the AI assistant (processed by Google, outside India).";
+
+/**
+ * How long original photos are kept, in days. Decision 5 is NOT made: no
+ * number is invented here. While this is null, no copy states a period and
+ * nothing enforces one (an S3 lifecycle rule is an infra OWNER ACTION).
+ */
+export const IMAGE_RETENTION_PERIOD_DAYS: number | null = null;
