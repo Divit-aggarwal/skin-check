@@ -1,5 +1,7 @@
 # DATA_MODEL — minimum credible persistent model
 
+> **Amended (2026-10-03):** the `skinStates` collection below is replaced by gate 01's immutable `scanAnalyses` record plus the computed SkinState view in [SKIN_STATE_CONTRACT_FINAL.md](SKIN_STATE_CONTRACT_FINAL.md) (D-21, D-23). Read every `skinStates` reference in this file as `scanAnalyses` → `toSkinState()`.
+
 Status: PLANNING.
 
 **Decision:** stay on Firestore + private S3 (DECISION D-01). Every query is scoped to one user. A user has tens of records of about 10 KB each. Nothing in CORE needs a cross-user join. Postgres would add a second auth/rules model and a second erasure surface, and would answer no query we need.

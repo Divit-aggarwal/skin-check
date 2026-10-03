@@ -1,5 +1,7 @@
 # SKIN_STATE_CONTRACT — what one stored measurement means
 
+> **SUPERSEDED (2026-10-03)** by [SKIN_STATE_CONTRACT_FINAL.md](SKIN_STATE_CONTRACT_FINAL.md) (`skinstate-1`). SkinState is now a computed view over `scanAnalyses`, not a stored collection (DECISION_LOG D-23). Kept for history only.
+
 Status: PLANNING. This contract applies to records created after it is implemented. Legacy `skinChecks.result` (schemaVersion 1) records are covered in §6.
 
 ## 1. Purpose

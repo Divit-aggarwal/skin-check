@@ -155,6 +155,18 @@ None of these decisions has been implemented. "PROPOSED" means the investigation
 - **Also in gate 01:** the scan save now blocks until it succeeds or times out after 15 s, with a retry. This replaces the old "non-fatal by design" save, so a failed save can no longer silently lose the scan.
 - Details: IMPLEMENTATION_GATE_01.md.
 
+**D-23 SkinState is a computed, versioned view over `scanAnalyses`, not a stored collection. Contract `skinstate-1` is frozen. (PROPOSED → FROZEN contract; no code)**
+- **Identity:** `(analysisRef, contractVersion)`. The mapping per version is frozen and kept in code forever. Any change requires a new version.
+- **Why:** gate 01 already writes the immutable raw record server-side. A second stored copy would create two sources of truth for no query we need.
+- **Legacy `skinChecks.result`** produces no SkinState; it is shown only as a labelled legacy display.
+- **The 7 `scores` and all `region_scores` are deprecated PROXY.** No metric is kept because the product currently displays it.
+  - **Removed:** hydration, pores and blemishes internals.
+  - **Kept, as photo statistics with physical names:** corrected-path colour, texture, and the specular fraction.
+  - **Only colorimetry candidate:** native-path colour (UNKNOWN until `stats=both`, D-07).
+- **Comparability key:** includes `engine.build` and `captureMethod`. Both are null today, so no two SkinStates are comparable.
+- **Supersedes:** SKIN_STATE_CONTRACT.md, and the `skinStates` collection in DATA_MODEL, SYSTEM_MODEL and IMPLEMENTATION_MAP C2.
+- **Details:** SKIN_STATE_CONTRACT_FINAL.md.
+
 ## B. Conflicts with the research doc
 
 | # | Research doc says | Repository reality / finding | Resolution |
