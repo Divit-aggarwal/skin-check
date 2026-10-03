@@ -19,7 +19,7 @@ const FIELD = "colour.native.lStarMean";
 const KEY: ComparabilityKey = {
   contractVersion: "skinstate-1", fieldPath: FIELD, region: "cheeks",
   pipelineVersion: "scan-0.1.6-provisional", engineBuild: "sha-test-build", colourPath: "native",
-  statsPath: "both", inputVariant: "cv_downscale_1280", captureMethod: "native",
+  statsPath: "both", inputVariant: "cv_downscale_1280", captureMethod: "native", captureMethodAssertedBy: "client",
   regionStatus: "available", lowPixelCount: false,
 };
 const TABLE: ComparableQuantity[] = [{ fieldPath: FIELD, region: "cheeks", pipelineVersion: "scan-0.1.6-provisional", calibrationId: null }];
@@ -127,6 +127,21 @@ describe("compareStates on real skinstate-1 states", () => {
     expect(reasonsAt("chin")).toContain("region_low_pixel_count");
     // A region the state does not have at all counts as absent, never as available.
     expect(comparabilityKey(stateFrom(both()), FIELD, "cheek_image_left").regionStatus).toBe("absent_region");
+  });
+
+  it("O-1 = A: the key keeps capture method from the state, marked client-asserted", () => {
+    const native = comparabilityKey(stateFrom(both()), FIELD, "cheeks");
+    const canvas = comparabilityKey(stateFrom(both(), { captureMethod: "canvas" }), FIELD, "cheeks");
+    expect(native).toMatchObject({ captureMethod: "native", captureMethodAssertedBy: "client" });
+    expect(canvas).toMatchObject({ captureMethod: "canvas", captureMethodAssertedBy: "client" });
+    const record = buildScanAnalysisRecord(both() as unknown as SkinScanResult, { scanId: "s-none", inputSha256: "f".repeat(64), requestId: "r" });
+    const none = toSkinState({ ...record, createdAt: "2026-10-01T00:00:00.000Z" }, `users/user-a/scanAnalyses/${scanAnalysisDocId("s-none", "f".repeat(64))}`, "user-a");
+    expect(none.kind === "skinstate" && comparabilityKey(none.state, FIELD, "cheeks").captureMethod).toBeNull();
+    if (none.kind === "skinstate") {
+      expect(compareStates(stateFrom(both()), none.state, FIELD, "cheeks", TABLE)).toEqual({
+        verdict: "not_comparable", reasons: ["engine_build_unknown", "capture_method_unknown"],
+      });
+    }
   });
 
   it("the client gate result changes nothing: comparability never reads it (D-26, Q-2)", () => {

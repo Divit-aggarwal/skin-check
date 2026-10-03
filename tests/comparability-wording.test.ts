@@ -10,7 +10,7 @@ const DIGIT_NEXT_TO_CHANGE = new RegExp(`\\d\\s*${CHANGE_WORDS}\\b|\\b${CHANGE_W
 const A: ComparabilityKey = {
   contractVersion: "skinstate-1", fieldPath: "colour.native.lStarMean", region: "cheek_image_left",
   pipelineVersion: "scan-0.1.6-provisional", engineBuild: "sha-a", colourPath: "native", statsPath: "both",
-  inputVariant: "cv_downscale_1280", captureMethod: "native", regionStatus: "available", lowPixelCount: false,
+  inputVariant: "cv_downscale_1280", captureMethod: "native", captureMethodAssertedBy: "client", regionStatus: "available", lowPixelCount: false,
 };
 
 // Every combination of the key parts that drive a reason, against both tables.

@@ -35,6 +35,13 @@ export interface ComparabilityKey {
   statsPath: "corrected" | "both";
   inputVariant: string | null;
   captureMethod: "native" | "canvas" | null;
+  /**
+   * Owner O-1 = A (a change to D-26): captureMethod stays in the key, marked
+   * client-asserted. An honest value can only split pairs; a forged one can
+   * only merge the two capture paths, and every other key part plus the
+   * validated-quantity table still apply.
+   */
+  captureMethodAssertedBy: "client";
   regionStatus: "available" | "absent_region";
   lowPixelCount: boolean;
 }
@@ -81,6 +88,7 @@ export function comparabilityKey(state: SkinState, fieldPath: string, region: Sk
     statsPath: state.engine.statsPath,
     inputVariant: state.input.variant || null,
     captureMethod: state.input.captureMethod,
+    captureMethodAssertedBy: "client",
     regionStatus: state.regions[region]?.status === "available" ? "available" : "absent_region",
     lowPixelCount: state.quality.lowPixelCount[region] === true,
   };
