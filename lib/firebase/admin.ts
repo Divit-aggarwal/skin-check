@@ -1,5 +1,6 @@
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
 // SERVER ONLY. This module holds the service-account credential that can mint
 // and inspect tokens for the whole Firebase project — the exact opposite of
@@ -73,6 +74,16 @@ function adminApp(): App {
     // module might initialise for a different purpose.
     APP_NAME
   );
+}
+
+/**
+ * Admin Firestore for server-written records (C2: users/{uid}/scanAnalyses).
+ * Same lazy app and same AdminNotConfiguredError as token verification.
+ * Bypasses firestore.rules entirely — every path it writes must be built
+ * from a VERIFIED uid, never one read from the request.
+ */
+export function adminDb(): Firestore {
+  return getFirestore(adminApp());
 }
 
 /**

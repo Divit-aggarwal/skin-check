@@ -61,7 +61,8 @@ async function freshIdToken(): Promise<string> {
 
 export async function getSkinScanResult(
   photo: Blob,
-  overlay?: string | string[] | null
+  overlay?: string | string[] | null,
+  scanId?: string
 ): Promise<SkinScanResult> {
   // PHASE 1 fast path — a signed-out caller is stopped before a request is
   // even built. Every route that can put a facial image on the wire funnels
@@ -76,6 +77,9 @@ export async function getSkinScanResult(
   // per category.
   const overlayParam = Array.isArray(overlay) ? overlay.join(",") : overlay;
   if (overlayParam) formData.append("overlay", overlayParam);
+  // C2: lets the server persist the full analysis under this scan. Optional
+  // — without it the route analyzes exactly as before and writes nothing.
+  if (scanId) formData.append("scanId", scanId);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), SKIN_SCAN_CLIENT_TIMEOUT_MS);
@@ -239,7 +243,7 @@ export async function runSkinScan(opts: {
     originalStored = true;
   }
 
-  const result = await getSkinScanResult(photo, overlays);
+  const result = await getSkinScanResult(photo, overlays, scanId);
   return { result, originalStored };
 }
 

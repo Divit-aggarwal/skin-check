@@ -124,6 +124,14 @@ export interface DraftScan {
   /** null while the CV call is still in flight or failed. */
   result: SkinScanResult | null;
   captureMethod: CaptureMethod;
+  /**
+   * Restored onto the scan so a resumed draft's record says what actually
+   * happened to the original (D11). Always written together: a stored:true
+   * record without the matching consent version is refused by the rules.
+   * Optional because drafts written before these fields existed lack them.
+   */
+  originalStored?: boolean | undefined;
+  retentionConsentVersion?: string | undefined;
 }
 
 function openDb(): Promise<IDBDatabase | null> {

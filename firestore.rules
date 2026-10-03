@@ -27,6 +27,14 @@ service cloud.firestore {
         allow update, delete: if false;
       }
 
+      // C2. Full analysis records, written ONLY by /api/skin-scan through the
+      // Admin SDK (which bypasses these rules). The owner may read; no client
+      // may ever create, change, or delete one.
+      match /scanAnalyses/{id} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+
       // PHASE 3 consent gate. A record may only claim that the original image
       // is stored if it also carries image-retention consent at the current
       // version. The presign route asks the client for the same flag, but that

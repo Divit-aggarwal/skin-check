@@ -7,7 +7,10 @@ import type { SkinScanState } from "@/types/skin-scan";
 import { PhoneAuthForm } from "@/components/auth/PhoneAuthForm";
 import { saveSkinCheck } from "@/lib/firebase/skin-checks";
 import { useAuth } from "@/lib/auth-context";
+import { canSaveScan, withTimeout } from "@/lib/useSkinCheckFlow";
 import { Button } from "@/components/ui/button";
+
+const SAVE_TIMEOUT_MS = 15_000;
 
 interface PhoneAuthStepProps {
   step: PhoneStep;
@@ -60,28 +63,49 @@ export function PhoneAuthStep({
   // read as "your code didn't work".
   const [justAuthed, setJustAuthed] = useState<User | null>(null);
   const activeUser = user ?? justAuthed;
+  const [saving, setSaving] = useState(false);
+  const [saveFailed, setSaveFailed] = useState(false);
 
   function handleAuthenticated(user: User) {
     if (committed.current) return;
-    committed.current = true;
     setJustAuthed(user);
+    // Checked here as well as on the button: the signed-out PhoneAuthForm
+    // path calls this directly.
+    if (step.savesScan && !canSaveScan(scan, answers)) return;
+    committed.current = true;
     // Firebase's verified number is the authoritative one — the typed value
     // is never promoted to an answer, so there is only ever one phone
     // identity for this session.
     const verified = user.phoneNumber ?? "";
-    onChange(verified);
-    onCommit();
-    if (!step.savesScan) return;
-    // Non-fatal by design: the user has authenticated and their results are
-    // already computed client-side, so a failed write must not block them.
-    void saveSkinCheck(user.uid, scanId, { ...answers, [step.id]: verified }, scan)
-      // The draft has served its purpose once the scan belongs to a real
-      // uid. Cleared only on success, so a failed write leaves the user's
-      // answers recoverable rather than silently dropping them.
-      .then(onSaved)
+    if (!step.savesScan) {
+      onChange(verified);
+      onCommit();
+      return;
+    }
+    // The results only open once the write lands. Advancing first would
+    // leave a failed save with no retry (this step unmounts) and let "Take
+    // a new scan" clear the only copy of an unsaved scan. A retry is safe:
+    // a write that already landed comes back as permission-denied, which
+    // saveSkinCheck treats as saved. Offline, setDoc stays pending instead
+    // of rejecting, so the wait is capped; a write that lands after the
+    // timeout is covered by the same permission-denied rule on retry.
+    setSaving(true);
+    setSaveFailed(false);
+    withTimeout(saveSkinCheck(user.uid, scanId, { ...answers, [step.id]: verified }, scan), SAVE_TIMEOUT_MS)
+      .then(() => {
+        // The draft has served its purpose once the scan belongs to a real
+        // uid. Cleared only on success, so a failed write leaves the user's
+        // answers recoverable rather than silently dropping them.
+        onSaved();
+        onChange(verified);
+        onCommit();
+      })
       .catch((error) => {
         console.error("[skin-check] session association failed", error);
-      });
+        committed.current = false;
+        setSaveFailed(true);
+      })
+      .finally(() => setSaving(false));
   }
 
   // A returning user whose Firebase session was restored must not be made to
@@ -135,10 +159,12 @@ export function PhoneAuthStep({
   // in. On the final step that's still an explicit tap rather than an
   // auto-commit, so finishing the questionnaire stays the user's action.
   if (activeUser?.phoneNumber) {
-    // Saving while the photo is still being analysed would record the scan
-    // without its result. Reachable quickly when a reused questionnaire goes
-    // straight from the photo to this step.
+    // Saving before the analysis has finished (or with no photo, e.g. after
+    // a refresh mid-scan) would permanently record the scan without its
+    // result. Reachable quickly when a reused questionnaire goes straight
+    // from the photo to this step.
     const analyzing = Boolean(step.savesScan) && scan.status === "loading";
+    const blocked = Boolean(step.savesScan) && !canSaveScan(scan, answers);
     return (
       <div className="flex flex-col gap-3">
         <p className="text-body text-text/70">
@@ -147,12 +173,21 @@ export function PhoneAuthStep({
         <Button
           variant="ink"
           size="sm"
-          disabled={analyzing}
+          disabled={blocked || saving}
           onClick={() => handleAuthenticated(activeUser)}
           className="w-fit"
         >
-          {analyzing ? "Analyzing your photo…" : step.savesScan ? "Get my results" : "Continue"}
+          {analyzing
+            ? "Analyzing your photo…"
+            : saving
+              ? "Saving…"
+              : step.savesScan
+                ? "Get my results"
+                : "Continue"}
         </Button>
+        {saveFailed && (
+          <p className="text-sm text-text/70">We couldn&rsquo;t save your results. Check your connection and try again.</p>
+        )}
       </div>
     );
   }

@@ -34,7 +34,8 @@ interface SkinCheckDashboardProps {
   scan: SkinScanState;
   /** Stable id for this scan attempt — half of the S3 key for the original. */
   scanId: string;
-  onScanChange: (scan: SkinScanState) => void;
+  /** `forScanId` lets the flow drop a response from a superseded attempt. */
+  onScanChange: (scan: SkinScanState, forScanId?: string) => void;
   answers: SkinCheckAnswers;
 }
 
@@ -122,7 +123,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, answers }: Skin
           captureMethod,
           originalStored: retried.originalStored,
           retentionConsentVersion,
-        });
+        }, scanId);
       } catch (err) {
         console.error("Skin scan retry failed:", err);
         // Reusing the previous `message` would misreport a fresh auth failure
@@ -144,7 +145,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, answers }: Skin
             ? false
             : (originalStored || (Boolean(original) && Boolean(retentionConsentVersion))),
           retentionConsentVersion,
-        });
+        }, scanId);
       }
     };
 

@@ -194,4 +194,31 @@ describe.skipIf(!EMULATOR)("firestore.rules — skinChecks image metadata", () =
     const db = env.unauthenticatedContext().firestore();
     await assertFails(getDocs(collection(db, "users", OWNER, "skinChecks")));
   });
+
+  // ── C2: scanAnalyses is server-written only (Admin SDK bypasses rules) ───
+  const ANALYSIS = "scan-analysis-01_0123456789abcdef";
+
+  it("REFUSES a client create of the owner's own scanAnalyses doc", async () => {
+    const db = env.authenticatedContext(OWNER).firestore();
+    await assertFails(setDoc(doc(db, "users", OWNER, "scanAnalyses", ANALYSIS), { schemaVersion: 1, source: "server" }));
+  });
+
+  it("REFUSES a client write into another user's scanAnalyses", async () => {
+    const db = env.authenticatedContext(VICTIM).firestore();
+    await assertFails(setDoc(doc(db, "users", OWNER, "scanAnalyses", ANALYSIS), { schemaVersion: 1 }));
+  });
+
+  it("lets the owner read their own scanAnalyses", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await setDoc(doc(ctx.firestore(), "users", OWNER, "scanAnalyses", ANALYSIS), { schemaVersion: 1, source: "server" });
+    });
+    const db = env.authenticatedContext(OWNER).firestore();
+    await assertSucceeds(getDoc(doc(db, "users", OWNER, "scanAnalyses", ANALYSIS)));
+    await assertSucceeds(getDocs(collection(db, "users", OWNER, "scanAnalyses")));
+  });
+
+  it("REFUSES another user (or signed-out) reading scanAnalyses", async () => {
+    await assertFails(getDocs(collection(env.authenticatedContext(VICTIM).firestore(), "users", OWNER, "scanAnalyses")));
+    await assertFails(getDocs(collection(env.unauthenticatedContext().firestore(), "users", OWNER, "scanAnalyses")));
+  });
 });

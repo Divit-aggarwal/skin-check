@@ -12,6 +12,7 @@ import {
   PRIVACY_POLICY_LINK_TEXT,
   PRIVACY_POLICY_URL,
 } from "@/lib/consent";
+import { saveDraftScan } from "@/lib/skin-check-draft";
 import { Button } from "@/components/ui/button";
 import type { PhotoCaptureStep } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanState } from "@/types/skin-scan";
@@ -31,7 +32,8 @@ interface PhotoCaptureProps {
   onChange: (value: string) => void;
   onCommit: () => void;
   scan: SkinScanState;
-  onScanChange: (scan: SkinScanState) => void;
+  /** `forScanId` lets the flow drop a response from a superseded attempt. */
+  onScanChange: (scan: SkinScanState, forScanId?: string) => void;
 }
 
 // capture="user" on a file input only actually opens the device camera on
@@ -253,6 +255,19 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     onCommit();
 
     onScanChange({ status: "loading" });
+    // Into the draft before the analysis starts, so a refresh mid-scan
+    // restores this photo as a retryable scan instead of losing it. Written
+    // under-claiming: the upload hasn't happened yet, so originalStored is
+    // false until the outcome below rewrites it.
+    const retentionConsentVersion = hasRetentionConsent ? IMAGE_RETENTION_CONSENT_VERSION : undefined;
+    void saveDraftScan({
+      scanId,
+      photo: blob,
+      result: null,
+      captureMethod,
+      originalStored: false,
+      retentionConsentVersion,
+    });
     // Request every traversable category's overlay in this one call — the
     // skin-scan service accepts a comma-separated `overlays` list and
     // generates all of them in one pipeline run (measured well under its own
@@ -264,7 +279,6 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     // PHASE 3 ordering: the original image is PUT to private S3 first and the
     // CV analysis only starts once that succeeded (runSkinScan owns both
     // halves, so the dashboard's retry runs the same sequence).
-    const retentionConsentVersion = hasRetentionConsent ? IMAGE_RETENTION_CONSENT_VERSION : undefined;
 
     void runSkinScan({
       scanId,
@@ -274,15 +288,18 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
       overlays: OVERLAY_CATEGORIES,
     })
       .then(({ result, originalStored }) =>
-        onScanChange({
-          status: "success",
-          result,
-          photo: blob,
-          original,
-          captureMethod,
-          originalStored,
-          retentionConsentVersion,
-        })
+        onScanChange(
+          {
+            status: "success",
+            result,
+            photo: blob,
+            original,
+            captureMethod,
+            originalStored,
+            retentionConsentVersion,
+          },
+          scanId
+        )
       )
       .catch((err) => {
         console.error("Skin scan failed:", err);
@@ -309,7 +326,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           // failed (case B), so the record must not claim otherwise.
           originalStored: !isUploadError(err) && Boolean(original) && hasRetentionConsent,
           retentionConsentVersion,
-        });
+        }, scanId);
       });
   }, [hasConsented, hasRetentionConsent, onChange, onCommit, onScanChange, isMobile, user, scanId]);
 
