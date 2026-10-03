@@ -10,7 +10,8 @@ import { loadTrustedEchoContext } from "@/lib/echo-trusted-context";
 import { signHistory, verifyHistory } from "@/lib/echo-history-token";
 import { bandScores } from "@/lib/skin-check-rules";
 import { summarizeConcerns } from "@/lib/skin-check-score";
-import { ageStatus, withLedgerTimeout, type AgeStatus } from "@/app/api/account/_ledger";
+import { ageStatus, latestGrant, withLedgerTimeout, type AgeStatus } from "@/app/api/account/_ledger";
+import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 
 // firebase-admin needs Node APIs and hard-fails on the Edge runtime — same
 // explicit opt-in as /api/skin-scan.
@@ -149,9 +150,12 @@ export async function POST(request: NextRequest) {
   // the attestation UI ships with this lane). It fails closed: a ledger it
   // can't read is a 503, never a pass. Before the quota, so a refusal
   // doesn't spend it.
+  // H03c: and the user's AI-share consent at the current version (D-16,
+  // D-14). Same fail-closed read. LOCAL ONLY until decision 6 and final copy.
   let age: AgeStatus;
+  let aiShare: boolean | null;
   try {
-    age = await withLedgerTimeout(ageStatus(uid));
+    [age, aiShare] = await withLedgerTimeout(Promise.all([ageStatus(uid), latestGrant(uid, "ai_share", AI_SHARE_CONSENT_VERSION)]));
   } catch (err) {
     console.error("skin-check chat: consent ledger unavailable:", err instanceof Error ? err.message : String(err));
     return NextResponse.json(
@@ -164,6 +168,9 @@ export async function POST(request: NextRequest) {
   }
   if (age === "missing") {
     return NextResponse.json({ error: "Please confirm your age to use Echo.", code: "ATTESTATION_REQUIRED" }, { status: 403 });
+  }
+  if (aiShare !== true) {
+    return NextResponse.json({ error: "Please agree to share your skin check with Echo.", code: "AI_CONSENT_REQUIRED" }, { status: 403 });
   }
 
   const quotaLimited = consumeDailyQuota(request, GEMINI_ROUTE_LIMITS);

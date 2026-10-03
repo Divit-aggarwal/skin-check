@@ -90,3 +90,31 @@ describe("chat age gate", () => {
     await expectRefused(503, "CONSENT_CHECK_UNAVAILABLE");
   });
 });
+
+describe("chat AI-share consent gate (H03c)", () => {
+  it("reads the grant at the current version for the verified uid", async () => {
+    const { AI_SHARE_CONSENT_VERSION } = await import("@/lib/consent");
+    expect((await post()).status).toBe(200);
+    expect(latestGrant).toHaveBeenCalledWith("uid-chat", "ai_share", AI_SHARE_CONSENT_VERSION);
+  });
+
+  it("no grant: 403 AI_CONSENT_REQUIRED", async () => {
+    latestGrant.mockResolvedValue(null);
+    await expectRefused(403, "AI_CONSENT_REQUIRED");
+  });
+
+  it("a grant followed by a later withdrawal: 403", async () => {
+    latestGrant.mockResolvedValue(false);
+    await expectRefused(403, "AI_CONSENT_REQUIRED");
+  });
+
+  it("the consent read throws: 503, fails closed", async () => {
+    latestGrant.mockRejectedValue(new Error("down"));
+    await expectRefused(503, "CONSENT_CHECK_UNAVAILABLE");
+  });
+
+  it("under 18 wins over a consent grant", async () => {
+    ageStatus.mockResolvedValue("under18");
+    await expectRefused(403, "UNDER_18");
+  });
+});
