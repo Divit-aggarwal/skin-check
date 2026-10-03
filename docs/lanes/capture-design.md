@@ -81,7 +81,7 @@ It has three parts:
 The table and why it exists:
 - LONGITUDINAL_METHOD §2–§3 says the gates apply only to quantities listed in a COMPARABLE table, and that table is **empty today**. A field enters it only after test–retest (C05–C07).
 - So "the engine gave a value" and "the value is safe to compare" stay separate. A field that is not in the table gives `quantity_not_validated`, whatever the keys say.
-- The production table is an empty constant. Only tests pass in a table with entries.
+- The production table is an empty constant. Only tests pass in a table with entries. A test checks that no file outside `tests/` passes a `table` argument.
 
 **Today every real pair returns `not_comparable`**, with at least two reasons:
 - `quantity_not_validated`, because the table is empty;
@@ -159,7 +159,7 @@ The fixed order of checks, used everywhere (the result list and the choice of pr
 
 `exposure, blur, resolution, distance, framing, pose, expression`
 
-`distance` corresponds to contract `quality.faceScale`, and `framing`/`pose` to `quality.pose`. That link is for a future server-side producer only. The client result never fills those contract fields (§2.5).
+`distance` corresponds to contract `quality.faceScale` and `pose` to `quality.pose`. `framing` has no contract field. That link is for a future server-side producer only. The client result never fills those contract fields (§2.5).
 
 ### 2.4 Retake reasons (one named enum)
 
@@ -252,11 +252,11 @@ interface ComparabilityKey {
 }
 
 /** LONGITUDINAL_METHOD §2 COMPARABLE table. Empty in production until C05–C07. */
-interface ComparableQuantity { fieldPath: string; pipelineVersion: string; calibrationId: string | null }
+interface ComparableQuantity { fieldPath: string; region: SkinStateRegionKey; pipelineVersion: string; calibrationId: string | null }
 export const COMPARABLE_QUANTITIES: readonly ComparableQuantity[] = [];
 
 type NotComparableReason =
-  | "quantity_not_validated"         // (fieldPath, pipelineVersion) not in the table
+  | "quantity_not_validated"         // (fieldPath, region, pipelineVersion) not in the table
   | "engine_build_unknown" | "engine_build_differs"
   | "pipeline_version_unknown" | "pipeline_version_differs"
   | "input_variant_unknown" | "input_variant_differs"
@@ -413,6 +413,7 @@ Key-pair table (each row lists the verdict and its exact reasons):
 | identical keys, non-null build | a test table **with** the entry | `comparable`, noise `unknown` |
 | identical keys | the **production** (empty) table | `quantity_not_validated` |
 | entry for another pipeline version | test table | `quantity_not_validated` |
+| entry for another region only | test table | `quantity_not_validated` |
 | build null on either side | — | `engine_build_unknown` |
 | builds differ | — | `engine_build_differs` |
 | pipeline versions differ | — | `pipeline_version_differs` |
@@ -446,6 +447,7 @@ Purity:
 - The unit tests do **not** read seeded data. They run first, with no emulator (`scripts/local-stack.sh:34-38`). They build their own pairs.
 
 **e2e (`capture.e2e.test.ts`, only with O-2)**
+- Skips itself with `describe.skipIf(!LOCAL_STACK_WEB)` (the `tests/local-stack.e2e.test.ts` pattern), because the unit pass collects every test file.
 - A synthetic scan posted with `captureQuality` reads back unchanged:
   - Option A: from `scanAnalyses`;
   - Option B: from `skinChecks`.
@@ -507,7 +509,7 @@ All steps wait for the owner to approve this design. Every code step ends with:
 | S9 | Persist `CaptureQuality` (A: record field and route form field; B: `skinChecks.capture`) | **O-2** | capture.e2e | `feat(capture): persist client capture quality` |
 | S10 | Pose, expression, distance and framing checks | **O-3** | capture-gate cases for the four checks | `feat(capture): landmark-based checks` |
 | S11 | Adjust the `captureMethod` part of the key to the O-1 outcome. Empty if the frozen contract is kept | **O-1** | comparability table rows for capture method | `fix(capture): comparability key per D-26` |
-| S12 | `capture-report.md`: link to this design, owner approval, what was built, commits, test results, requests, open questions | none (last) | none (document task) | `docs(lanes): capture report` |
+| S12 | `capture-report.md`, written last and reporting whatever has landed: link to this design, owner approval, what was built, commits, test results, requests, open questions | none (last) | none (document task) | `docs(lanes): capture report` |
 
 S5 can be built entirely now, to the frozen contract. If O-1 removes `captureMethod`, only the extractor and a few table rows change.
 
