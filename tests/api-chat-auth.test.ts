@@ -11,7 +11,7 @@ import { getSkinCheckChatReply, isAuthError } from "@/lib/api";
 const SCAN_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 
 function stubFetch(status: number, body: unknown) {
-  const fetchMock = vi.fn(async (_url: string, _init: RequestInit) => new Response(JSON.stringify(body), { status }));
+  const fetchMock = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(async () => new Response(JSON.stringify(body), { status }));
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
