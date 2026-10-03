@@ -135,18 +135,6 @@ None of these decisions has been implemented. "PROPOSED" means the investigation
 **D-20 Remove "digital twin" from the persona and from app metadata. (PROPOSED)**
 - **Evidence:** research doc §8; the FTC net-impression standard; the system is not a twin by NASEM criteria.
 
-**D-21 Move Firestore to a named database in `asia-south1` before C2 ships, and move the Vercel function region to `bom1` in the same window. (PROPOSED)**
-- Resolves PREFLIGHT_AUDIT G4.2. Full analysis, runbook and risks are in [DATA_LOCALITY_DECISION.md](DATA_LOCALITY_DECISION.md).
-- **Evidence:**
-  - Production holds 21 docs (7 users, 14 skinChecks, 0 scanAnalyses) and no composite indexes.
-  - A Firestore location is immutable.
-  - Longitudinal records are append-only, so they are cheapest to place correctly at birth.
-  - ECS and S3 are already in ap-south-1.
-- **Rejected:**
-  - Recreating `(default)` in place: destructive, no fallback database, and its viability is unverified.
-  - A new Firebase project: requires an Auth migration.
-  - Staying on nam5 and disclosing it: the cost of moving grows with every scan.
-
 **D-21 Gate 01 stores raw analysis in `users/{uid}/scanAnalyses/{scanId}_{sha16}`, not in `skinStates`. (IMPLEMENTED in 6e9081d; not deployed)**
 - This gate was scoped to preservation only; SkinState semantics (comparability keys, engineBuild, requestedScanId join) are deferred to a later gate.
 - `scanAnalyses` is the immutable raw substrate. A later SkinState may be derived from it or replace it, but it is never mutated.
@@ -154,6 +142,23 @@ None of these decisions has been implemented. "PROPOSED" means the investigation
 - Retries of the same bytes are idempotent. A retake gets its own document, keyed by hash. A failed write never fails the scan (D-03 honoured).
 - **Also in gate 01:** the scan save now blocks until it succeeds or times out after 15 s, with a retry. This replaces the old "non-fatal by design" save, so a failed save can no longer silently lose the scan.
 - Details: IMPLEMENTATION_GATE_01.md.
+
+**D-22 Recreate Firestore `(default)` in `asia-south1` (no data copy) and move Vercel functions to `bom1`. (APPROVED by owner 2026-10-03; preparation committed, reset not yet executed)**
+- Resolves PREFLIGHT_AUDIT G4.2.
+  - Analysis: [DATA_LOCALITY_DECISION.md](DATA_LOCALITY_DECISION.md), "Owner input" section.
+  - Runbook: [FIRESTORE_RESET_RUNBOOK.md](FIRESTORE_RESET_RUNBOOK.md).
+- **Evidence:**
+  - The owner confirmed all 21 production docs (7 users) are disposable test data.
+  - Direction: India-first, and cost matters.
+  - A Firestore location is immutable.
+  - Recreating `(default)` keeps the free tier and needs no code change. `asia-south1` is offered for this project (`firebase firestore:locations`). There is no location pin: the project was created after 2024-10-30, the Storage bucket was never provisioned, and App Engine integration is disabled.
+- **Vercel:** `vercel.json` `regions: ["bom1"]` replaces the dashboard default `iad1`. It takes effect on the next production deploy from `master`.
+- **Rejected:**
+  - A named database: loses the free tier and adds config everywhere.
+  - A new project: requires an Auth migration.
+  - Staying on nam5.
+- **Not covered:** Firebase Auth (global) and Gemini (any country) remain outside India.
+- Supersedes an earlier draft of this decision, committed in 311c700 under the duplicate number D-21, which proposed a named database with a data copy.
 
 ## B. Conflicts with the research doc
 
