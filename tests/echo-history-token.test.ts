@@ -1,3 +1,4 @@
+import { createHmac, hkdfSync } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { signHistory, verifyHistory, type EchoHistoryTurn } from "@/lib/echo-history-token";
 import { AdminNotConfiguredError } from "@/lib/firebase/admin";
@@ -63,5 +64,19 @@ describe("echo history token", () => {
   it("unset key → AdminNotConfiguredError", () => {
     vi.stubEnv("FIREBASE_PRIVATE_KEY", "");
     expect(() => signHistory("u", SCAN, "cheeks", TURNS)).toThrow(AdminNotConfiguredError);
+  });
+});
+
+describe("echo history token v2 (privacy R-F)", () => {
+  // The v1 scheme, verbatim, as it signed threads before the H03 minimisation.
+  const v1 = (secret: string) => {
+    const key = Buffer.from(hkdfSync("sha256", secret, "skin-check/echo-history/v1", "skin-check/echo-history/v1", 32));
+    const canonical = JSON.stringify(["echo-history-v1", "u", SCAN, "cheeks", TURNS.map((t) => [t.role, t.text])]);
+    return createHmac("sha256", key).update(canonical).digest().toString("base64url");
+  };
+
+  it("a thread signed with v1 no longer verifies", () => {
+    expect(verifyHistory("u", SCAN, "cheeks", TURNS, v1("test-private-key"))).toBe(false);
+    expect(verifyHistory("u", SCAN, "cheeks", TURNS, signHistory("u", SCAN, "cheeks", TURNS))).toBe(true);
   });
 });

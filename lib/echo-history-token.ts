@@ -16,8 +16,11 @@ import type { EchoRegion } from "@/lib/echo-regions";
 // raw credential nor reusable for anything else. Rotating the service-account
 // key invalidates every live thread's token; acceptable, since threads are
 // in-memory client-side and don't survive a refresh anyway.
+//
+// v2 (privacy R-F): threads signed before the H03 Gemini minimisation stop
+// verifying, so no pre-minimisation history is carried into a new prompt.
 
-const LABEL = "skin-check/echo-history/v1";
+const LABEL = "skin-check/echo-history/v2";
 
 export interface EchoHistoryTurn {
   role: "user" | "echo";
@@ -33,7 +36,7 @@ function historyKey(): Buffer {
 function mac(uid: string, scanId: string, region: EchoRegion, turns: EchoHistoryTurn[]): Buffer {
   // JSON array encoding is unambiguous (no delimiter collisions between
   // fields or turns), and the version tag lets the format change later.
-  const canonical = JSON.stringify(["echo-history-v1", uid, scanId, region, turns.map((t) => [t.role, t.text])]);
+  const canonical = JSON.stringify(["echo-history-v2", uid, scanId, region, turns.map((t) => [t.role, t.text])]);
   return createHmac("sha256", historyKey()).update(canonical).digest();
 }
 
