@@ -30,3 +30,11 @@ export function scanImageKey(uid: string, scanId: string): string {
 }
 
 export const ORIGINAL_CONTENT_TYPE = "image/jpeg";
+
+/**
+ * Everything one user has in the bucket (H01b erasure). The trailing slash is
+ * load-bearing: without it, erasing "abc" would also match "abcd/…".
+ */
+export function userPrefix(uid: string): string {
+  return `users/${uid}/`;
+}
