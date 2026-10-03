@@ -56,6 +56,9 @@ function isMobileCaptureDevice(): boolean {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
+// R3: the checkbox shows PROCESSING_CONSENT_COPY exactly, with the terms label as a link.
+const [PROCESSING_TERMS_BEFORE, PROCESSING_TERMS_AFTER] = PROCESSING_CONSENT_COPY.split(PROCESSING_CONSENT_TERMS_LABEL);
+
 // Downscales a full-res camera File to ~maxDimension on its long edge, for
 // the CV call only — the original File's bytes are stored untouched
 // elsewhere (see originalBlobRef below). Never upscales.
@@ -68,8 +71,6 @@ function isMobileCaptureDevice(): boolean {
 // or, worse, succeeds against the wrong pixels and silently mislabels which
 // region is which. The stored original (originalBlobRef) is the untouched
 // File itself, not this bitmap, so its EXIF tag is never altered.
-// R3: the checkbox shows PROCESSING_CONSENT_COPY exactly, with the terms label as a link.
-const [PROCESSING_TERMS_BEFORE, PROCESSING_TERMS_AFTER] = PROCESSING_CONSENT_COPY.split(PROCESSING_CONSENT_TERMS_LABEL);
 
 async function downscaleToJpeg(file: Blob, maxDimension: number, quality: number): Promise<Blob> {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });

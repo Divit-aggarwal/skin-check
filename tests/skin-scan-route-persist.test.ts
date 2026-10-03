@@ -22,7 +22,13 @@ vi.mock("@/lib/firebase/admin", async () => {
 
 // Privacy lane (H02a): the 18+ preamble gate has its own suite
 // (tests/privacy-scan-gate.test.ts); here it always goes ahead.
-vi.mock("@/app/api/account/_ledger", () => ({ scanAgeGate: async () => null }));
+// Step 14: the processing ledger write is a no-op here (privacy-processing-consent tests it),
+// so it never errors inside the route and never counts as a create below.
+vi.mock("@/app/api/account/_ledger", () => ({
+  scanAgeGate: async () => null,
+  appendConsent: async () => undefined,
+  withLedgerTimeout: <T,>(p: Promise<T>) => p,
+}));
 import { POST } from "@/app/api/skin-scan/route";
 import { PROCESSING_CONSENT_VERSION } from "@/lib/consent";
 import { AdminNotConfiguredError } from "@/lib/firebase/admin";
