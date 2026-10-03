@@ -3,7 +3,7 @@ import { checkRequestRate, SKIN_SCAN_ROUTE_LIMITS } from "@/lib/rate-limit";
 import { AdminNotConfiguredError, bearerToken, verifyFirebaseIdToken } from "@/lib/firebase/admin";
 import { isValidScanId, ORIGINAL_CONTENT_TYPE, scanImageKey } from "@/lib/s3-key";
 import { IMAGE_RETENTION_CONSENT_COPY, IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
-import { appendConsent, withLedgerTimeout } from "@/app/api/account/_ledger";
+import { appendConsent, scanAgeGate, withLedgerTimeout } from "@/app/api/account/_ledger";
 import { presignOriginalUpload, S3NotConfiguredError, UPLOAD_URL_TTL_SECONDS } from "@/lib/s3";
 
 // firebase-admin and the AWS SDK both need Node APIs.
@@ -85,6 +85,11 @@ export async function POST(request: NextRequest) {
       { status: 403 }
     );
   }
+
+  // H02a (D-19): an under-18 record is refused before anything is recorded or
+  // presigned. Everything else goes ahead (decision 3a, D-03).
+  const ageRefusal = await scanAgeGate(uid, "skin-scan/upload");
+  if (ageRefusal) return ageRefusal;
 
   // D-16: the server's own record of this consent, written before the URL is
   // handed out, so an abandoned flow still leaves one (audit D11). Best-effort:

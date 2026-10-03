@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import type { ConsentPurpose } from "@/lib/consent";
@@ -83,4 +84,38 @@ export async function ageStatus(uid: string): Promise<AgeStatus> {
   const all = await entries(uid, "age_18_plus");
   if (all.length === 0) return "missing";
   return all.some((e) => e.granted !== true) ? "under18" : "over18";
+}
+
+/**
+ * Decision 3(a): with no 18+ record, upload and scan still run (D-03a, old
+ * bundles and existing users have none yet) and the server logs it. Flip to
+ * true once old bundles are gone; R8 (capture lane) must land first.
+ */
+export const REQUIRE_AGE_ATTESTATION = false;
+
+/**
+ * The 18+ check for the upload and scan routes. Null means go ahead.
+ * - under-18 record: 403 UNDER_18 (the D-03a exception the owner approved).
+ * - no record: logged, or 403 ATTESTATION_REQUIRED once the constant flips.
+ * - the read fails or hangs: go ahead (D-03: never break the live scan).
+ */
+export async function scanAgeGate(uid: string, route: string, requireAttestation = REQUIRE_AGE_ATTESTATION): Promise<NextResponse | null> {
+  let age: AgeStatus;
+  try {
+    age = await withLedgerTimeout(ageStatus(uid));
+  } catch (err) {
+    console.warn(`${route}: age attestation unreadable; going ahead (D-03):`, (err as Error)?.message ?? "unknown");
+    return null;
+  }
+  if (age === "under18") {
+    return NextResponse.json({ error: "This service is only for people aged 18 or over.", code: "UNDER_18" }, { status: 403 });
+  }
+  if (age === "missing") {
+    if (requireAttestation) {
+      return NextResponse.json({ error: "Please confirm your age first.", code: "ATTESTATION_REQUIRED" }, { status: 403 });
+    }
+    // No uid: the count of unattested requests is what matters.
+    console.warn(`${route}: no age attestation on file; going ahead (decision 3a).`);
+  }
+  return null;
 }

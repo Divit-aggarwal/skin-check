@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // D-16 on the presign route: the server records image-retention consent before
 // it hands out a URL, and a ledger problem never refuses the upload (D-03).
-const { verifyFirebaseIdToken, presignOriginalUpload, appendConsent, ageStatus } = vi.hoisted(() => ({
+const { verifyFirebaseIdToken, presignOriginalUpload, appendConsent, scanAgeGate } = vi.hoisted(() => ({
   verifyFirebaseIdToken: vi.fn(),
   presignOriginalUpload: vi.fn(),
   appendConsent: vi.fn(),
-  ageStatus: vi.fn(),
+  scanAgeGate: vi.fn(),
 }));
 
 vi.mock("@/lib/firebase/admin", async () => {
@@ -22,23 +22,14 @@ vi.mock("@/lib/rate-limit", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
   return { ...actual, checkRequestRate: () => null };
 });
-const ledgerMode = vi.hoisted(() => ({ require: false }));
 vi.mock("@/app/api/account/_ledger", async () => {
   const actual = await vi.importActual<typeof import("@/app/api/account/_ledger")>("@/app/api/account/_ledger");
-  return {
-    ...actual,
-    appendConsent,
-    ageStatus,
-    get REQUIRE_AGE_ATTESTATION() {
-      return ledgerMode.require;
-    },
-    withLedgerTimeout: <T,>(p: Promise<T>) => actual.withLedgerTimeout(p, 20),
-  };
+  return { ...actual, appendConsent, scanAgeGate, withLedgerTimeout: <T,>(p: Promise<T>) => actual.withLedgerTimeout(p, 20) };
 });
 
 import { POST } from "@/app/api/skin-scan/upload/route";
 import { IMAGE_RETENTION_CONSENT_COPY, IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const SCAN_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const CONSENT = { imageRetentionConsent: true, imageRetentionConsentVersion: IMAGE_RETENTION_CONSENT_VERSION };
@@ -55,11 +46,10 @@ const post = (body: unknown = { scanId: SCAN_ID, ...CONSENT }) =>
 let errorLog: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   vi.clearAllMocks();
-  ledgerMode.require = false;
   verifyFirebaseIdToken.mockResolvedValue("uid-upload");
   presignOriginalUpload.mockResolvedValue("https://signed");
   appendConsent.mockResolvedValue(undefined);
-  ageStatus.mockResolvedValue("over18");
+  scanAgeGate.mockResolvedValue(null);
   errorLog = vi.spyOn(console, "error").mockImplementation(() => {});
   vi.spyOn(console, "warn").mockImplementation(() => {});
 });
@@ -113,5 +103,21 @@ describe("presign writes the image_retention ledger entry", () => {
       expect((await res.json()).code).toBe("CONSENT_REQUIRED");
     }
     expect(appendConsent).not.toHaveBeenCalled();
+  });
+});
+
+describe("age gate wiring (gate logic: privacy-ledger.test.ts)", () => {
+  it("asks the gate with the verified uid", async () => {
+    await post();
+    expect(scanAgeGate).toHaveBeenCalledWith("uid-upload", "skin-scan/upload");
+  });
+
+  it("a refusal is returned as is: nothing recorded, nothing presigned", async () => {
+    scanAgeGate.mockResolvedValue(NextResponse.json({ code: "UNDER_18" }, { status: 403 }));
+    const res = await post();
+    expect(res.status).toBe(403);
+    expect((await res.json()).code).toBe("UNDER_18");
+    expect(appendConsent).not.toHaveBeenCalled();
+    expect(presignOriginalUpload).not.toHaveBeenCalled();
   });
 });
