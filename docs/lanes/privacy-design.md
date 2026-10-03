@@ -178,7 +178,7 @@ The source is `lib/gemini.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-fo
 | `app/(marketing)/account/page.tsx` | render the delete-account section (component location: request R1) | H01b |
 | `lib/skin-check-validation.ts` | phone answer is valid when it equals `"verified"`; `RECONFIRM_EACH_SCAN_IDS = ["current_products", "female_skin_context"]`, stripped from reuse and skipped in the completeness check | H02b, H02c |
 | `components/skin-check/inputs/PhoneAuthStep.tsx` | store `"verified"`, never `user.phoneNumber`, in both phone answers; after sign-in on `phone_verify`, call the attestation route | H02a, H02c |
-| `lib/gemini.ts` | `GEMINI_FIELD_INVENTORY` constant (step id → `"sent" \| "not_sent"`); drop the Dryness band from the scale note | H03a, H03b |
+| `lib/gemini.ts` | `GEMINI_FIELD_INVENTORY` constant (step id → `"sent" \| "not_sent"`); drop the Dryness band from the scale note; `EXTRA_CAUTION_TRIGGERS` (provisional, E05) and `extraCautionFor(answers)`, applied inside the system-instruction builder | H03a, H03b |
 | `lib/skin-check-format.ts` | `summarizeSkinCheckAnswers` renders only step ids marked `"sent"`; `summarizeSkinScanScores` skips the fields marked remove | H03b |
 | `lib/echo-trusted-context.ts` | none. It reads the answers on the server; the removals and `extraCaution` happen later, in `lib/gemini.ts` and `lib/skin-check-format.ts`, so all three fields stop at the prompt builder | H03 |
 | `lib/firebase/admin.ts` | **one-time exception (decision 12, R2), add-only:** `adminAuth()` and `verifyFirebaseIdTokenClaims()` | H01b |
@@ -192,7 +192,7 @@ The source is `lib/gemini.ts`, `lib/echo-trusted-context.ts`, `lib/skin-check-fo
 | `app/api/account/_ledger.ts` | **server-only** ledger read and write helpers (`appendConsent`, `latestGrant`, `ageStatus`). Lives under `app/api/account/**` because `lib/consent.ts` is imported by client code and must not pull in the admin SDK. `_`-prefixed, so Next.js doesn't route it |
 | `app/api/account/attestation/route.ts` | H02a |
 | `app/api/account/consent/route.ts` | H03c |
-| `app/api/account/erase/route.ts` | H01b. Uses `adminDb().recursiveDelete(...)` and Admin Auth (`revokeRefreshTokens`, `deleteUser`). It first calls `verifyFirebaseIdToken`, which keeps the production-emulator guard and the revocation check. It then needs `auth_time` from the decoded token (request R2) |
+| `app/api/account/erase/route.ts` | H01b. Uses `adminDb().recursiveDelete(...)` and Admin Auth (`revokeRefreshTokens`, `deleteUser`). It calls `verifyFirebaseIdTokenClaims()` once (production-emulator guard, revocation check, and `auth_time`) and uses `adminAuth()` (R2, approved lane edit) |
 | `scripts/seed-lane-privacy.ts` | ledger entries for the seed users, plus one under-18 seed user and one user with S3Mock objects to erase |
 | `tests/privacy-*.test.ts`, `tests/firestore-rules-privacy.test.ts`, `tests/privacy.e2e.test.ts` | §4 |
 
@@ -260,7 +260,7 @@ Unit tests use vitest with the same fake-Firestore pattern as `skin-check-chat-t
 - Under-18 record: the scan route returns 403 `UNDER_18` before `formData()` is read and before the engine is called.
 - Missing attestation, mode "degrade" (D-03a): the scan runs, the response is unchanged, and a log line is written.
 - Missing attestation, mode "refuse": 403 `ATTESTATION_REQUIRED`.
-- The mode is one named constant, `REQUIRE_AGE_ATTESTATION` (upload and scan), set by decision 3.
+- The mode is one named constant, `REQUIRE_AGE_ATTESTATION` in `app/api/account/_ledger.ts` (upload and scan), `false` under decision 3a. Tests switch it to refuse mode by mocking that module (`vi.mock` with a getter), so both modes are tested.
 - The attestation read throws: the scan runs.
 
 **`tests/privacy-chat-gate.test.ts`**
@@ -280,7 +280,7 @@ Unit tests use vitest with the same fake-Firestore pattern as `skin-check-chat-t
 - The reuse walk for a female user visits those two steps, and for a male user only `current_products`.
 - A reused scan can't reach `get-your-results` with either one unanswered.
 - An under-18 saved answer still returns null.
-- `reconfirmHints(previous)` returns "Last time you said: …" text for the re-confirmed steps, and `reusableAnswers(previous)` contains neither id, so the hint never becomes an answer (decision 10a).
+- `reconfirmHints(previous)` returns "Last time you said: …" text for the re-confirmed steps, and `reusableAnswers(previous)` contains neither id, so the hint never becomes an answer (decision 10a). The hook keeps the hints in their own state, not in `answers`, so `saveDraft` and `saveSkinCheck` never see them; this is checked by reading the hook code in review, because the suite has no React renderer (vitest runs in node).
 
 **`tests/privacy-gemini-inventory.test.ts`** (H03)
 - Mock `@google/genai`, call `getSkinCheckChatReply` with every step answered, and capture the real `generateContent` argument (`config.systemInstruction` and `contents`).
@@ -491,7 +491,7 @@ Each step ends with passing tests (`npm run test:local`, typecheck, lint) and on
 - **Options:** approve each, or route it to main or after merge.
 - **Recommendation:**
   - R1: approve; it's a new file in an owned route folder.
-  - R2: main adds `adminAuth()`; the lane uses the fallback until then.
+  - R2: approved as a one-time lane edit, add-only (§0).
   - R6: approve. The test change is exactly the D-19 behaviour change.
 - **Blocks:** R1 blocks step 6; R6 blocks step 11. **Can start without it:** steps 1–5, 7–10, 12–14.
 
