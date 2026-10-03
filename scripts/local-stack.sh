@@ -87,7 +87,10 @@ export SKIN_SCAN_API_URL="http://127.0.0.1:$ENGINE" S3_SKIN_IMAGES_ENDPOINT="htt
 export FIREBASE_PROJECT_ID=$PROJECT NEXT_PUBLIC_FIREBASE_PROJECT_ID=$PROJECT
 export LOCAL_STACK_WEB="http://127.0.0.1:$WEB"
 
+# Base seed, then any lane seed (scripts/seed-lane-<lane>.ts), so lanes never
+# edit the shared seed file.
 SEED="npx vite-node --config vitest.config.ts scripts/seed-local.ts"
+for f in scripts/seed-lane-*.ts; do [ -e "$f" ] && SEED="$SEED && npx vite-node --config vitest.config.ts $f"; done
 if [ "$MODE" = up ]; then
   echo "== web on http://localhost:$WEB  (emulator UI http://127.0.0.1:$UI; sign-in codes print in this terminal)"
   $FIREBASE emulators:exec --config firebase.local.json --project "$PROJECT" --only auth,firestore --ui \

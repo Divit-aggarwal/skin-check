@@ -16,4 +16,6 @@ for _ in $(seq 1 120); do
   sleep 1
 done
 
-npx vitest run tests/firestore-rules.test.ts tests/local-stack.e2e.test.ts
+# Every rules test (tests/firestore-rules*.test.ts) and every end-to-end test
+# (tests/*.e2e.test.ts), so a lane adds its own files instead of editing this one.
+npx vitest run firestore-rules e2e.test
