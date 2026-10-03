@@ -174,7 +174,9 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     // Category + message only — never the raw SDK error object, which can
     // carry request/response internals that don't belong in server logs.
-    console.error("skin-check Echo chat failed:", err instanceof Error ? err.message : String(err));
+    // Name and code only: a Firestore failure in loadTrustedEchoContext
+    // carries the doc path (users/<uid>/...) in its message.
+    console.error("skin-check Echo chat failed:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
     return NextResponse.json(
       { error: "Couldn't reach Echo. Please try again.", code: "CHAT_SERVICE_ERROR" },
       { status: 502 }

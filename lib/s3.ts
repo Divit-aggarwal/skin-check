@@ -1,6 +1,6 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectsCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { ORIGINAL_CONTENT_TYPE } from "@/lib/s3-key";
+import { ORIGINAL_CONTENT_TYPE, userPrefix } from "@/lib/s3-key";
 
 // SERVER ONLY — same tripwire as lib/firebase/admin.ts. AWS credentials come
 // from the standard provider chain (instance/execution role in production, or
@@ -80,4 +80,61 @@ export function presignOriginalUpload(key: string): Promise<string> {
     new PutObjectCommand({ Bucket: BUCKET!, Key: key, ContentType: ORIGINAL_CONTENT_TYPE }),
     { expiresIn: UPLOAD_URL_TTL_SECONDS }
   );
+}
+
+// ─── H01b erasure (D-17) ────────────────────────────────────────────────────
+// A SEPARATE credential pair (decision 11a): the upload key can only PUT, so a
+// leaked upload key can never delete anyone's photos. Production needs the
+// owner's erase IAM principal (ListBucket on users/*, DeleteObject on
+// users/*); locally these point at S3Mock. No fallback to the upload pair or
+// the provider chain: unset means fail closed, before anything is listed.
+const ERASE_ACCESS_KEY_ID = process.env.S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID;
+const ERASE_SECRET_ACCESS_KEY = process.env.S3_SKIN_IMAGES_ERASE_SECRET_ACCESS_KEY;
+
+let eraseClient: S3Client | null = null;
+
+function s3Erase(): S3Client {
+  const missing: string[] = [];
+  if (!REGION) missing.push("S3_SKIN_IMAGES_REGION");
+  if (!BUCKET) missing.push("S3_SKIN_IMAGES_BUCKET");
+  if (!ERASE_ACCESS_KEY_ID) missing.push("S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID");
+  if (!ERASE_SECRET_ACCESS_KEY) missing.push("S3_SKIN_IMAGES_ERASE_SECRET_ACCESS_KEY");
+  if (missing.length > 0) throw new S3NotConfiguredError(missing);
+  eraseClient ??= new S3Client({
+    region: REGION!,
+    ...ENDPOINT_CONFIG,
+    credentials: { accessKeyId: ERASE_ACCESS_KEY_ID!, secretAccessKey: ERASE_SECRET_ACCESS_KEY! },
+  });
+  return eraseClient;
+}
+
+/** Throws S3NotConfiguredError when the erase pair is missing. Lets a caller check before it changes anything. */
+export function assertEraseConfigured(): void {
+  s3Erase();
+}
+
+/**
+ * Deletes every object under users/<uid>/ and returns how many were deleted.
+ * `uid` must be server-VERIFIED. Lists and deletes in pages until the prefix
+ * is empty; any per-object delete error throws, so the caller stops before
+ * the Firestore and Auth steps. No versioning or Object Lock today
+ * (H01_S3_ERASURE_READINESS), so a delete is final.
+ */
+export async function eraseUserPrefix(uid: string): Promise<number> {
+  const client = s3Erase();
+  const Prefix = userPrefix(uid);
+  let deleted = 0;
+  for (;;) {
+    const listed = await client.send(new ListObjectsV2Command({ Bucket: BUCKET!, Prefix, MaxKeys: 1000 }));
+    const keys = (listed.Contents ?? []).flatMap((o) => (o.Key ? [{ Key: o.Key }] : []));
+    if (keys.length === 0) return deleted;
+    const result = await client.send(
+      new DeleteObjectsCommand({ Bucket: BUCKET!, Delete: { Objects: keys, Quiet: true } })
+    );
+    if (result.Errors?.length) {
+      // Codes only: a key carries the uid.
+      throw new Error(`S3 erase failed for ${result.Errors.length} object(s): ${result.Errors.map((e) => e.Code).join(", ")}`);
+    }
+    deleted += keys.length;
+  }
 }

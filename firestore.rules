@@ -78,6 +78,15 @@ service cloud.firestore {
         allow write: if false;
       }
       // ── end lane:routine ──
+      // ── lane:privacy ──
+      // D-16 consent ledger. Written ONLY by the server through the Admin SDK
+      // (app/api/account/_ledger.ts), which bypasses these rules. The owner
+      // may read their own entries; no client may create, change or delete one.
+      match /consentLedger/{entryId} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+      // ── end lane:privacy ──
     }
   }
 }

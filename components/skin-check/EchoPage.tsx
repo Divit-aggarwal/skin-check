@@ -13,6 +13,8 @@ import { getSkinCheckChatReply, ApiError } from "@/lib/api";
 import { bandScores } from "@/lib/skin-check-rules";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import type { SkinScanScores } from "@/types/skin-scan";
+import { useAuth } from "@/lib/auth-context";
+import { AI_SHARE_CONSENT_COPY, AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 
 // hydration is labeled "Dryness" - see lib/skin-check-skus.ts's METRIC_LABELS
 // comment. Same reasoning, same relabel, kept in sync across both sites.
@@ -29,6 +31,14 @@ const CATEGORY_KEYS = Object.keys(CATEGORY_LABELS) as (keyof SkinScanScores)[];
 
 const RETRYABLE_ERROR_MESSAGE = "Couldn't reach Echo just now.";
 const CONFIG_ERROR_MESSAGE = "Echo isn't set up yet — this isn't something retrying will fix.";
+
+// Privacy gates on the chat route (H02a, H03c). Retrying can't fix these, so
+// they get their own message and no Retry button.
+const GATE_MESSAGES: Record<string, string> = {
+  UNDER_18: "Echo is only available to people aged 18 or over.",
+  ATTESTATION_REQUIRED: "Please confirm your age in Skin Check before using Echo.",
+};
+const NOT_RETRYABLE = new Set(["CHAT_MISCONFIGURED", "UNDER_18", "ATTESTATION_REQUIRED", "AI_CONSENT_REQUIRED"]);
 
 function greetingFor(region: EchoRegion): string {
   return `Hey — let's talk about your ${ECHO_REGION_LABELS[region].toLowerCase()}. What would you like to know?`;
@@ -65,7 +75,11 @@ export function EchoPage() {
     retryBefore: EchoThread;
     retryMessage: EchoThreadMessage;
     retryable: boolean;
+    code: string | undefined;
   } | null>(null);
+  const { user } = useAuth();
+  const [consentSaving, setConsentSaving] = useState(false);
+  const [consentFailed, setConsentFailed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Aborts any in-flight /api/skin-check/chat request when this page
@@ -149,7 +163,7 @@ export function EchoPage() {
       // succeed instead of failing the same way forever.
       const retryBefore = code === "CHAT_HISTORY_INVALID" ? { messages: [], historyToken: null } : before;
       if (retryBefore !== before) setThread(region, { messages: [userMessage], historyToken: null });
-      setSendError({ region, retryBefore, retryMessage: userMessage, retryable: code !== "CHAT_MISCONFIGURED" });
+      setSendError({ region, retryBefore, retryMessage: userMessage, retryable: !NOT_RETRYABLE.has(code ?? ""), code });
     } finally {
       if (!controller.signal.aborted) setSendingRegion(null);
       if (abortControllerRef.current === controller) abortControllerRef.current = null;
@@ -171,6 +185,33 @@ export function EchoPage() {
   function handleRetry() {
     if (!activeError || sendingRegion) return;
     void sendToEcho(activeError.region, activeError.retryBefore, activeError.retryMessage);
+  }
+
+  // H03c: the server refused because there is no AI-share consent. Record the
+  // user's yes, then resend the turn that was refused. LOCAL ONLY for now:
+  // DRAFT copy (decision 7b), Gemini key pending (decision 6).
+  async function grantAiShare() {
+    if (!activeError || consentSaving) return;
+    if (!user) {
+      setConsentFailed(true);
+      return;
+    }
+    setConsentSaving(true);
+    setConsentFailed(false);
+    try {
+      const res = await fetch("/api/account/consent", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${await user.getIdToken()}` },
+        body: JSON.stringify({ purpose: "ai_share", granted: true, version: AI_SHARE_CONSENT_VERSION }),
+      });
+      if (res.ok) void sendToEcho(activeError.region, activeError.retryBefore, activeError.retryMessage);
+      else setConsentFailed(true);
+    } catch (err) {
+      console.error("AI-share consent not recorded:", err instanceof Error ? err.message : err);
+      setConsentFailed(true);
+    } finally {
+      setConsentSaving(false);
+    }
   }
 
   return (
@@ -261,10 +302,26 @@ export function EchoPage() {
             <TypingIndicator key="thinking" className="rounded-tl-sm bg-blush-soft text-blush" />
           )}
         </AnimatePresence>
-        {activeError && (
+        {activeError?.code === "AI_CONSENT_REQUIRED" && (
+          <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl bg-blush-soft px-4 py-3">
+            <p className="text-body text-text">{AI_SHARE_CONSENT_COPY}</p>
+            <button
+              type="button"
+              onClick={() => void grantAiShare()}
+              disabled={consentSaving || sendingRegion !== null}
+              className="text-label font-semibold uppercase tracking-label text-blush underline underline-offset-2 disabled:opacity-50"
+            >
+              I agree
+            </button>
+            {consentFailed && (
+              <p className="text-sm text-text/70">We couldn&apos;t save that. Please reload the page and try again.</p>
+            )}
+          </div>
+        )}
+        {activeError && activeError.code !== "AI_CONSENT_REQUIRED" && (
           <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl bg-blush-soft px-4 py-3">
             <p className="text-body text-text">
-              {activeError.retryable ? RETRYABLE_ERROR_MESSAGE : CONFIG_ERROR_MESSAGE}
+              {GATE_MESSAGES[activeError.code ?? ""] ?? (activeError.retryable ? RETRYABLE_ERROR_MESSAGE : CONFIG_ERROR_MESSAGE)}
             </p>
             {activeError.retryable && (
               <button

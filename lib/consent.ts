@@ -22,3 +22,94 @@ export const IMAGE_RETENTION_CONSENT_COPY =
 // must never have.
 export const PRIVACY_POLICY_URL = "https://theprojectskin.com/policies/privacy-policy";
 export const PRIVACY_POLICY_LINK_TEXT = "Read our Privacy Policy";
+
+// ─── Privacy lane (H01, H02, H03): docs/lanes/privacy-design.md ─────────────
+// Client-safe strings only, like everything above. The server-only ledger
+// helpers that record these live in app/api/account/_ledger.ts.
+
+/** One purpose per consent-ledger entry. Purposes are never combined. */
+export type ConsentPurpose = "image_retention" | "processing" | "ai_share" | "age_18_plus";
+
+/** Bump when the attestation copy below changes. */
+export const AGE_ATTESTATION_VERSION = "age 18 plus attestation version 1";
+/** Draft (design §2.2); the owner approves the final copy. */
+export const AGE_ATTESTATION_COPY = "I confirm I am 18 or older.";
+
+// Decision 7(b): the GEMINI_BOUNDARY §8 draft, for local use only. "DRAFT" is
+// in the version, so a ledger entry recorded against it can never pass for
+// the final wording. Production waits for the owner's copy (decision 7a) and
+// the Gemini key answer (decision 6).
+export const AI_SHARE_CONSENT_VERSION = "ai share DRAFT version 1";
+export const AI_SHARE_CONSENT_COPY =
+  "DRAFT: Share my skin check with the AI assistant (processed by Google, outside India).";
+
+/**
+ * How long original photos are kept, in days. Decision 5 is NOT made: no
+ * number is invented here. While this is null, no copy states a period and
+ * nothing enforces one (an S3 lifecycle rule is an infra OWNER ACTION).
+ */
+export const IMAGE_RETENTION_PERIOD_DAYS: number | null = null;
+
+/** What the user types to confirm account erasure (H01b); the erase route requires it verbatim. */
+export const ERASE_CONFIRMATION = "DELETE MY DATA";
+
+/** How recent the sign-in must be to erase, in seconds. Named setting, PROVISIONAL (design §2.3). */
+export const ERASE_MAX_AUTH_AGE_SECONDS = 300;
+
+// H02a: an under-18 answer is blocked in the browser BEFORE sign-in, so there
+// is no uid to record it against yet. This tab remembers that it was chosen,
+// and the attestation sent after sign-in says "under-18" even if the user went
+// back and picked another bucket. sessionStorage, not localStorage: the
+// marker must not outlive the tab and land on a different person who signs
+// in later on a shared device (a parent after a child). Self-attestation: a
+// new tab or cleared storage defeats it; the server record is the strong check.
+const UNDER18_CHOSEN_KEY = "skin-check-under18-chosen";
+
+export function markUnder18Chosen(): void {
+  try {
+    sessionStorage.setItem(UNDER18_CHOSEN_KEY, "1");
+  } catch {
+    // Storage blocked: the server-side record (when signed in) still applies.
+  }
+}
+
+/**
+ * Cleared once the server holds the under-18 record. The server record is
+ * sticky (decision 4), so the device no longer needs to remember, and a later
+ * account signed in on this device (a parent after a child) is not marked.
+ */
+export function clearUnder18Chosen(): void {
+  try {
+    sessionStorage.removeItem(UNDER18_CHOSEN_KEY);
+  } catch {
+    // Storage blocked: nothing was stored either.
+  }
+}
+
+export function under18ChosenOnThisDevice(): boolean {
+  try {
+    return sessionStorage.getItem(UNDER18_CHOSEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** The age bucket to attest: "under-18" if it was ever chosen on this device. */
+export function attestedAgeBucket(answered: unknown): string | null {
+  if (under18ChosenOnThisDevice()) return "under-18";
+  return typeof answered === "string" && answered ? answered : null;
+}
+
+/**
+ * Posts the 18+ attestation. Best-effort: callers never wait on it (D-03a).
+ * After an under-18 answer is recorded, the device marker is cleared.
+ */
+export async function postAgeAttestation(idToken: string, ageBucket: string): Promise<boolean> {
+  const res = await fetch("/api/account/attestation", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ ageBucket, version: AGE_ATTESTATION_VERSION }),
+  });
+  if (res.ok && ageBucket === "under-18") clearUnder18Chosen();
+  return res.ok;
+}

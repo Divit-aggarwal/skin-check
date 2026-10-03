@@ -1,6 +1,7 @@
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import type { Auth, DecodedIdToken } from "firebase-admin/auth";
 
 // SERVER ONLY. This module holds the service-account credential that can mint
 // and inspect tokens for the whole Firebase project — the exact opposite of
@@ -137,4 +138,30 @@ export function bearerToken(header: string | null): string | null {
   if (!header) return null;
   const match = /^Bearer\s+(\S+)$/i.exec(header.trim());
   return match ? match[1]! : null;
+}
+
+// ─── Privacy lane (H01b erasure), owner decision 12 / R2: add-only ──────────
+// The two functions below are new. Nothing above was changed.
+
+/**
+ * Admin Auth for server-side account operations (H01b erasure: revoke
+ * sessions, delete the user). Same lazy app and AdminNotConfiguredError as
+ * everything else here. Every uid passed to it must come from a VERIFIED token.
+ */
+export function adminAuth(): Auth {
+  return getAuth(adminApp());
+}
+
+/**
+ * Like verifyFirebaseIdToken, but returns the whole decoded token, so a route
+ * can read `auth_time` (the erase route requires a recent sign-in). Repeats
+ * the same production-emulator guard and `checkRevoked: true` on purpose,
+ * rather than refactoring verifyFirebaseIdToken to call this: that function
+ * stays byte-identical.
+ */
+export async function verifyFirebaseIdTokenClaims(idToken: string): Promise<DecodedIdToken> {
+  if (process.env.NODE_ENV === "production" && process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+    throw new AdminNotConfiguredError(["FIREBASE_AUTH_EMULATOR_HOST must be unset in production"]);
+  }
+  return getAuth(adminApp()).verifyIdToken(idToken, true);
 }
