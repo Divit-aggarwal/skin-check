@@ -325,6 +325,24 @@ Each finding below has tests in `context-attacks.test.ts` ("security review bypa
 10. **A rejected injection stayed in history.** Fixed: an exchange that ended in the fallback is stored with `historyExcluded: true`, like pre-filter and referral turns. `loadChatHistory` reads only turns with `historyExcluded === false`.
 11. **No TTL on chatTurns.** `expireAt` does nothing until the Firestore TTL policy exists. That is a request to main, not code here.
 
+### 3.12 Security re-check of §3.11 (2026-10-04) and the fixes
+
+The re-check found that findings 1, 3, 6, 8 and 9 were still only partly fixed, plus new bypasses N1-N7. All are fixed, each with a test in `context-attacks.test.ts` ("security re-check bypasses"):
+
+1. **Lookalike letters and spacing (finding 6).** Fixed:
+   - Latin lookalike letters with no plain fold (ı, ɑ, small capitals) are rejected as `non_latin_script`;
+   - `normalizeForMatch` makes curly quotes straight and collapses whitespace runs.
+2. **The red-flag pre-filter (finding 9).** Fixed: it matches on the folded message as well as the raw one, and the self-harm phrasings are wider.
+3. **N1.** Fixed: a `self_reported_echo` cites exactly one fact.
+4. **N2.** Fixed: a sentence with one metric and two different band words fails.
+5. **N3.** Fixed: a band word with no metric in its sentence fails.
+6. **N4.** Fixed: link verbs ("reflects", "consistent with", "related to") are cause terms.
+7. **N5.** Fixed: band and intensity words never count as a cited fact's own words.
+8. **N6.** Fixed: a `rec.*` quote takes own words from product facts only.
+9. **N7.** Fixed: quote stripping matches whole words only.
+10. **Unmeasured words with no band.** Fixed: hydration and pores words fail anywhere, unless a missing fact is cited or the claim is a self-report echo.
+11. **Catalog screen.** Fixed: it adds "directions", "say" and dotted letters.
+
 **Residual (GEMINI_BOUNDARY §5 known limit):** the lexicons catch phrasing, not meaning. A paraphrase in an unlisted word can still pass. The package never holds cross-scan data, so a change claim always has nothing true behind it.
 
 ## 4. Tests, with the failure each catches

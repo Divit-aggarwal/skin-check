@@ -2,6 +2,8 @@
 // message before any package is built. A hit means a fixed answer and no
 // Gemini call. EN, Hinglish and Devanagari; recall is favoured over precision.
 
+import { normalizeForMatch } from "./lexicon";
+
 const re = (parts: string[]) => new RegExp(parts.join("|"), "iu");
 
 const RED_FLAG = re([
@@ -52,7 +54,10 @@ const RED_FLAG = re([
   "\\bself[- ]?harm\\w*",
   "\\bhurt(?:ing)? my ?self\\b",
   "\\bend (?:my|it all)\\b",
-  "\\bwant to die\\b",
+  "\\b(?:want|wanna|wanted|going) (?:to )?die\\b",
+  "\\bwish (?:i|i'?d) (?:was|were|had) (?:dead|died|never been born)\\b",
+  "\\bbetter off dead\\b",
+  "\\bno (?:reason|point) (?:to|in) (?:live|living)\\b",
   "\\bdon'?t want to (?:live|be alive)\\b",
   "\\bjeena nahi\\b",
   "\\bmar ?ja\\w*",
@@ -109,8 +114,11 @@ const COMPARISON = re([
   "पहले|बेहतर|सुधार",
 ]);
 
-export const redFlagHit = (message: string): boolean => RED_FLAG.test(message);
-export const comparisonHit = (message: string): boolean => COMPARISON.test(message);
+// Curly apostrophes (iOS default), doubled spaces and folded forms must not
+// slip a message past the patterns (security re-check, finding 9).
+const fold = (message: string) => normalizeForMatch(message.normalize("NFKC"));
+export const redFlagHit = (message: string): boolean => RED_FLAG.test(fold(message)) || RED_FLAG.test(message);
+export const comparisonHit = (message: string): boolean => COMPARISON.test(fold(message)) || COMPARISON.test(message);
 
 // No helpline number until one is verified (GEMINI_BOUNDARY §6).
 export const REFERRAL_COPY =

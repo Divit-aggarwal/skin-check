@@ -10,14 +10,24 @@
 const re = (parts: string[]) => new RegExp(parts.join("|"), "iu");
 
 /**
- * Compatibility forms folded (fullwidth, small capitals, ligatures) and
- * combining marks removed, so "ｃａｕｓｅｄ" or "câused" match like "caused"
- * (security review finding 6). Format characters (zero-width, soft hyphen)
- * are not removed here: hasFormatChars() rejects them outright.
+ * Compatibility forms folded (fullwidth, ligatures), combining marks removed,
+ * curly quotes made straight and whitespace runs collapsed, so "ｃａｕｓｅｄ",
+ * "câused", "don’t" and "due  to" match like their plain forms (security
+ * review finding 6, re-check). Format characters (zero-width, soft hyphen)
+ * are not removed here: FORMAT_CHARS rejects them, and LOOKALIKE rejects
+ * Latin letters with no plain fold (ı, ɑ, small capital ᴄ).
  */
 export function normalizeForMatch(text: string): string {
-  return text.normalize("NFKD").replace(new RegExp(String.raw`\p{M}`, "gu"), "");
+  return text
+    .normalize("NFKD")
+    .replace(new RegExp(String.raw`\p{M}`, "gu"), "")
+    .replace(/[\u2018\u2019\u201B\u2032]/g, "'")
+    .replace(/[\u201C\u201D\u2033]/g, '"')
+    .replace(/\s+/g, " ");
 }
+
+/** After normalizeForMatch: a letter that is not plain a-z is a lookalike, rejected like another script. */
+export const LOOKALIKE = new RegExp(String.raw`(?![a-zA-Z])\p{L}`, "u");
 
 export const FORMAT_CHARS = new RegExp(String.raw`\p{Cf}`, "u");
 
@@ -111,6 +121,15 @@ export const DIAGNOSIS = re([
 
 export const CAUSE = re([
   "\\bbecause\\b",
+  // link verbs that turn a quoted answer into an explanation of a reading
+  "\\breflect\\w*",
+  "\\bmirror\\w*",
+  "\\bconsistent with\\b",
+  "\\bin line with\\b",
+  "\\b(?:related|connected|associated|tied) (?:to|with)\\b",
+  "\\bgoes with\\b",
+  "\\bfits? with\\b",
+  "\\bwhich is why\\b",
   "\\bstem(?:s|med|ming)? from\\b",
   "\\bcom(?:e|es|ing) from\\b",
   "\\blinked (?:to|with)\\b",
@@ -266,6 +285,9 @@ export const INSTRUCTION = re([
   "\\balways (?:say|tell|answer)\\b",
   "\\bguidance\\b",
   "\\bprompt\\b",
+  "\\bdirections?\\b",
+  "\\bsay\\b",
+  "(?:\\b\\w[.\\-_*]){3,}\\w\\b",
   // letters spaced out to dodge a word list: "i g n o r e"
   "(?:\\b\\w\\s){3,}\\w\\b",
 ]);
@@ -285,7 +307,7 @@ export const METRIC_WORDS: Record<"redness" | "oiliness" | "texture" | "blemishe
   pigment: new RegExp(String.raw`\bpigment\w*|\bdark marks?\b`, "iu"),
 };
 
-export const UNMEASURED_WORDS = new RegExp(String.raw`\bhydrat\w*|\bdryness\b|\bmoisture\b|\bpores?\b`, "iu");
+export const UNMEASURED_WORDS = new RegExp(String.raw`\b(?:de)?hydrat\w*|\bdryness\b|\bmoisture\w*|\bpores?\b`, "iu");
 
 /** §5 rule 4b: any letter outside the Latin script. */
 export const NON_LATIN = new RegExp(String.raw`(?![\p{Script=Latin}])\p{L}`, "u");

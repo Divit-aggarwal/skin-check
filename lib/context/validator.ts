@@ -5,6 +5,7 @@ import {
   ACTIVE,
   BAND_WORD,
   FORMAT_CHARS,
+  LOOKALIKE,
   CAUSE,
   CHANGE,
   CONFIDENCE,
@@ -101,13 +102,15 @@ const FRAME = new Set(
 const wordsOf = (text: string) => text.toLowerCase().match(new RegExp(String.raw`\p{L}+`, "gu")) ?? [];
 
 function extraWord(stripped: string, cited: CitableFact[]): string | null {
-  const own = new Set(cited.flatMap((f) => wordsOf(normalizeForMatch(f.text))));
+  // A band or intensity word is never an "own" word: "Your Redness is heavy" reuses a label word as a band (re-check N5).
+  const own = new Set(cited.flatMap((f) => wordsOf(normalizeForMatch(f.text))).filter((w) => !BAND_WORD.test(w)));
   return wordsOf(stripped).find((w) => !FRAME.has(w) && !own.has(w)) ?? null;
 }
 
 function stripQuotes(text: string, cited: CitableFact[]): string {
   const segments = cited.flatMap(quotable).map(normalizeForMatch).filter((s) => s.trim().length > 0).sort((a, b) => b.length - a.length);
-  return segments.reduce((t, seg) => t.replace(new RegExp(escape(seg), "giu"), " "), text);
+  // Whole words only: a short label ("Dry") is not cut out of a longer word (re-check N7).
+  return segments.reduce((t, seg) => t.replace(new RegExp(String.raw`(?<!\p{L})` + escape(seg) + String.raw`(?!\p{L})`, "giu"), " "), text);
 }
 
 export function parseAnswer(raw: string): GeminiAnswer | null {
@@ -146,6 +149,8 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
     if (script) fail("non_latin_script", i, script);
 
     const text = normalizeForMatch(claim.text);
+    const lookalike = script ? null : firstMatch(LOOKALIKE, text);
+    if (lookalike) fail("non_latin_script", i, lookalike);
     const stripped = stripQuotes(text, cited);
     // Band and contradiction checks keep quoted readings, so their metric and
     // band stay paired. Quoted labels are removed ("Exercise or heavy sweating
@@ -178,12 +183,18 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
     }
 
     // A metric named with a band the package does not hold for it, cited or
-    // not. Per sentence, each metric word pairs with its nearest band word.
+    // not. Per sentence, each metric word pairs with its nearest band word. A
+    // band word must sit next to a metric in its own sentence ("It reads
+    // Elevated." is not anchored), and one metric gets one band ("not Low but
+    // Elevated" fails) — security re-check N2, N3.
     for (const sentence of bandText.split(/[.;!?]/)) {
       const bands = matchesOf(BAND_WORD, sentence);
       if (bands.length === 0) continue;
       const unmeasured = firstMatch(UNMEASURED_WORDS, sentence);
       if (unmeasured) fail("contradicts_package", i, unmeasured);
+      const metricHits = (Object.keys(METRIC_WORDS) as (keyof typeof METRIC_WORDS)[]).flatMap((m) => matchesOf(METRIC_WORDS[m], sentence));
+      if (metricHits.length === 0 && !unmeasured) fail("contradicts_package", i, bands[0]!.word);
+      if (metricHits.length === 1 && new Set(bands.map((b) => b.word)).size > 1) fail("contradicts_package", i, bands[1]!.word);
       const regions = REGION_WORDS.filter(([, re]) => re.test(sentence)).map(([r]) => r);
       for (const metric of Object.keys(METRIC_WORDS) as (keyof typeof METRIC_WORDS)[]) {
         for (const at of matchesOf(METRIC_WORDS[metric], sentence)) {
@@ -194,7 +205,14 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
       }
     }
 
+    // Hydration and pores are never described, banded or not, except by quoting a missing fact.
+    const unmeasuredWord = firstMatch(UNMEASURED_WORDS, stripped);
+    // A self-report echo is bound to its own label words by the framing rule below.
+    if (unmeasuredWord && !kinds.has("missing") && claim.claim_type !== "self_reported_echo") fail("contradicts_package", i, unmeasuredWord);
+
     // F04: what the user told us is never presented as measured.
+    // One quoted answer per echo, so two labels cannot be joined into a new claim (re-check N1).
+    if (claim.claim_type === "self_reported_echo" && cited.length > 1) fail("self_report_as_measurement", i);
     if (kinds.has("self") && claim.claim_type !== "self_reported_echo") fail("self_report_as_measurement", i);
     if (claim.claim_type === "self_reported_echo" && cited.some((f) => f.kind !== "self")) fail("self_report_as_measurement", i);
     const measured = firstMatch(MEASUREMENT, stripped);
@@ -206,7 +224,8 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
       if (extra) fail("self_report_as_measurement", i, extra);
     }
     if (kinds.has("rec")) {
-      const extra = extraWord(stripped, cited);
+      // Own words from the product facts only, so a reading cannot be pulled in ("…, for your Elevated redness").
+      const extra = extraWord(stripped, cited.filter((f) => f.kind === "rec"));
       if (extra) fail("product_claim", i, extra);
     }
   });

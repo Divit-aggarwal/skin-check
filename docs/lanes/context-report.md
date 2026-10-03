@@ -10,7 +10,7 @@ Branch `lane/context`. Design: [context-design.md](context-design.md). Date: 202
   - O-2: D-14 and D-15 are approved for local use. Production waits for G1 and the final consent wording.
   - O-3: longitudinal facts are "not enough evidence" only.
   - O-4: the new path is behind a switch, on locally and off in production, with a test.
-- The design passed the verifier after its fixes (§3.9).
+- The verifier gave FAIL on the design. All six blocking findings are fixed in the design (§3.9). The verifier was **not** re-run on the fixed design.
 - **Formal owner approval of the brief (README rule 3) is still an open exit condition.**
 
 ## 1. Steps done and skipped
@@ -97,6 +97,14 @@ Divergences between the design text and the code were fixed in the design. The s
 - the verbatim-quote exemption could be used to launder claims;
 - the red-flag pre-filter had misses;
 - a rejected injection was replayed from history.
+
+**Re-review status:** each review returned FAIL or found issues, and every finding is fixed with a test. The verifier was not re-run on the design or the code.
+
+**Security re-check of `f6f2c6a`.** It found:
+- 5 earlier fixes still partial: lookalike letters and doubled spaces; the iOS curly apostrophe getting "I don’t want to live" past the self-harm pre-filter (high); quote laundering; band pairing; unmeasured words;
+- 7 new bypasses (N1-N7).
+
+All are fixed, each with a test (design §3.12). **That second round of fixes has not been re-reviewed.**
 
 **Residual risk:** the lexicons catch phrasing, not meaning (GEMINI_BOUNDARY §5 known limit). The package holds no cross-scan data, so a change claim never has a true fact behind it.
 
@@ -205,4 +213,5 @@ All attacks are in `tests/context-attacks.test.ts`. The fake Gemini returns the 
 | `f1fce4e` | feat(context): chat route branch behind the local-only switch |
 | `0370e63` | fix(context): verifier findings on the code |
 | `f6f2c6a` | fix(context): security review — close validator, screen and pre-filter bypasses |
+| (next) | fix(context): security re-check — lookalikes, whitespace, curly apostrophes, band anchoring, quote framing |
 | (this report) | docs(context): lane report |
