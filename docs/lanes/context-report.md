@@ -40,8 +40,8 @@ Branch `lane/context`. Design: [context-design.md](context-design.md). Date: 202
 
 ## 2. Test results
 
-- **`npm run test:local`:** green, at the end, on commit `f6f2c6a`.
-  - Unit: 62 files passed, 9 skipped; 847 tests passed, 46 skipped.
+- **`npm run test:local`:** green, at the end, on commit `6daa5c7`.
+  - Unit: 62 files passed, 9 skipped; 867 tests passed, 46 skipped.
   - Stack: 9 files, 46 of 46 passed, including `firestore-rules-context` (4) and `context-chat-turns.e2e` (1).
   - It also ran once after step 7: 46 of 46.
 - **`npx tsc --noEmit`:** green.
@@ -58,7 +58,7 @@ New or extended test files:
 | `context-validator.test.ts` | 31 |
 | `context-answer.test.ts` | 11 |
 | `context-route.test.ts` | 13 |
-| `context-attacks.test.ts` | 71 |
+| `context-attacks.test.ts` | 91 |
 | `context-trusted.test.ts` | 4 |
 | `firestore-rules-context.test.ts` | 4 (emulator) |
 | `context-chat-turns.e2e.test.ts` | 1 (emulator) |
@@ -213,5 +213,6 @@ All attacks are in `tests/context-attacks.test.ts`. The fake Gemini returns the 
 | `f1fce4e` | feat(context): chat route branch behind the local-only switch |
 | `0370e63` | fix(context): verifier findings on the code |
 | `f6f2c6a` | fix(context): security review — close validator, screen and pre-filter bypasses |
-| (next) | fix(context): security re-check — lookalikes, whitespace, curly apostrophes, band anchoring, quote framing |
-| (this report) | docs(context): lane report |
+| `6daa5c7` | fix(context): security re-check — lookalikes, whitespace, curly apostrophes, band anchoring, quote framing |
+| `d76e377` | docs(context): lane report |
+| (this commit) | docs(context): report — final test results |
