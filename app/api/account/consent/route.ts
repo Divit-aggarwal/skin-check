@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ ok: true });
   } catch (err) {
-    console.error("account/consent: ledger unavailable:", (err as Error)?.message ?? "unknown");
+    console.error("account/consent: ledger unavailable:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
     return NextResponse.json({ error: "Please try again.", code: "LEDGER_UNAVAILABLE" }, { status: 500 });
   }
 }

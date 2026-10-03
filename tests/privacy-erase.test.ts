@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // H01b erase route with fakes: order, stop-on-failure, identity only from the
 // token, fresh sign-in, and the decision 9(b) receipt.
-const { order, verifyFirebaseIdTokenClaims, revokeRefreshTokens, deleteUser, recursiveDelete, eraseUserPrefix, receipts } =
+const { order, verifyFirebaseIdTokenClaims, revokeRefreshTokens, deleteUser, recursiveDelete, eraseUserPrefix, receipts, assertEraseConfigured } =
   vi.hoisted(() => {
     const order: string[] = [];
     return {
@@ -16,6 +16,7 @@ const { order, verifyFirebaseIdTokenClaims, revokeRefreshTokens, deleteUser, rec
         return 2;
       }),
       receipts: { add: vi.fn(async (_: Record<string, unknown>) => ({})) },
+      assertEraseConfigured: vi.fn(),
     };
   });
 
@@ -35,7 +36,7 @@ vi.mock("@/lib/firebase/admin", async () => {
 });
 vi.mock("@/lib/s3", async () => {
   const actual = await vi.importActual<typeof import("@/lib/s3")>("@/lib/s3");
-  return { ...actual, eraseUserPrefix };
+  return { ...actual, eraseUserPrefix, assertEraseConfigured };
 });
 vi.mock("@/lib/rate-limit", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
@@ -143,13 +144,40 @@ describe("erase route", () => {
     expect(order).toEqual([]);
   });
 
-  it("erase credentials unset: 500 at the S3 step, nothing deleted", async () => {
-    eraseUserPrefix.mockRejectedValueOnce(new S3NotConfiguredError(["S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID"]));
+  it("erase credentials unset: 500 before anything runs, not even the revoke", async () => {
+    assertEraseConfigured.mockImplementationOnce(() => {
+      throw new S3NotConfiguredError(["S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID"]);
+    });
     const res = await post();
     expect(res.status).toBe(500);
-    expect((await res.json()).failedStep).toBe("s3");
-    expect(recursiveDelete).not.toHaveBeenCalled();
-    expect(deleteUser).not.toHaveBeenCalled();
+    expect(await res.json()).toMatchObject({ failedStep: "s3", completedSteps: [] });
+    expect(order).toEqual([]);
+  });
+
+  it("preflight: a uid that is not one plain path segment is refused before anything runs", async () => {
+    for (const uid of ["victim/scans", "..", "a.b"]) {
+      verifyFirebaseIdTokenClaims.mockResolvedValueOnce({ uid, auth_time: now() - 10 });
+      const res = await post();
+      expect(res.status).toBe(500);
+      expect((await res.json()).failedStep).toBe("preflight");
+    }
+    expect(order).toEqual([]);
+  });
+
+  it("preflight: production with FIRESTORE_EMULATOR_HOST set is refused before anything runs", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("FIRESTORE_EMULATOR_HOST", "127.0.0.1:8080");
+    const res = await post();
+    vi.unstubAllEnvs();
+    expect(res.status).toBe(500);
+    expect((await res.json()).failedStep).toBe("preflight");
+    expect(order).toEqual([]);
+  });
+
+  it("logs carry the error name and code, never the message (it can embed the doc path)", async () => {
+    recursiveDelete.mockRejectedValueOnce(Object.assign(new Error(`BulkWriter failed at users/${UID}/skinChecks/x`), { code: 14 }));
+    await post();
+    expect(JSON.stringify(errorLog.mock.calls)).not.toContain(UID);
   });
 
   it("writes one receipt with no uid, no uid hash and no phone (decision 9b)", async () => {

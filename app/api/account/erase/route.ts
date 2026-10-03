@@ -9,8 +9,9 @@ import {
   bearerToken,
   verifyFirebaseIdTokenClaims,
 } from "@/lib/firebase/admin";
-import { eraseUserPrefix } from "@/lib/s3";
-import { ERASE_CONFIRMATION } from "@/lib/consent";
+import { assertEraseConfigured, eraseUserPrefix } from "@/lib/s3";
+import { isPlainUid } from "@/lib/s3-key";
+import { ERASE_CONFIRMATION, ERASE_MAX_AUTH_AGE_SECONDS } from "@/lib/consent";
 
 // firebase-admin and the AWS SDK both need Node APIs.
 export const runtime = "nodejs";
@@ -21,8 +22,6 @@ export const runtime = "nodejs";
 // so the user can sign in again and rerun the route to finish the job.
 // D-17: "Immutability is a promise to clients, not a retention promise."
 
-/** How recent the sign-in must be to erase. Named setting, PROVISIONAL (design §2.3). */
-const ERASE_MAX_AUTH_AGE_SECONDS = 300;
 
 // Strict: a `uid` in the body is a 400, never an identity source.
 const BodySchema = z.object({ confirm: z.literal(ERASE_CONFIRMATION) }).strict();
@@ -74,6 +73,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request.", code: "BAD_REQUEST" }, { status: 400 });
   }
 
+  // Preflight, before anything changes (not even the revoke):
+  // - a uid that isn't one plain path segment could address another user's tree;
+  // - the Admin SDK follows FIRESTORE_EMULATOR_HOST whatever NODE_ENV says, so
+  //   in production the recursive delete could "succeed" against an emulator
+  //   and leave the real tree orphaned once the Auth user is gone;
+  // - without the erase credentials the S3 step can only fail, and revoking
+  //   first would just sign the user out for nothing (decision 11 pending).
+  if (!isPlainUid(uid) || (process.env.NODE_ENV === "production" && process.env.FIRESTORE_EMULATOR_HOST)) {
+    console.error("account/erase: refused by preflight (uid shape or emulator host).");
+    return NextResponse.json(
+      { ok: false, error: "Account deletion is unavailable right now.", code: "ERASE_UNAVAILABLE", failedStep: "preflight", completedSteps: [] },
+      { status: 500 }
+    );
+  }
+  try {
+    assertEraseConfigured();
+  } catch (err) {
+    console.error("account/erase: erase storage not configured:", (err as Error)?.message ?? "unknown");
+    return NextResponse.json(
+      { ok: false, error: "Account deletion is unavailable right now.", code: "ERASE_UNAVAILABLE", failedStep: "s3", completedSteps: [] },
+      { status: 500 }
+    );
+  }
+
   const userRef = adminDb().collection("users").doc(uid);
   let s3ObjectsDeleted = 0;
   const run: Record<Step, () => Promise<unknown>> = {
@@ -98,8 +121,9 @@ export async function POST(request: NextRequest) {
       await run[step]();
       completedSteps.push(step);
     } catch (err) {
-      // No uid in the log: the step and the error name are enough to act on.
-      console.error(`account/erase: step ${step} failed:`, (err as Error)?.name ?? "unknown", (err as Error)?.message ?? "");
+      // Name and code only: Firestore and Admin messages embed doc paths,
+      // i.e. the uid of the person asking to be forgotten.
+      console.error(`account/erase: step ${step} failed:`, (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
       return NextResponse.json(
         { ok: false, error: "Your account could not be fully deleted.", code: "ERASE_FAILED", failedStep: step, completedSteps },
         { status: 500 }
@@ -118,7 +142,7 @@ export async function POST(request: NextRequest) {
       s3ObjectsDeleted,
     });
   } catch (err) {
-    console.error("account/erase: receipt write failed:", (err as Error)?.message ?? "unknown");
+    console.error("account/erase: receipt write failed:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
   }
 
   return NextResponse.json({ ok: true, steps: Object.fromEntries(STEPS.map((s) => [s, "done"])) });

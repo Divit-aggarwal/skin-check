@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ ok: true, over18: (await ageStatus(uid)) === "over18" });
   } catch (err) {
-    console.error("account/attestation: ledger unavailable:", (err as Error)?.message ?? "unknown");
+    console.error("account/attestation: ledger unavailable:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
     return NextResponse.json({ error: "Please try again.", code: "LEDGER_UNAVAILABLE" }, { status: 500 });
   }
 }

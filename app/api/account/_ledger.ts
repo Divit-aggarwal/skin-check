@@ -81,9 +81,13 @@ export async function latestGrant(uid: string, purpose: ConsentPurpose, version:
  * around the block, not one who lies the first time.
  */
 export async function ageStatus(uid: string): Promise<AgeStatus> {
-  const all = await entries(uid, "age_18_plus");
-  if (all.length === 0) return "missing";
-  return all.some((e) => e.granted !== true) ? "under18" : "over18";
+  // Two fixed-size reads (equality filters only, no composite index), so a
+  // ledger flooded with 18+ entries can't slow this past the timeout and make
+  // upload and scan fail open.
+  const age = ledger(uid).where("purpose", "==", "age_18_plus");
+  const [under, any] = await Promise.all([age.where("granted", "==", false).limit(1).get(), age.limit(1).get()]);
+  if (!under.empty) return "under18";
+  return any.empty ? "missing" : "over18";
 }
 
 /**
@@ -104,7 +108,7 @@ export async function scanAgeGate(uid: string, route: string, requireAttestation
   try {
     age = await withLedgerTimeout(ageStatus(uid));
   } catch (err) {
-    console.warn(`${route}: age attestation unreadable; going ahead (D-03):`, (err as Error)?.message ?? "unknown");
+    console.warn(`${route}: age attestation unreadable; going ahead (D-03):`, (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
     return null;
   }
   if (age === "under18") {

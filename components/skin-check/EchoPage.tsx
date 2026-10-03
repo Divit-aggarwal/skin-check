@@ -79,6 +79,7 @@ export function EchoPage() {
   } | null>(null);
   const { user } = useAuth();
   const [consentSaving, setConsentSaving] = useState(false);
+  const [consentFailed, setConsentFailed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Aborts any in-flight /api/skin-check/chat request when this page
@@ -190,8 +191,13 @@ export function EchoPage() {
   // user's yes, then resend the turn that was refused. LOCAL ONLY for now:
   // DRAFT copy (decision 7b), Gemini key pending (decision 6).
   async function grantAiShare() {
-    if (!activeError || !user || consentSaving) return;
+    if (!activeError || consentSaving) return;
+    if (!user) {
+      setConsentFailed(true);
+      return;
+    }
     setConsentSaving(true);
+    setConsentFailed(false);
     try {
       const res = await fetch("/api/account/consent", {
         method: "POST",
@@ -199,8 +205,10 @@ export function EchoPage() {
         body: JSON.stringify({ purpose: "ai_share", granted: true, version: AI_SHARE_CONSENT_VERSION }),
       });
       if (res.ok) void sendToEcho(activeError.region, activeError.retryBefore, activeError.retryMessage);
+      else setConsentFailed(true);
     } catch (err) {
       console.error("AI-share consent not recorded:", err instanceof Error ? err.message : err);
+      setConsentFailed(true);
     } finally {
       setConsentSaving(false);
     }
@@ -305,6 +313,9 @@ export function EchoPage() {
             >
               I agree
             </button>
+            {consentFailed && (
+              <p className="text-sm text-text/70">We couldn&apos;t save that. Please reload the page and try again.</p>
+            )}
           </div>
         )}
         {activeError && activeError.code !== "AI_CONSENT_REQUIRED" && (

@@ -17,8 +17,6 @@ import type { SkinCheckAnswers, StepConfig } from "@/types/skin-check";
 
 const NAME = "ZZNAMEZZ";
 const PHONE = "+919999999999";
-const UID = "uid-ZZUIDZZ";
-const SCAN_ID = "scan-ZZSCANZZ";
 
 // One answer for every step, of the right type for that step.
 function answerFor(step: StepConfig): string | string[] {
@@ -100,9 +98,11 @@ describe("H03 Gemini field inventory", () => {
     expect(notSent).toEqual(["age", "female_skin_context", "final_phone", "gender", "name", "phone_verify", "skin_photo"]);
   });
 
-  it("never sends phone numbers, unknown keys, ids or numeric scores", async () => {
+  // getSkinCheckChatReply takes no uid or scanId at all, so none can reach the
+  // prompt through it; the route passes only answers, scores and the region.
+  it("never sends phone numbers, unknown keys or numeric scores", async () => {
     const { all } = await captureCall();
-    for (const banned of [PHONE, "9999999999", "ZZUNKNOWNZZ", UID, SCAN_ID, "0.731", "731"]) {
+    for (const banned of [PHONE, "9999999999", "ZZUNKNOWNZZ", "0.731", "731"]) {
       expect(all, banned).not.toContain(banned);
     }
     expect(all).not.toMatch(/\d{3,}/);
@@ -142,6 +142,8 @@ describe("extra caution flag (owner decision 8)", () => {
         expect(instruction.split(EXTRA_CAUTION_INSTRUCTION)).toHaveLength(2);
         expect(all).not.toMatch(FEMALE_WORDS);
         expect(all).not.toContain("pregnant_or_breastfeeding");
+        // The answer that set the flag is hidden as well, so no reason is visible.
+        expect(all).not.toContain("A prescription product");
       }
     }
   });
@@ -151,9 +153,15 @@ describe("extra caution flag (owner decision 8)", () => {
     expect(instruction).not.toContain("Extra caution");
   });
 
-  it("the sentence itself gives no reason", () => {
+  it("the sentence itself gives no reason and no telltale example list", () => {
     expect(EXTRA_CAUTION_INSTRUCTION).not.toMatch(FEMALE_WORDS);
-    expect(EXTRA_CAUTION_INSTRUCTION).not.toMatch(/prescri/i);
+    expect(EXTRA_CAUTION_INSTRUCTION).not.toMatch(/prescri|retinoid|acid|vitamin|why/i);
+  });
+
+  it("with the flag on, the other current products are still sent", async () => {
+    const { instruction } = await captureCall({ current_products: ["actives", "prescription"] });
+    expect(instruction).toContain("Actives");
+    expect(instruction).not.toContain("A prescription product");
   });
 
   it("the trigger list is the provisional one awaiting clinical review (E05)", () => {

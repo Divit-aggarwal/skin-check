@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { clearDraft } from "@/lib/skin-check-draft";
-import { ERASE_CONFIRMATION } from "@/lib/consent";
+import { ERASE_CONFIRMATION, ERASE_MAX_AUTH_AGE_SECONDS } from "@/lib/consent";
 import { Button } from "@/components/ui/button";
 
 // H01b: a signed-in user deletes their account and every copy of their data
@@ -47,7 +47,7 @@ export function DeleteAccount() {
       // Sessions are revoked as the erase starts, so any retry needs a fresh sign-in.
       const message =
         body.code === "REAUTH_REQUIRED"
-          ? "For your safety, please sign out, sign in again, and then delete your account within 5 minutes."
+          ? `For your safety, please sign out, sign in again, and then delete your account within ${Math.round(ERASE_MAX_AUTH_AGE_SECONDS / 60)} minutes.`
           : "Your account could not be fully deleted. Please sign in again and try once more.";
       if (body.code !== "REAUTH_REQUIRED") await signOut().catch(() => undefined);
       setState({ kind: "error", message });

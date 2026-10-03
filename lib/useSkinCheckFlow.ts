@@ -10,6 +10,7 @@ import {
   reusableAnswers,
 } from "@/lib/skin-check-validation";
 import { reconfirmHints } from "@/lib/skin-check-format";
+import { markUnder18Chosen, postAgeAttestation } from "@/lib/consent";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
 import { useAuth } from "@/lib/auth-context";
 import { latestSkinCheckAnswers } from "@/lib/firebase/skin-checks";
@@ -506,6 +507,11 @@ export function useSkinCheckFlow() {
   const next = useCallback(() => {
     setDirection(1);
     if (section.id === "about-you" && answers.age === "under-18") {
+      // H02a: going back and picking another bucket must not undo this. The
+      // device remembers it for the attestation sent after sign-in, and a
+      // signed-in user's server record is written now (sticky, decision 4).
+      markUnder18Chosen();
+      if (user) void user.getIdToken().then((token) => postAgeAttestation(token, "under-18")).catch(() => undefined);
       setBlocked(true);
       return;
     }
@@ -517,7 +523,7 @@ export function useSkinCheckFlow() {
     } else {
       setComplete(true);
     }
-  }, [section, sectionIndex, answers, reusing]);
+  }, [section, sectionIndex, answers, reusing, user]);
 
   const back = useCallback(() => {
     setDirection(-1);

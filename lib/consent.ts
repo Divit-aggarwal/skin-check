@@ -52,3 +52,44 @@ export const IMAGE_RETENTION_PERIOD_DAYS: number | null = null;
 
 /** What the user types to confirm account erasure (H01b); the erase route requires it verbatim. */
 export const ERASE_CONFIRMATION = "DELETE MY DATA";
+
+/** How recent the sign-in must be to erase, in seconds. Named setting, PROVISIONAL (design §2.3). */
+export const ERASE_MAX_AUTH_AGE_SECONDS = 300;
+
+// H02a: an under-18 answer is blocked in the browser BEFORE sign-in, so there
+// is no uid to record it against yet. This device remembers that it was
+// chosen, and the attestation sent after sign-in says "under-18" even if the
+// user went back and picked another bucket. Self-attestation: clearing
+// browser storage defeats it; a server-side record is the stronger check.
+const UNDER18_CHOSEN_KEY = "skin-check-under18-chosen";
+
+export function markUnder18Chosen(): void {
+  try {
+    localStorage.setItem(UNDER18_CHOSEN_KEY, "1");
+  } catch {
+    // Storage blocked: the server-side record (when signed in) still applies.
+  }
+}
+
+export function under18ChosenOnThisDevice(): boolean {
+  try {
+    return localStorage.getItem(UNDER18_CHOSEN_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** The age bucket to attest: "under-18" if it was ever chosen on this device. */
+export function attestedAgeBucket(answered: unknown): string | null {
+  if (under18ChosenOnThisDevice()) return "under-18";
+  return typeof answered === "string" && answered ? answered : null;
+}
+
+/** Posts the 18+ attestation. Best-effort: callers never wait on it (D-03a). */
+export async function postAgeAttestation(idToken: string, ageBucket: string): Promise<void> {
+  await fetch("/api/account/attestation", {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${idToken}` },
+    body: JSON.stringify({ ageBucket, version: AGE_ATTESTATION_VERSION }),
+  });
+}

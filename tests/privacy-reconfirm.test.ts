@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { nextEligibleIndex, revealCountFor } from "@/lib/useSkinCheckFlow";
-import { RECONFIRM_EACH_SCAN_IDS, reusableAnswers } from "@/lib/skin-check-validation";
+import { defaultAnswerFor, isStepAnswerValid, RECONFIRM_EACH_SCAN_IDS, reusableAnswers } from "@/lib/skin-check-validation";
 import { reconfirmHints } from "@/lib/skin-check-format";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 
@@ -65,6 +65,21 @@ describe("re-confirm on every scan", () => {
       // The reveal stops at (and includes) the blank step.
       expect(revealCountFor(section, reuse)).toBe(eligible.indexOf(blank) + 1);
     }
+  });
+
+  // The same check as the hook's isSectionComplete, which gates next():
+  // results can't be reached with a re-confirmed step unanswered.
+  it("a re-confirm section is incomplete until its blank step is answered", () => {
+    const reuse = reusableAnswers(saved("female"))!;
+    const complete = (id: string, answers: SkinCheckAnswers) =>
+      SECTIONS[indexOf(id)]!.steps
+        .filter((s) => !s.condition || s.condition(answers))
+        .every((s) => isStepAnswerValid(s, answers[s.id] ?? defaultAnswerFor(s)));
+    expect(complete("your-skin", reuse)).toBe(false);
+    expect(complete("personal-context", reuse)).toBe(false);
+    const answered = { ...reuse, current_products: ["none"], female_skin_context: ["none_not_sure"] };
+    expect(complete("your-skin", answered)).toBe(true);
+    expect(complete("personal-context", answered)).toBe(true);
   });
 
   it("an under-18 saved answer still can't be reused", () => {

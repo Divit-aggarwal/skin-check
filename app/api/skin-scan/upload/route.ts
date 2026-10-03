@@ -148,7 +148,8 @@ async function recordRetentionConsent(uid: string, scanId: string): Promise<void
     } catch (err) {
       // No uid in the log line: the failure is what matters, not whose.
       if (attempt === 2) {
-        console.error("skin-scan/upload: consent ledger write failed; URL issued anyway:", (err as Error)?.message ?? "unknown");
+        // Name and code only: Firestore messages embed the doc path (the uid).
+        console.error("skin-scan/upload: consent ledger write failed; URL issued anyway:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
       }
     }
   }

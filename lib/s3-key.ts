@@ -36,5 +36,15 @@ export const ORIGINAL_CONTENT_TYPE = "image/jpeg";
  * load-bearing: without it, erasing "abc" would also match "abcd/…".
  */
 export function userPrefix(uid: string): string {
+  // A uid with "/" or ".." would point the prefix into another user's tree.
+  // Phone-auth uids are alphanumeric; anything else is refused outright.
+  if (!isPlainUid(uid)) throw new Error("Refusing to build a user prefix from an unexpected uid shape.");
   return `users/${uid}/`;
+}
+
+const PLAIN_UID = /^[A-Za-z0-9_-]{1,128}$/;
+
+/** True for a uid that is safe as one path segment (no "/", no "."). */
+export function isPlainUid(uid: unknown): uid is string {
+  return typeof uid === "string" && PLAIN_UID.test(uid);
 }

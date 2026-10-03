@@ -57,6 +57,10 @@ describe("userPrefix", () => {
     expect(userPrefix("abc")).toBe("users/abc/");
     expect("users/abcd/scans/x/original.jpg".startsWith(userPrefix("abc"))).toBe(false);
   });
+
+  it("refuses a uid that could point into another user's tree", () => {
+    for (const uid of ["victim/scans", "..", "", "a.b", "a b"]) expect(() => userPrefix(uid)).toThrow();
+  });
 });
 
 describe("eraseUserPrefix", () => {

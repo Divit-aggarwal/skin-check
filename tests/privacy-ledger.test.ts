@@ -2,11 +2,33 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // The consent ledger helpers against an in-memory Firestore that records every
 // call, so the tests can assert .create() is the only write.
-const { docs, calls, hang } = vi.hoisted(() => ({
+const { docs, calls, hang, fail } = vi.hoisted(() => ({
   docs: new Map<string, Record<string, unknown>>(),
   calls: [] as string[],
   hang: { reads: false },
+  fail: { reads: false },
 }));
+
+// Equality filters and limit only, like the real helpers use.
+function fakeQuery(path: string, filters: [string, unknown][], max = Infinity): {
+  where: (f: string, op: "==", v: unknown) => ReturnType<typeof fakeQuery>;
+  limit: (n: number) => ReturnType<typeof fakeQuery>;
+  get: () => Promise<{ empty: boolean; docs: { data: () => Record<string, unknown> }[] }>;
+} {
+  return {
+    where: (f, _op, v) => fakeQuery(path, [...filters, [f, v]], max),
+    limit: (n) => fakeQuery(path, filters, n),
+    get: async () => {
+      if (hang.reads) await new Promise(() => {});
+      if (fail.reads) throw new Error("firestore down");
+      calls.push(`query ${path} ${filters.map(([f, v]) => `${f}==${String(v)}`).join(" ")}${max < Infinity ? ` limit ${max}` : ""}`);
+      const matching = Array.from(docs.entries())
+        .filter(([p, d]) => p.startsWith(`${path}/`) && !p.slice(path.length + 1).includes("/") && filters.every(([f, v]) => d[f] === v))
+        .slice(0, max);
+      return { empty: matching.length === 0, docs: matching.map(([, d]) => ({ data: () => d })) };
+    },
+  };
+}
 
 let autoId = 0;
 function fakeCollection(path: string) {
@@ -24,16 +46,7 @@ function fakeCollection(path: string) {
         update: async () => calls.push(`update ${docPath}`),
       };
     },
-    where: (field: string, _op: "==", value: unknown) => ({
-      get: async () => {
-        if (hang.reads) await new Promise(() => {});
-        calls.push(`query ${path} ${field}==${String(value)}`);
-        const matching = Array.from(docs.entries()).filter(
-          ([p, d]) => p.startsWith(`${path}/`) && !p.slice(path.length + 1).includes("/") && d[field] === value
-        );
-        return { docs: matching.map(([, d]) => ({ data: () => d })) };
-      },
-    }),
+    where: (field: string, _op: "==", value: unknown) => fakeQuery(path, [[field, value]]),
   };
 }
 
@@ -49,6 +62,7 @@ function seed(uid: string, id: string, fields: Record<string, unknown>) {
 
 beforeEach(() => {
   hang.reads = false;
+  fail.reads = false;
   docs.clear();
   calls.length = 0;
 });
@@ -165,6 +179,21 @@ describe("scanAgeGate (upload and scan routes)", () => {
   it("attested 18+: goes ahead", async () => {
     seed("u", "1", { purpose: "age_18_plus", granted: true, recordedAt: ts(1) });
     expect(await scanAgeGate("u", "test", true)).toBeNull();
+  });
+
+  it("a failed read goes ahead (D-03)", async () => {
+    fail.reads = true;
+    expect(await scanAgeGate("u", "test", true)).toBeNull();
+  });
+
+  it("reads are fixed-size: a flood of 18+ entries doesn't grow them", async () => {
+    for (let i = 0; i < 50; i++) seed("u", `e${i}`, { purpose: "age_18_plus", granted: true, recordedAt: ts(i) });
+    calls.length = 0;
+    expect(await ageStatus("u")).toBe("over18");
+    expect(calls.sort()).toEqual([
+      "query users/u/consentLedger purpose==age_18_plus granted==false limit 1",
+      "query users/u/consentLedger purpose==age_18_plus limit 1",
+    ]);
   });
 
   it("a hung read goes ahead after the ceiling (D-03)", async () => {

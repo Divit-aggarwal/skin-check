@@ -108,6 +108,11 @@ function s3Erase(): S3Client {
   return eraseClient;
 }
 
+/** Throws S3NotConfiguredError when the erase pair is missing. Lets a caller check before it changes anything. */
+export function assertEraseConfigured(): void {
+  s3Erase();
+}
+
 /**
  * Deletes every object under users/<uid>/ and returns how many were deleted.
  * `uid` must be server-VERIFIED. Lists and deletes in pages until the prefix
