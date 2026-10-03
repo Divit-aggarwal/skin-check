@@ -54,7 +54,7 @@ docker image inspect "$REPO:$TAG" --format '{{.Id}} {{.Os}}/{{.Architecture}}'
 - Who: owner.
 - Good output: `sha256:9a8f96c0a54025c4137b89dee181ba7fb140db1431fa95156cc20d8880e1fc2c linux/amd64`.
 - If the ID differs or the image is missing: **STOP.** Do not rebuild. A rebuild is a different image and needs a new Phase 0 replay (PHASE_0_0_1_6_RESULTS Part I §6 item 4).
-- Optional, before C1 (tracker A12): QA and security re-verification of this image. Compare its `/app` with `git -C ../skin-scan archive 8dc37dc`, confirm it is amd64-only, and run a local smoke test. The agent can do this read-only if you ask.
+- Optional, before C1 (tracker A12): QA and security re-verification of this image. Compare its `/app` with `git -C ../skin-scan archive 8dc37dc`, confirm it is amd64-only, and run a local smoke test. The agent can do this read-only if you ask. Done 2026-10-03 by a read-only verifier agent: PASS (amd64-only index plus one attestation; `/app` identical to `git archive 8dc37dc` for every file the Dockerfile copies, the other 62 files excluded by `.dockerignore`; local `/health/ready` reports `scan-0.1.6-provisional`, cv2 `4.11.0`). Rerun C0 itself on the day.
 - Undo: nothing to undo.
 
 ### C1. Push the image to ECR
@@ -81,6 +81,19 @@ docker push "$REPO:$TAG"
 
 ### C2. Register task definition `skin-scan:2`, pinned by digest
 
+**First, a read-only check: `skin-scan:1` must have exactly one container.** The `jq` below sets the image of *every* container. A sidecar (log router, agent) would get the engine image too.
+
+```bash
+N=$(aws ecs describe-task-definition --region $REG --task-definition skin-scan:1 \
+  --query 'length(taskDefinition.containerDefinitions)' --output text)
+echo "containers in skin-scan:1: $N"
+[ "$N" = "1" ] || echo "STOP: expected 1 container, found $N. Do not register."
+```
+- Good output: `containers in skin-scan:1: 1` and no STOP line.
+- **If it prints STOP: stop here.** Do not run the register command. Record the container count in the tracker (A12). The `jq` must then be changed to set the image of the engine container only, by name, and this runbook re-reviewed.
+
+Then register:
+
 ```bash
 umask 077; TD=$(mktemp -d)
 aws ecs describe-task-definition --region $REG --task-definition skin-scan:1 --query taskDefinition --output json \
@@ -96,6 +109,34 @@ rm -rf "$TD"
 - Good output: `{"rev": 2, "image": "550428926515.dkr.ecr.ap-south-1.amazonaws.com/skin-scan@<$DIGEST>"}`, normally `…@sha256:9a8f96c0a54025c4137b89dee181ba7fb140db1431fa95156cc20d8880e1fc2c`.
 - Check (read-only): `aws ecs describe-task-definition --region $REG --task-definition skin-scan:2 --query 'taskDefinition.containerDefinitions[0].image' --output text` prints the line above, ending in `@$DIGEST`. It must contain `@sha256:`, not `:sha-`.
 - Undo (only while no service uses it): `aws ecs deregister-task-definition --region $REG --task-definition skin-scan:2`.
+
+### C2b. Record the pre-deploy baseline (read-only)
+
+Run right before C3, in the same shell. It reads the last 24 hours of the live 0.1.5 service. The `date -v` syntax is macOS.
+
+```bash
+LB=$(aws elbv2 describe-load-balancers --region $REG --names skin-scan-alb \
+  --query 'LoadBalancers[0].LoadBalancerArn' --output text | sed 's#.*:loadbalancer/##')
+START=$(date -u -v-24H +%Y-%m-%dT%H:%M:%SZ); END=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+for M in RequestCount HTTPCode_ELB_5XX_Count HTTPCode_Target_5XX_Count; do
+  printf '%s ' $M
+  aws cloudwatch get-metric-statistics --region $REG --namespace AWS/ApplicationELB --metric-name $M \
+    --dimensions Name=LoadBalancer,Value=$LB --start-time $START --end-time $END \
+    --period 3600 --statistics Sum --query 'sum(Datapoints[].Sum)' --output text
+done
+
+Q=$(aws logs start-query --region $REG --log-group-name /ecs/skin-scan \
+  --start-time $(date -u -v-24H +%s) --end-time $(date -u +%s) \
+  --query-string 'filter message = "scan_request" and status = 200 | stats count(*) as n, pct(duration_ms, 95) as p95_ms' \
+  --query queryId --output text)
+sleep 15; aws logs get-query-results --region $REG --query-id "$Q" --query '{status: status, results: results}'
+```
+- Who: owner.
+- Good output: three lines, `RequestCount <n>`, `HTTPCode_ELB_5XX_Count <n>`, `HTTPCode_Target_5XX_Count <n>` (a metric with no datapoints prints `0`), then the query result with `"status": "Complete"`, `n` and `p95_ms`. If the status is `Running`, run the `get-query-results` line again.
+- `p95_ms` is the engine's own `/scan` time (`duration_ms` in the `scan_request` log line, successful scans only). The ALB adds network time on top, which this baseline leaves out on purpose so the two engine versions compare like for like.
+- **Write the five numbers into the tracker (A12) before C3.** Also compute the baseline 5xx rate: (ELB 5xx + Target 5xx) / RequestCount.
+- If `n` is below about 20, the p95 is not meaningful. Write that down; the p95 rule in C3 then does not apply, and the other rollback rules still do.
+- Undo: nothing to undo. (Logs Insights bills a few cents for the data it scans.)
 
 ### C3. Update the service
 
@@ -123,7 +164,7 @@ aws ecs wait services-stable --region $REG --cluster skin-scan-cluster --service
   aws ecs update-service --region $REG --cluster skin-scan-cluster --service skin-scan-service --task-definition skin-scan:1
   aws ecs wait services-stable --region $REG --cluster skin-scan-cluster --services skin-scan-service
   ```
-  Roll back on: ALB 5xx above the pre-deploy baseline; `/scan` p95 more than about 20% above baseline; health-check failures or task restarts; the fixture scan in C4 not returning 200. The deployment circuit breaker also rolls back on its own if tasks fail health checks. Never deregister `skin-scan:1` and never delete the `sha-7f3695e…` image.
+  Roll back on, comparing with the numbers recorded in C2b: a 5xx rate during the watch above the C2b baseline rate (any 5xx at all if the baseline was 0); `/scan` `p95_ms` more than about 20% above the C2b `p95_ms`; health-check failures or task restarts; the fixture scan in C4 not returning 200. To measure the watch window, rerun the C2b commands with `-v-30M` in place of every `-v-24H`. With few scans in 30 minutes, judge p95 only once `n` is at least about 20. The deployment circuit breaker also rolls back on its own if tasks fail health checks. Never deregister `skin-scan:1` and never delete the `sha-7f3695e…` image.
 
 ### C4. Authenticated smoke scan
 
@@ -207,9 +248,19 @@ F() { npx -y firebase-tools@latest "$@"; }   # a function, so it works in zsh an
 git rev-parse --abbrev-ref HEAD                                  # longitudinal-platform
 git status --short firebase.json firestore.rules firestore.indexes.json   # prints nothing
 F firestore:databases:get "(default)" --project $P              # Location nam5
+F --version                                                      # the firebase-tools version A2 will use
+F firestore:databases:create --help | grep -oE -- '--(location|edition|delete-protection|point-in-time-recovery) ' | sort -u
 ```
 - Who: owner.
-- Good output: as in the comments. P2 is done.
+- Good output: as in the comments. P2 is done. The last command prints exactly these four lines (every flag A2 uses):
+  ```
+  --delete-protection 
+  --edition 
+  --location 
+  --point-in-time-recovery 
+  ```
+- If a line is missing: **stop.** Do not run A1. The installed firebase-tools changed the flag; A2 must be fixed first, because A1 cannot be undone.
+- Checked 2026-10-03 with firebase-tools 15.32.1: all four flags exist with the values A2 uses (`--edition standard`, `--delete-protection ENABLED`, `--point-in-time-recovery ENABLED`). A2 needed no change.
 - Undo: nothing to undo.
 
 ### A1. Delete `(default)` (IRREVERSIBLE)
@@ -344,6 +395,10 @@ scan works, tracker A05 updated. Do not start job D before this.
   npm run typecheck && npm run lint && npm test && npm run build          # all pass
   ```
 - Run these checks **before** A14 step 5 (`git stash drop`).
+- **After P2, `.env.local` no longer has the Firebase Admin and S3 variables. The checks still pass; they need no production keys.**
+  - `next build` needs **no** environment variables. Firebase client, Firebase Admin and S3 are all initialised lazily (`lib/firebase/client.ts`, `lib/firebase/admin.ts`, `lib/s3.ts`), so a missing value is a runtime error, not a build error. Verified 2026-10-03 at 5105b3b: `next build` passed in a clean worktree with no `.env*` file at all. ff08107 adds no new `process.env` reads.
+  - `npm test` (vitest) and `typecheck`/`lint` read no `.env` values. The Firestore rules tests (`npm run test:rules`) use the local emulator and the demo project `demo-rules-check`, never production.
+  - If a check fails with `Firebase Admin is not configured` or `S3 image storage is not configured`, a test or page started calling them at build time. That is a bug to record in the tracker. Never put the production keys back to make the check pass.
 - A14_RECONCILIATION_PROPOSAL step 4 has the same `grep` bug: it matches `**D-03a` as `**D-03`. Use the fixed command above.
 - Undo (before step 5 and before pushing): `git reset --hard ORIG_HEAD`, then `git stash pop` to restore the drafts.
 
@@ -402,5 +457,4 @@ production check) may start.
 
 ## Known gaps, recorded in the tracker, not fixed here
 
-- `lib/skin-state.ts` `ENGINE_TABLE` lists only `scan-0.1.5-provisional`. After job C, SkinState returns `null` (unknown) for `landmarkModel` and `opencvVersion` on 0.1.6 records. This is not breaking. Adding 0.1.6 changes a frozen skinstate-1 mapping (D-23), so the owner decides.
-- The `.claude/settings.json` deny rules do not match the `npx -y firebase-tools@latest …` form used in this runbook. Agents can therefore still run those commands; only the hard rules in CLAUDE.md stop them.
+- None open. `ENGINE_TABLE` now lists `scan-0.1.6-provisional` (A17), and the deny rules now match the `npx -y firebase-tools@latest …` and `F …` forms (B05).
