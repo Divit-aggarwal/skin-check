@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { adminDb } from "@/lib/firebase/admin";
-import { SkinScanScoresSchema, type SkinScanScores } from "@/types/skin-scan";
+import { SkinScanRegionLowConfidenceSchema, SkinScanScoresSchema, type SkinScanScores } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 
 // SERVER ONLY (imports lib/firebase/admin.ts). Gate 02: client-provided
@@ -12,6 +12,9 @@ import type { SkinCheckAnswers } from "@/types/skin-check";
 const AnalysisSchema = z.object({
   scores: SkinScanScoresSchema,
   region_scores: z.record(z.string(), SkinScanScoresSchema).optional(),
+  // lane:context, additive: provenance and confidence for the context package.
+  region_low_confidence: SkinScanRegionLowConfidenceSchema.optional(),
+  pipeline_version: z.string().max(100).optional(),
 });
 
 // Same bounds the chat route used to apply to client-sent answers. Answers are
@@ -25,6 +28,8 @@ export interface TrustedEchoContext {
   scores: SkinScanScores;
   regionScores: Record<string, SkinScanScores>;
   answers: SkinCheckAnswers;
+  regionLowConfidence: Record<string, boolean>;
+  pipelineVersion: string | null;
 }
 
 const millis = (value: unknown): number =>
@@ -63,5 +68,7 @@ export async function loadTrustedEchoContext(uid: string, scanId: string): Promi
     scores: analysis.data.scores,
     regionScores: analysis.data.region_scores ?? {},
     answers: answers.success ? answers.data : {},
+    regionLowConfidence: analysis.data.region_low_confidence ?? {},
+    pipelineVersion: analysis.data.pipeline_version ?? null,
   };
 }

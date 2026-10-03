@@ -1,0 +1,169 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+// The chat route with the context switch (docs/lanes/context-design.md §3.1, §3.2).
+// Gemini is faked at the SDK boundary; chatTurns and the trusted context are mocked.
+const h = vi.hoisted(() => ({
+  verifyFirebaseIdToken: vi.fn(),
+  getSkinCheckChatReply: vi.fn(),
+  consumeDailyQuota: vi.fn(),
+  loadTrustedEchoContext: vi.fn(),
+  ageStatus: vi.fn(),
+  latestGrant: vi.fn(),
+  generateContent: vi.fn(),
+  recordChatTurns: vi.fn(),
+  loadChatHistory: vi.fn(),
+  buildContextPackage: vi.fn(),
+}));
+
+vi.mock("@google/genai", () => ({ GoogleGenAI: class { models = { generateContent: h.generateContent }; } }));
+vi.mock("@/lib/firebase/admin", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/firebase/admin")>("@/lib/firebase/admin");
+  return { bearerToken: actual.bearerToken, AdminNotConfiguredError: actual.AdminNotConfiguredError, verifyFirebaseIdToken: h.verifyFirebaseIdToken };
+});
+vi.mock("@/lib/gemini", async () => ({ ...(await vi.importActual<typeof import("@/lib/gemini")>("@/lib/gemini")), getSkinCheckChatReply: h.getSkinCheckChatReply }));
+vi.mock("@/lib/echo-trusted-context", () => ({ loadTrustedEchoContext: h.loadTrustedEchoContext }));
+vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory }));
+vi.mock("@/lib/context/builder", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/context/builder")>("@/lib/context/builder");
+  h.buildContextPackage.mockImplementation(actual.buildContextPackage);
+  return { ...actual, buildContextPackage: h.buildContextPackage };
+});
+vi.mock("@/lib/rate-limit", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
+  return { ...actual, checkRequestRate: () => null, consumeDailyQuota: h.consumeDailyQuota };
+});
+vi.mock("@/app/api/account/_ledger", async () => {
+  const actual = await vi.importActual<typeof import("@/app/api/account/_ledger")>("@/app/api/account/_ledger");
+  return { ...actual, ageStatus: h.ageStatus, latestGrant: h.latestGrant, withLedgerTimeout: <T,>(p: Promise<T>) => actual.withLedgerTimeout(p, 20) };
+});
+
+import { POST } from "@/app/api/skin-check/chat/route";
+import { signHistory } from "@/lib/echo-history-token";
+import { REFERRAL_COPY, COMPARISON_LEAD } from "@/lib/context/prefilter";
+import { UNCERTAINTY } from "@/lib/context/builder";
+import { NextRequest } from "next/server";
+import { CHEEK_SCORES, SCORES } from "./context-fixtures";
+
+const SCAN_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
+const GOOD = JSON.stringify({ claims: [{ claim_type: "uncertainty", text: UNCERTAINTY.text, fact_ids: [UNCERTAINTY.id] }], needs_referral: false });
+
+function post(message = "what does my cheek reading mean?", history: { role: "user" | "echo"; text: string }[] = []) {
+  const body = { scanId: SCAN_ID, region: "cheeks", message, history, historyToken: history.length ? signHistory("uid-ctx", SCAN_ID, "cheeks", history) : null };
+  return POST(new NextRequest("http://localhost/api/skin-check/chat", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer t" }, body: JSON.stringify(body) }));
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  vi.stubEnv("GEMINI_API_KEY", "test-key");
+  vi.stubEnv("FIREBASE_PRIVATE_KEY", "test-private-key");
+  vi.stubEnv("ECHO_CONTEXT_PATH", "on");
+  h.verifyFirebaseIdToken.mockResolvedValue("uid-ctx");
+  h.consumeDailyQuota.mockReturnValue(null);
+  h.ageStatus.mockResolvedValue("over18");
+  h.latestGrant.mockResolvedValue(true);
+  h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers: { skin_type: "oily" } });
+  h.getSkinCheckChatReply.mockResolvedValue("today's echo");
+  h.generateContent.mockResolvedValue({ text: GOOD });
+  h.recordChatTurns.mockResolvedValue(undefined);
+  h.loadChatHistory.mockResolvedValue([]);
+  vi.spyOn(console, "error").mockImplementation(() => {});
+});
+afterEach(() => vi.unstubAllEnvs());
+
+describe("switch off: today's Echo, unchanged", () => {
+  it.each([
+    ["unset", "test", ""],
+    ["production build, even with the switch set", "production", "on"],
+  ])("%s", async (_name, nodeEnv, flag) => {
+    vi.stubEnv("NODE_ENV", nodeEnv);
+    vi.stubEnv("ECHO_CONTEXT_PATH", flag);
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect((await res.json()).reply).toBe("today's echo");
+    expect(h.getSkinCheckChatReply).toHaveBeenCalledTimes(1);
+    expect(h.buildContextPackage).not.toHaveBeenCalled();
+    expect(h.recordChatTurns).not.toHaveBeenCalled();
+  });
+});
+
+describe("switch on: the gates still refuse before any package is built", () => {
+  it.each([
+    ["under 18", () => h.ageStatus.mockResolvedValue("under18"), 403, "UNDER_18"],
+    ["unattested", () => h.ageStatus.mockResolvedValue("missing"), 403, "ATTESTATION_REQUIRED"],
+    ["no AI-share consent", () => h.latestGrant.mockResolvedValue(null), 403, "AI_CONSENT_REQUIRED"],
+  ])("%s", async (_name, arrange, status, code) => {
+    arrange();
+    const res = await post("my mole is bleeding"); // even a red-flag message is refused first
+    expect(res.status).toBe(status);
+    expect((await res.json()).code).toBe(code);
+    for (const fn of [h.buildContextPackage, h.loadTrustedEchoContext, h.generateContent, h.recordChatTurns, h.consumeDailyQuota]) expect(fn).not.toHaveBeenCalled();
+  });
+});
+
+describe("switch on: the new path", () => {
+  it("a normal question: one Gemini call, recorded with versions and the validator result", async () => {
+    const res = await post();
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.reply).toBe(UNCERTAINTY.text);
+    expect(body.historyToken).toBeTruthy();
+    expect(h.getSkinCheckChatReply).not.toHaveBeenCalled();
+    expect(h.generateContent).toHaveBeenCalledTimes(1);
+    const meta = h.recordChatTurns.mock.calls[0]![5];
+    expect(meta).toMatchObject({ packageVersion: "ctx-1", promptVersion: "ctx-prompt-1", modelId: expect.any(String), prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
+    expect(meta.packageSha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("a red-flag message: referral, no package, no Gemini call, recorded as red flag", async () => {
+    const res = await post("mujhe jeena nahi hai");
+    expect((await res.json()).reply).toBe(REFERRAL_COPY);
+    expect(h.buildContextPackage).not.toHaveBeenCalled();
+    expect(h.generateContent).not.toHaveBeenCalled();
+    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ prefilter: "red_flag", redFlag: true, modelId: null });
+  });
+
+  it("a red-flag message still gets the referral when the record fails", async () => {
+    h.recordChatTurns.mockRejectedValue(Object.assign(new Error("users/uid-ctx/chatTurns down"), { code: 14 }));
+    const res = await post("I want to kill myself");
+    expect(res.status).toBe(200);
+    expect((await res.json()).reply).toBe(REFERRAL_COPY);
+    expect(JSON.stringify((console.error as unknown as ReturnType<typeof vi.fn>).mock.calls)).not.toContain("uid-ctx");
+  });
+
+  it("a comparison question: the fixed template, no Gemini call", async () => {
+    const res = await post("is my redness better than last time?");
+    expect((await res.json()).reply.startsWith(COMPARISON_LEAD)).toBe(true);
+    expect(h.generateContent).not.toHaveBeenCalled();
+    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ prefilter: "comparison", packageVersion: "ctx-1" });
+  });
+
+  it("history comes from stored turns only; a client's (validly signed) turns never reach Gemini", async () => {
+    h.loadChatHistory.mockResolvedValue([{ role: "user", text: "STORED-Q" }, { role: "echo", text: "STORED-A" }]);
+    await post("and the nose?", [{ role: "user", text: "CLIENT-Q" }, { role: "echo", text: "CLIENT-FORGED-A" }]);
+    const contents = JSON.stringify(h.generateContent.mock.calls[0]![0].contents);
+    expect(contents).toContain("STORED-A");
+    expect(contents).not.toMatch(/CLIENT-/);
+    expect(h.loadChatHistory).toHaveBeenCalledWith("uid-ctx", SCAN_ID, "cheeks");
+  });
+
+  it("a record failure on the Gemini path: 502, the reply is not returned unrecorded", async () => {
+    h.recordChatTurns.mockRejectedValue(new Error("down"));
+    const res = await post();
+    expect(res.status).toBe(502);
+    expect((await res.json()).code).toBe("CHAT_SERVICE_ERROR");
+  });
+
+  it("no analysis: the existing 409", async () => {
+    h.loadTrustedEchoContext.mockResolvedValue(null);
+    const res = await post();
+    expect(res.status).toBe(409);
+    expect(h.generateContent).not.toHaveBeenCalled();
+  });
+
+  it("a Gemini outage: the existing 502", async () => {
+    h.generateContent.mockRejectedValue(Object.assign(new Error("bad"), { status: 400 }));
+    const res = await post();
+    expect(res.status).toBe(502);
+    expect(h.recordChatTurns).not.toHaveBeenCalled();
+  });
+});

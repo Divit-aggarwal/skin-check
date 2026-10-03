@@ -12,6 +12,8 @@ import { bandScores } from "@/lib/skin-check-rules";
 import { summarizeConcerns } from "@/lib/skin-check-score";
 import { ageStatus, latestGrant, withLedgerTimeout, type AgeStatus } from "@/app/api/account/_ledger";
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
+import { contextChatEnabled } from "@/lib/context/switch";
+import { handleContextChat } from "@/lib/context/chat";
 
 // firebase-admin needs Node APIs and hard-fails on the Edge runtime — same
 // explicit opt-in as /api/skin-scan.
@@ -178,6 +180,15 @@ export async function POST(request: NextRequest) {
   if (quotaLimited) return quotaLimited;
 
   try {
+    // lane:context (owner decision O-4): the context-package path, local only.
+    // Off, everything below runs exactly as before.
+    if (contextChatEnabled()) {
+      const result = await handleContextChat({ uid, scanId, region, message });
+      if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+      const turns = [...history, { role: "user" as const, text: message }, { role: "echo" as const, text: result.reply }];
+      return NextResponse.json({ ok: true, reply: result.reply, historyToken: signHistory(uid, scanId, region, turns) });
+    }
+
     const context = await loadTrustedEchoContext(uid, scanId);
     // Not found, someone else's scanId, or a malformed record all look the
     // same. Retryable: the server write may simply not have landed yet.
