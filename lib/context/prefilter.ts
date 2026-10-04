@@ -379,7 +379,8 @@ export const comparisonHit = (message: string): boolean => COMPARISON.test(fold(
 const OWN_READING = "(?:it|this|that|my (?:\\w+ )?(?:skin|face|redness|oil\\w*|texture|blemish\\w*|pigment\\w*|spots?|acne|pores|breakouts?|marks?|readings?|cheeks?|forehead|nose|chin|tone)|the (?:redness|oil\\w*|texture|blemish\\w*|pigment\\w*|spots?|acne|readings?|breakouts?))";
 const CHECK_COMPARISON = re([
   // A change question about the user's own readings ("is it better now?", "did my oiliness drop?") (recheck).
-  `\\b(?:is|has|did|are|have|was)\\s+${OWN_READING}\\s+(?:\\w+ ){0,2}(?:better|worse|improv\\w*|gone (?:down|up)|go(?:ne)? down|drop\\w*|reduc\\w*|increas\\w*|decreas\\w*|fad\\w*|clear\\w*|lower|higher|less|more|calm\\w*)\\b(?! (?:to|for|if|when)\\b)`,
+  // Plain concatenation, not a template literal: the production compiler mangled the escapes in one.
+  "\\b(?:is|has|did|are|have|was)\\s+" + OWN_READING + "\\s+(?:\\w+ ){0,2}(?:better|worse|improv\\w*|gone (?:down|up)|go(?:ne)? down|drop\\w*|reduc\\w*|increas\\w*|decreas\\w*|fad\\w*|clear\\w*|lower|higher|less|more|calm\\w*)\\b(?! (?:to|for|if|when)\\b)",
   "\\b(?:last|previous|earlier|prior) (?:time|check|scan|photo|reading|result)s?\\b",
   "\\b(?:my|the) (?:last|previous|earlier|two|past) (?:\\w+ )?(?:checks?|scans?|photos?|readings?|results?)\\b",
   "\\bcompar\\w* (?:my |the |these |those |two )?(?:\\w+ )?(?:checks?|scans?|photos?|readings?|results?)\\b",
