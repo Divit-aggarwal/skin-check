@@ -177,6 +177,17 @@ const RED_FLAG = re([
   "\\bschool (?:student|kid|going)\\b",
   "\\b(?:i'?m|i am|im) (?:a )?teen(?:ager)?\\b",
   "\\b(?:i'?m|i am|im|am) expecting\\b(?! (?:a |an |the )?(?:parcel|delivery|package|call|order|reply|answer|result))",
+  // ── red team pass 2 (context path, I02 P2-2) ──
+  "\\bcan'?t go on (?:anymore|any more|like this|living)\\b|\\bcan'?t go on\\W*$",
+  "\\bpoint (?:of|in) (?:living|life|going on)\\b",
+  "\\b(?:wish|wished) (?:i|i'd) (?:wasn'?t|weren'?t|was not|were not) (?:alive|here|born|around)\\b",
+  "\\bwant everything to (?:stop|end)\\b(?! being)",
+  "\\bgoodbye (?:everyone|everybody|world|all)\\b|\\blast message\\b.{0,30}\\b(?:goodbye|bye)\\b",
+  "\\bfeel(?:ing)? (?:so |very |completely |totally )?hopeless\\b|\\bhopeless and empty\\b",
+  "\\bnahi? ji (?:sakti|sakta|sakte|paungi|paunga)\\b",
+  "\\bzinda nahi? (?:rehna|rahna)\\b",
+  "नहीं जी सकत|नही जी सकत",
+  "जिंदा नहीं रहना|जिंदा नही रहना",
 ]);
 
 const COMPARISON = re([

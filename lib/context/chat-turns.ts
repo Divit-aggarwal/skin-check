@@ -70,3 +70,20 @@ export async function loadChatHistory(uid: string, scanId: string, region: EchoR
     .slice(-HISTORY_TURNS)
     .map((t) => ({ role: t.role as "user" | "echo", text: t.text as string }));
 }
+
+/**
+ * Red team pass 2 (I02 P2-3): the user turns the split-message check reads.
+ * Every stored user turn of this thread except earlier red-flag turns (those
+ * were already referred), the last HISTORY_TURNS of them: a turn left out of
+ * Gemini's history because its answer fell back still counts, so "i want to"
+ * (fallback) then "die" is referred.
+ */
+export async function loadSplitCheckTurns(uid: string, scanId: string, region: EchoRegion): Promise<EchoChatMessage[]> {
+  const snap = await turns(uid).where("scanId", "==", scanId).get();
+  return snap.docs
+    .map((d) => d.data())
+    .filter((t) => t.region === region && t.role === "user" && t.redFlag !== true && t.prefilter == null && typeof t.text === "string")
+    .sort((a, b) => (a.createdAt as Timestamp).toMillis() - (b.createdAt as Timestamp).toMillis())
+    .slice(-HISTORY_TURNS)
+    .map((t) => ({ role: "user" as const, text: t.text as string }));
+}

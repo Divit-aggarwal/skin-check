@@ -50,6 +50,9 @@ export async function answerFromPackage(
   const done = (v: Validation[], regenerated: boolean, modelId: string): AnswerOutcome => {
     const last = v[v.length - 1]!;
     // Either signal wins (GEMINI_BOUNDARY §6): the model asking for a referral is never overruled.
+    // Red team pass 2 (I02 P2-1): a claim that reads as self-harm or another red flag is a referral too.
+    const flagged = v.some((x) => x.redFlag);
+    if (flagged) return { reply: REFERRAL_COPY, referral: true, modelId, validator: { passed: false, failures: names(...v), regenerated, fallback: false } };
     if (last.answer?.needs_referral) return { reply: REFERRAL_COPY, referral: true, modelId, validator: { passed: last.passed, failures: names(...v), regenerated, fallback: false } };
     if (last.passed) return { reply: last.answer!.claims.map((c) => c.text.trim()).join(" "), referral: false, modelId, validator: { passed: true, failures: names(...v), regenerated, fallback: false } };
     return { reply: fallbackAnswer(pkg), referral: false, modelId, validator: { passed: false, failures: names(...v), regenerated, fallback: true } };

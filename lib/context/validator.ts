@@ -1,6 +1,7 @@
 import { z } from "zod";
 import type { AllowedClaim, ContextPackage, ForbiddenClaim } from "@/lib/contracts/context-package";
 import { packageFacts, type CitableFact, type FactKind } from "./builder";
+import { redFlagHit } from "./prefilter";
 import {
   ACTIVE,
   BAND_WORD,
@@ -61,6 +62,8 @@ export interface Validation {
   failures: Failure[];
   /** A failing term also appears in the user's own message (§3.7: no retry). */
   userPremise: boolean;
+  /** A claim's own words (quotes of our facts removed) read as self-harm or another red flag: a referral (red team pass 2). */
+  redFlag: boolean;
 }
 
 const WORD_CHECKS: [ForbiddenClaim, RegExp][] = [
@@ -114,6 +117,11 @@ const UNCITED_SKIN_STATE = new RegExp(
   String.raw`\b(?:gone|cleared?|clearing|healthy|great|good|fine|normal|bad|severe|mild|serious|perfect|flawless|glow\w*|calm\w*|settled|subsid\w*|okay|ok|nothing to worry|chale? ga(?:ye|ya|yi)|theek|thik|saaf|kam ho\w*)\b`,
   "iu"
 );
+// Red team pass 2 (I02 P2-1): an uncited claim names no brand, day or other
+// proper noun (a capital letter inside a sentence, except "I"), and never
+// sends the user to a link, a sign-in or a code.
+const UNCITED_PROPER = new RegExp(String.raw`(?<=[\p{L},;:]\s+)(?!I\b)\p{Lu}\p{L}*`, "u");
+const UNCITED_PHISH = new RegExp(String.raw`https?:|www\.|\b\w+\s*(?:\.|\bdot\b)\s*(?:com|in|org|net|io|app|example)\b|\bsign (?:in|up)\b|\blog ?in\b|\botp\b|\bpassword\b|\bphone\b|\bcode\b`, "iu");
 const GOOD_QUESTION = new RegExp(String.raw`\b(?:good|great) question\b`, "giu");
 // An uncertainty or comparability claim cites the facts it is about (H20, finding 4).
 const NEEDS_KIND: Partial<Record<AllowedClaim, FactKind[]>> = { uncertainty: ["uncert", "missing", "long"], comparability: ["long", "missing", "confounder"] };
@@ -149,7 +157,8 @@ const metricsIn = (text: string) => (Object.keys(METRIC_WORDS) as (keyof typeof 
 
 export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: string): Validation {
   const answer = parseAnswer(raw);
-  if (!answer) return { passed: false, answer: null, failures: [{ check: "malformed_output", claimIndex: -1 }], userPremise: false };
+  if (!answer) return { passed: false, answer: null, failures: [{ check: "malformed_output", claimIndex: -1 }], userPremise: false, redFlag: false };
+  let redFlag = false;
 
   const facts = new Map(packageFacts(pkg).map((f) => [f.id, f]));
   const readings = pkg.skin?.readings ?? [];
@@ -189,6 +198,19 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
     if (claim.claim_type === "smalltalk") {
       const skin = firstMatch(SMALLTALK_SKIN, text);
       if (skin) fail("citation_rule", i, skin);
+    }
+    // Red team pass 2 (I02 P2-1): a claim whose own words read as self-harm or another
+    // red flag never passes, and answer.ts gives the referral. Our quoted fact text
+    // (e.g. the user's own label "Deep or painful breakouts") is not the claim's own words.
+    if (redFlagHit(stripped)) {
+      redFlag = true;
+      fail("contradicts_package", i);
+    }
+    if (!MUST_CITE.has(claim.claim_type)) {
+      const proper = firstMatch(UNCITED_PROPER, claim.text);
+      if (proper) fail("citation_rule", i, proper);
+      const phish = firstMatch(UNCITED_PHISH, text);
+      if (phish) fail("citation_rule", i, phish);
     }
     if (claim.claim_type === "clarify" || claim.claim_type === "out_of_scope") {
       const plain = text.replace(GOOD_QUESTION, " ");
@@ -263,7 +285,9 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
     // no "dropped to", "your March check", "likely from the humidity",
     // "plenty of" or "shaving bumps" (security review, wave 2).
     if (claim.claim_type === "descriptive") {
-      const extra = extraWord(stripped, cited, DESCRIBE_FRAME, cited.flatMap((f) => (f.band ? [f.band.toLowerCase()] : [])));
+      // Own words come from the cited READINGS only (red team pass 2, I02 P2-1:
+      // "not" from the uncertainty fact turned "Redness is not Elevated" into an allowed claim).
+      const extra = extraWord(stripped, cited.filter((f) => f.kind === "state"), DESCRIBE_FRAME, cited.flatMap((f) => (f.band ? [f.band.toLowerCase()] : [])));
       // No term: a common extra word ("about") must not read as the user's own premise and stop the retry.
       if (extra) fail("contradicts_package", i);
     }
@@ -295,5 +319,5 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
 
   const message = userMessage.toLowerCase();
   const userPremise = failures.some((f) => f.term !== undefined && f.check !== "unknown_fact_id" && message.includes(f.term.toLowerCase()));
-  return { passed: failures.length === 0, answer, failures, userPremise };
+  return { passed: failures.length === 0, answer, failures, userPremise, redFlag };
 }

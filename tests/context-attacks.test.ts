@@ -8,10 +8,11 @@ const h = vi.hoisted(() => ({
   loadTrustedEchoContext: vi.fn(),
   recordChatTurns: vi.fn(),
   loadChatHistory: vi.fn(),
+  loadSplitCheckTurns: vi.fn(),
 }));
 vi.mock("@google/genai", () => ({ GoogleGenAI: class { models = { generateContent: h.generateContent }; } }));
 vi.mock("@/lib/echo-trusted-context", () => ({ loadTrustedEchoContext: h.loadTrustedEchoContext }));
-vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory }));
+vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory, loadSplitCheckTurns: h.loadSplitCheckTurns }));
 
 import { handleContextChat } from "@/lib/context/chat";
 import { answerFromPackage, fallbackAnswer } from "@/lib/context/answer";
@@ -30,6 +31,7 @@ beforeEach(() => {
   h.loadTrustedEchoContext.mockResolvedValue(TRUSTED);
   h.recordChatTurns.mockResolvedValue(undefined);
   h.loadChatHistory.mockResolvedValue([]);
+  h.loadSplitCheckTurns.mockResolvedValue([]);
 });
 
 /** Runs one chat turn where Gemini (both attempts) returns `raw`; returns the reply and the recorded validator result. */

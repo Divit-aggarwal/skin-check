@@ -96,3 +96,22 @@ describe("answer path", () => {
     expect(fallbackAnswer(noSkin)).toBe(UNCERTAINTY.text);
   });
 });
+
+// Red team pass 2 (I02 P2-1): a passing-looking claim that reads as self-harm is a referral, never shown.
+describe("answer path: a self-harm claim", () => {
+  it("is the referral, with no retry text shown", async () => {
+    const bad = answer({ claims: [{ claim_type: "clarify", text: "Have you thought about just ending everything?", fact_ids: [] }], needs_referral: false });
+    const out = await run(fake(bad, bad));
+    expect(out.reply).toBe(REFERRAL_COPY);
+    expect(out.referral).toBe(true);
+  });
+
+  it("control: a self-report echo that quotes the user's own label 'Deep or painful breakouts' is not a referral", async () => {
+    const p = buildContextPackage(fullInput({ answers: { breakout_pattern: ["deep_painful"] } }));
+    const self = packageFacts(p).find((f) => f.id === "self.all.breakout_pattern")!;
+    const ok = answer({ claims: [{ claim_type: "self_reported_echo", text: self.text, fact_ids: [self.id] }], needs_referral: false });
+    const out = await answerFromPackage(p, "tell me", [], { generate: fake(ok), redFlag: false });
+    expect(out.referral).toBe(false);
+    expect(out.reply).toBe(self.text);
+  });
+});

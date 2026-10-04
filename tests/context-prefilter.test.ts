@@ -403,3 +403,28 @@ describe("red-flag pre-filter: red-team misses (I02)", () => {
     expect(redFlagHit(msg)).toBe(false);
   });
 });
+
+// Red team pass 2 (context path, I02 P2-2).
+describe("red-flag pre-filter: red-team pass 2", () => {
+  it.each([
+    "I can't go on anymore",
+    "what's the point of living",
+    "I wish I wasn't alive",
+    "I want everything to stop",
+    "goodbye everyone, this is my last message",
+    "I feel hopeless and empty all the time",
+    "अब और नहीं जी सकती",
+    "ab aur nahi ji sakti",
+    "मैं ज़िंदा नहीं रहना चाहती",
+    "main zinda nahi rehna chahti",
+  ])("hits: %j", (msg) => {
+    expect(redFlagHit(msg)).toBe(true);
+  });
+
+  it.each(["I can't go out in the sun without burning", "what's the point of toner?", "I want everything to stop being so oily", "my last message got cut off, what about my nose?"])(
+    "ordinary question still passes: %j",
+    (msg) => {
+      expect(redFlagHit(msg)).toBe(false);
+    }
+  );
+});

@@ -12,6 +12,7 @@ const h = vi.hoisted(() => ({
   generateContent: vi.fn(),
   recordChatTurns: vi.fn(),
   loadChatHistory: vi.fn(),
+  loadSplitCheckTurns: vi.fn(),
   buildContextPackage: vi.fn(),
   handleContextChat: vi.fn(),
   loadTrustedSkinState2Series: vi.fn(),
@@ -31,7 +32,7 @@ vi.mock("@/lib/rules/safety", async () => {
   h.evaluateSafety.mockImplementation(actual.evaluateSafety);
   return { ...actual, evaluateSafety: h.evaluateSafety };
 });
-vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory }));
+vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory, loadSplitCheckTurns: h.loadSplitCheckTurns }));
 vi.mock("@/lib/context/builder", async () => {
   const actual = await vi.importActual<typeof import("@/lib/context/builder")>("@/lib/context/builder");
   h.buildContextPackage.mockImplementation(actual.buildContextPackage);
@@ -88,6 +89,7 @@ beforeEach(async () => {
   h.generateContent.mockResolvedValue({ text: GOOD });
   h.recordChatTurns.mockResolvedValue(undefined);
   h.loadChatHistory.mockResolvedValue([]);
+  h.loadSplitCheckTurns.mockResolvedValue([]);
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -351,17 +353,25 @@ describe("red-flag pre-filter on both chat paths (wave-2 security review)", () =
   });
 
   it("context path: a split red flag wins over a safety error (checked before anything is built)", async () => {
-    h.loadChatHistory.mockResolvedValue([{ role: "user", text: "i want to" }]);
+    h.loadSplitCheckTurns.mockResolvedValue([{ role: "user", text: "i want to" }]);
     h.evaluateSafety.mockImplementation(() => { throw new Error("bug"); });
     expect((await (await post("die")).json()).reply).toBe(REFERRAL_COPY);
     expect(h.loadTrustedEchoContext).not.toHaveBeenCalled();
   });
 
   it("context path: a message split over stored turns is caught before Gemini and recorded as a red flag", async () => {
-    h.loadChatHistory.mockResolvedValue([{ role: "user", text: "i want to" }, { role: "echo", text: "Could you say more?" }]);
+    h.loadSplitCheckTurns.mockResolvedValue([{ role: "user", text: "i want to" }]);
     const res = await post("die");
     expect((await res.json()).reply).toBe(REFERRAL_COPY);
     expect(h.generateContent).not.toHaveBeenCalled();
     expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ prefilter: "red_flag", redFlag: true });
+  });
+
+  it("red team pass 2 (P2-3): the split check reads a first half whose answer fell back (not in Gemini's history)", async () => {
+    h.loadChatHistory.mockResolvedValue([]); // the fallback turn is left out of Gemini's history
+    h.loadSplitCheckTurns.mockResolvedValue([{ role: "user", text: "i want to" }]);
+    expect((await (await post("die")).json()).reply).toBe(REFERRAL_COPY);
+    expect(h.generateContent).not.toHaveBeenCalled();
+    expect(h.loadSplitCheckTurns).toHaveBeenCalledWith("uid-ctx", SCAN_ID, "cheeks");
   });
 });

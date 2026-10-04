@@ -107,6 +107,10 @@ export const MEDICAL = re([
   "\\bmedicines?\\b",
   "\\bmedications?\\b",
   "\\bdermatologist[- ]approved\\b",
+  // red team pass 2 (I02 P2-1)
+  "\\bantibiotic\\w*",
+  "\\bantifungal\\w*",
+  "\\bointments?\\b",
 ]);
 
 export const DIAGNOSIS = re([
@@ -129,6 +133,13 @@ export const DIAGNOSIS = re([
   "\\bkeratosis\\b",
   "\\bvitiligo\\b",
   "\\bgrade\\b",
+  // red team pass 2 (I02 P2-1)
+  "\\bimpetigo\\b",
+  "\\bringworm\\b",
+  "\\bscabies\\b",
+  "\\bherpes\\b",
+  "\\bshingles\\b",
+  "\\btinea\\b",
 ]);
 
 export const CAUSE = re([
@@ -163,6 +174,7 @@ export const CAUSE = re([
   "\\bresponsible for\\b",
   "\\bis why\\b",
   "\\bcontribut\\w*",
+  "\\bplays? (?:a |an )?(?:big |large |major |key |huge )?(?:part|role)\\b",
   "\\bwajah\\b",
   "\\bvajah\\b",
   "\\bisliye\\b",
