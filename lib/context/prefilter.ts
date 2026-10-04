@@ -22,7 +22,7 @@ const RED_FLAG = re([
   // painful, cystic or nodular lesions, scarring
   "\\bcyst\\w*",
   "\\bnodul\\w*",
-  "\\bpain\\w*",
+  "\\bpain(?!t)\\w*", // not "painted" (red team C)
   "\\bhurt(?:s|ing)?\\b",
   "\\bsore\\b",
   "\\bboils?\\b",
@@ -129,6 +129,54 @@ const RED_FLAG = re([
   "\\bbimaa?ri\\b",
   "\\bdawa\\w*",
   "दवा|बीमारी",
+  // ── red team (2026-10-04, tracker I02): phrasings that reached Gemini ──
+  // self-harm, English idioms
+  "\\bkys\\b",
+  "\\bsleep\\b.{0,20}\\bnever wake up\\b",
+  "\\bsleep forever\\b",
+  "\\b(?:nobody|no one|no-one)\\b.{0,20}\\bmiss me\\b",
+  "\\bjump(?:ing)? off\\b.{0,25}\\b(?:roof|bridge|building|terrace|balcony|cliff)",
+  "\\blife is (?:pointless|meaningless|worthless|not worth)",
+  "\\bnot worth living\\b",
+  "\\b(?:rather|want to|wanna|wish i could(?: just)?|i'?d like to)\\b.{0,10}\\b(?:not exist|stop existing)",
+  "\\b(?:do ?n[o']?t|dont) want to be (?:here|alive|around) anymore\\b",
+  "\\bdone with (?:living|life)\\b",
+  "\\bslit\\w*\\b.{0,15}\\bwrists?\\b",
+  "\\btake my (?:own )?life\\b",
+  "\\b(?:blade|razor|knife)\\b.{0,40}\\b(?:arms?|wrists?|thighs?)\\b",
+  "\\b(?:arms?|wrists?|thighs?)\\b.{0,40}\\b(?:blade|razor|knife)\\b",
+  "\\bending (?:things|everything)\\b",
+  "\\boff myself\\b",
+  "\\btime to rope\\b|\\brope (?:myself|time)\\b",
+  "\\bsewer ?slide\\b",
+  // self-harm, Hinglish
+  "\\b(?:mann|man|dil) nahi? karta\\b.{0,10}\\bjee?n",
+  "\\b(?:apni )?jaa?n (?:le|lena|lene|leni|lunga|lungi)\\b",
+  // self-harm and red flags, Devanagari (run on the copy with no nukta)
+  "(?:खुद|जिंदगी|सब).{0,20}खत्म",
+  "जान (?:दे|ले)",
+  "गोलि\\S*.{0,15}खा|गोली.{0,15}खा",
+  "जीने का (?:मन|दिल)",
+  "खुद को मार|अपने आप को मार",
+  "मेरी बेटी|मेरा बेटा|मेरे बेटे|मेरे बच्चे|मेरा बच्चा",
+  "प्रेग्नेंट|प्रेगनेंट|गर्भवती",
+  // medical red flags with no trigger word
+  "\\b(?:spot|patch|mark|mole|lump|growth)\\w*\\b.{0,40}\\b(?:bigger|growing|darker|black|uneven|irregular|changing)\\b",
+  "\\blumps?\\b",
+  "\\bblister\\w*",
+  "\\bweeping\\b|\\b(?:yellow|green) fluid\\b",
+  "\\bburn(?:ing|ed|s)?\\b.{0,30}\\b(?:peel|acid|chemical|badly)\\b",
+  "\\b(?:peel|acid)\\b.{0,30}\\bburn\\w*",
+  "\\b(?:warm|hot)\\b.{0,30}\\b(?:bigger|growing|spreading|swell\\w*)\\b",
+  "\\bwhat (?:is )?this (?:is )?on my (?:skin|face|body)\\b",
+  "\\bis (?:it|this|that) serious\\b",
+  // age and pregnancy
+  "\\bmy age is (?:1[0-7]|[1-9])\\b",
+  "\\b(?:class|grade|std|standard)\\s*(?:[1-9]|1[0-2])(?:st|nd|rd|th)?\\b(?!\\s*(?:years?|yrs?))",
+  "\\b(?:[1-9]|1[0-2])(?:st|nd|rd|th) (?:grade|class|std|standard)\\b",
+  "\\bschool (?:student|kid|going)\\b",
+  "\\b(?:i'?m|i am|im) (?:a )?teen(?:ager)?\\b",
+  "\\b(?:i'?m|i am|im|am) expecting\\b(?! (?:a |an |the )?(?:parcel|delivery|package|call|order|reply|answer|result))",
 ]);
 
 const COMPARISON = re([
@@ -163,6 +211,11 @@ const CONFUSABLE: Record<string, string> = {
   "і": "i", "ї": "i", "ј": "j", "ѕ": "s", "ԁ": "d", "ԛ": "q", "ԝ": "w", "ɡ": "g", "ı": "i", "ɑ": "a", "µ": "u", "μ": "u",
   "α": "a", "β": "b", "ε": "e", "η": "n", "ι": "i", "κ": "k", "ν": "v", "ο": "o", "ρ": "p", "τ": "t", "υ": "u", "χ": "x",
 };
+/** Regional-indicator symbols ("🇸🇺🇮…") read as letters (red team C). */
+const regionalIndicator = (c: string): string | undefined => {
+  const cp = c.codePointAt(0)!;
+  return cp >= 0x1f1e6 && cp <= 0x1f1ff ? String.fromCharCode(97 + cp - 0x1f1e6) : undefined;
+};
 const LEET: Record<string, string> = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "$": "s", "@": "a", "!": "i", "|": "l" };
 const DEVANAGARI_DIGIT = /[\u0966-\u096F]/g;
 // Hangul fillers count as letters but show nothing (second security review, H20).
@@ -186,7 +239,7 @@ const fold = (message: string) =>
       .normalize("NFKC")
       .replace(new RegExp(String.raw`[\p{Cf}${HANGUL_FILLERS}]`, "gu"), "")
       .toLowerCase()
-      .replace(new RegExp(".", "gu"), (c) => CONFUSABLE[c] ?? c)
+      .replace(new RegExp(".", "gu"), (c) => CONFUSABLE[c] ?? regionalIndicator(c) ?? c)
       .replace(DEVANAGARI_DIGIT, (d) => String(d.charCodeAt(0) - 0x0966))
   );
 /** Leetspeak read as letters (a separate copy, so "I'm 16" still reads as an age). */
@@ -236,6 +289,7 @@ function squashedPhraseHit(folded: string): boolean {
 }
 // A Greek or Cyrillic letter left after mapping is a disguise, not a language this product serves.
 // One carve-out (H20): a Greek letter used as a chemistry prefix, as in "γ-oryzanol".
+const DEVANAGARI_SELF_HARM = new RegExp("आत्महत्या|खुदकोखत्म|खुदकोमार|जानदे|जानले|जीनेकामन|जीनानही", "u");
 const OTHER_SCRIPT_LOOKALIKE = new RegExp(String.raw`[\p{Script=Cyrillic}\p{Script=Greek}]`, "u");
 const GREEK_PREFIX = new RegExp(String.raw`(?<!\p{L})\p{Script=Greek}(?=-\p{L})`, "gu");
 // A Latin-script letter that is not plain a-z after folding (small capitals "ꜱᴜɪᴄɪᴅᴇ") is a disguise too (H20).
@@ -248,6 +302,8 @@ export const redFlagHit = (message: string): boolean => {
     RED_FLAG.test(folded) ||
     RED_FLAG.test(unleet(folded)) ||
     RED_FLAG.test(devanagari(message)) ||
+    // A Devanagari word spaced out or split ("आ त्म ह त्या", "आत्म हत्या") (red team C).
+    DEVANAGARI_SELF_HARM.test(devanagari(message).replace(/\s+/g, "")) ||
     SELF_HARM_WORD.test(squash(folded)) ||
     PHRASE_SPACED.test(spaced(folded)) ||
     squashedPhraseHit(folded) ||
