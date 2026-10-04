@@ -240,6 +240,7 @@ describe("validator: red-team pass 2", () => {
   it.each([
     ["clarify: which part", { claim_type: "clarify", text: "Which part of your face do you mean?", fact_ids: [] }],
     ["out_of_scope: plain", { claim_type: "out_of_scope", text: "I can only talk about your skin check here.", fact_ids: [] }],
+    ["clarify: two sentences", { claim_type: "clarify", text: "Sure. In which area do you mean?", fact_ids: [] }],
     ["descriptive: quoted reading", { claim_type: "descriptive", text: FOREHEAD.text, fact_ids: [FOREHEAD.id] }],
   ] as const)("passes: %s", (_name, claim) => {
     const claims = claim.claim_type === "descriptive" ? [claim, UNC] : [claim];

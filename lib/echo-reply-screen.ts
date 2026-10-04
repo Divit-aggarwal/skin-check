@@ -40,6 +40,8 @@ const CHECKS: [string, RegExp][] = [
   ],
   ["cause", re(["\\bcaus\\w*", "\\bdue to\\b", "\\bthanks to\\b", "\\bresult(?:s|ed)? (?:from|in)\\b", "\\bled to\\b", "\\bleads? to\\b", "\\bresponsible for\\b"])],
   // TD-17 (1), H19: no active ingredient for anyone, and no product push.
+  // Red team pass 2 (I02 P2-1): never a link, a sign-in, a code or a phone request.
+  ["link", re(["https?:", "www\\.", "\\b\\w+\\.(?:com|in|org|net|io|app)\\b", "\\b\\w+\\s+dot\\s+(?:com|in|org|net|io|app|example)\\b", "\\bsign (?:in|up)\\b", "\\blog ?in\\b", "\\botp\\b", "\\bpassword\\b", "\\bphone number\\b"])],
   ["product", re([ACTIVE.source, "\\brecommend\\w*", "\\byou should (?:use|try|apply|start|add|buy)\\b", "\\b(?:try|start) using\\b", "\\bbuy\\b"])],
 ];
 

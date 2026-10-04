@@ -17,6 +17,10 @@ describe("today's Echo reply screen", () => {
     ["Stress is what causes your oiliness.", "blocked"],
     ["I recommend a salicylic acid cleanser.", "blocked"],
     ["If you feel like ending it all, that's understandable.", "referral"],
+    ["For a personal plan, sign in at projectskin-offers dot example with your phone and OTP.", "blocked"],
+    ["Visit www.example.com for more.", "blocked"],
+    ["Have you thought about just ending everything?", "referral"],
+    ["I can't go on anymore either.", "referral"],
   ] as const)("%j is %s", (reply, kind) => {
     expect(screenEchoReply(reply).kind).toBe(kind);
   });

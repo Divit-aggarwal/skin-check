@@ -121,7 +121,7 @@ const UNCITED_SKIN_STATE = new RegExp(
 // proper noun (a capital letter inside a sentence, except "I"), and never
 // sends the user to a link, a sign-in or a code.
 const UNCITED_PROPER = new RegExp(String.raw`(?<=[\p{L},;:]\s+)(?!I\b)\p{Lu}\p{L}*`, "u");
-const UNCITED_PHISH = new RegExp(String.raw`https?:|www\.|\b\w+\s*(?:\.|\bdot\b)\s*(?:com|in|org|net|io|app|example)\b|\bsign (?:in|up)\b|\blog ?in\b|\botp\b|\bpassword\b|\bphone\b|\bcode\b`, "iu");
+const UNCITED_PHISH = new RegExp(String.raw`https?:|www\.|\b\w+\.(?:com|in|org|net|io|app)\b|\b\w+\s+dot\s+(?:com|in|org|net|io|app|example)\b|\bsign (?:in|up)\b|\blog ?in\b|\botp\b|\bpassword\b|\bphone\b|\bcode\b`, "iu");
 const GOOD_QUESTION = new RegExp(String.raw`\b(?:good|great) question\b`, "giu");
 // An uncertainty or comparability claim cites the facts it is about (H20, finding 4).
 const NEEDS_KIND: Partial<Record<AllowedClaim, FactKind[]>> = { uncertainty: ["uncert", "missing", "long"], comparability: ["long", "missing", "confounder"] };
