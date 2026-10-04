@@ -239,6 +239,9 @@ const COMPARISON = re([
   "\\b(?:has|have|is|did) (?:my |the )?\\w+ (?:dropped|gone down|gone up|reduced|increased|faded|cleared)\\b",
   "\\bfa?rak\\b",
   "\\bdifference\\b",
+  // final-review recheck (I02)
+  "\\bwent (?:down|up)\\b",
+  "\\b(?:kam|behtar|better) hu(?:i|a|e)\\b",
 ]);
 
 // Lookalike letters from Cyrillic and Greek that read as Latin (security review, wave 2).

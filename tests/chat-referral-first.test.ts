@@ -230,9 +230,20 @@ describe("today's Echo: Gemini's reply is checked before it is shown or signed",
 
 // Final review (I02 H1, H3), on today's Echo route.
 describe("today's Echo: final-review fixes", () => {
-  it("H3: ordinary questions with 'before', 'better' or 'change' reach Gemini", async () => {
+  // Recheck decision: today's Echo uses the recall-first comparison list of the context
+  // path (TD-16 (2)), so a question about change never reaches Gemini, paraphrased or not.
+  it("every change question gets the fixed answer, no Gemini call (both lists)", async () => {
+    const { COMPARISON_LEAD } = await import("@/lib/context/prefilter");
+    for (const msg of ["am I improving?", "is there less redness than before?", "has anything changed?", "did the serum work on my redness?", "my redness went down right?", "kya redness kam hui?", "meri skin behtar hui kya?", "is it better now?"]) {
+      getSkinCheckChatReply.mockClear();
+      expect(((await (await post(msg)).json()).reply as string).startsWith(COMPARISON_LEAD), msg).toBe(true);
+      expect(getSkinCheckChatReply).not.toHaveBeenCalled();
+    }
+  });
+
+  it("control: ordinary questions with no change words reach Gemini", async () => {
     getSkinCheckChatReply.mockResolvedValue("Your cheeks read Moderate for redness in this photo.");
-    for (const msg of ["Should I apply moisturizer before sunscreen?", "Is a gel or cream better for oily skin?", "Should I change my cleanser?", "How can I improve my skin texture?"]) {
+    for (const msg of ["what does oiliness mean?", "how should I wear sunscreen with oily skin?", "Is a gel or cream good for oily skin?", "what should I do at night?"]) {
       getSkinCheckChatReply.mockClear();
       expect((await (await post(msg)).json()).reply, msg).toBe("Your cheeks read Moderate for redness in this photo.");
       expect(getSkinCheckChatReply).toHaveBeenCalledTimes(1);

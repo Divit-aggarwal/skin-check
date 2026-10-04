@@ -37,6 +37,13 @@ describe("today's Echo reply screen", () => {
     ["Your skin is clearer now.", "blocked"],
     ["Good news, your redness is down.", "blocked"],
     ["Aapki skin better hui hai.", "blocked"],
+    // Final-review recheck 2.
+    ["Redness: Moderate, down from Elevated.", "blocked"],
+    ["Your redness has come down a lot.", "blocked"],
+    ["Your oiliness has toned down.", "blocked"],
+    ["Your redness looks milder.", "blocked"],
+    ["Your skin looks healthier now.", "blocked"],
+    ["Haan, redness ab kam hai.", "blocked"],
   ] as const)("%j is %s", (reply, kind) => {
     expect(screenEchoReply(reply).kind).toBe(kind);
   });

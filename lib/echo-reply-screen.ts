@@ -30,6 +30,10 @@ const CHECKS: [string, RegExp][] = [
       "\\b(?:is|are)\\s+(?:now\\s+)?(?:down|up)\\b",
       "\\bthan before\\b",
       "\\bbetter hu(?:i|a|e)\\b",
+      // A band from another time ("Moderate, down from Elevated") and more change wording (recheck).
+      "\\b(?:from|was|were|used to be)\\s+(?:low|moderate|elevated)\\b",
+      "\\b(?:come|toned|calmed|settled|died|cooled) down\\b",
+      "\\bmilder\\b", "\\bhealthier\\b", "\\bab kam\\b", "\\bkam (?:hai|ho) gay\\w*",
     ]),
   ],
   ["past_event", PAST_EVENT],
