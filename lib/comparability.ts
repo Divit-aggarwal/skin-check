@@ -3,13 +3,15 @@
 // Answers one question: may field F in region R of scan A be compared with
 // the same field and region of scan B? The answer is "comparable" or
 // "not_comparable" with named reasons. It never outputs a difference, a
-// percentage or a direction, and it reads only SkinState (skinstate-1).
+// percentage or a direction, and it reads only SkinState (skinstate-1 or skinstate-2).
 //
 // Fails closed: a null key part is a reason, and a quantity not listed in the
 // COMPARABLE table (LONGITUDINAL_METHOD §2) is a reason. The client capture
 // gate result (`captureQuality`) is never read here (D-26, owner Q-2).
+// skinstate-2 (A20) is accepted too: same key, with engine.build mapped.
 
 import type { SkinState, SkinStateRegionKey } from "@/lib/skin-state";
+import type { SkinState2 } from "@/lib/skin-state-2";
 
 /** The skinstate-1 per-region quantities a comparability question can name. */
 export const SKINSTATE_FIELD_PATHS = [
@@ -24,11 +26,11 @@ export const SKINSTATE_FIELD_PATHS = [
 export type ColourPath = "corrected" | "native";
 
 export interface ComparabilityKey {
-  contractVersion: "skinstate-1";
+  contractVersion: "skinstate-1" | "skinstate-2";
   fieldPath: string;
   region: SkinStateRegionKey;
   pipelineVersion: string | null;
-  /** Always null under skinstate-1 (engine.build is not mapped). */
+  /** Always null under skinstate-1 (engine.build is not mapped); the CV image tag or null under skinstate-2. */
   engineBuild: string | null;
   /** null for non-colour fields. */
   colourPath: ColourPath | null;
@@ -77,7 +79,7 @@ export type ComparabilityVerdict =
   | { verdict: "not_comparable"; reasons: NotComparableReason[] };
 
 /** Copies key parts from the state; never infers one. A region the state lacks counts as absent. */
-export function comparabilityKey(state: SkinState, fieldPath: string, region: SkinStateRegionKey): ComparabilityKey {
+export function comparabilityKey(state: SkinState | SkinState2, fieldPath: string, region: SkinStateRegionKey): ComparabilityKey {
   return {
     contractVersion: state.contractVersion,
     fieldPath,
@@ -134,12 +136,12 @@ export function compareKeys(a: ComparabilityKey, b: ComparabilityKey, table: rea
   return finish(keyReasons(a, b, table), a);
 }
 
-const uidOf = (state: SkinState) => state.identity.analysisRef.split("/")[1] ?? "";
+const uidOf = (state: SkinState | SkinState2) => state.identity.analysisRef.split("/")[1] ?? "";
 
 /** Checks both states belong to the same user (the key has no uid), then compares their keys. */
 export function compareStates(
-  a: SkinState,
-  b: SkinState,
+  a: SkinState | SkinState2,
+  b: SkinState | SkinState2,
   fieldPath: string,
   region: SkinStateRegionKey,
   table: readonly ComparableQuantity[] = COMPARABLE_QUANTITIES
