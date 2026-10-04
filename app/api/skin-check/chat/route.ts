@@ -181,18 +181,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, reply: REFERRAL_COPY, historyToken: signHistory(uid, scanId, region, turns) });
   }
 
-  // Fails loudly rather than letting getClient() throw deep inside the try
-  // block below and get flattened into the same 502 as a real Gemini outage
-  // — same reasoning as /api/skin-scan's SCAN_MISCONFIGURED check. An unset
-  // key is a deploy misconfiguration (500), not a provider failure (502).
-  if (!geminiApiKey()) {
-    console.error("Gemini API key is not set (GEMINI_API_KEY, or GEMINI_DEV_API_KEY in development) — refusing to call Gemini.");
-    return NextResponse.json(
-      { error: "Echo isn't configured yet.", code: "CHAT_MISCONFIGURED" },
-      { status: 500 }
-    );
-  }
-
   // H02a (D-19): Gemini's terms require 18+. Chat may hard-reject (D-03a:
   // the attestation UI ships with this lane). It fails closed: a ledger it
   // can't read is a 503, never a pass. Before the quota, so a refusal
@@ -219,6 +207,20 @@ export async function POST(request: NextRequest) {
   }
   if (aiShare !== true) {
     return NextResponse.json({ error: "Please agree to share your skin check with Echo.", code: "AI_CONSENT_REQUIRED" }, { status: 403 });
+  }
+
+  // After the 18+ and consent gates (R-4): a user they refuse is told why,
+  // whatever the key. Before the quota, so a misconfiguration spends nothing.
+  // Fails loudly rather than letting getClient() throw deep inside the try
+  // block below and get flattened into the same 502 as a real Gemini outage
+  // — same reasoning as /api/skin-scan's SCAN_MISCONFIGURED check. An unset
+  // key is a deploy misconfiguration (500), not a provider failure (502).
+  if (!geminiApiKey()) {
+    console.error("Gemini API key is not set (GEMINI_API_KEY, or GEMINI_DEV_API_KEY in development) — refusing to call Gemini.");
+    return NextResponse.json(
+      { error: "Echo isn't configured yet.", code: "CHAT_MISCONFIGURED" },
+      { status: 500 }
+    );
   }
 
   const quotaLimited = consumeDailyQuota(request, GEMINI_ROUTE_LIMITS);

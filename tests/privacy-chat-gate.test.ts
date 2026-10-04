@@ -118,3 +118,27 @@ describe("chat AI-share consent gate (H03c)", () => {
     await expectRefused(403, "UNDER_18");
   });
 });
+
+// R-4 (dashboard report): the Gemini key check comes after the 18+ and consent gates.
+describe("no Gemini key: the gates still answer first", () => {
+  beforeEach(() => vi.stubEnv("GEMINI_API_KEY", ""));
+
+  it("under 18: 403 UNDER_18, not 500", async () => {
+    ageStatus.mockResolvedValue("under18");
+    await expectRefused(403, "UNDER_18");
+  });
+
+  it("unattested: 403 ATTESTATION_REQUIRED, not 500", async () => {
+    ageStatus.mockResolvedValue("missing");
+    await expectRefused(403, "ATTESTATION_REQUIRED");
+  });
+
+  it("no AI-share consent: 403 AI_CONSENT_REQUIRED, not 500", async () => {
+    latestGrant.mockResolvedValue(null);
+    await expectRefused(403, "AI_CONSENT_REQUIRED");
+  });
+
+  it("an admitted user: 500 CHAT_MISCONFIGURED, and no quota spent", async () => {
+    await expectRefused(500, "CHAT_MISCONFIGURED");
+  });
+});
