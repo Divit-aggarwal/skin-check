@@ -133,7 +133,15 @@ describe("switch on: the gates still refuse before any package is built", () => 
     const res = await post("my mole is bleeding");
     expect(res.status).toBe(200);
     expect((await res.json()).reply).toBe(REFERRAL_COPY);
-    for (const fn of [h.buildContextPackage, h.loadTrustedEchoContext, h.generateContent, h.consumeDailyQuota]) expect(fn).not.toHaveBeenCalled();
+    // Nothing about a user the gates would refuse is stored.
+    for (const fn of [h.buildContextPackage, h.loadTrustedEchoContext, h.generateContent, h.consumeDailyQuota, h.recordChatTurns]) expect(fn).not.toHaveBeenCalled();
+  });
+
+  it("a consented adult's early referral is still recorded as a red-flag turn", async () => {
+    const res = await post("my mole is bleeding");
+    expect((await res.json()).reply).toBe(REFERRAL_COPY);
+    expect(h.recordChatTurns).toHaveBeenCalledTimes(1);
+    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ prefilter: "red_flag", redFlag: true, modelId: null });
   });
 });
 

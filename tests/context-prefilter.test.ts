@@ -261,3 +261,34 @@ describe("red-flag pre-filter: second security review misses", () => {
     expect(redFlagHit("kilλ myself")).toBe(true);
   });
 });
+
+// Advisor check of the H20 narrowing: phrasings the old, broader patterns caught must still hit.
+describe("red-flag pre-filter: the H20 narrowing keeps the old hits", () => {
+  it.each([
+    "I want to end my suffering",
+    "end my existence",
+    "I just want to end my misery",
+    "main khatam karna chahta hun",
+    "mujhe khatam kar do",
+    "khatam kar dunga sab",
+    "aankh mein kuch chala gaya",
+    "aankh me infection",
+    "aankh se dikhai nahi deta",
+    "my eyes reddened after the serum",
+    "minor here, what can I use",
+    "I think it's melasma",
+    "does this look like eczema",
+    "are these hives?",
+    "my eye hurts",
+    "aankh lal ho gayi",
+    "आँख में जलन",
+    "16 yo here",
+    "i want to kms",
+  ])("hits: %j", (msg) => {
+    expect(redFlagHit(msg)).toBe(true);
+  });
+
+  it.each(["I end my routine with sunscreen", "at the end, my skin felt soft", "dark circles khatam karne ka tarika?", "daag khatam kar sakte hain?"])("passes: %j", (msg) => {
+    expect(redFlagHit(msg)).toBe(false);
+  });
+});

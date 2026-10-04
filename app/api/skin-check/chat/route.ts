@@ -137,7 +137,18 @@ export async function POST(request: NextRequest) {
   // nothing is read or spent. The token covers the client's history only if
   // it verified; a forged history is never signed.
   if (redFlagHit(message)) {
-    if (contextChatEnabled()) await recordReferral(uid, scanId, region, message);
+    // The context path keeps a record of the turn, but only for a user the
+    // gates would admit: an under-18, unattested or unconsented user's message
+    // is never stored. Any ledger error or timeout means no record; the
+    // referral still goes out.
+    if (contextChatEnabled()) {
+      try {
+        const [age, aiShare] = await withLedgerTimeout(Promise.all([ageStatus(uid), latestGrant(uid, "ai_share", AI_SHARE_CONSENT_VERSION)]));
+        if (age === "over18" && aiShare === true) await recordReferral(uid, scanId, region, message);
+      } catch (err) {
+        console.error("skin-check chat: referral not recorded:", (err as Error)?.name ?? "unknown");
+      }
+    }
     const turns = [...(historyOk ? history : []), { role: "user" as const, text: message }, { role: "echo" as const, text: REFERRAL_COPY }];
     let referralToken: string | undefined;
     try {

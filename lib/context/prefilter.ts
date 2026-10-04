@@ -44,10 +44,10 @@ const RED_FLAG = re([
   "बुखार",
   "सूजन",
   // eye involvement
-  "\\beye(?:s|lids?)?\\b.{0,30}\\b(?:swell\\w*|pain\\w*|hurt\\w*|red(?:ness|dish)?\\b|vision|blur\\w*|rash\\w*|itch\\w*|sting\\w*|burn\\w*)",
+  "\\beye(?:s|lids?)?\\b.{0,30}\\b(?:swell\\w*|pain\\w*|hurt\\w*|red(?:ness|dish|den\\w*)?\\b|vision|blur\\w*|rash\\w*|itch\\w*|sting\\w*|burn\\w*)",
   "\\b(?:swollen|swell\\w*|pain\\w*|hurt\\w*|red|reddish|blur\\w*|itch\\w*|sting\\w*|burn\\w*|watery|sore)\\b.{0,30}\\beye(?:s|lids?)?\\b",
   "\\bvision\\b",
-  "\\baa?nkh\\w*.{0,30}\\b(?:jalan|dard|sooj\\w*|suj\\w*|laal|lal|khujl\\w*|pani|paani|dhundh\\w*|chubh\\w*)",
+  "\\baa?nkh\\w*.{0,30}\\b(?:jalan|dard|sooj\\w*|suj\\w*|laal|lal|khujl\\w*|pani|paani|dhundh\\w*|chubh\\w*|infect\\w*|kharab|problem|chot|dikh\\w*|chala gaya|chali gayi|gir\\w*)",
   "\\b(?:jalan|dard|sooj\\w*|suj\\w*|laal|lal|khujl\\w*|dhundh\\w*|chubh\\w*)\\b.{0,30}\\baa?nkh\\w*",
   "(?:आंख|आँख)\\S*.{0,30}(?:जलन|दर्द|सूज|लाल|खुजली|पानी|धुंध)",
   "(?:जलन|दर्द|सूज|लाल|खुजली|धुंध).{0,30}(?:आंख|आँख)",
@@ -57,10 +57,13 @@ const RED_FLAG = re([
   // A distance ("5 kms daily") is not "kill myself"; the leet copy reads the 5 as "s", hence the second guard.
   "(?<!\\p{N}\\s?)\\bkms\\b(?!\\s*(?:daily|a day|every|per|away|from|run|walk|cycl\\w*)\\b)",
   "\\b(?:khud|apne aap|apne ap|sab|sabkuch|zindagi|zindgi|life|jaan)\\b(?: \\w+){0,2} khatam\\b",
+  // Bare "khatam kar..." still hits, unless it is about a skin problem ("pimples khatam karne ke liye").
+  "(?<!\\b(?:pimples?|acne|daane|dane|daag|dag|spots?|marks?|tan|oil|oiliness|blackheads?|whiteheads?|circles|redness|dandruff|scars?)(?: \\w+){0,2} )\\bkhatam kar\\w*",
   "\\bsuicid\\w*",
   "\\bself[- ]?harm\\w*",
   "\\bhurt(?:ing)? my ?self\\b",
-  "\\bend(?:ing|ed|s)? (?:my (?:life|self)|myself|it all|everything)\\b",
+  // Any "end my ..." except "the end, my ..." and a skincare noun ("end my routine with sunscreen").
+  "(?<!\\bthe )\\bend(?:ing|ed|s)? (?:my (?!skin|face|routine|day|night|morning|evening|week|cleans\\w*|pimple\\w*|acne|regimen|steps?\\b)\\w+|myself|it all|everything)",
   "\\b(?:want|wanna|going|gonna|ready) (?:to )?end it\\b(?!\\s*(?:with|on|in|at|for|by|before|now that)\\b)",
   "\\bhang(?:ing)? my ?self\\b",
   "\\boverdos\\w*",
@@ -102,6 +105,7 @@ const RED_FLAG = re([
   "\\bunder\\s*(?:18|eighteen)\\b",
   "\\b(?:i'?m|i am|im|am) (?:a |still a )?minor\\b",
   "\\bas a minor\\b",
+  "\\bminor here\\b",
   "\\b(?:have|got|running|with|has) (?:a )?(?:high |slight )?temperature\\b",
   "\\bmer[aie] (?:bet[aie]|bachch?[ae]|bacch?[ae])\\b",
   "\\b(?:1[0-7]|[1-9]) ?saal\\b(?! se\\b)",
