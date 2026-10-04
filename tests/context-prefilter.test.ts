@@ -102,3 +102,67 @@ describe("comparison-intent pre-filter (§6b)", () => {
     expect(comparisonHit(msg)).toBe(false);
   });
 });
+
+// ── wave-2 security review: bypasses of the red-flag pre-filter ─────────────
+describe("red-flag pre-filter: disguised and variant inputs (wave-2 security review)", () => {
+  it.each([
+    // zero-width space and soft hyphen inside a word
+    "sui​cide",
+    "kill my­self",
+    // Cyrillic lookalike letters
+    "suіcide",
+    "kіll myself",
+    // leetspeak
+    "k1ll myself",
+    "$uicide",
+    // spaced letters, emoji and line breaks inside the phrase
+    "s u i c i d e",
+    "kill 🔪 myself",
+    "sui\ncide",
+    // typos
+    "sucide",
+    "kil myself",
+    "bleding mole",
+    "pregnent, retinol ok?",
+    // phrasings not on the old list
+    "I want to cut myself",
+    "I want to disappear",
+    // Hinglish
+    "jeena nhi chahta",
+    "jina nahi",
+    "khudkhushi",
+    "aatmhatya",
+    "marne ka mann karta hai",
+    "mera beta 12 saal ka hai",
+    "meri umar 16 saal hai",
+    // Devanagari digits
+    "I'm १६",
+    // requests the old lists did not cover
+    "Can I keep adapalene while pregnant?",
+    "which medicine for this",
+    "do I have acne?",
+    "isotretinoin?",
+  ])("hits: %j", (msg) => {
+    expect(redFlagHit(msg)).toBe(true);
+  });
+
+  it.each([
+    "what does my cheek reading mean?",
+    "should I apply sunscreen in the morning?",
+    "is my oiliness high on the nose?",
+    "I'm 25 and I wash my face twice a day",
+    "मेरी त्वचा तैलीय है, क्या करूं?",
+    "என் தோல் எண்ணெய் பசையாக உள்ளது",
+    "আমার ত্বক তৈলাক্ত",
+    "I have a skill for skincare",
+  ])("ordinary question still passes: %j", (msg) => {
+    expect(redFlagHit(msg)).toBe(false);
+  });
+
+  it("a message split over turns is caught when joined with the last user turns", async () => {
+    const { joinedUserTurns } = await import("@/lib/context/prefilter");
+    const history = [{ role: "user", text: "i want to" }, { role: "echo", text: "Could you say more?" }];
+    expect(redFlagHit("die")).toBe(false);
+    expect(redFlagHit(joinedUserTurns(history, "die"))).toBe(true);
+  });
+});

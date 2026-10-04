@@ -71,7 +71,7 @@ function post(message = "what does my cheek reading mean?", history: { role: "us
   return POST(new NextRequest("http://localhost/api/skin-check/chat", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer t" }, body: JSON.stringify(body) }));
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   vi.clearAllMocks();
   vi.stubEnv("GEMINI_API_KEY", "test-key");
   vi.stubEnv("FIREBASE_PRIVATE_KEY", "test-private-key");
@@ -82,6 +82,8 @@ beforeEach(() => {
   h.latestGrant.mockResolvedValue(true);
   h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers: { skin_type: "oily", primary_concerns: ["redness"] } });
   h.loadTrustedSkinState2Series.mockResolvedValue([]);
+  // A throwing implementation from one test must never leak into the next.
+  h.evaluateSafety.mockImplementation((await vi.importActual<typeof import("@/lib/rules/safety")>("@/lib/rules/safety")).evaluateSafety);
   h.getSkinCheckChatReply.mockResolvedValue("today's echo");
   h.generateContent.mockResolvedValue({ text: GOOD });
   h.recordChatTurns.mockResolvedValue(undefined);
@@ -292,5 +294,44 @@ describe("context path: a safety error is never 'no red flag' (wiring 4)", () =>
     h.evaluateSafety.mockImplementation(() => { throw new Error("bug"); });
     const res = await post("I don't want to live anymore");
     expect((await res.json()).reply).toBe(REFERRAL_COPY);
+  });
+});
+
+// ── wave-2 security review: red flags never reach Gemini on either path ──────
+describe("red-flag pre-filter on both chat paths (wave-2 security review)", () => {
+  it("today's Echo (switch off): a self-harm message gets the referral, Gemini is never called", async () => {
+    vi.stubEnv("ECHO_CONTEXT_PATH", "");
+    const res = await post("I want to k1ll myself");
+    expect((await res.json()).reply).toBe(REFERRAL_COPY);
+    expect(h.getSkinCheckChatReply).not.toHaveBeenCalled();
+    expect(h.loadTrustedEchoContext).not.toHaveBeenCalled();
+  });
+
+  it("today's Echo (switch off): a message split over the signed history is caught", async () => {
+    vi.stubEnv("ECHO_CONTEXT_PATH", "");
+    const res = await post("die", [{ role: "user", text: "i want to" }, { role: "echo", text: "Could you say more?" }]);
+    expect((await res.json()).reply).toBe(REFERRAL_COPY);
+    expect(h.getSkinCheckChatReply).not.toHaveBeenCalled();
+  });
+
+  it("today's Echo (switch off): an ordinary question still reaches Echo", async () => {
+    vi.stubEnv("ECHO_CONTEXT_PATH", "");
+    const res = await post("what does my cheek reading mean?");
+    expect((await res.json()).reply).toBe("today's echo");
+  });
+
+  it("context path: a split red flag wins over a safety error (checked before anything is built)", async () => {
+    h.loadChatHistory.mockResolvedValue([{ role: "user", text: "i want to" }]);
+    h.evaluateSafety.mockImplementation(() => { throw new Error("bug"); });
+    expect((await (await post("die")).json()).reply).toBe(REFERRAL_COPY);
+    expect(h.loadTrustedEchoContext).not.toHaveBeenCalled();
+  });
+
+  it("context path: a message split over stored turns is caught before Gemini and recorded as a red flag", async () => {
+    h.loadChatHistory.mockResolvedValue([{ role: "user", text: "i want to" }, { role: "echo", text: "Could you say more?" }]);
+    const res = await post("die");
+    expect((await res.json()).reply).toBe(REFERRAL_COPY);
+    expect(h.generateContent).not.toHaveBeenCalled();
+    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ prefilter: "red_flag", redFlag: true });
   });
 });

@@ -172,7 +172,8 @@ async function runEchoChat(messages: EchoChatMessage[], systemInstruction: strin
         role: m.role === "user" ? ("user" as const) : ("model" as const),
         parts: [{ text: m.text }],
       })),
-      config: { systemInstruction, httpOptions: { timeout: GEMINI_REQUEST_TIMEOUT_MS } },
+      // Explicit, not the platform default (security review, wave 2).
+      config: { systemInstruction, safetySettings: CONTEXT_SAFETY_SETTINGS, httpOptions: { timeout: GEMINI_REQUEST_TIMEOUT_MS } },
     })
   );
 

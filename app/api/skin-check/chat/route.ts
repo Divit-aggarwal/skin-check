@@ -14,6 +14,7 @@ import { ageStatus, latestGrant, withLedgerTimeout, type AgeStatus } from "@/app
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 import { contextChatEnabled } from "@/lib/context/switch";
 import { handleContextChat } from "@/lib/context/chat";
+import { joinedUserTurns, redFlagHit, REFERRAL_COPY } from "@/lib/context/prefilter";
 
 // firebase-admin needs Node APIs and hard-fails on the Edge runtime — same
 // explicit opt-in as /api/skin-scan.
@@ -187,6 +188,14 @@ export async function POST(request: NextRequest) {
       if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
       const turns = [...history, { role: "user" as const, text: message }, { role: "echo" as const, text: result.reply }];
       return NextResponse.json({ ok: true, reply: result.reply, historyToken: signHistory(uid, scanId, region, turns) });
+    }
+
+    // GEMINI_BOUNDARY §6 on today's Echo too (security review, wave 2): a red
+    // flag or self-harm message, alone or split over the signed history's
+    // user turns, gets the fixed referral and never reaches Gemini.
+    if (redFlagHit(joinedUserTurns(history, message))) {
+      const turns = [...history, { role: "user" as const, text: message }, { role: "echo" as const, text: REFERRAL_COPY }];
+      return NextResponse.json({ ok: true, reply: REFERRAL_COPY, historyToken: signHistory(uid, scanId, region, turns) });
     }
 
     const context = await loadTrustedEchoContext(uid, scanId);

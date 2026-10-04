@@ -12,7 +12,7 @@ import type { SkinState2Result } from "@/lib/skin-state-2";
 import { answerFromPackage, comparisonAnswer, fallbackAnswer } from "./answer";
 import { buildContextPackage, PACKAGE_VERSION, packageSha256 } from "./builder";
 import { loadChatHistory, recordChatTurns, type EchoTurnRecord } from "./chat-turns";
-import { comparisonHit, redFlagHit, REFERRAL_COPY } from "./prefilter";
+import { comparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY } from "./prefilter";
 import { PROMPT_VERSION } from "./renderer";
 
 // The chat route's context-package branch (docs/lanes/context-design.md §3.2).
@@ -81,6 +81,15 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
     return { ok: true, reply: REFERRAL_COPY };
   }
 
+  // A message split over turns ("i want to" then "die") is checked joined with
+  // the last stored user turns, still before anything is built (security
+  // review, wave 2). Stored turns hold no pre-filter or referral turns.
+  const history = await loadChatHistory(uid, scanId, region);
+  if (redFlagHit(joinedUserTurns(history, message))) {
+    await recordBestEffort(uid, scanId, region, message, REFERRAL_COPY, meta({ ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: "red_flag", redFlag: true }));
+    return { ok: true, reply: REFERRAL_COPY };
+  }
+
   const trusted = await loadTrustedEchoContext(uid, scanId);
   if (!trusted) return { ok: false, status: 409, code: "CHAT_ANALYSIS_UNAVAILABLE", error: "This scan's analysis isn't available yet." };
 
@@ -124,7 +133,6 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
     return { ok: true, reply };
   }
 
-  const history = await loadChatHistory(uid, scanId, region);
   const outcome = await answerFromPackage(pkg, message, history, { generate: generateContextAnswer, redFlag: safety.redFlag });
   // Not best effort: an unrecorded reply would make the D-15 history diverge.
   await recordChatTurns(

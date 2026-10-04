@@ -255,3 +255,16 @@ describe("context-package path with every internal input (lane:context)", () => 
     expect(all).not.toMatch(/redFlag|raisedBy|ruleId|triggeredBy|inputSha256|ZZSECRET/);
   });
 });
+
+// ── wave-2 security review: today's Echo sets explicit safety settings ──────
+describe("today's Echo call (wave-2 security review)", () => {
+  it("passes explicit safety settings, not the platform default", async () => {
+    generateContent.mockClear();
+    await captureCall();
+    const config = (generateContent.mock.calls[0]![0] as { config: { safetySettings?: { category: string; threshold: string }[] } }).config;
+    expect(config.safetySettings?.map((s) => s.category).sort()).toEqual([
+      "HARM_CATEGORY_DANGEROUS_CONTENT", "HARM_CATEGORY_HARASSMENT", "HARM_CATEGORY_HATE_SPEECH", "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+    ]);
+    expect(new Set(config.safetySettings!.map((s) => s.threshold))).toEqual(new Set(["BLOCK_MEDIUM_AND_ABOVE"]));
+  });
+});
