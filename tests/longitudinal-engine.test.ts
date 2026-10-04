@@ -206,7 +206,7 @@ describe("the brief's cases, with test-only tables", () => {
   it("a histogram quantity never gets a difference, even with a table row for it", () => {
     const r = run(CASES.histogram!.s(), TEST, HIST);
     expect(r.evidence).toBe("not_enough_evidence");
-    expect(codes(r)).toEqual(["noise_table_empty"]);
+    expect(codes(r)).toEqual(["noise_table_empty", "histogram_quantity"]);
     expect(r.detail).toMatchObject({ baselineValue: null, latestValue: null, difference: null });
   });
 
@@ -252,7 +252,7 @@ describe("the brief's cases, with test-only tables", () => {
     const r = run([LEGACY, s[0]!, s[1]!, s[2]!, broken], TEST);
     expect(codes(r)).toEqual(["bad_raw_data"]);
     expect(r.compared.baseline).toEqual({ rule: "first_3_comparable_scans", status: "insufficient", scans: 0 });
-    expect(r.comparability.verdict).toBe("not_comparable");
+    expect(r.comparability).toEqual({ verdict: "not_evaluated" });
     expect(r.detail.baselineAnalysisRefs).toEqual([]);
   });
 
@@ -288,13 +288,12 @@ const REACHABLE: Record<string, () => LongitudinalResult> = {
   region_low_pixel_count: () => run(series(flat(3), { px: 1000 }), TEST),
   lr_cheek_cross_capture_method: () => run(series(flat(3), { capture: "canvas" }, { cheeks: true }), TEST, Q, CHEEK),
   different_user: () => run(series(flat(3), { uid: "OTHER_UID" }), TEST),
-  // Only with no SkinState at all: every key part is unknown.
-  pipeline_version_unknown: () => run([], TEST),
-  input_variant_unknown: () => run([], TEST),
 };
-const NO_STATE = ["pipeline_version_unknown", "input_variant_unknown"];
 /** Cannot arise in the engine, and why. If one becomes reachable, this list must change. */
 const UNREACHABLE: Record<string, string> = {
+  // Only an all-unknown key had these; with no SkinState there is no pair, so comparability is not_evaluated.
+  pipeline_version_unknown: "a SkinState always has a pipeline version; with no state comparability is not_evaluated",
+  input_variant_unknown: "skinstate-2 maps input.variant to one constant; with no state comparability is not_evaluated",
   field_not_defined: "QuantityPath is exactly the comparability field list",
   input_variant_differs: "skinstate-2 maps input.variant to one constant",
   contract_version_differs: "the engine reads skinstate-2 states only",
@@ -304,9 +303,15 @@ describe("4. scans that cannot be compared", () => {
   it.each(Object.keys(REACHABLE))("%s gives not_comparable with that reason", (why) => {
     const r = REACHABLE[why]!();
     expect(r.evidence).toBe("not_enough_evidence");
-    // With no SkinState there is no pair: the reason is too_few_scans_for_baseline, and comparability holds the all-unknown key.
-    expect(codes(r)).toContain(NO_STATE.includes(why) ? "too_few_scans_for_baseline" : "not_comparable");
+    expect(codes(r)).toContain("not_comparable");
     expect(ncReasons(r)).toContain(why as NotComparableReason);
+  });
+
+  it("no SkinState at all: no pair, so comparability is not_evaluated (shared shape arm)", () => {
+    const r = run([], TEST);
+    expect(r.evidence).toBe("not_enough_evidence");
+    expect(codes(r)).toEqual(["too_few_scans_for_baseline"]);
+    expect(r.comparability).toEqual({ verdict: "not_evaluated" });
   });
 
   it("the reachable and unreachable lists are disjoint and cover every NotComparableReason", () => {
@@ -368,7 +373,7 @@ describe("output wording and determinism", () => {
 
   it("reason output order is the LongitudinalReasonCode declaration order", () => {
     expect(Object.keys(REASON_TEXT)).toEqual([
-      "identical_scan", "within_noise", "beyond_noise", "noise_table_empty", "not_comparable", "engine_boundary",
+      "identical_scan", "within_noise", "beyond_noise", "noise_table_empty", "histogram_quantity", "not_comparable", "engine_boundary",
       "legacy_record", "bad_raw_data", "too_few_scans_for_baseline", "conflicting_scans", "persistence_not_available",
     ]);
   });

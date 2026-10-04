@@ -27,6 +27,7 @@ export const REASON_TEXT: Readonly<Record<LongitudinalReasonCode, string>> = Obj
   within_noise: "Within photo-to-photo variation compared with your starting checks.",
   beyond_noise: "Beyond photo-to-photo variation compared with your starting checks.",
   noise_table_empty: "There is no validated photo-to-photo variation for this reading yet.",
+  histogram_quantity: "This reading is a spread of values, so there is no single value to compare.",
   not_comparable: "These checks cannot be compared for this reading.",
   engine_boundary: "The analysis software is not the same across these checks, so they are not compared.",
   legacy_record: "Readings from an earlier version of the app are kept as they were and are not compared.",
@@ -84,15 +85,6 @@ function toComparableKey(k: ComparabilityKey): ComparableKey {
   return { contractVersion: k.contractVersion, fieldPath: k.fieldPath, region: k.region, pipelineVersion, engineBuild, inputVariant, captureMethod, captureMethodAssertedBy: "client" };
 }
 
-/** With no SkinState at all, every key part is unknown. */
-function unknownKey(quantity: QuantityPath, region: SkinStateRegionKey): ComparabilityKey {
-  return {
-    contractVersion: SKIN_STATE_2_CONTRACT_VERSION, fieldPath: quantity, region, pipelineVersion: null, engineBuild: null,
-    colourPath: null, statsPath: "corrected", inputVariant: null, captureMethod: null, captureMethodAssertedBy: "client",
-    regionStatus: "absent_region", lowPixelCount: false,
-  };
-}
-
 const emptyDetail = (): LongitudinalDetail => ({
   baselineValue: null, latestValue: null, difference: null, noiseFloorValue: null, unit: null,
   baselineAnalysisRefs: [], latestAnalysisRef: null, windowFrom: null, windowTo: null, engineBuilds: [],
@@ -145,12 +137,13 @@ export function longitudinalResult(
     };
   };
 
-  // 1. Bad raw data: no partial answer.
+  // 1. Bad raw data: no partial answer, and no pair to evaluate.
+  const notEvaluated: Comparability = { verdict: "not_evaluated" };
   const noPair = (k: ComparabilityKey): Comparability => asComparability(reasonsOf(compareKeys(k, k), k, k), k);
   // The same record twice would let one physical scan fill the baseline: refuse it as bad input.
   const refs = series.flatMap((e) => (e.kind === "skinstate" ? [e.state.identity.analysisRef] : []));
   if (series.some((e) => e.kind === "invalid") || new Set(refs).size !== refs.length) {
-    return notEnough(new Set<NotEnoughEvidenceReasonCode>(["bad_raw_data"]), insufficient(0), noPair(unknownKey(quantity, region)), unknownFloor, emptyDetail());
+    return notEnough(new Set<NotEnoughEvidenceReasonCode>(["bad_raw_data"]), insufficient(0), notEvaluated, unknownFloor, emptyDetail());
   }
 
   // 2-5. Baseline candidates by time and known build; engine boundary over the window.
@@ -172,7 +165,7 @@ export function longitudinalResult(
     windowTo: latest?.provenance.analyzedAt ?? null,
     engineBuilds: Array.from(new Set(window.map((s) => s.engine.build).filter((b): b is string => b !== null))),
   };
-  if (!latest) return notEnough(codes, insufficient(0), noPair(unknownKey(quantity, region)), unknownFloor, detail);
+  if (!latest) return notEnough(codes, insufficient(0), notEvaluated, unknownFloor, detail);
 
   // 6. Each candidate against the latest. With no candidate, the latest against itself names what stops it pairing at all.
   const pairs = candidates.map((c) => pairReasons(c, latest));
@@ -187,6 +180,7 @@ export function longitudinalResult(
   // 7. Noise floor for the latest's pipeline version.
   const noise = lookupNoise(noiseTable, quantity, region, latest.engine.pipelineVersion);
   if (noise.floor.status === "unknown") codes.add("noise_table_empty");
+  if (isHistogram(quantity)) codes.add("histogram_quantity");
   else detail.noiseFloorValue = noise.value;
 
   // 8-10. Values (internal), identical input, conflicting baseline.
@@ -203,7 +197,7 @@ export function longitudinalResult(
     if (noise.value !== null && Math.max(...(baseValues as number[])) - Math.min(...(baseValues as number[])) > noise.value) codes.add("conflicting_scans");
   } else if (established && !isHistogram(quantity)) {
     // Comparable states with an unreadable scalar: refuse rather than guess.
-    return notEnough(new Set<NotEnoughEvidenceReasonCode>(["bad_raw_data"]), insufficient(0), noPair(unknownKey(quantity, region)), unknownFloor, emptyDetail());
+    return notEnough(new Set<NotEnoughEvidenceReasonCode>(["bad_raw_data"]), insufficient(0), notEvaluated, unknownFloor, emptyDetail());
   }
 
   // 11. Pairwise only when nothing above stood in the way.

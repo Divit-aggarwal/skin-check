@@ -91,6 +91,7 @@ const REGION_OF: Record<string, Exclude<ContextRegion, "all">> = {
 export const REASON_TEXT: Record<NotEnoughEvidenceReasonCode, string> = {
   too_few_scans_for_baseline: "There are not enough checks yet to set a starting point.",
   noise_table_empty: "There is no checked measure yet of how much this reading varies from photo to photo.",
+  histogram_quantity: "This reading is a spread of values, so there is no single value to compare.",
   not_comparable: "These checks were taken in ways that cannot be matched up.",
   engine_boundary: "The analysis software was updated between these checks.",
   legacy_record: "An older check was saved in a format that cannot be matched up.",

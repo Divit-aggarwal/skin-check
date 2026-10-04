@@ -60,6 +60,7 @@ describe("red flags (PROVISIONAL list, rules-design §5.1)", () => {
       rulesetVersion: "rules-0-provisional",
       reviewStatus: "provisional",
       extraCaution: false,
+      extraCautionRaisedBy: [],
       redFlag: false,
     });
   });
@@ -71,6 +72,17 @@ describe("red flags (PROVISIONAL list, rules-design §5.1)", () => {
 });
 
 describe("extra caution (privacy decision 8)", () => {
+  it("names exactly the answers that turned it on (internal extraCautionRaisedBy), normalised", () => {
+    expect(safety({ current_products: ["cleanser", " PRESCRIPTION "], gender: "female", female_skin_context: ["pregnant_or_breastfeeding"] })).toMatchObject({
+      extraCaution: true,
+      extraCautionRaisedBy: [
+        { field: "female_skin_context", value: "pregnant_or_breastfeeding" },
+        { field: "current_products", value: "prescription" },
+      ],
+    });
+    expect(safety({ current_products: ["cleanser"] })).toMatchObject({ extraCaution: false, extraCautionRaisedBy: [] });
+  });
+
   it.each<[Record<string, unknown>, boolean]>([
     [{ gender: "female", female_skin_context: ["pregnant_or_breastfeeding"] }, true],
     [{ current_products: ["cleanser_moisturizer", "prescription"] }, true],

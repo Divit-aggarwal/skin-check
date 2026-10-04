@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildContextPackage, packageFacts, packageJson, QUANTITY_METRIC, REASON_TEXT, screenExternalText, serializePackage } from "@/lib/context/builder";
 import type { ContextPackage } from "@/lib/contracts/context-package";
+import type { SafetyState } from "@/lib/contracts/safety-state";
 import { SKINSTATE_FIELD_PATHS } from "@/lib/comparability";
 import { ANSWERS, fullInput, nee, PAIRWISE, PRODUCTS, RECOMMENDATION, RED_SAFETY, SAFETY, SECRETS, withExtraKeys } from "./context-fixtures";
 
@@ -103,7 +104,7 @@ describe("context package builder", () => {
 
   it("a red flag leaves the package identical to no red flag (no signal by omission)", () => {
     const base = fullInput({ answers: { skin_type: "oily" } });
-    const red = { ...RED_SAFETY, extraCaution: false };
+    const red: SafetyState = { ...RED_SAFETY, extraCaution: false, extraCautionRaisedBy: [] };
     expect(packageJson(buildContextPackage({ ...base, safety: red, recommendation: { result: { ...RECOMMENDATION, safety: red }, products: PRODUCTS } }))).toBe(
       packageJson(buildContextPackage({ ...base, safety: SAFETY }))
     );

@@ -41,6 +41,7 @@ export type LongitudinalReasonCode =
   | "within_noise"
   | "beyond_noise"
   | "noise_table_empty" // no validated noise floor for this quantity (true for every quantity today)
+  | "histogram_quantity" // a spread of values, not one value: there is no single difference to set against a noise floor
   | "not_comparable" // details, including region_absent, in comparability.reasons
   | "engine_boundary" // pipeline version or engine build changes inside the window: a visible boundary
   | "legacy_record" // legacy readings stay legacy; never upgraded (D-23)
@@ -158,7 +159,9 @@ export type ComparableKey = ComparedKey & {
 
 export type Comparability =
   | { verdict: "comparable"; key: ComparableKey }
-  | { verdict: "not_comparable"; reasons: [NotComparableReason, ...NotComparableReason[]] };
+  | { verdict: "not_comparable"; reasons: [NotComparableReason, ...NotComparableReason[]] }
+  /** No pair exists to check: no SkinState at all, or bad raw data. Only on a "not enough evidence" answer. */
+  | { verdict: "not_evaluated" };
 
 interface LongitudinalCommon {
   /** SkinState contract the states were read under. Both versions may exist side by side. */

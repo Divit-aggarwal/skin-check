@@ -123,8 +123,37 @@ describe("longitudinal result: forbidden states do not type-check", () => {
       ((): LongitudinalResult => ({ ...pairwise, confounders: [] }))(),
       // @ts-expect-error not_comparable needs at least one reason
       ((): LongitudinalResult => ({ ...nee, comparability: { verdict: "not_comparable", reasons: [] } }))(),
+      // @ts-expect-error a pairwise answer always has an evaluated, comparable pair
+      ((): LongitudinalResult => ({ ...pairwise, comparability: { verdict: "not_evaluated" } }))(),
+      // @ts-expect-error the histogram reason means "not enough evidence", never a pairwise answer
+      ((): LongitudinalResult => ({ ...pairwise, reasons: [{ code: "histogram_quantity", text: "x" }] }))(),
     ];
-    expect(bad).toHaveLength(10);
+    expect(bad).toHaveLength(12);
+  });
+
+  it("'not enough evidence' may say no pair was evaluated, and may name a histogram reading", () => {
+    const ok: LongitudinalResult = { ...nee, comparability: { verdict: "not_evaluated" }, reasons: [{ code: "noise_table_empty", text: "x" }, { code: "histogram_quantity", text: "x" }] };
+    expect(ok.comparability.verdict).toBe("not_evaluated");
+  });
+});
+
+describe("safety state: the internal caution answers agree with the flag", () => {
+  const base = { rulesetVersion: "s-1", reviewStatus: "provisional" as const, redFlag: false as const };
+  it("valid states type-check", () => {
+    const off: SafetyState = { ...base, extraCaution: false, extraCautionRaisedBy: [] };
+    const on: SafetyState = { ...base, extraCaution: true, extraCautionRaisedBy: [{ field: "current_products", value: "prescription" }] };
+    expect([off.extraCaution, on.extraCaution]).toEqual([false, true]);
+  });
+  it("each broken condition is a type error", () => {
+    const bad: unknown[] = [
+      // @ts-expect-error extra caution on names at least one answer
+      ((): SafetyState => ({ ...base, extraCaution: true, extraCautionRaisedBy: [] }))(),
+      // @ts-expect-error extra caution off names no answer
+      ((): SafetyState => ({ ...base, extraCaution: false, extraCautionRaisedBy: [{ field: "current_products", value: "prescription" }] }))(),
+      // @ts-expect-error the field is required, so a producer cannot forget it
+      ((): SafetyState => ({ ...base, extraCaution: false }))(),
+    ];
+    expect(bad).toHaveLength(3);
   });
 });
 
@@ -160,7 +189,8 @@ describe("Gemini-facing shapes", () => {
       | "uid" | "scanId" | "analysisRef" | "name" | "age" | "gender" | "female_skin_context" | "phone_verify" | "final_phone"
       | "skin_photo" | "scores" | "raw" | "detail" | "quantity" | "fired" | "triggeredBy" | "raisedBy" | "redFlag" | "excluded"
       | "limits" | "notices" | "consent" | "difference" | "baselineValue" | "baselineAnalysisRefs" | "windowFrom" | "inputSha256"
-      | "ruleId" | "latestAnalysisRef" | "latestValue" | "windowTo" | "engineBuilds" | "noiseFloorValue" | "calibrationId";
+      | "ruleId" | "latestAnalysisRef" | "latestValue" | "windowTo" | "engineBuilds" | "noiseFloorValue" | "calibrationId"
+      | "extraCautionRaisedBy";
     expectTypeOf<Extract<DeepKeys<ContextPackage>, Banned>>().toEqualTypeOf<never>();
     // Positive control: DeepKeys does reach nested keys, so the check above can fail.
     expectTypeOf<Extract<DeepKeys<ContextPackage>, "lowConfidence" | "confounders" | "code">>().toEqualTypeOf<"lowConfidence" | "confounders" | "code">();
@@ -185,7 +215,7 @@ describe("Gemini-facing shapes", () => {
   });
 
   it("a full package fixture type-checks", () => {
-    const safety: SafetyState = { redFlag: true, rulesetVersion: "s-1", reviewStatus: "provisional", extraCaution: true, raisedBy: ["hormonal_pattern"] };
+    const safety: SafetyState = { redFlag: true, rulesetVersion: "s-1", reviewStatus: "provisional", extraCaution: true, extraCautionRaisedBy: [{ field: "female_skin_context", value: "pregnant_or_breastfeeding" }], raisedBy: ["hormonal_pattern"] };
     const full: ContextPackage = {
       packageVersion: "ctx-2", regionFocus: "cheeks",
       skin: { contractVersion: "skinstate-1", scoringVersion: "scoring-1", pipelineVersion: "scan-0.1.6-provisional", readings: [{ id: "state.all.redness", text: "Redness, photo-based estimate: Moderate", source: "measured", region: "all", metric: "redness", band: "Moderate", lowConfidence: false }] },

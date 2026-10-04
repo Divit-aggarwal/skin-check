@@ -30,7 +30,12 @@ export interface RecommendedItem {
   productId: string;
   productVersionId: string;
   slot: "AM" | "PM" | "AM_PM";
-  /** Order within the slot (RECOMMENDATION_MODEL §2 step 5; a convention, labelled as such). */
+  /**
+   * Order key (RECOMMENDATION_MODEL §2 step 5; a convention, labelled as such).
+   * One key per item across all slots: sorting any slot's items by it gives
+   * that slot's order. An AM_PM item has one position, and the order is the
+   * same in both of its slots. Not a dense 1..n per slot.
+   */
   position: number;
   /** The rule that put it here. */
   ruleId: string;
@@ -62,7 +67,13 @@ export interface ExcludedOption {
 export interface RecommendationResult {
   rulesetVersion: string;
   catalogVersion: string;
-  /** SHA-256 of the canonical JSON of the exact inputs, so the result is reproducible (§6). */
+  /**
+   * SHA-256 of the canonical JSON of the exact inputs the rules read, so the
+   * result is reproducible (§6; owner decision TD-15): the ruleset version, the
+   * catalogue version, a digest of the catalogue content, and the normalised
+   * reading of each rule field. Answers the rules do not read (name, phone,
+   * others) are left out. Equal hashes give equal results.
+   */
   inputSha256: string;
   /** Clinical lists are provisional until a clinical reviewer signs off (E05); off in production until then. */
   reviewStatus: "provisional" | "clinically_reviewed";

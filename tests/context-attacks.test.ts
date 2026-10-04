@@ -112,7 +112,7 @@ describe("security review bypasses", () => {
   const pkg = buildContextPackage(
     fullInput({
       answers: { primary_concerns: ["redness", "hydration", "pores"], skin_type: "oily", male_skin_context: ["shaving_irritation"], pih_scar_tendency: "dark_mark_fades", water_intake: "1to2" },
-      safety: { ...fullInput().safety!, extraCaution: false },
+      safety: { ...fullInput().safety!, extraCaution: false, extraCautionRaisedBy: [] },
     })
   );
   const r = (id: string) => pkg.skin!.readings.find((x) => x.id === id)!;
@@ -209,7 +209,7 @@ describe("security re-check bypasses", () => {
   const pkg = buildContextPackage(
     fullInput({
       answers: { primary_concerns: ["redness"], male_skin_context: ["shaving_irritation", "exercise_sweat_breakouts"], skin_factors: ["nothing_noticeable"] },
-      safety: { ...fullInput().safety!, extraCaution: false },
+      safety: { ...fullInput().safety!, extraCaution: false, extraCautionRaisedBy: [] },
     })
   );
   const band = pkg.skin!.readings.find((x) => x.id === "state.all.redness")!.band;

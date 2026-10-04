@@ -84,8 +84,8 @@ export const PAIRWISE: LongitudinalResult = {
   reasons: [{ code: "beyond_noise", text: "Different from your starting checks by more than photo-to-photo variation." }],
 };
 
-export const SAFETY: SafetyState = { rulesetVersion: "s-1", reviewStatus: "provisional", extraCaution: false, redFlag: false };
-export const RED_SAFETY: SafetyState = { rulesetVersion: "s-1", reviewStatus: "provisional", extraCaution: true, redFlag: true, raisedBy: ["rule-ZZSECRET"] };
+export const SAFETY: SafetyState = { rulesetVersion: "s-1", reviewStatus: "provisional", extraCaution: false, extraCautionRaisedBy: [], redFlag: false };
+export const RED_SAFETY: SafetyState = { rulesetVersion: "s-1", reviewStatus: "provisional", extraCaution: true, extraCautionRaisedBy: [{ field: "current_products", value: "prescription" }], redFlag: true, raisedBy: ["rule-ZZSECRET"] };
 
 export const RECOMMENDATION: RecommendationResult = {
   rulesetVersion: "r-1",
