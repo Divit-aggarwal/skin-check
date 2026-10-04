@@ -19,7 +19,7 @@ describe("S3 endpoint override", () => {
     vi.stubEnv("S3_SKIN_IMAGES_ACCESS_KEY_ID", "test");
     vi.stubEnv("S3_SKIN_IMAGES_SECRET_ACCESS_KEY", "test");
     const { presignOriginalUpload } = await import("@/lib/s3");
-    return new URL(await presignOriginalUpload("users/u/scans/s/original.jpg"));
+    return new URL(await presignOriginalUpload("users/u/scans/s/original.jpg", 1000));
   };
   it("is used outside production", async () => {
     expect((await presign("development")).host).toBe("127.0.0.1:3108");

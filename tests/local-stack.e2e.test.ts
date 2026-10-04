@@ -55,7 +55,7 @@ describe.skipIf(!WEB)("local stack end to end", () => {
     const presign = await fetch(`${WEB}/api/skin-scan/upload`, {
       method: "POST",
       headers: { ...bearer, "content-type": "application/json" },
-      body: JSON.stringify({ scanId, imageRetentionConsent: true, imageRetentionConsentVersion: IMAGE_RETENTION_CONSENT_VERSION }),
+      body: JSON.stringify({ scanId, contentLength: face.length, imageRetentionConsent: true, imageRetentionConsentVersion: IMAGE_RETENTION_CONSENT_VERSION }),
     });
     expect(presign.status).toBe(200);
     const { uploadUrl, key, contentType } = (await presign.json()) as { uploadUrl: string; key: string; contentType: string };

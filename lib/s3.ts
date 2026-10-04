@@ -33,6 +33,13 @@ const ENDPOINT_CONFIG = ENDPOINT ? { endpoint: ENDPOINT, forcePathStyle: true } 
 
 export const UPLOAD_URL_TTL_SECONDS = 300;
 
+/**
+ * Largest original the presigned PUT accepts (second security review, H20).
+ * PROVISIONAL: generous for a full-resolution phone photo; a refused presign
+ * stops the scan, so too small would break real captures.
+ */
+export const MAX_ORIGINAL_BYTES = 25 * 1024 * 1024;
+
 export class S3NotConfiguredError extends Error {
   constructor(missing: string[]) {
     // Names only, never values.
@@ -71,14 +78,16 @@ function s3(): S3Client {
  * Short-lived presigned PUT for one scan's original image.
  *
  * The caller passes the FULL key it built from a verified uid — this function
- * never takes a uid or a client-supplied path. ContentType is signed, so the
- * browser must send exactly the same header or S3 rejects the signature.
+ * never takes a uid or a client-supplied path. Content-Type and
+ * Content-Length are both signed (the presigner signs only Content-Length by
+ * default, so Content-Type is named), so the browser must send exactly that
+ * type and exactly `contentLength` bytes or S3 rejects the signature (H20).
  */
-export function presignOriginalUpload(key: string): Promise<string> {
+export function presignOriginalUpload(key: string, contentLength: number): Promise<string> {
   return getSignedUrl(
     s3(),
-    new PutObjectCommand({ Bucket: BUCKET!, Key: key, ContentType: ORIGINAL_CONTENT_TYPE }),
-    { expiresIn: UPLOAD_URL_TTL_SECONDS }
+    new PutObjectCommand({ Bucket: BUCKET!, Key: key, ContentType: ORIGINAL_CONTENT_TYPE, ContentLength: contentLength }),
+    { expiresIn: UPLOAD_URL_TTL_SECONDS, signableHeaders: new Set(["content-type", "content-length"]) }
   );
 }
 

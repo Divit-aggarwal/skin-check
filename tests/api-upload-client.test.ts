@@ -62,6 +62,7 @@ describe("uploadOriginalImage", () => {
     expect((presign.init.headers as Record<string, string>).Authorization).toBe("Bearer fresh-id-token");
     expect(JSON.parse(presign.init.body as string)).toEqual({
       scanId: SCAN_ID,
+      contentLength: original.size,
       imageRetentionConsent: true,
       imageRetentionConsentVersion: "skin image retention version 1",
     });

@@ -4,7 +4,7 @@ import { AdminNotConfiguredError, bearerToken, verifyFirebaseIdToken } from "@/l
 import { isValidScanId, ORIGINAL_CONTENT_TYPE, scanImageKey } from "@/lib/s3-key";
 import { IMAGE_RETENTION_CONSENT_COPY, IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
 import { appendConsent, scanAgeGate, withLedgerTimeout } from "@/app/api/account/_ledger";
-import { presignOriginalUpload, S3NotConfiguredError, UPLOAD_URL_TTL_SECONDS } from "@/lib/s3";
+import { MAX_ORIGINAL_BYTES, presignOriginalUpload, S3NotConfiguredError, UPLOAD_URL_TTL_SECONDS } from "@/lib/s3";
 
 // firebase-admin and the AWS SDK both need Node APIs.
 export const runtime = "nodejs";
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body.", code: "BAD_REQUEST" }, { status: 400 });
   }
 
-  // scanId and the consent fields are the ONLY things read from the body.
+  // scanId, the size and the consent fields are the ONLY things read from the body.
   // Anything else it carries — a uid, a key, a bucket — is ignored by
   // construction, not by filtering.
   const scanId = (body as { scanId?: unknown } | null)?.scanId;
@@ -86,6 +86,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // The exact size the browser will PUT, signed into the URL (H20): a URL can
+  // only write that many bytes, and never more than MAX_ORIGINAL_BYTES.
+  const contentLength = (body as { contentLength?: unknown } | null)?.contentLength;
+  if (typeof contentLength !== "number" || !Number.isInteger(contentLength) || contentLength < 1) {
+    return NextResponse.json({ error: "Invalid image size.", code: "INVALID_CONTENT_LENGTH" }, { status: 400 });
+  }
+  if (contentLength > MAX_ORIGINAL_BYTES) {
+    return NextResponse.json({ error: "Image too large.", code: "IMAGE_TOO_LARGE" }, { status: 413 });
+  }
+
   // H02a (D-19): an under-18 record is refused before anything is recorded or
   // presigned. Everything else goes ahead (decision 3a, D-03).
   const ageRefusal = await scanAgeGate(uid, "skin-scan/upload");
@@ -103,7 +113,7 @@ export async function POST(request: NextRequest) {
 
   let uploadUrl: string;
   try {
-    uploadUrl = await presignOriginalUpload(key);
+    uploadUrl = await presignOriginalUpload(key, contentLength);
   } catch (err) {
     if (err instanceof S3NotConfiguredError) {
       console.error("skin-scan/upload:", err.message);

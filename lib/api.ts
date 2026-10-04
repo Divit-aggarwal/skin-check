@@ -197,6 +197,8 @@ export async function uploadOriginalImage(scanId: string, original: Blob): Promi
     // request contract — the route refuses to sign anything without it.
     body: JSON.stringify({
       scanId,
+      // Signed into the URL: S3 accepts exactly this many bytes (H20).
+      contentLength: original.size,
       imageRetentionConsent: true,
       imageRetentionConsentVersion: IMAGE_RETENTION_CONSENT_VERSION,
     }),

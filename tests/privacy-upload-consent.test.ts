@@ -16,6 +16,7 @@ vi.mock("@/lib/firebase/admin", async () => {
 vi.mock("@/lib/s3", () => ({
   presignOriginalUpload,
   UPLOAD_URL_TTL_SECONDS: 300,
+  MAX_ORIGINAL_BYTES: 25 * 1024 * 1024,
   S3NotConfiguredError: class S3NotConfiguredError extends Error {},
 }));
 vi.mock("@/lib/rate-limit", async () => {
@@ -32,7 +33,7 @@ import { IMAGE_RETENTION_CONSENT_COPY, IMAGE_RETENTION_CONSENT_VERSION } from "@
 import { NextRequest, NextResponse } from "next/server";
 
 const SCAN_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
-const CONSENT = { imageRetentionConsent: true, imageRetentionConsentVersion: IMAGE_RETENTION_CONSENT_VERSION };
+const CONSENT = { imageRetentionConsent: true, imageRetentionConsentVersion: IMAGE_RETENTION_CONSENT_VERSION, contentLength: 2_000_000 };
 
 const post = (body: unknown = { scanId: SCAN_ID, ...CONSENT }) =>
   POST(
