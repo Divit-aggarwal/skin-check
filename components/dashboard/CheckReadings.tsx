@@ -23,7 +23,7 @@ export function CheckReadings({ view }: { view: CheckView }) {
       )}
       {view.hardToRead.length > 0 && <p className="text-sm text-text/70">{C.current.hardToRead(view.hardToRead.join(", "))}</p>}
       {view.photoCheck && <p className="text-sm text-text/70">{C.photoCheck[view.photoCheck]}</p>}
-      {view.source === "legacy" && <p className="text-sm text-text/70">{C.legacyNote}</p>}
+      {view.source === "legacy" && view.bands && <p className="text-sm text-text/70">{C.legacyNote}</p>}
     </div>
   );
 }

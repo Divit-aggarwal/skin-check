@@ -17,7 +17,7 @@ export const DASHBOARD_COPY = {
     title: "Your newest photo reading",
     none: "None of your checks has a photo reading yet.",
     checkedOn: (date: string) => `Checked on ${date}`,
-    newerNotShown: "Your newest check is not shown here: it has no reading from our server yet. This is the most recent reading there is.",
+    newerNotShown: "Your newest check has no photo reading from our server. The reading below is from an earlier check.",
     unreadable: "The readings of this check could not be shown.",
     hardToRead: (areas: string) => `Hard to read in this photo: ${areas}. Those readings are uncertain.`,
     knownTitle: "What this tells you",

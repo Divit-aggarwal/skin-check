@@ -186,16 +186,13 @@ export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: r
       ? { kind: "reading", view: legacyView(newestLegacy, legacyResultOf(newestLegacy)!) }
       : { kind: "none" };
 
-  // Same picker and rule as the engine, over every valid record as the chat
-  // path passes them; the newest is never a candidate. The page counts CHECKS,
-  // not records: a retake or recovery record never adds a starting check, and
-  // an earlier record of the newest check is not one (design gap G-1).
-  const { latest, candidates, engineBoundary } = pickBaseline(measured.map((m) => m.state));
-  const scanOf = new Map(measured.map((m) => [m.state, m.scanId] as const));
-  const startingScans = new Set(candidates.map((c) => scanOf.get(c)!));
-  if (latest) startingScans.delete(scanOf.get(latest)!);
+  // Same picker and rule as the engine, over ONE state per check (the record
+  // picked above), so the page counts checks: a retake or recovery record never
+  // adds or takes a starting-check place. The newest check is never a
+  // candidate. The engine is passed every record (design gap G-1).
+  const { candidates, engineBoundary } = pickBaseline(Array.from(byScan.values()).map((m) => m.state));
   const needed = BASELINE_RULE.scans;
-  const count = Math.min(startingScans.size, needed);
+  const count = Math.min(candidates.length, needed);
   const trend: Trend = {
     kind: measured.length === 0 ? "empty" : count < needed ? "building" : "set",
     count,

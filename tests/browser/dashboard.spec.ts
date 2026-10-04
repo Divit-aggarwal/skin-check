@@ -137,6 +137,9 @@ test("privacy: sharing on, with the stop button", async ({ page }) => {
 test("unreadable: stored scores that do not parse", async ({ page }) => {
   await dashboardAs(page, U.unreadable!.phoneNumber);
   await expect(page.getByText(C.current.unreadable)).toBeVisible();
+  // Nothing that speaks of readings that are not on screen.
+  await expect(page.getByText(C.legacyNote)).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: C.current.knownTitle })).toHaveCount(0);
   await shot(page, "unreadable");
 });
 

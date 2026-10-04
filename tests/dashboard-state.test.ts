@@ -98,6 +98,12 @@ describe("dashboard view model", () => {
     expect(deriveDashboard(UID, [check("a", 1), check("c", 3)], [analysis("a", 1), retake, analysis("c", 3)]).trend.count).toBe(1);
   });
 
+  it("a retake on an early check never keeps the count below the number needed", () => {
+    const ids = ["a", "b", "c", "d", "e"];
+    const records = [...ids.map((s, i) => analysis(s, i + 1)), analysis("a", 1, {}, {}, "b")];
+    expect(deriveDashboard(UID, ids.map((s, i) => check(s, i + 1)), records).trend).toMatchObject({ kind: "set", count: 3 });
+  });
+
   it("an invalid primary record gives the scan no reading, as Echo then has none (no fallback to a recovery record)", () => {
     const primary = analysis("s", 1);
     primary.data.schemaVersion = 2;

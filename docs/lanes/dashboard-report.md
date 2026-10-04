@@ -29,15 +29,15 @@ Skipped, each needing an owner decision (§4):
 
 ## 2. Test results
 
-At aebf1eb:
-- `npm run test:local`: exit 0. Unit tests 1231 passed, 47 skipped (86 files); stack 10 files, 47/47. The baseline before the lane was 1199 passed, 47 skipped; stack 47/47.
+At the final commit (§7, last row):
+- `npm run test:local`: exit 0. Unit tests 1232 passed, 47 skipped (86 files); stack 10 files, 47/47. The baseline before the lane was 1199 passed, 47 skipped; stack 47/47.
 - `npx tsc --noEmit`: 0 errors. `npm run lint`: clean. `next build`: exit 0 (`/dashboard` 2.66 kB).
-- The lane's unit tests are `tests/dashboard-state.test.ts` (every state in design §3) and `tests/dashboard-copy.test.ts` (D-12 wording, positive controls, no score, band colour or arrow, no import of the rules, context, gemini or engine code). Together: 32/32.
+- The lane's unit tests are `tests/dashboard-state.test.ts` (every state in design §3) and `tests/dashboard-copy.test.ts` (D-12 wording, positive controls, no score, band colour or arrow, no import of the rules, context, gemini or engine code). Together: 33/33.
 - **Browser tests:** `npx playwright test` against a fresh `npm run dev:local`, Chromium, 390×844, mobile user agent, one worker.
   - Result: **25/25 passed.** One of these is K-1, a known defect pinned with `test.fail()`, so it passes while it still fails.
   - Run command: `GEMINI_DEV_API_KEY=placeholder-not-a-key npm run dev:local`, then `npx playwright test`.
   - Why the placeholder key: the chat route checks for a Gemini key before it checks consent. With no key, Echo answers "isn't set up" and never reaches its consent prompt.
-  - It cannot reach Google in these tests. No test grants consent: the Echo user was never asked, and the withdraw user is checked as "off" before the message is sent. The route refuses without consent before any Gemini code runs.
+  - It cannot reach Google in these tests. No test grants consent and the route refuses without consent before any Gemini code runs. The seed users with sharing on are `withdraw` (checked as "off" before its Echo message is sent) and `newer` (never sends an Echo message; its consent requests are answered by `page.route`). The Echo user was never asked.
   - The value lives only in the shell, not in any file.
   - The data-changing tests (scan, withdraw, delete, routine) need a fresh stack for each run.
 - **Screenshots:** `docs/lanes/dashboard-*.png`.
@@ -84,7 +84,7 @@ At aebf1eb:
 - Dates in `en-IN`.
 - Browser tests written.
 
-**Fresh review of code and screenshots: FAIL. No screen puts two checks' readings side by side, and none shows a score, colour, arrow or chart.** Its findings and the response:
+**Fresh review of code and screenshots: FAIL. No screen puts two checks' readings side by side, and none shows a score, colour, arrow or chart.** Its findings and the response (fixed in aebf1eb; a confirmation pass then found four follow-ups, fixed in the next commit and listed after this list):
 1. The report was interim. This report is final.
 2. The reviewer could not check frozen files without a shell. Checked with `git diff --name-only`: none touched.
 3. **An older reading could sit under "Your newest photo reading" right after a new check.** Now a plain line is shown whenever a newer check has no server reading. Unit and browser tested.
@@ -97,6 +97,12 @@ At aebf1eb:
 10. Some states had no screenshot. Added for unreadable, newer check not shown, and privacy saving, failed and out of date. Two privacy states have none; the reason is in the design §6.
 11. No test pinned the retake count. Added.
 12. /routine is wider than a 390 px phone (the "Swap for" selects spill out). Not lane code: row R-6.
+
+**Confirmation pass: FAIL, four follow-ups, all fixed:**
+1. The "newer check" line said "no reading … yet", which is false for a questions-only or failed check. It now reads "Your newest check has no photo reading from our server. The reading below is from an earlier check."
+2. Counting records and then removing duplicates by check could leave the count at "2 of 3" for good after an early retake. `pickBaseline` now gets one state per check, with a 5-check unit test.
+3. The unreadable state showed the app-only note and "what this tells you" next to no readings. Both now show only when readings do, with a browser assertion.
+4. This report's Gemini statement missed the `newer` seed user. Now named.
 
 ## 4. New owner decisions
 
@@ -123,7 +129,7 @@ At aebf1eb:
 
 | Row | Area | What | Evidence or next action |
 |---|---|---|---|
-| G01 | Dashboard | Move to DONE / CHECKED LOCAL, with the evidence in §2 | aebf1eb; test:local exit 0; browser 25/25 |
+| G01 | Dashboard | Move to DONE / CHECKED LOCAL, with the evidence in §2 | final commit (§7); test:local exit 0; browser 25/25 |
 | H14 | Privacy | Move to DONE / CHECKED LOCAL: withdraw control on /dashboard and /account | ConsentSection; withdraw browser test; 409 state |
 | E06 | Routine | The browser click-through is done: add, used, skipped, other product, reload | flows.spec.ts routine test |
 | R-1 (K-1) | Echo / flow | Echo's back link after a dashboard hand-off reopens an old results screen | §5.2; pinned by `test.fail()` |
@@ -146,4 +152,5 @@ At aebf1eb:
 | 787a9c4 | fix: show a reading that landed before the questionnaire was saved |
 | 1dac63c | test: flow browser tests 2–10, warm-up, returning-user seed |
 | aebf1eb | fix: review fixes (newer check named, checks not records, Echo record order, app-only copy); tests and screenshots |
-| (this commit) | docs: final report |
+| c555e2e | docs: final report |
+| (this commit) | fix: confirmation-pass follow-ups (newer-check copy, one state per check for the count, unreadable state); tests, screenshots, design and report updated |
