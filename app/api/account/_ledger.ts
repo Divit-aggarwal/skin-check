@@ -11,7 +11,7 @@ import { AGE_ATTESTATION_VERSION, type ConsentPurpose } from "@/lib/consent";
 // is imported by client code and must not pull in the Admin SDK. The `_`
 // prefix keeps Next.js from routing it.
 
-export type LedgerSource = "presign" | "scan" | "attestation_route" | "consent_route";
+export type LedgerSource = "presign" | "scan" | "attestation_route" | "consent_route" | "support_clear";
 
 export interface ConsentEvent {
   purpose: ConsentPurpose;
@@ -104,13 +104,48 @@ export async function ageStatus(uid: string): Promise<AgeStatus> {
   // Two fixed-size reads (equality filters only, no composite index), so a
   // ledger flooded with 18+ entries can't slow this past the timeout and make
   // upload and scan fail open.
+  // H05: a support clear (clearUnder18) lifts the block. Every under-18 answer
+  // writes the marker with its entry (H24), so an answer after a clear blocks
+  // again through the marker. An under-18 entry with no marker and no clear
+  // (a record from before H24) still blocks.
   const age = ledger(uid).where("purpose", "==", "age_18_plus");
-  const [under, over] = await Promise.all([
+  const [marker, under, cleared, over] = await Promise.all([
+    under18Marker(uid).get(),
     age.where("granted", "==", false).limit(1).get(),
+    age.where("source", "==", "support_clear").limit(1).get(),
     age.where("granted", "==", true).where("version", "==", AGE_ATTESTATION_VERSION).limit(1).get(),
   ]);
-  if (!under.empty) return "under18";
+  if (marker.exists || (!under.empty && cleared.empty)) return "under18";
   return over.empty ? "missing" : "over18";
+}
+
+/** The version a support clear is recorded under: never the attestation version, so a clear is not an 18+ answer. */
+export const SUPPORT_CLEAR_VERSION = "support clear of an under-18 record version 1";
+export const SUPPORT_CLEAR_COPY = "Support cleared a mistaken under-18 answer at the user's request.";
+
+/**
+ * H05 (decision 4): support clears a mistaken under-18 answer. The ledger stays
+ * append-only: this adds one audited entry (who, why) and removes the H24
+ * marker, together or not at all. The clear is not an 18+ answer (it is
+ * recorded at SUPPORT_CLEAR_VERSION), so the user is asked their age again.
+ * Run only by scripts/clear-under18.ts, which the owner runs after a check.
+ */
+export async function clearUnder18(uid: string, operator: string, reason: string): Promise<void> {
+  const batch = adminDb().batch();
+  batch.create(ledger(uid).doc(), {
+    schemaVersion: 1,
+    purpose: "age_18_plus",
+    granted: true,
+    version: SUPPORT_CLEAR_VERSION,
+    copySha256: sha256(SUPPORT_CLEAR_COPY),
+    scanId: null,
+    source: "support_clear",
+    operator,
+    reason,
+    recordedAt: FieldValue.serverTimestamp(),
+  });
+  batch.delete(under18Marker(uid));
+  await batch.commit();
 }
 
 /**

@@ -42,7 +42,19 @@ function fakeCollection(path: string) {
           if (docs.has(docPath)) throw new Error("ALREADY_EXISTS");
           docs.set(docPath, data);
         },
-        set: async () => calls.push(`set ${docPath}`),
+        set: async (data: Record<string, unknown> = {}) => {
+          calls.push(`set ${docPath}`);
+          docs.set(docPath, data);
+        },
+        get: async () => {
+          if (fail.reads) throw new Error("firestore down");
+          calls.push(`get ${docPath}`);
+          return { exists: docs.has(docPath) };
+        },
+        delete: async () => {
+          calls.push(`delete ${docPath}`);
+          docs.delete(docPath);
+        },
         update: async () => calls.push(`update ${docPath}`),
       };
     },
@@ -56,6 +68,7 @@ function fakeBatch() {
   return {
     create: (ref: { create: (d: Record<string, unknown>) => Promise<void> }, d: Record<string, unknown>) => void ops.push(() => ref.create(d)),
     set: (ref: { set: (d: Record<string, unknown>) => Promise<unknown> }, d: Record<string, unknown>) => void ops.push(() => ref.set(d)),
+    delete: (ref: { delete: () => Promise<unknown> }) => void ops.push(() => ref.delete()),
     commit: async () => {
       if (fail.reads) throw new Error("firestore down");
       calls.push("batch commit");
@@ -67,7 +80,7 @@ function fakeBatch() {
 vi.mock("@/lib/firebase/admin", () => ({ adminDb: () => ({ collection: (name: string) => fakeCollection(name), batch: fakeBatch }) }));
 
 import { AGE_ATTESTATION_VERSION } from "@/lib/consent";
-import { ageStatus, appendConsent, latestGrant, REQUIRE_AGE_ATTESTATION, scanAgeGate, sha256, withLedgerTimeout } from "@/app/api/account/_ledger";
+import { ageStatus, appendConsent, clearUnder18, SUPPORT_CLEAR_VERSION, latestGrant, REQUIRE_AGE_ATTESTATION, scanAgeGate, sha256, withLedgerTimeout } from "@/app/api/account/_ledger";
 import { FieldValue } from "firebase-admin/firestore";
 
 const ts = (ms: number) => ({ toMillis: () => ms });
@@ -220,8 +233,10 @@ describe("scanAgeGate (upload and scan routes)", () => {
     calls.length = 0;
     expect(await ageStatus("u")).toBe("over18");
     expect(calls.sort()).toEqual([
+      "get under18Accounts/u",
       "query users/u/consentLedger purpose==age_18_plus granted==false limit 1",
       `query users/u/consentLedger purpose==age_18_plus granted==true version==${AGE_ATTESTATION_VERSION} limit 1`,
+      "query users/u/consentLedger purpose==age_18_plus source==support_clear limit 1",
     ]);
   });
 
@@ -251,5 +266,37 @@ describe("under-18 marker (H24)", () => {
     calls.length = 0;
     await appendConsent("adult", event(true));
     expect(calls.some((c) => c.includes("under18Accounts"))).toBe(false);
+  });
+});
+
+// H05 (decision 4): support clears a mistaken under-18 answer; the ledger stays append-only.
+describe("support clear (H05)", () => {
+  const under18 = { purpose: "age_18_plus" as const, granted: false, version: AGE_ATTESTATION_VERSION, copy: "c", scanId: null, source: "attestation_route" as const };
+  const adult = { ...under18, granted: true };
+
+  it("lifts the block: the user is asked their age again (missing), never counted as 18+", async () => {
+    await appendConsent("m", under18);
+    expect(await ageStatus("m")).toBe("under18");
+    calls.length = 0;
+    await clearUnder18("m", "owner", "mis-tap, confirmed by phone");
+    expect(calls).toContain("delete under18Accounts/m");
+    expect(calls.some((c) => c.startsWith("update ") || c.startsWith("set users/"))).toBe(false); // nothing changed, one entry added
+    expect(await ageStatus("m")).toBe("missing");
+    const entry = Array.from(docs.entries()).find(([p, d]) => p.startsWith("users/m/consentLedger/") && d.source === "support_clear")![1];
+    expect(entry).toMatchObject({ purpose: "age_18_plus", granted: true, version: SUPPORT_CLEAR_VERSION, operator: "owner", reason: "mis-tap, confirmed by phone" });
+    await appendConsent("m", adult);
+    expect(await ageStatus("m")).toBe("over18");
+  });
+
+  it("an under-18 answer after the clear blocks again (through the marker)", async () => {
+    await appendConsent("m2", under18);
+    await clearUnder18("m2", "owner", "mis-tap");
+    await appendConsent("m2", under18);
+    expect(await ageStatus("m2")).toBe("under18");
+  });
+
+  it("an under-18 entry with no marker (written before H24) and no clear still blocks", async () => {
+    seed("old", "1", { purpose: "age_18_plus", granted: false, version: AGE_ATTESTATION_VERSION, recordedAt: ts(1) });
+    expect(await ageStatus("old")).toBe("under18");
   });
 });
