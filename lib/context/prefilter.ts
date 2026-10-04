@@ -15,14 +15,15 @@ const RED_FLAG = re([
   "\\bbleding\\b",
   "\\bblood\\w*",
   "\\bkho+o?n\\b",
-  "\\btil\\b.{0,30}\\b(?:khoon|khun|badh|badal)\\w*",
-  "तिल.{0,30}(?:खून|बढ़|बदल)",
+  "\\btil\\b.{0,30}\\b(?:khoon|khun|badh(?!iya)|badal)\\w*",
+  // Devanagari patterns run on a copy with no nukta (DEVANAGARI below), so none is written here.
+  "तिल.{0,30}(?:खून|बढ|बदल)",
   "खून",
   // painful, cystic or nodular lesions, scarring
   "\\bcyst\\w*",
   "\\bnodul\\w*",
   "\\bpain\\w*",
-  "\\bhurts?\\b",
+  "\\bhurt(?:s|ing)?\\b",
   "\\bsore\\b",
   "\\bboils?\\b",
   "\\bscarring\\b",
@@ -43,24 +44,36 @@ const RED_FLAG = re([
   "बुखार",
   "सूजन",
   // eye involvement
-  "\\beye(?:s|lids?)?\\b.{0,30}\\b(?:swell\\w*|pain\\w*|hurt\\w*|red\\w*|vision|blur\\w*|rash\\w*|itch\\w*|sting\\w*|burn\\w*)",
+  "\\beye(?:s|lids?)?\\b.{0,30}\\b(?:swell\\w*|pain\\w*|hurt\\w*|red(?:ness|dish)?\\b|vision|blur\\w*|rash\\w*|itch\\w*|sting\\w*|burn\\w*)",
+  "\\b(?:swollen|swell\\w*|pain\\w*|hurt\\w*|red|reddish|blur\\w*|itch\\w*|sting\\w*|burn\\w*|watery|sore)\\b.{0,30}\\beye(?:s|lids?)?\\b",
   "\\bvision\\b",
-  "\\baa?nkh\\w*",
-  "आंख|आँख",
+  "\\baa?nkh\\w*.{0,30}\\b(?:jalan|dard|sooj\\w*|suj\\w*|laal|lal|khujl\\w*|pani|paani|dhundh\\w*|chubh\\w*)",
+  "\\b(?:jalan|dard|sooj\\w*|suj\\w*|laal|lal|khujl\\w*|dhundh\\w*|chubh\\w*)\\b.{0,30}\\baa?nkh\\w*",
+  "(?:आंख|आँख)\\S*.{0,30}(?:जलन|दर्द|सूज|लाल|खुजली|पानी|धुंध)",
+  "(?:जलन|दर्द|सूज|लाल|खुजली|धुंध).{0,30}(?:आंख|आँख)",
   // self-harm or severe distress
   "\\bkill\\s*(?:my\\W*self|me)\\b",
   "\\bunalive\\w*",
-  "\\bkms\\b",
-  "\\bkhatam kar\\w*",
+  // A distance ("5 kms daily") is not "kill myself"; the leet copy reads the 5 as "s", hence the second guard.
+  "(?<!\\p{N}\\s?)\\bkms\\b(?!\\s*(?:daily|a day|every|per|away|from|run|walk|cycl\\w*)\\b)",
+  "\\b(?:khud|apne aap|apne ap|sab|sabkuch|zindagi|zindgi|life|jaan)\\b(?: \\w+){0,2} khatam\\b",
   "\\bsuicid\\w*",
   "\\bself[- ]?harm\\w*",
   "\\bhurt(?:ing)? my ?self\\b",
-  "\\bend (?:my|it all)\\b",
+  "\\bend(?:ing|ed|s)? (?:my (?:life|self)|myself|it all|everything)\\b",
+  "\\b(?:want|wanna|going|gonna|ready) (?:to )?end it\\b(?!\\s*(?:with|on|in|at|for|by|before|now that)\\b)",
+  "\\bhang(?:ing)? my ?self\\b",
+  "\\boverdos\\w*",
+  "\\b(?:want|wanna|wish|rather) (?:to )?be dead\\b",
+  "\\bjee?ne? ka (?:mann|man|dil) n",
+  "\\bgoli(?:yan|yaan|an)?\\b.{0,20}\\bkha\\w*",
+  "\\bneend ki goli\\w*",
+  "\\bjaa?n de\\w*",
   "\\b(?:want|wanna|wanted|going) (?:to )?die\\b",
   "\\bwish (?:i|i'?d) (?:was|were|had) (?:dead|died|never been born)\\b",
   "\\bbetter off dead\\b",
   "\\bno (?:reason|point) (?:to|in) (?:live|living)\\b",
-  "\\bdon'?t want to (?:live|be alive)\\b",
+  "\\b(?:do ?n[o']?t|dont|never) (?:want|wanna) (?:to )?(?:live|be alive|wake up|exist)\\b",
   "\\bjee?na nahi\\b",
   "\\b(?:jee?na|jina) n(?:a|h)?h?i\\b",
   "\\bcut(?:ting)? my ?self\\b",
@@ -73,19 +86,23 @@ const RED_FLAG = re([
   "\\bmarna\\b",
   "\\bkhudkushi\\b",
   "आत्महत्या",
-  "जीना नहीं",
+  "जीना नही",
+  "मरना|मरने|मर जा|मार डाल",
   // pregnancy combined with actives
-  "\\b(?:preg\\w*|breastfeed\\w*|nursing|garbh\\w*|expecting (?:a )?baby)\\b.{0,60}\\b(?:retin\\w*|\\w+retin\\w*|adapalene|accutane|acids?|actives?|aha|bha|vitamin|serum\\w*|use|using|apply\\w*|safe|ok|okay|routine|cream\\w*|niacinamide|salicylic|products?|lagana|laga)\\b",
-  "\\b(?:retin\\w*|\\w+retin\\w*|adapalene|accutane|acids?|actives?|aha|bha|vitamin|serum\\w*|use|using|apply\\w*|safe|ok|okay|keep|routine|cream\\w*|niacinamide|salicylic|products?)\\b.{0,60}\\b(?:preg\\w*|breastfeed\\w*|nursing|garbh\\w*|expecting (?:a )?baby)",
+  "\\b(?:preg\\w*|breastfeed\\w*|nursing|garbh\\w*|expecting (?:a )?baby)\\b.{0,60}\\b(?:retin\\w*|\\w+retin\\w*|adapalene|accutane|acids?|actives?|aha|bha|vitamin|serum\\w*|use|using|apply\\w*|safe|ok|okay|routine|cream\\w*|niacinamide|salicylic|hydroquinone|fine|allowed|harmful|products?|lagana|laga)\\b",
+  "\\b(?:retin\\w*|\\w+retin\\w*|adapalene|accutane|acids?|actives?|aha|bha|vitamin|serum\\w*|use|using|apply\\w*|safe|ok|okay|keep|routine|cream\\w*|niacinamide|salicylic|hydroquinone|fine|allowed|harmful|products?)\\b.{0,60}\\b(?:preg\\w*|breastfeed\\w*|nursing|garbh\\w*|expecting (?:a )?baby)",
   "गर्भ",
   // under 18 or "my child"
   "\\bmy (?:child|children|kid|kids|son|daughter|baby|toddler|teen\\w*)\\b",
-  "\\b(?:i'?m|i am|im)\\s+(?:1[0-7]|[1-9])\\b",
-  "\\b(?:1[0-7]|[1-9])\\s*(?:years?|yrs?)\\s*old\\b",
-  "\\b(?:1[0-7]|[1-9])\\s*(?:yo|y/o|yrs?)\\b",
+  "\\bnew ?borns?\\b|\\binfants?\\b",
+  "\\b(?:i'?m|i am|im)\\s+(?:1[0-7]|[1-9])\\b(?!\\s*(?:weeks?|wks?|days?|months?|mos?|hours?|hrs?|mins?|minutes?|times?|steps?|products?|%|x\\b|kgs?|kms?|litres?|liters?))",
+  "\\b(?:1[0-7]|[1-9])[\\s-]*(?:years?|yrs?)[\\s-]*old\\b",
+  "(?<!\\b(?:for|since|past|last|from|over|about|almost|nearly|around)\\s+)\\b(?:1[0-7]|[1-9])\\s*(?:yo|y/o|yrs?)\\b",
   "\\b(?:i'?m|i am|im)\\s+(?:ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen)\\b",
   "\\bunder\\s*(?:18|eighteen)\\b",
-  "\\bminor\\b",
+  "\\b(?:i'?m|i am|im|am) (?:a |still a )?minor\\b",
+  "\\bas a minor\\b",
+  "\\b(?:have|got|running|with|has) (?:a )?(?:high |slight )?temperature\\b",
   "\\bmer[aie] (?:bet[aie]|bachch?[ae]|bacch?[ae])\\b",
   "\\b(?:1[0-7]|[1-9]) ?saal\\b(?! se\\b)",
   "\\bumr?a?r? (?:1[0-7]|[1-9])\\b",
@@ -102,7 +119,8 @@ const RED_FLAG = re([
   "\\bdo i have (?:\\w+ ){0,2}(?:acne|rosacea|eczema|psoriasis|melasma|infection|cancer|melanoma|disease|condition|fungal|allerg\\w*|dermatitis|hives|pcos)\\b",
   "\\b(?:tablets?|pills?)\\b",
   "\\b(?:what|which) (?:disease|condition|infection)\\b",
-  "\\b(?:is|could|might|do|does|am|are|it'?s)\\b.{0,30}\\b(?:cancer\\w*|melanoma|rosacea|eczema|psoriasis|infect\\w*|fungal|melasma|dermatitis|hives|allerg\\w*|pcos)\\b",
+  "\\b(?:is|could|might|can|do|does|am|are)\\s+(?:it|this|that|these|those|they|i|my \\w+|this \\w+|the \\w+)\\s+(?:\\w+\\s+){0,2}(?:cancer\\w*|melanoma|rosacea|eczema|psoriasis|infect\\w*|fungal|melasma|dermatitis|hives|allerg\\w*|pcos)\\b",
+  "\\bit'?s (?:\\w+ ){0,2}(?:cancer\\w*|melanoma|rosacea|eczema|psoriasis|infect\\w*|fungal|melasma|dermatitis|hives|allerg\\w*|pcos)\\b",
   "\\b(?:skin cancer|melanoma|infected)\\b",
   "\\bbimaa?ri\\b",
   "\\bdawa\\w*",
@@ -143,6 +161,16 @@ const CONFUSABLE: Record<string, string> = {
 };
 const LEET: Record<string, string> = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "$": "s", "@": "a", "!": "i", "|": "l" };
 const DEVANAGARI_DIGIT = /[\u0966-\u096F]/g;
+// Hangul fillers count as letters but show nothing (second security review, H20).
+const HANGUL_FILLERS = "\u115F\u1160\u3164\uFFA0";
+
+/**
+ * The copy the Devanagari patterns run on (H20): normalizeForMatch removes every
+ * combining mark, which in Devanagari is every vowel sign, so they cannot run on
+ * the folded copy. Here only format characters (ZWJ, ZWNJ) and the nukta go:
+ * NFC leaves "ख़" decomposed, so with the nukta removed it reads as "ख".
+ */
+const devanagari = (message: string) => message.normalize("NFC").replace(new RegExp(String.raw`[\p{Cf}${HANGUL_FILLERS}\u093C]`, "gu"), "");
 
 // Curly apostrophes (iOS default), doubled spaces and folded forms must not
 // slip a message past the patterns (security re-check, finding 9). Wave 2:
@@ -152,7 +180,7 @@ const fold = (message: string) =>
   normalizeForMatch(
     message
       .normalize("NFKC")
-      .replace(new RegExp(String.raw`\p{Cf}`, "gu"), "")
+      .replace(new RegExp(String.raw`[\p{Cf}${HANGUL_FILLERS}]`, "gu"), "")
       .toLowerCase()
       .replace(new RegExp(".", "gu"), (c) => CONFUSABLE[c] ?? c)
       .replace(DEVANAGARI_DIGIT, (d) => String(d.charCodeAt(0) - 0x0966))
@@ -164,7 +192,7 @@ const squash = (folded: string) => unleet(folded).replace(new RegExp(String.raw`
 
 // Self-harm words that are one word: matched on the squashed copy, typos included.
 const SELF_HARM_WORD = new RegExp(
-  ["su+i?c+i?d", "sucid", "suicd", "suisid", "selfharm", "unaliv", "khudk?h?ush?i", "a+tma?h?atya", "आत्महत्या"].join("|"),
+  ["su+i?c+i?d", "sucid", "suicd", "suisid", "selfharm", "unaliv", "khudk?h?ush?i", "a+tma?h?atya"].join("|"),
   "u"
 );
 // Self-harm phrases: matched on a word-spaced copy (non-letters become spaces, so
@@ -172,26 +200,55 @@ const SELF_HARM_WORD = new RegExp(
 // "diet" do not match), and on the squashed copy only when letters are spaced out.
 const SELF_HARM_PHRASE = [
   "kil+ ?my ?self", "kil+ ?me", "end ?my ?(?:life|self)", "end ?it ?all", "(?:want|wanna|wanted|going) ?(?:to )?die",
-  "cut(?:ting)? ?my ?self", "hurt(?:ing)? ?my ?self", "better ?off ?dead", "(?:jee?na|jina) ?n(?:a|h)?h?i", "marne ?ka ?ma",
+  "cut(?:ting)? ?my ?self", "hurt(?:ing)? ?my ?self", "better ?off ?dead", "(?:jee?na|jina) ?n(?:a|h)?h?i", "marne ?ka ?ma", "hang ?my ?self",
 ];
 const PHRASE_SPACED = new RegExp(SELF_HARM_PHRASE.map((p) => String.raw`\b(?:${p})\b`).join("|"), "u");
-const PHRASE_SQUASHED = new RegExp(SELF_HARM_PHRASE.map((p) => p.replace(/ \?/g, "").replace(/ /g, "")).join("|"), "u");
-const LETTER_SPACED = new RegExp(String.raw`(?:(?<!\p{L})\p{L}(?!\p{L})\W*){3,}`, "u");
+const PHRASE_SQUASHED = SELF_HARM_PHRASE.map((p) => new RegExp(p.replace(/ \?/g, "").replace(/ /g, ""), "uy"));
 /** Non-letters as single spaces, so words keep their boundaries. */
 const spaced = (folded: string) => unleet(folded).replace(new RegExp(String.raw`[^\p{L}]+`, "gu"), " ");
+/**
+ * A phrase with its letters spaced out or run together ("k i l l m y s e l f",
+ * "wanttodie"), matched on the squashed copy but only from the start of a word
+ * to the end of a word, so "I'm a student ... diet" or "skill myself" never
+ * match (H20: replaces the any-three-single-letters switch).
+ */
+function squashedPhraseHit(folded: string): boolean {
+  const words = spaced(folded).trim().split(" ").filter(Boolean);
+  const starts: number[] = [];
+  const ends = new Set<number>();
+  let text = "";
+  for (const w of words) {
+    starts.push(text.length);
+    text += w;
+    ends.add(text.length);
+  }
+  return starts.some((at) =>
+    PHRASE_SQUASHED.some((re) => {
+      re.lastIndex = at;
+      const m = re.exec(text);
+      return m !== null && ends.has(at + m[0].length);
+    })
+  );
+}
+// A Greek or Cyrillic letter left after mapping is a disguise, not a language this product serves.
+// One carve-out (H20): a Greek letter used as a chemistry prefix, as in "γ-oryzanol".
 const OTHER_SCRIPT_LOOKALIKE = new RegExp(String.raw`[\p{Script=Cyrillic}\p{Script=Greek}]`, "u");
+const GREEK_PREFIX = new RegExp(String.raw`(?<!\p{L})\p{Script=Greek}(?=-\p{L})`, "gu");
+// A Latin-script letter that is not plain a-z after folding (small capitals "ꜱᴜɪᴄɪᴅᴇ") is a disguise too (H20).
+const LATIN_LOOKALIKE = new RegExp(String.raw`(?![a-z])\p{Script=Latin}`, "u");
+// Other Indian scripts (Tamil, Bengali, ...) are not referred: they are real users' languages (tracker row).
 
 export const redFlagHit = (message: string): boolean => {
   const folded = fold(message);
   return (
     RED_FLAG.test(folded) ||
     RED_FLAG.test(unleet(folded)) ||
-    RED_FLAG.test(message) ||
+    RED_FLAG.test(devanagari(message)) ||
     SELF_HARM_WORD.test(squash(folded)) ||
     PHRASE_SPACED.test(spaced(folded)) ||
-    (LETTER_SPACED.test(folded) && PHRASE_SQUASHED.test(squash(folded))) ||
-    // A Cyrillic or Greek letter left after mapping is a disguise, not a language this product serves.
-    OTHER_SCRIPT_LOOKALIKE.test(folded)
+    squashedPhraseHit(folded) ||
+    OTHER_SCRIPT_LOOKALIKE.test(folded.replace(GREEK_PREFIX, "")) ||
+    LATIN_LOOKALIKE.test(folded)
   );
 };
 /** The last few user turns and the new message, as one text for the pre-filter. */

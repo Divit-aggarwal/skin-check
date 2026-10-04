@@ -190,3 +190,74 @@ describe("red-flag pre-filter: the wave-2 widening does not block ordinary quest
     expect(redFlagHit(msg)).toBe(true);
   });
 });
+
+// ── second security review (2026-10-04, tracker H20) ────────────────────────
+describe("red-flag pre-filter: second security review misses", () => {
+  it.each([
+    // self-harm phrasings
+    "I keep thinking about ending my life",
+    "I just want to end it",
+    "i want to end it all",
+    "I want to hang myself",
+    "I do not want to live",
+    "dont wanna live",
+    "I don't want to wake up",
+    "I want to be dead",
+    "thinking of an overdose",
+    "jeene ka mann nahi karta",
+    "neend ki goliyan kha lunga",
+    "main jaan de dunga",
+    "main sab khatam karna chahta hun",
+    "khud ko khatam karna hai",
+    "zindagi khatam",
+    // Devanagari: plain, with a zero-width joiner, with a nukta (precomposed and decomposed)
+    "मैं मरना चाहता हूँ",
+    "मैं मरना चाहता हूं",
+    "आत्म‍हत्या",
+    "ख़ून आ रहा है",
+    "ख़ून आ रहा है",
+    "मुझे जीना नही है",
+    "तिल बढ़ रहा है",
+    // medical
+    "my pimple is hurting a lot",
+    "itchy red eyes after this serum",
+    "my 8-year-old has a rash",
+    "can I use this on my newborn",
+    "I have a temperature and my face is puffy",
+    "I'm pregnant — is hydroquinone fine?",
+    // lookalike letters
+    "ꜱᴜɪᴄɪᴅᴇ",
+    "suiㅤcide",
+  ])("hits: %j", (msg) => {
+    expect(redFlagHit(msg)).toBe(true);
+  });
+
+  // Controls: ordinary questions that must still pass.
+  it.each([
+    "pimples khatam karne ke liye kya lagaun?",
+    "aankhon ke neeche dark circles ke liye kya lagaun?",
+    "eye cream to reduce puffiness?",
+    "I have a minor breakout",
+    "At the end my skin feels tight",
+    "I've had acne for 2 yrs",
+    "I'm 3 weeks into niacinamide",
+    "I run 5 kms daily, which sunscreen?",
+    "Is niacinamide good for melasma?",
+    "til ka tel se skin badhiya hoti hai?",
+    "I'm a student and I want to diet for clear skin",
+    "Is γ-oryzanol good?",
+    "at the end it looked less oily",
+    "what temperature water should I wash with?",
+    "eye cream for puffy eyes?",
+    "आँखों के नीचे काले घेरे के लिए क्या लगाऊं?",
+    "is it ok to hang my towel to dry?",
+    "this serum feels fine",
+  ])("ordinary question still passes: %j", (msg) => {
+    expect(redFlagHit(msg)).toBe(false);
+  });
+
+  it("a Greek or Cyrillic letter inside a Latin word is still a disguise", () => {
+    expect(redFlagHit("suiϲide")).toBe(true);
+    expect(redFlagHit("kilλ myself")).toBe(true);
+  });
+});
