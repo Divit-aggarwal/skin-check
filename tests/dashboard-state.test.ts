@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 import { buildScanAnalysisRecord, scanAnalysisDocId } from "@/lib/scan-analysis-record";
 import type { SkinScanResult } from "@/types/skin-scan";
-import { aiShareStatus, deriveDashboard, echoRecord, pastCheck, withdrawalOutcome, type Doc } from "@/components/dashboard/state";
+import { aiShareStatus, deriveDashboard, echoRecord, isEmpty, pastCheck, withdrawalOutcome, type Doc } from "@/components/dashboard/state";
 import { syntheticAnalysis, syntheticNative } from "./synthetic-scan";
 
 // G01 dashboard view model (docs/lanes/dashboard-design.md §3). All values synthetic.
@@ -177,6 +177,9 @@ describe("one check at a time", () => {
     const d = deriveDashboard(UID, [], [analysis("z", 4)]);
     expect(d.current.kind).toBe("reading");
     expect(d.history).toEqual([]);
+    // Found by the scan browser test: the analysis lands before the questionnaire is saved.
+    expect(isEmpty(d)).toBe(false);
+    expect(isEmpty(deriveDashboard(UID, [], []))).toBe(true);
   });
 
   it("echoRecord returns the record Echo will load for the scan, or null", () => {

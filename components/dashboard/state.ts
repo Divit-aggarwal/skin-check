@@ -50,6 +50,9 @@ export interface Trend {
   legacyPresent: boolean;
 }
 
+/** Neither a check nor a reading: the page's empty state. */
+export const isEmpty = (d: Dashboard) => d.history.length === 0 && d.current.kind === "none";
+
 export interface Dashboard {
   current: Current;
   trend: Trend;

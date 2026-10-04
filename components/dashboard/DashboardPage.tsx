@@ -15,7 +15,7 @@ import { CheckReadings, formatDate, KnownAndNotKnown } from "./CheckReadings";
 import { ConsentSection } from "./ConsentSection";
 import { DASHBOARD_COPY as C } from "./copy";
 import { loadDashboard, type DashboardData } from "./data";
-import { deriveDashboard, echoRecord, pastCheck, type Dashboard } from "./state";
+import { deriveDashboard, echoRecord, isEmpty, pastCheck, type Dashboard } from "./state";
 
 // G01 dashboard (docs/lanes/dashboard-design.md). Phone first, one column.
 // Six sections. Readings are shown for the newest photo reading only; a past
@@ -97,7 +97,9 @@ export function DashboardPage() {
 
   return (
     <Shell>
-      {dashboard.history.length === 0 ? (
+      {/* Empty only when there is neither a check nor a reading: an analysis
+          lands before the questionnaire is saved (design §3, orphan record). */}
+      {isEmpty(dashboard) ? (
         <section className={section}>
           <p className="text-body text-text/70">{C.empty}</p>
           <Link href="/skin-check" className={link}>
