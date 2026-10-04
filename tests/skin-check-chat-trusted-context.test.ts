@@ -58,7 +58,8 @@ import { signHistory } from "@/lib/echo-history-token";
 import { NextRequest } from "next/server";
 
 const SCAN_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
-const scores = (n: number) => ({ redness: n, oiliness: n, texture: n, pores: 0, blemishes: n, hydration: n, pigment: n });
+// Distinct per fixture, inside the real [0, 1] range (SkinScanScoresSchema).
+const scores = (n: number) => ({ redness: n / 10, oiliness: n / 10, texture: n / 10, pores: 0, blemishes: n / 10, hydration: n / 10, pigment: n / 10 });
 const ts = (ms: number) => ({ toMillis: () => ms });
 
 function seedAnalysis(uid: string, docId: string, fields: Record<string, unknown>) {

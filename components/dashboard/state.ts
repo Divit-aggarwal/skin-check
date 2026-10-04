@@ -194,7 +194,8 @@ export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: r
   const needed = BASELINE_RULE.scans;
   const count = startingCheckCount(pick);
   const trend: Trend = {
-    kind: measured.length === 0 ? "empty" : count < needed ? "building" : "set",
+    // Red team (I02, E-F3): starting checks read by different engine versions are never "set".
+    kind: measured.length === 0 ? "empty" : count < needed || engineBoundary ? "building" : "set",
     count,
     needed,
     engineBoundary,
@@ -216,7 +217,8 @@ export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: r
     newerCheckNotShown,
     trend,
     history,
-    echoScanId: newestMeasured?.scanId ?? null,
+    // Red team (I02, E-F4): only a reading whose scores can be read is offered to Echo.
+    echoScanId: newestMeasured && bandsOf(newestMeasured.record.scores) ? newestMeasured.scanId : null,
     photoKept: withPhoto ? (withPhoto.data.image as Obj).stored === true : null,
   };
 }

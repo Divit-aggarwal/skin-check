@@ -4,14 +4,17 @@ import type { CaptureQuality, RetakeReason } from "@/lib/capture-quality/types";
 // Matches the skin-scan service's POST /scan response exactly — the 7th key
 // is `pigment`, not `pigmentation`. Do not rename to match Gemini's vision
 // category naming (types/gemini.ts) — these are separate services.
+// Scores are per-image-relative floats in [0, 1] (MEASUREMENT_VALIDATION_STATUS).
+// Anything else is not a reading (red team I02, area A: 1e308 and -5 were banded).
+const score = z.number().finite().min(0).max(1);
 export const SkinScanScoresSchema = z.object({
-  redness: z.number(),
-  oiliness: z.number(),
-  texture: z.number(),
-  pores: z.number(),
-  blemishes: z.number(),
-  hydration: z.number(),
-  pigment: z.number(),
+  redness: score,
+  oiliness: score,
+  texture: score,
+  pores: score,
+  blemishes: score,
+  hydration: score,
+  pigment: score,
 });
 
 // The service only fills these in when the request passes ?overlays= — by

@@ -256,3 +256,48 @@ describe("AI-share consent status (same rule as the server's latestGrant)", () =
     expect(aiShareStatus([entry(true, 5), entry(false, null)])).toBe("off");
   });
 });
+
+// Red team (2026-10-04, tracker I02).
+describe("red-team fixes", () => {
+  it("E-F3: an engine change inside the starting checks never reads as 'set'", () => {
+    const ids = ["a", "b", "c", "d"];
+    const builds = [BUILD, "sha-0000000000000000000000000000000000000000", BUILD, BUILD];
+    const d = deriveDashboard(UID, ids.map((s, i) => check(s, i + 1)), ids.map((s, i) => analysis(s, i + 1, { engine_build: builds[i] })));
+    expect(d.trend.engineBoundary).toBe(true);
+    expect(d.trend.kind).not.toBe("set");
+    // Control: the same checks from one build are set.
+    const same = deriveDashboard(UID, ids.map((s, i) => check(s, i + 1)), ids.map((s, i) => analysis(s, i + 1)));
+    expect(same.trend.kind).toBe("set");
+  });
+
+  it("E-F4: a newest reading whose scores cannot be read offers no Echo chat (the button crashed)", () => {
+    const d = deriveDashboard(UID, [check("s1", 1), check("s2", 2)], [analysis("s1", 1), analysis("s2", 2, { scores: { redness: "x" } })]);
+    if (d.current.kind === "reading" && d.current.view.scanId === "s2") expect(d.current.view.bands).toBeNull();
+    expect(d.echoScanId).not.toBe("s2");
+  });
+
+  it("A-F3: out-of-range scores are not a reading", () => {
+    const d = deriveDashboard(UID, [check("s1", 1)], [analysis("s1", 1, { scores: { redness: 1e308, oiliness: -5, texture: 42, pores: 0, blemishes: 0.5, hydration: 0.5, pigment: 0.5 } })]);
+    if (d.current.kind === "reading") expect(d.current.view.bands).toBeNull();
+    expect(d.echoScanId).toBeNull();
+  });
+});
+
+describe("score range (A-F3)", () => {
+  it("scores must be finite numbers between 0 and 1", async () => {
+    const { SkinScanScoresSchema } = await import("@/types/skin-scan");
+    const ok = { redness: 0, oiliness: 1, texture: 0.5, pores: 0, blemishes: 0.2, hydration: 0.9, pigment: 0.3 };
+    expect(SkinScanScoresSchema.safeParse(ok).success).toBe(true);
+    for (const bad of [1e308, -5, 42, -0.0001, 1.0001, Number.NaN, Number.POSITIVE_INFINITY]) {
+      expect(SkinScanScoresSchema.safeParse({ ...ok, redness: bad }).success, String(bad)).toBe(false);
+    }
+  });
+
+  it("E-F5: the results summary makes no claim about the user's routine", async () => {
+    const { summarizeConcerns } = await import("@/lib/skin-check-score");
+    const { bandScores } = await import("@/lib/skin-check-rules");
+    const low = { redness: 0, oiliness: 0, texture: 0, pores: 0, blemishes: 0, hydration: 1, pigment: 0 };
+    const line = summarizeConcerns(low, bandScores(low).bands).summaryLine;
+    expect(line).not.toMatch(/keep doing|routine|working/i);
+  });
+});
