@@ -7,7 +7,7 @@ import { geminiApiKey } from "@/lib/gemini-key";
 import { ECHO_REGIONS, ECHO_REGION_LABELS } from "@/lib/echo-regions";
 import { isValidScanId } from "@/lib/s3-key";
 import { loadTrustedEchoContext } from "@/lib/echo-trusted-context";
-import { isNewestEchoScan } from "@/lib/echo-newest-scan";
+import { checkEchoScan, type EchoScanCheck } from "@/lib/echo-newest-scan";
 import { signHistory, verifyHistory } from "@/lib/echo-history-token";
 import { bandScores } from "@/lib/skin-check-rules";
 import { summarizeConcerns } from "@/lib/skin-check-score";
@@ -188,16 +188,21 @@ export async function POST(request: NextRequest) {
   // F13 (owner TD-20): only the newest measured check, after the referral
   // (which always goes out) and before the ledger and the quota. Any read
   // error refuses: it never lets an older check through.
-  let newest: boolean;
+  let scanCheck: EchoScanCheck;
   try {
-    newest = await isNewestEchoScan(uid, scanId);
+    scanCheck = await checkEchoScan(uid, scanId);
   } catch (err) {
     if (err instanceof AdminNotConfiguredError) return misconfigured(err);
     console.error("skin-check chat: newest check unreadable:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
     return NextResponse.json({ error: "Echo can't check your scans right now. Please try again.", code: "CHAT_CHECK_UNAVAILABLE" }, { status: 503 });
   }
-  if (!newest) {
+  if (scanCheck === "not_newest") {
     return NextResponse.json({ error: "Echo talks about your newest check only.", code: "CHAT_NOT_NEWEST" }, { status: 409 });
+  }
+  // The check just made whose reading has not landed (or an unreadable one):
+  // the same retryable answer as before, and nothing is spent.
+  if (scanCheck === "no_reading") {
+    return NextResponse.json({ error: "This scan's analysis isn't available yet.", code: "CHAT_ANALYSIS_UNAVAILABLE" }, { status: 409 });
   }
 
   // H02a (D-19): Gemini's terms require 18+. Chat may hard-reject (D-03a:

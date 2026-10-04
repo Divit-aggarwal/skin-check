@@ -14,7 +14,7 @@ vi.mock("@/lib/firebase/admin", () => ({
   }),
 }));
 
-import { isNewestEchoScan } from "@/lib/echo-newest-scan";
+import { checkEchoScan } from "@/lib/echo-newest-scan";
 import { deriveDashboard } from "@/components/dashboard/state";
 
 const UID = "SYNTH_UID";
@@ -27,24 +27,29 @@ function analysis(scanId: string, day: number, extra: Record<string, unknown> = 
   return { id: scanAnalysisDocId(scanId, sha), data: { ...data, createdAt: new Date(Date.UTC(2026, 9, day)) } };
 }
 
-describe("isNewestEchoScan (F13)", () => {
+describe("checkEchoScan (F13)", () => {
   it("only the newest measured check; reads this uid's own records", async () => {
     h.docs = [analysis(A, 1), analysis(B, 2)];
-    expect(await isNewestEchoScan(UID, B)).toBe(true);
-    expect(await isNewestEchoScan(UID, A)).toBe(false);
+    expect(await checkEchoScan(UID, B)).toBe("ok");
+    expect(await checkEchoScan(UID, A)).toBe("not_newest");
     expect(h.path).toBe(`users/${UID}/scanAnalyses`);
     // The same scan the dashboard offers.
     expect(deriveDashboard(UID, [], h.docs).echoScanId).toBe(B);
   });
 
-  it("a newest reading with unreadable scores: no check at all, not the older one", async () => {
+  it("a newest reading with unreadable scores: neither check is answered, and neither is told 'not newest'", async () => {
     h.docs = [analysis(A, 1), analysis(B, 2, { scores: { redness: 5 } })];
-    expect(await isNewestEchoScan(UID, A)).toBe(false);
-    expect(await isNewestEchoScan(UID, B)).toBe(false);
+    expect(await checkEchoScan(UID, A)).toBe("no_reading");
+    expect(await checkEchoScan(UID, B)).toBe("no_reading");
   });
 
-  it("no records: nothing", async () => {
+  it("the check just made, with no server record yet, next to an older reading: no_reading (retryable), not 'not newest'", async () => {
+    h.docs = [analysis(A, 1)];
+    expect(await checkEchoScan(UID, B)).toBe("no_reading");
+  });
+
+  it("no records: no reading", async () => {
     h.docs = [];
-    expect(await isNewestEchoScan(UID, A)).toBe(false);
+    expect(await checkEchoScan(UID, A)).toBe("no_reading");
   });
 });

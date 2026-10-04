@@ -17,11 +17,11 @@ const h = vi.hoisted(() => ({
   handleContextChat: vi.fn(),
   loadTrustedSkinState2Series: vi.fn(),
   evaluateSafety: vi.fn(),
-  isNewestEchoScan: vi.fn(),
+  checkEchoScan: vi.fn(),
 }));
 
 // F13: the route's newest-check guard; tests/echo-newest-scan.test.ts covers it.
-vi.mock("@/lib/echo-newest-scan", () => ({ isNewestEchoScan: (...a: unknown[]) => h.isNewestEchoScan(...a) }));
+vi.mock("@/lib/echo-newest-scan", () => ({ checkEchoScan: (...a: unknown[]) => h.checkEchoScan(...a) }));
 vi.mock("@google/genai", () => ({ GoogleGenAI: class { models = { generateContent: h.generateContent }; } }));
 vi.mock("@/lib/firebase/admin", async () => {
   const actual = await vi.importActual<typeof import("@/lib/firebase/admin")>("@/lib/firebase/admin");
@@ -81,7 +81,7 @@ beforeEach(async () => {
   vi.stubEnv("FIREBASE_PRIVATE_KEY", "test-private-key");
   vi.stubEnv("ECHO_CONTEXT_PATH", "on");
   h.verifyFirebaseIdToken.mockResolvedValue("uid-ctx");
-  h.isNewestEchoScan.mockResolvedValue(true);
+  h.checkEchoScan.mockResolvedValue("ok");
   h.consumeDailyQuota.mockReturnValue(null);
   h.ageStatus.mockResolvedValue("over18");
   h.latestGrant.mockResolvedValue(true);
@@ -394,21 +394,29 @@ describe("red-flag pre-filter on both chat paths (wave-2 security review)", () =
 describe("only the newest measured check (F13)", () => {
   it.each([["context path", "on"], ["today's Echo", "off"]])("%s: an older check gets 409 CHAT_NOT_NEWEST before the ledger, the quota and Gemini", async (_n, flag) => {
     vi.stubEnv("ECHO_CONTEXT_PATH", flag);
-    h.isNewestEchoScan.mockResolvedValue(false);
+    h.checkEchoScan.mockResolvedValue("not_newest");
     const res = await post();
     expect(res.status).toBe(409);
     expect((await res.json()).code).toBe("CHAT_NOT_NEWEST");
-    expect(h.isNewestEchoScan).toHaveBeenCalledWith("uid-ctx", SCAN_ID);
+    expect(h.checkEchoScan).toHaveBeenCalledWith("uid-ctx", SCAN_ID);
     for (const fn of [h.ageStatus, h.consumeDailyQuota, h.loadTrustedEchoContext, h.generateContent, h.getSkinCheckChatReply, h.recordChatTurns]) expect(fn).not.toHaveBeenCalled();
   });
 
   it("a red-flag message about an older check still gets the referral", async () => {
-    h.isNewestEchoScan.mockResolvedValue(false);
+    h.checkEchoScan.mockResolvedValue("not_newest");
     expect((await (await post("I want to end my life")).json()).reply).toBe(REFERRAL_COPY);
   });
 
+  it("the check just made, whose reading has not landed: the retryable 409 CHAT_ANALYSIS_UNAVAILABLE, nothing spent", async () => {
+    h.checkEchoScan.mockResolvedValue("no_reading");
+    const res = await post();
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("CHAT_ANALYSIS_UNAVAILABLE");
+    for (const fn of [h.consumeDailyQuota, h.generateContent, h.getSkinCheckChatReply, h.recordChatTurns]) expect(fn).not.toHaveBeenCalled();
+  });
+
   it("a read error refuses (503), never lets the check through", async () => {
-    h.isNewestEchoScan.mockRejectedValue(new Error("firestore down"));
+    h.checkEchoScan.mockRejectedValue(new Error("firestore down"));
     const res = await post();
     expect(res.status).toBe(503);
     expect((await res.json()).code).toBe("CHAT_CHECK_UNAVAILABLE");

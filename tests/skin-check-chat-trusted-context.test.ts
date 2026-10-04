@@ -33,7 +33,7 @@ function fakeCollection(path: string) {
 }
 
 // F13: the route's newest-check guard; tests/echo-newest-scan.test.ts covers it.
-vi.mock("@/lib/echo-newest-scan", () => ({ isNewestEchoScan: async () => true }));
+vi.mock("@/lib/echo-newest-scan", () => ({ checkEchoScan: async () => "ok" }));
 vi.mock("@/lib/firebase/admin", async () => {
   const actual = await vi.importActual<typeof import("@/lib/firebase/admin")>("@/lib/firebase/admin");
   return {

@@ -171,6 +171,11 @@ function primaryPerScan(uid: string, analyses: readonly Doc[]): Map<string, Meas
   return out;
 }
 
+/** Checks with a measured reading here (the record picked as Echo picks it is a valid skinstate-2). */
+export function measuredScanIds(uid: string, analyses: readonly Doc[]): Set<string> {
+  return new Set(primaryPerScan(uid, analyses).keys());
+}
+
 /**
  * The scan Echo is offered about: the newest measured reading whose scores can
  * be read (red team I02, E-F4), else null. F13 (owner TD-20): the chat route
