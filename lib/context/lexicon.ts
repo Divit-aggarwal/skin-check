@@ -39,7 +39,7 @@ export function firstMatch(pattern: RegExp, text: string): string | null {
 export const NUMBER = re([
   "\\p{N}",
   "%",
-  "\\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|half|halves|double|twice|thrice|triple|dozen|percent|percentage|third|quarter|several|couple|first|second|fifth|tenth)s?\\b",
+  "\\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|half|halves|double|twice|thrice|triple|dozen|percent|percentage|third|quarter|several|couple|first|second|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)s?\\b",
   "\\b(?:ek|teen|char|chaar|paanch|panch|chhe|chhah|saat|aath|nau|das|bees|pachees|tees|chalees|pachaas|sau|hazaar|hazar|lakh|crore|aadha|dedh|dhai|dugna)\\b",
 ]);
 
@@ -76,6 +76,18 @@ export const CHANGE = re([
   "\\bacc?ha hua\\b",
   "\\bbadh\\w*",
   "\\bghat\\w*",
+  // wave-2 security review: change verbs and comparatives not listed before
+  "\\bdrop(?:s|ped|ping)?\\b",
+  "\\bfell\\b",
+  "\\bfall(?:en|ing|s)?\\b",
+  "\\b(?:rose|risen|rising|rises)\\b",
+  "\\bspik\\w*",
+  "\\beas(?:ed|ing|es)\\b",
+  "\\bsettl\\w*",
+  "\\b(?:down|up) from\\b",
+  "\\b(?:redder|smoother|oilier|shinier|rougher|darker|lighter|bumpier|drier|softer)\\b",
+  "\\bthan\\b",
+  "\\bfa?rak\\b",
 ]);
 
 // §5 rule 5.
@@ -154,6 +166,13 @@ export const CAUSE = re([
   "\\bwajah\\b",
   "\\bvajah\\b",
   "\\bisliye\\b",
+  // wave-2 security review
+  "\\bfrom (?:the|your) (?:humidity|weather|heat|climate|pollution|water|diet|food|products?|routine|cream|stress|sleep|hormones?)\\b",
+  "\\bowing to\\b",
+  "\\ba result of\\b",
+  "\\bke kaa?ran\\b",
+  "\\bkyu+n?ki\\b",
+  "\\bkyuki\\b",
 ]);
 
 export const FORECAST = re([
@@ -200,6 +219,11 @@ export const PAST_EVENT = re([
   "\\bsince you\\b",
   "\\bpich(?:h)?l[ie]\\b",
   "\\bpehle\\b",
+  // wave-2 security review
+  "\\blast (?:monday|tuesday|wednesday|thursday|friday|saturday|sunday|spoke|talked|chatted|saw|time we)\\b",
+  "\\bwhen (?:we|you) last\\b",
+  "\\b(?:january|february|april|june|july|august|september|october|november|december)\\b",
+  "\\bmarch (?:check|scan|photo|reading)s?\\b",
 ]);
 
 // Actives and named product categories (§2 item 3: no product outside rec.* facts).
@@ -287,6 +311,7 @@ export const INSTRUCTION = re([
   "\\bprompt\\b",
   "\\bdirections?\\b",
   "\\bsay\\b",
+  "\\b(?:write|reply|respond|answer|speak|translate)\\b.{0,30}\\b(?:in|only|every|always|as)\\b",
   "(?:\\b\\w[.\\-_*]){3,}\\w\\b",
   // letters spaced out to dodge a word list: "i g n o r e"
   "(?:\\b\\w\\s){3,}\\w\\b",

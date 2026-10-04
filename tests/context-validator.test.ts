@@ -156,3 +156,33 @@ describe("our own text passes our own validator", () => {
     expect(NUMBER.test(UNCERTAINTY.text)).toBe(true);
   });
 });
+
+// ── wave-2 security review: answers that passed the validator before ────────
+describe("validator: wave-2 security review bypasses are caught", () => {
+  const BLEM = reading("state.all.blemishes");
+  const desc = (text: string, id = RED.id) => ok([{ claim_type: "descriptive", text, fact_ids: [id] }, UNC]);
+  it.each([
+    ["a change verb", desc(`Redness for the whole face has dropped to ${RED.band}.`)],
+    ["a made-up past event", desc(`Your March check showed Redness at ${RED.band} for the whole face.`)],
+    ["a cause", desc(`Redness for the whole face reads ${RED.band}, likely from the humidity.`)],
+    ["an amount word that is not a band", desc("The photo shows plenty of redness across the whole face.")],
+    ["a user answer shown as measured (shaving bumps)", desc("The photo shows shaving bumps on the chin.", BLEM.id)],
+    ["a user answer shown as measured (breakouts)", desc("The photo shows breakouts across the whole face.", BLEM.id)],
+    ["an echo with no 'you told us'", ok([{ claim_type: "self_reported_echo", text: "Your skin is shiny by mid-day.", fact_ids: ["self.all.skin_type"] }])],
+    ["an uncited change pointing back at a reading", ok([{ claim_type: "descriptive", text: `Your redness reads ${RED.band} for the whole face.`, fact_ids: [RED.id] }, UNC, { claim_type: "smalltalk", text: "That is down from where it was.", fact_ids: [] }])],
+    ["smalltalk with a past event and a comparative", ok([UNC, { claim_type: "smalltalk", text: "Last Tuesday your skin was redder.", fact_ids: [] }])],
+    ["smalltalk with 'than'", ok([UNC, { claim_type: "smalltalk", text: "Your skin is smoother than when we last spoke.", fact_ids: [] }])],
+    ["a Roman numeral", ok([UNC, { claim_type: "clarify", text: "Do you mean type III?", fact_ids: [] }])],
+    ["an ordinal", ok([UNC, { claim_type: "clarify", text: "Is this your fourth check?", fact_ids: [] }])],
+    ["a change phrase split across two claims", ok([UNC, { claim_type: "clarify", text: "Do you want to know whether yours went", fact_ids: [] }, { claim_type: "clarify", text: "down? I can help.", fact_ids: [] }])],
+  ])("%s fails", (_name, raw) => {
+    expect(validateAnswer(raw, pkg, "tell me about my skin").passed).toBe(false);
+  });
+
+  it("faithful answers still pass: a framed description, a told echo, plain smalltalk and clarify", () => {
+    expect(validateAnswer(desc(`Your scan shows ${RED.band} redness for the whole face.`), pkg, "x").failures).toEqual([]);
+    expect(validateAnswer(ok([{ claim_type: "self_reported_echo", text: "You said: Leaves a dark mark that fades over time.", fact_ids: ["self.all.pih_scar_tendency"] }]), pkg, "x").failures).toEqual([]);
+    expect(validateAnswer(ok([UNC, { claim_type: "smalltalk", text: "Happy to help.", fact_ids: [] }]), pkg, "x").failures).toEqual([]);
+    expect(validateAnswer(ok([UNC, { claim_type: "clarify", text: "Which area of your face do you mean?", fact_ids: [] }]), pkg, "x").failures).toEqual([]);
+  });
+});

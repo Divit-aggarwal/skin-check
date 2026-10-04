@@ -99,12 +99,24 @@ const UNCITED_MAX = 240;
 const FRAME = new Set(
   "you told us said say mentioned noted shared your that the a an and or is are was were for about on in of with we as it this these listed picked chose selected answered answer answers quiz here also so i me my our".split(" ")
 );
+// A descriptive claim may add only these words to its cited facts' own words (security review, wave 2).
+const DESCRIBE_FRAME = new Set(
+  Array.from(FRAME).concat("reads read reading readings shows show photo photos scan skin level at across whole face region area estimate based by".split(" "))
+);
+// A self-report echo must say it is what the user told us (security review, wave 2).
+const TOLD = new RegExp(String.raw`\b(?:told|said|mentioned|noted|shared|listed|picked|chose|selected|answered)\b`, "iu");
+// Uncited claims: no comparison, and smalltalk does not talk about the skin or point back at a reading.
+const UNCITED_COMPARE = new RegExp(String.raw`\bthan\b`, "iu");
+const SMALLTALK_SKIN = new RegExp(String.raw`\b(?:skin|face|complexion|spots?|acne|pimples?|breakouts?|shine|shiny|oily|bumps?|marks?|tone|it|that|this)\b`, "iu");
+// Roman numerals as numbers ("type III skin"), on the raw text, upper case only.
+const ROMAN = /\b(?:II|III|IV|VI|VII|VIII|IX|XI|XII)\b/;
 const wordsOf = (text: string) => text.toLowerCase().match(new RegExp(String.raw`\p{L}+`, "gu")) ?? [];
 
-function extraWord(stripped: string, cited: CitableFact[]): string | null {
+function extraWord(stripped: string, cited: CitableFact[], frame: Set<string> = FRAME, bands: string[] = []): string | null {
   // A band or intensity word is never an "own" word: "Your Redness is heavy" reuses a label word as a band (re-check N5).
-  const own = new Set(cited.flatMap((f) => wordsOf(normalizeForMatch(f.text))).filter((w) => !BAND_WORD.test(w)));
-  return wordsOf(stripped).find((w) => !FRAME.has(w) && !own.has(w)) ?? null;
+  // Only a cited reading's own band is allowed back in, and band_mismatch still checks it.
+  const own = new Set(cited.flatMap((f) => wordsOf(normalizeForMatch(f.text))).filter((w) => !BAND_WORD.test(w)).concat(bands));
+  return wordsOf(stripped).find((w) => !frame.has(w) && !own.has(w)) ?? null;
 }
 
 function stripQuotes(text: string, cited: CitableFact[]): string {
@@ -164,6 +176,13 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
     if (!MUST_CITE.has(claim.claim_type) && (claim.fact_ids.length > 0 || BAND_WORD.test(text) || metricsIn(text).length > 0 || text.length > UNCITED_MAX)) {
       fail("citation_rule", i);
     }
+    if (!MUST_CITE.has(claim.claim_type) && UNCITED_COMPARE.test(text)) fail("comparative_or_change", i, "than");
+    if (claim.claim_type === "smalltalk") {
+      const skin = firstMatch(SMALLTALK_SKIN, text);
+      if (skin) fail("citation_rule", i, skin);
+    }
+    const roman = firstMatch(ROMAN, claim.text);
+    if (roman) fail("made_up_number", i, roman);
 
     for (const [check, pattern] of WORD_CHECKS) {
       // Numbers also on the raw text: NFKD folds "Ⅳ" to the letters "IV".
@@ -222,6 +241,15 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
     if (claim.claim_type === "self_reported_echo") {
       const extra = extraWord(stripped, cited);
       if (extra) fail("self_report_as_measurement", i, extra);
+      if (!TOLD.test(text)) fail("self_report_as_measurement", i);
+    }
+    // A description is the cited readings' own words in a frame, nothing else:
+    // no "dropped to", "your March check", "likely from the humidity",
+    // "plenty of" or "shaving bumps" (security review, wave 2).
+    if (claim.claim_type === "descriptive") {
+      const extra = extraWord(stripped, cited, DESCRIBE_FRAME, cited.flatMap((f) => (f.band ? [f.band.toLowerCase()] : [])));
+      // No term: a common extra word ("about") must not read as the user's own premise and stop the retry.
+      if (extra) fail("contradicts_package", i);
     }
     if (kinds.has("rec")) {
       // Own words from the product facts only, so a reading cannot be pulled in ("…, for your Elevated redness").
@@ -229,6 +257,13 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
       if (extra) fail("product_claim", i, extra);
     }
   });
+
+  // The user reads the claims joined: a phrase split across two claims is checked too.
+  const joined = answer.claims.map((c) => stripQuotes(normalizeForMatch(c.text), c.fact_ids.flatMap((id) => facts.get(id) ?? []))).join(" ");
+  for (const [check, pattern] of WORD_CHECKS) {
+    const term = firstMatch(pattern, joined);
+    if (term && !failures.some((f) => f.check === check)) fail(check, -1, term);
+  }
 
   // An answer that describes a reading also says what the reading cannot tell.
   const describes = answer.claims.some((c) => c.claim_type === "descriptive");

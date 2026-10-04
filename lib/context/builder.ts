@@ -27,7 +27,7 @@ import type { SkinCheckAnswers } from "@/types/skin-check";
 import type { SkinScanScores } from "@/types/skin-scan";
 import {
   BAND_NAME, CAUSE, CHANGE, CONFIDENCE, DIAGNOSIS, FORECAST, FORMAT_CHARS, INSTRUCTION, MEASUREMENT, MEDICAL, NON_LATIN, NUMBER,
-  PAST_EVENT, PRODUCT_INTENT, UNMEASURED_WORDS, normalizeForMatch,
+  LOOKALIKE, PAST_EVENT, PRODUCT_INTENT, UNMEASURED_WORDS, normalizeForMatch,
 } from "./lexicon";
 
 // F01 + F04 (docs/lanes/context-design.md §3.3, §3.4). Deterministic: the
@@ -152,7 +152,8 @@ const SCREENS = [CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST, CONFIDENCE, INSTRU
 export function screenExternalText(text: string): boolean {
   if (!text.trim() || text.length > 300 || FORMAT_CHARS.test(text) || NON_LATIN.test(text.normalize("NFKC"))) return false;
   const folded = normalizeForMatch(text);
-  return !SCREENS.some((re) => re.test(folded));
+  // A lookalike letter (dotless ı, small capitals) is a disguise (security review, wave 2).
+  return !LOOKALIKE.test(folded) && !SCREENS.some((re) => re.test(folded));
 }
 
 const SLUG = /^[a-z0-9-]{1,40}$/;

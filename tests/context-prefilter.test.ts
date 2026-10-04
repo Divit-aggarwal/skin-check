@@ -166,3 +166,9 @@ describe("red-flag pre-filter: disguised and variant inputs (wave-2 security rev
     expect(redFlagHit(joinedUserTurns(history, "die"))).toBe(true);
   });
 });
+
+describe("comparison pre-filter: wave-2 security review phrasings", () => {
+  it.each(["did it work?", "has redness dropped?", "kya farak pada?", "any difference?"])("hits: %j", (msg) => {
+    expect(comparisonHit(msg)).toBe(true);
+  });
+});

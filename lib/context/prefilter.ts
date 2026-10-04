@@ -128,6 +128,11 @@ const COMPARISON = re([
   "\\bacc?ha hua\\b",
   "\\bkaam kar (?:raha|rahi|rha|rhi)\\b",
   "पहले|बेहतर|सुधार",
+  // wave-2 security review
+  "\\bdid (?:it|this|that|the \\w+) (?:work|help)\\b",
+  "\\b(?:has|have|is|did) (?:my |the )?\\w+ (?:dropped|gone down|gone up|reduced|increased|faded|cleared)\\b",
+  "\\bfa?rak\\b",
+  "\\bdifference\\b",
 ]);
 
 // Lookalike letters from Cyrillic and Greek that read as Latin (security review, wave 2).
