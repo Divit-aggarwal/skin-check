@@ -124,7 +124,7 @@ export function fullInput(overrides: Partial<BuildInput> = {}): BuildInput {
   return {
     regionFocus: "cheeks",
     message: "what products should I use for my routine?",
-    skin: { scores: SCORES, regionScores: { cheeks: CHEEK_SCORES, forehead: SCORES }, regionLowConfidence: { cheeks: true }, pipelineVersion: "scan-0.1.6-provisional" },
+    skin: { scores: SCORES, regionScores: { cheeks: CHEEK_SCORES, forehead: SCORES }, regionLowConfidence: { cheeks: true }, pipelineVersion: "scan-0.1.6-provisional", schemaVersion: 1 },
     answers: ANSWERS,
     longitudinal: [nee("colour.native.aStarMean", "cheek_image_left"), nee("colour.corrected.aStarP90", "cheek_image_right", true), nee("texture.lbpEntropy", "forehead"), PAIRWISE],
     recommendation: { result: RECOMMENDATION, products: PRODUCTS },

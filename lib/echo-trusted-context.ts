@@ -17,6 +17,9 @@ const AnalysisSchema = z.object({
   // could read into a 409.
   region_low_confidence: SkinScanRegionLowConfidenceSchema.optional().catch(undefined),
   pipeline_version: z.string().max(100).optional().catch(undefined),
+  // F09: the record's own schema version, so the context package names the
+  // contract the data was really read under. A bad value is dropped (unknown).
+  schemaVersion: z.number().int().positive().max(1000).optional().catch(undefined),
 });
 
 // Same bounds the chat route used to apply to client-sent answers. Answers are
@@ -32,6 +35,8 @@ export interface TrustedEchoContext {
   answers: SkinCheckAnswers;
   regionLowConfidence: Record<string, boolean>;
   pipelineVersion: string | null;
+  /** schemaVersion of the scanAnalyses record read; null when absent or malformed. */
+  schemaVersion: number | null;
 }
 
 const millis = (value: unknown): number =>
@@ -72,5 +77,6 @@ export async function loadTrustedEchoContext(uid: string, scanId: string): Promi
     answers: answers.success ? answers.data : {},
     regionLowConfidence: analysis.data.region_low_confidence ?? {},
     pipelineVersion: analysis.data.pipeline_version ?? null,
+    schemaVersion: analysis.data.schemaVersion ?? null,
   };
 }

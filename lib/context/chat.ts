@@ -97,7 +97,7 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
   // rules are off in production builds, and nothing calls recommend() yet.
   // No server record says which answers were confirmed on this check
   // (tracker row), so every answer counts as reused: caution is never removed.
-  const skin = { scores: trusted.scores, regionScores: trusted.regionScores, regionLowConfidence: trusted.regionLowConfidence, pipelineVersion: trusted.pipelineVersion };
+  const skin = { scores: trusted.scores, regionScores: trusted.regionScores, regionLowConfidence: trusted.regionLowConfidence, pipelineVersion: trusted.pipelineVersion, schemaVersion: trusted.schemaVersion };
   let safety: SafetyState;
   try {
     safety = evaluateSafety({ answers: trusted.answers, confirmedThisScan: [] });

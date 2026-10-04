@@ -21,7 +21,6 @@ import { PRODUCT_NAME_EXCEPTIONS } from "@/lib/catalog/catalogue";
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { describeStepAnswerParts } from "@/lib/skin-check-format";
 import { bandScores, SCORING_VERSION } from "@/lib/skin-check-rules";
-import { SCAN_ANALYSIS_SCHEMA_VERSION } from "@/lib/scan-analysis-record";
 import type { EchoRegion } from "@/lib/echo-regions";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import type { SkinScanScores } from "@/types/skin-scan";
@@ -173,6 +172,8 @@ export interface TrustedSkin {
   regionScores: Record<string, SkinScanScores>;
   regionLowConfidence: Record<string, boolean>;
   pipelineVersion: string | null;
+  /** schemaVersion of the scanAnalyses record the scores were read from (F09). */
+  schemaVersion?: number | null;
 }
 
 export interface ProductLookup {
@@ -306,8 +307,10 @@ export function buildContextPackage(input: BuildInput): ContextPackage {
     const focus = input.regionFocus;
     const focusScores = focus ? input.skin.regionScores[focus] : undefined;
     pkg.skin = {
-      // Honest provenance: bands come from the scanAnalyses record, not a SkinState read (request to main).
-      contractVersion: `scan-analysis-${SCAN_ANALYSIS_SCHEMA_VERSION}`,
+      // TD-17 (4), F09: bands come from a scanAnalyses record, not a SkinState
+      // read, so the label names that record's own schema version, never the
+      // version this code writes.
+      contractVersion: typeof input.skin.schemaVersion === "number" ? `scan-analysis-${input.skin.schemaVersion}` : "scan-analysis-unknown",
       scoringVersion: SCORING_VERSION,
       pipelineVersion: input.skin.pipelineVersion ?? "unknown",
       readings: [

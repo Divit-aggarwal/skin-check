@@ -38,3 +38,26 @@ describe("trusted context additive fields", () => {
     expect(ctx!.scores).toEqual(scores);
   });
 });
+
+// TD-17 (4), F09: the label names the contract the record was really read under.
+describe("contractVersion comes from the record that was read (F09)", () => {
+  const label = async (extra: Record<string, unknown>) => {
+    const { buildContextPackage } = await import("@/lib/context/builder");
+    store.analysis = { scanId: "s", scores, ...extra };
+    const ctx = (await loadTrustedEchoContext("u", "s"))!;
+    const skin = { scores: ctx.scores, regionScores: ctx.regionScores, regionLowConfidence: ctx.regionLowConfidence, pipelineVersion: ctx.pipelineVersion, schemaVersion: ctx.schemaVersion };
+    return buildContextPackage({ regionFocus: null, message: "hi", skin, answers: {} }).skin!.contractVersion;
+  };
+
+  it.each([
+    [{ schemaVersion: 1 }, "scan-analysis-1"],
+    // A record of another schema keeps its own label, not the version this code writes.
+    [{ schemaVersion: 2 }, "scan-analysis-2"],
+    [{}, "scan-analysis-unknown"],
+    [{ schemaVersion: "1" }, "scan-analysis-unknown"],
+    [{ schemaVersion: 1.5 }, "scan-analysis-unknown"],
+    [{ schemaVersion: -1 }, "scan-analysis-unknown"],
+  ])("%j gives %s, and the record still loads", async (extra, expected) => {
+    expect(await label(extra)).toBe(expected);
+  });
+});
