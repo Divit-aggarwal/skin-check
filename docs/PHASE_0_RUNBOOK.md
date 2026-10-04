@@ -1,34 +1,124 @@
-# PHASE 0 RUNBOOK: engine 0.1.6, India Firestore, Vercel bom1, website gates 01-04
+# DEPLOY RUNBOOK: everything on `longitudinal-platform`
 
-Prepared 2026-10-03 on `longitudinal-platform`. **Nothing in this file has been executed.**
+Engine 0.1.6, India Firestore, Vercel bom1, website gates 01-04, and every feature built on the branch since (longitudinal engine, rules safety check, context-path Echo, dashboard, privacy: consent ledger, 18+ gate, erase and sweep).
 
-- Every step that changes production is run by **the owner**. The agent only prepared this file.
-- Commands are written to run from the skin-check repository root (`/Users/divit/Projects/frontend/skin-check`) unless a step says otherwise.
-- Never paste a secret value into a terminal line, a document, a ticket or a chat. The commands below load secrets into shell variables only.
-- Sources: ENGINE_0_1_6_DEPLOYMENT_PLAN.md, FIRESTORE_RESET_RUNBOOK.md and DATA_LOCALITY_DECISION.md (D-22, both on `infra/india-region` ff08107), PHASE_0_0_1_6_RESULTS.md, GATE_02 §8.
+First prepared 2026-10-03; rewritten 2026-10-05 for the whole branch. **Nothing in this file has been executed except C0 and C1 (2026-10-03, TD-04).**
+
+- Every step that changes production is run by **the owner**. Each one has a `STOP (owner runs this)` line above it (C1 is already done). The agent only prepared this file.
+- Commands run from the skin-check repository root (`/Users/divit/Projects/frontend/skin-check`) unless a step says otherwise.
+- Never paste a secret value into a terminal line, a document, a ticket or a chat. The commands below pipe secrets straight from the tool that makes them into the tool that stores them.
+- Sources: ENGINE_0_1_6_DEPLOYMENT_PLAN.md, FIRESTORE_RESET_RUNBOOK.md and DATA_LOCALITY_DECISION.md (D-22, on `infra/india-region` ff08107), PHASE_0_0_1_6_RESULTS.md, GATE_02 §8, H01_S3_ERASURE_READINESS.md, the tracker (TD-19, TD-20).
 
 ## Order and why
 
 | Order | Job | Why here |
 |---|---|---|
-| 1 | **C. Engine 0.1.6** | Independent of the other jobs, and the safest: the live website (1b39f88) works unchanged with 0.1.6 (its response schema is `.passthrough()` and `pipeline_version` is any string). It is undone with one command. Doing it first means the new website's first `scanAnalyses` records already carry `engine_build`. Its live replay must finish before job A's outage, so the two checks never overlap. |
-| 2 | **A. Firestore reset to asia-south1** | Irreversible, but the data is disposable (owner decision, D-22). It must come **before D**, so the first `scanAnalyses` records are created in India. The live website keeps working on the new database once the rules are deployed (LP's rules are the live rules plus one owner-read-only block). |
-| 3 | **B. Vercel bom1** | Done as an isolated redeploy of the **current** production code (1b39f88) with the project region changed, so the region change is tested on its own and undone with Instant Rollback. It comes after A so the functions move next to the new database. The `vercel.json` half of B cannot ship on its own: ff08107 also carries gate-01 code (6e9081d) without its durability fix (428c63d). It ships with D. |
-| 4 | **D. Website gates 01-04** | Last, because it depends on A (D-22: first records in India) and on the A14 merge that brings `vercel.json`. Merging the pull request into `master` **is** the production deploy: the Vercel project deploys `master` automatically. Gates 01 and 02 ship together in one merge. GATE_02 §8 requires gate 01 first or together. |
+| 0 | **P. Before any job** | Backups and credential removal (unchanged), plus the owner inputs the code still needs before it can ship (P3). |
+| 1 | **C. Engine 0.1.6** | Unchanged. Independent of the others and undone with one command. C0 and C1 are done (2026-10-03); resume at C2. |
+| 2 | **A. Firestore reset to asia-south1** | Unchanged order, **one change in A3**: A3 now deploys the **live (`master`) rules**, not the branch rules. The branch rules are no longer "the live rules plus one read-only block": they refuse client writes the live site has never been tested against (profile key list, server-dated checks, erased and under-18 markers). They are deployed in job D (D3), right after the code that needs them. |
+| 3 | **B. Vercel bom1** | Unchanged. |
+| 4 | **S. Production settings (new)** | Before D because the new code reads these settings when it is deployed: the erase S3 keys and `CRON_SECRET` must exist when D2 builds, or the erase and the sweep refuse in production. The photo expiry rule (S5) can run any time after the owner chooses the period. |
+| 5 | **D. Website: everything on the branch** | Last. Depends on A (first records in India), B, S and the A14 merge. Merging into `master` **is** the production deploy. The branch rules and the chat-turn expiry policy (D3) go out right after the code is live. |
 
-**Between jobs:** each job ends with a STOP line. The owner confirms the job's checks passed, writes the result into the tracker, and only then starts the next job.
+**Between jobs:** each job ends with a STOP block. The owner confirms the job's checks passed, writes the result into the tracker, and only then starts the next job.
 
 ---
 
-## Before any job (owner, read-only or git-only)
+## Production settings (Vercel project `skin-check`, environment Production)
+
+Names only. Set with `vercel env add <NAME> production` (the value is read from stdin, never typed on the command line) or in the dashboard. "Present" means already set on 2026-10-05 (`vercel env ls`).
+
+| Variable | What it is for | Who sets it | Production value | Today |
+|---|---|---|---|---|
+| `NEXT_PUBLIC_FIREBASE_API_KEY`, `_AUTH_DOMAIN`, `_PROJECT_ID`, `_STORAGE_BUCKET`, `_MESSAGING_SENDER_ID`, `_APP_ID` | Firebase client config (sign-in, Firestore reads in the browser) | Owner | the `projectskin-a202c` web app config | Present |
+| `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Firebase Admin: verifies ID tokens, writes `scanAnalyses`, ledger, chat turns, erase. `FIREBASE_PRIVATE_KEY` also derives the Echo history-token signing key (`lib/echo-history-token.ts`), so rotating it (B01) invalidates open chat threads, which is harmless | Owner | the rotated key (B01) | Present (rotate in P2/B01) |
+| `SKIN_SCAN_API_URL`, `SCAN_API_SECRET` | The engine on ECS and its shared secret | Owner | `https://api.theprojectskin.com`, the ECS secret | Present |
+| `S3_SKIN_IMAGES_REGION`, `S3_SKIN_IMAGES_BUCKET` | Photo bucket | Owner | `ap-south-1`, `projectskin-skin-originals-prod` | Present |
+| `S3_SKIN_IMAGES_ACCESS_KEY_ID`, `S3_SKIN_IMAGES_SECRET_ACCESS_KEY` | Upload-only principal `skin-check-uploader` (presigned PUT) | Owner | existing keys | Present |
+| `S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID`, `S3_SKIN_IMAGES_ERASE_SECRET_ACCESS_KEY` | **Erase credentials**: a separate principal that may list and delete under `users/*` only (account erase and the sweep) | Owner (S1, S2) | keys of the new `skin-check-eraser` user | **Missing** |
+| `CRON_SECRET` | The erase sweep refuses without it; Vercel sends it as `Authorization: Bearer …` on every cron call | Owner (S3) | 32 random bytes, hex | **Missing** |
+| `GEMINI_API_KEY` | Echo (context path) | Owner, after G1 (paid tier, region) | the key G1 approves | Present (key ownership/tier unresolved, G1) |
+| `GEMINI_MODEL_SYNTHESIS` | Model id for Echo; unset means `gemini-3.6-flash` | Owner | the model G1 approves | Present |
+| `GEMINI_MODEL_VISION` | Not read by the code any more | Owner | may be removed | Present (unused) |
+| `NEXT_PUBLIC_APP_ENV` | Only turns on full fetch-URL logging when `development` | Owner | `production` | Present |
+| `NEXT_PUBLIC_TERMS_URL` | Terms link on the photo step | Owner | the terms page URL | Present |
+
+**Feature switches (no setting changes them in production):**
+
+| Switch | Where | Production behaviour |
+|---|---|---|
+| Echo path (`ECHO_CONTEXT_PATH`) | `lib/context/switch.ts` | Context path always (F12, TD-20). A production build ignores the variable; leave it **unset**. Going back to today's Echo is a code change and a redeploy. |
+| Rules safety check | `lib/rules/settings.ts` (`REVIEW_STATUS`) | **On**, marked `provisional` (TD-20): the red-flag and extra-caution check runs. |
+| Product recommendations | same | **Off** until clinical sign-off (E05). No setting turns them on. |
+| 18+ attestation required for scan/upload | `app/api/account/_ledger.ts` (`REQUIRE_AGE_ATTESTATION`) | `false` (decision 3a): logged, not refused. Under-18 is always refused; chat always requires 18+. |
+
+**Must be unset in Production** (development and test only; most are ignored in production builds anyway): `ECHO_CONTEXT_PATH`, `ERASE_SWEEP_DELAY_SECONDS`, `GEMINI_DEV_API_KEY`, `GEMINI_LOCAL_BASE_URL`, `FAKE_GEMINI_PORT`, `S3_SKIN_IMAGES_ENDPOINT`, `FIREBASE_AUTH_EMULATOR_HOST`, `FIRESTORE_EMULATOR_HOST`, `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST`, `NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST`. S4 checks this.
+
+## Database rules and indexes (as on the branch)
+
+`firestore.rules` (deployed in D3). Deny by default; every path a client touches is matched explicitly.
+
+| Path | Client read | Client write |
+|---|---|---|
+| `users/{uid}` | owner `get` | owner `create`/`update` with only `phoneNumber` (must equal the token's) and `lastSeenAt`, and only while no `erasedAccounts/{uid}`; never `delete` |
+| `users/{uid}/skinChecks/{checkId}` | owner `get`, `list` | owner `create` only: no `erasedAccounts/{uid}`, no `under18Accounts/{uid}` (H24), `createdAt == request.time`, `scanId` equals the doc id, `image.stored` boolean, `image.key` under the owner's own prefix, a stored image only with image-retention consent at the current version; never `update`/`delete` |
+| `users/{uid}/scanAnalyses/{id}` | owner `get`, `list` | none (server only) |
+| `users/{uid}/routineEvents/{id}` | owner `get`, `list` | none (server only) |
+| `users/{uid}/consentLedger/{id}` | owner `get`, `list` | none (server only, append-only) |
+| `users/{uid}/chatTurns/{id}` | owner `get`, `list` | none (server only) |
+| `erasedAccounts/{uid}`, `under18Accounts/{uid}`, `erasures/{id}` | none | none (server only) |
+
+`firestore.indexes.json` (deployed in D3):
+
+```json
+{ "indexes": [],
+  "fieldOverrides": [ { "collectionGroup": "chatTurns", "fieldPath": "expireAt", "ttl": true, "indexes": [] } ] }
+```
+
+- **No composite index.** Every query in the app is equality-only or one range on one field (ledger, chat turns, sweep `sweepAfter <=`), which Firestore's automatic single-field indexes serve.
+- **Expiry policy for stored chat turns (H17, D-15):** every `users/{uid}/chatTurns` document carries `expireAt` = written time + 90 days (`CHAT_TURN_TTL_DAYS`). The override above turns on Firestore TTL for that field and leaves it unindexed (nothing queries it). Firestore deletes expired documents some time after `expireAt`, not on the second. Erase deletes them at once with the account.
+
+## Scheduled job: the erase sweep (TD-19)
+
+- `vercel.json` (on the branch) declares one Vercel cron: `GET /api/account/erase/sweep`, schedule `30 21 * * *` (UTC), i.e. once a day between 03:00 and 03:59 India time. The Hobby plan allows one run a day at any minute of the scheduled hour.
+- Vercel sends `Authorization: Bearer $CRON_SECRET`. The route refuses (500) when `CRON_SECRET` is unset and (401) on any other header.
+- What it does: for every `erasedAccounts/{uid}` whose `sweepAfter` (erase + 70 minutes) has passed, it erases S3 `users/{uid}/`, the Firestore tree, `under18Accounts/{uid}` and the Auth user again, then removes the marker. A failed account keeps its marker and is retried next run.
+- The delete copy promises "within 2 days" (H26): 70 minutes + at most 24 h 59 min between runs. `ERASE_SWEEP_SCHEDULE` in `lib/consent.ts` and `vercel.json` are pinned together by a test. On a Pro plan the schedule can run more often; change both and the copy together.
+- Crons run on production deployments only, never on previews.
+
+---
+
+## Before any job (owner)
 
 | # | Command | Who | Good output | Check | Undo |
 |---|---|---|---|---|---|
 | P1 | `git -C ../skin-scan push origin engine-build-identity` | Owner | `* [new branch] engine-build-identity -> engine-build-identity` | `git -C ../skin-scan ls-remote --heads origin engine-build-identity` shows `8dc37dc…` | `git -C ../skin-scan push origin --delete engine-build-identity` |
-| P2 | B01 items 1-3 from DEV_PROD_BOUNDARY.md (on ff08107): remove the Firebase Admin key (`FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL`) and the `S3_SKIN_IMAGES_*` lines from `.env.local`, and move the Desktop `*-firebase-adminsdk-*.json` off this laptop | Owner | the variables and the file are gone | `grep -cE '^(FIREBASE_PRIVATE_KEY\|FIREBASE_CLIENT_EMAIL\|S3_SKIN_IMAGES_)' .env.local` prints `0`; `ls ~/Desktop/*adminsdk*.json` finds nothing | restore from your password manager |
+| P2 | B01 items 1-3 from DEV_PROD_BOUNDARY.md (on ff08107): remove the Firebase Admin key (`FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL`) and the `S3_SKIN_IMAGES_*` lines from `.env.local`, and move the Desktop `*-firebase-adminsdk-*.json` off this laptop | Owner | the variables and the file are gone | the P2 check command below the table prints `0`; `ls ~/Desktop/*adminsdk*.json` finds nothing | restore from your password manager |
 
-- P1 backs up the source of the image that job C deploys. Today it exists on one laptop only. It triggers no CI, because skin-scan's `deploy.yml` runs on pushes to `main` only, and GitHub has no `main` branch.
-- P2 matters before job A: the Firebase Admin key bypasses security rules, so a laptop that still holds it can write into the new database. The S3 keys write to the production image bucket.
+P2 check (outside the table, so the `|` characters are real):
+
+```bash
+grep -cE '^(FIREBASE_PRIVATE_KEY|FIREBASE_CLIENT_EMAIL|S3_SKIN_IMAGES_)' .env.local
+```
+
+- P1 backs up the source of the image that job C deploys. It triggers no CI (skin-scan's `deploy.yml` runs on pushes to `main` only).
+- P2 matters before job A: the Firebase Admin key bypasses security rules.
+
+### P3. Owner inputs the code needs before D1 (no production change)
+
+Each is a commit on `longitudinal-platform` by an engineer once the owner supplies the input, with tests, before D1:
+
+1. **F06**: a verified India helpline number and its hours for the referral message (deploy blocker for the context path).
+2. **H06**: the final AI-share and processing consent sentences (both versions still say DRAFT; tests pin them).
+3. **G1**: Gemini key ownership, paid tier and processing region (decision 6). The context path sends Gemini the user's message and the reading facts.
+4. **Decision 5** (optional before deploy): the photo retention period. Needed for S5 and for `IMAGE_RETENTION_PERIOD_DAYS` and its copy.
+
+```
+==================== STOP: P DONE ====================
+Owner confirms P1, P2 done and P3 inputs committed (or recorded as
+open blockers in the tracker). Do not start job C before this.
+=======================================================
+```
 
 ---
 
@@ -57,7 +147,7 @@ docker image inspect "$REPO:$TAG" --format '{{.Id}} {{.Os}}/{{.Architecture}}'
 - Optional, before C1 (tracker A12): QA and security re-verification of this image. Compare its `/app` with `git -C ../skin-scan archive 8dc37dc`, confirm it is amd64-only, and run a local smoke test. The agent can do this read-only if you ask. Done 2026-10-03 by a read-only verifier agent: PASS (amd64-only index plus one attestation; `/app` identical to `git archive 8dc37dc` for every file the Dockerfile copies, the other 62 files excluded by `.dockerignore`; local `/health/ready` reports `scan-0.1.6-provisional`, cv2 `4.11.0`). Rerun C0 itself on the day.
 - Undo: nothing to undo.
 
-### C1. Push the image to ECR
+### C1. Push the image to ECR (DONE 2026-10-03, TD-04)
 
 ```bash
 aws ecr get-login-password --region $REG | docker login --username AWS --password-stdin 550428926515.dkr.ecr.ap-south-1.amazonaws.com
@@ -80,6 +170,8 @@ docker push "$REPO:$TAG"
 - Undo: the image is only stored, nothing runs it. If it must go, and only before C3: `aws ecr batch-delete-image --region $REG --repository-name skin-scan --image-ids imageTag=$TAG`.
 
 ### C2. Register task definition `skin-scan:2`, pinned by digest
+
+**STOP (owner runs this):** the register command below changes production configuration.
 
 **First, a read-only check: `skin-scan:1` must have exactly one container.** The `jq` below sets the image of *every* container. A sidecar (log router, agent) would get the engine image too.
 
@@ -144,6 +236,8 @@ sleep 15; aws logs get-query-results --region $REG --query-id "$Q" --query '{sta
 
 ### C3. Update the service
 
+**STOP (owner runs this).**
+
 ```bash
 aws ecs update-service --region $REG --cluster skin-scan-cluster --service skin-scan-service \
   --task-definition skin-scan:2 --query 'service.taskDefinition' --output text
@@ -188,6 +282,8 @@ curl -s -H "X-Scan-Secret: $SCAN_SECRET" -F "image=@../skin-scan/fixtures/input_
 - Undo: nothing to undo (read-only call). On failure, roll back as in C3.
 
 ### C5. Phase 0 replay against the live service, compared with the local run (`$BASE`)
+
+**STOP (owner runs this):** it calls production 30 times.
 
 **Why:** the local release run used Docker on an arm64 Mac, emulating amd64. Fargate runs real amd64. Bit-identity across the two was never established (PHASE_0_RESULTS §3.7).
 
@@ -235,7 +331,7 @@ tracker A12 updated. Do not start job A before this.
 
 ## JOB A: Firestore (default) to asia-south1
 
-Run from the skin-check repository root on `longitudinal-platform`. `firebase.json`, `firestore.rules` and `firestore.indexes.json` there are the files that get deployed.
+Run from the skin-check repository root. A3 deploys the files from `origin/master` (the live site's own rules); the branch's files are deployed in D3.
 
 ```bash
 P=projectskin-a202c
@@ -269,6 +365,8 @@ F firestore:databases:create --help | grep -oE -- '--(location|edition|delete-pr
 
 ### A1. Delete `(default)` (IRREVERSIBLE)
 
+**STOP (owner runs this).**
+
 ```bash
 F firestore:databases:delete "(default)" --project $P
 ```
@@ -278,6 +376,8 @@ F firestore:databases:delete "(default)" --project $P
 - Undo: **none.** All test documents are gone for good. No export is taken, by owner decision (D-22). Point-in-time recovery was off.
 
 ### A2. Create `(default)` in asia-south1 with delete protection (wait about 5 minutes after A1)
+
+**STOP (owner runs this).**
 
 ```bash
 F firestore:databases:create "(default)" --location asia-south1 --edition standard \
@@ -290,25 +390,25 @@ F firestore:databases:create "(default)" --location asia-south1 --edition standa
 - Check (read-only): `F firestore:databases:get "(default)" --project $P` shows those three values and type `FIRESTORE_NATIVE`.
 - Undo: delete protection blocks a delete, on purpose. Do **not** try other regions (approved runbook §10). If the India database must go, first `F firestore:databases:update "(default)" --delete-protection DISABLED --project $P`. Then run A1, then A2 with `--location nam5`. That restores the previous, empty, behaviour with no code change.
 
-### A3. Deploy rules and indexes again
+### A3. Deploy the live (`master`) rules and indexes on the new database
+
+**STOP (owner runs this).** Run it right after A2. Until it finishes, client access to the new database is denied.
 
 ```bash
-F deploy --only firestore:rules,firestore:indexes --project $P
+MASTER_SHA=$(git rev-parse origin/master)        # 1b39f88… today; write it down, D3's undo uses it
+git worktree add /tmp/skin-check-master "$MASTER_SHA" && cd /tmp/skin-check-master \
+  && npx -y firebase-tools@latest deploy --only firestore:rules,firestore:indexes --project projectskin-a202c; cd -
+git worktree remove /tmp/skin-check-master
 ```
-- Who: owner. Run it right after A2. Until it finishes, client access to the new database is denied.
-- Deploys `longitudinal-platform`'s rules: the live rules plus `users/{uid}/scanAnalyses/{id}` (owner read only, no client writes). Only an addition, so the live website (1b39f88) is unaffected.
+- Who: owner.
+- **Changed 2026-10-05 (was: deploy the branch rules here).** The branch rules now refuse writes the live site (1b39f88) was never tested against: the profile key list, a client-dated check, and the erased and under-18 markers. Deploying the live site's own rules keeps job A a pure region move. The branch rules and the chat-turn expiry policy go out in D3, right after the code that needs them.
 - Good output: `✔ firestore: released rules firestore.rules to cloud.firestore` and `✔ Deploy complete!`.
-- Check (read-only):
-  - `F firestore:indexes --project $P` prints `{"indexes": [], "fieldOverrides": []}`.
-  - Firebase console → Firestore → Rules shows `match /scanAnalyses/{id}`.
-- Undo: deploy the live (`master`) rules instead, from a clean copy of `origin/master`:
-  ```bash
-  git worktree add /tmp/skin-check-master origin/master && cd /tmp/skin-check-master \
-    && npx -y firebase-tools@latest deploy --only firestore:rules,firestore:indexes --project projectskin-a202c; cd -
-  git worktree remove /tmp/skin-check-master
-  ```
+- Check (read-only): `F firestore:indexes --project $P` prints `{"indexes": [], "fieldOverrides": []}`.
+- Undo: there is nothing older to go back to on a new database. To redeploy, run the block again **without its first line**, with `MASTER_SHA` set by hand to the value you wrote down (after D2, `origin/master` is the new code).
 
 ### A4. Daily backups (recommended by the approved D-22 runbook)
+
+**STOP (owner runs this).**
 
 ```bash
 F firestore:backups:schedules:create --database "(default)" --recurrence DAILY --retention 7d --project $P
@@ -323,11 +423,9 @@ F firestore:backups:schedules:create --database "(default)" --recurrence DAILY -
 1. Sign in with an existing test account. It works, because Auth was untouched.
 2. Complete a scan with retention consent. `users/{uid}/skinChecks/{scanId}` appears in the console.
 3. The previous-scans list shows it.
-4. `scanAnalyses` stays empty: the live site does not write it until job D.
-5. The console shows `users/{uid}` with `phoneNumber` and `lastSeenAt` (the profile upsert on sign-in).
-6. Rules, local: `npm run test:rules` passes. It uses the emulator with the same rules file.
-7. Rules, production: in the console Rules Playground, a second test account cannot read the first account's `users/{uid}`. Never use a forged client.
-8. S3: `aws s3api list-objects-v2 --bucket projectskin-skin-originals-prod --prefix users/<uid>/scans/<scanId>/ --query 'KeyCount'` returns `1`.
+4. The console shows `users/{uid}` with `phoneNumber` and `lastSeenAt` (the profile upsert on sign-in).
+5. Rules, production: in the console Rules Playground, a second test account cannot read the first account's `users/{uid}`. Never use a forged client.
+6. S3: `aws s3api list-objects-v2 --bucket projectskin-skin-originals-prod --prefix users/<uid>/scans/<scanId>/ --query 'KeyCount'` returns `1`.
 
 - Who: owner.
 - Undo: as A3.
@@ -349,6 +447,8 @@ Two halves:
 
 ### B1. Change the project's function region
 
+**STOP (owner runs this).**
+
 - Who: owner.
 - Vercel dashboard → project `skin-check` → Settings → Functions → Function Region → **Mumbai, India (bom1)** only → Save.
 - Good output: the page shows bom1 selected.
@@ -360,6 +460,8 @@ Two halves:
 - Undo: set it back to Washington, D.C. (iad1) in the same place.
 
 ### B2. Redeploy the current production deployment so the setting takes effect
+
+**STOP (owner runs this).**
 
 ```bash
 vercel redeploy dpl_7aCicWiHeqEJuer3grPWqpC3dTow --target production
@@ -386,81 +488,265 @@ scan works, tracker A05 updated. Do not start job D before this.
 
 ---
 
-## JOB D: website gates 01-04 (the code that goes with engine 0.1.6)
+## JOB S: production settings for the new code (new 2026-10-05)
+
+Nothing in this job changes what users see until D2 deploys the code that reads it, except S5, which deletes old photos on its schedule.
+
+```bash
+REG=ap-south-1
+BUCKET=projectskin-skin-originals-prod
+```
+
+### S1. Create the erase principal (S3 list and delete under `users/*` only)
+
+Re-check first (read-only): versioning and Object Lock must still be off, or `DeleteObject` would not be a permanent delete (H01_S3_ERASURE_READINESS.md).
+
+```bash
+aws s3api get-bucket-versioning --bucket $BUCKET          # prints nothing (never enabled)
+aws s3api get-object-lock-configuration --bucket $BUCKET  # ObjectLockConfigurationNotFoundError
+```
+- If versioning shows `Enabled` or `Suspended`: **stop.** The erase then needs `s3:DeleteObjectVersion` and code that deletes every version (tracker row).
+
+**STOP (owner runs this).**
+
+```bash
+umask 077; POL=$(mktemp)
+cat > "$POL" <<EOF
+{ "Version": "2012-10-17", "Statement": [
+  { "Effect": "Allow", "Action": "s3:ListBucket", "Resource": "arn:aws:s3:::$BUCKET",
+    "Condition": { "StringLike": { "s3:prefix": "users/*" } } },
+  { "Effect": "Allow", "Action": "s3:DeleteObject", "Resource": "arn:aws:s3:::$BUCKET/users/*" } ] }
+EOF
+aws iam create-user --user-name skin-check-eraser --query 'User.Arn' --output text
+aws iam put-user-policy --user-name skin-check-eraser --policy-name skin-check-erase-originals --policy-document "file://$POL"
+rm -f "$POL"
+```
+- Who: owner.
+- Good output: the new user's ARN, then nothing.
+- Check (read-only): `aws iam get-user-policy --user-name skin-check-eraser --policy-name skin-check-erase-originals --query PolicyDocument` shows exactly the two statements; `aws iam list-attached-user-policies --user-name skin-check-eraser` shows none.
+- Undo: `aws iam delete-user-policy --user-name skin-check-eraser --policy-name skin-check-erase-originals && aws iam delete-user --user-name skin-check-eraser` (after S2's undo).
+
+### S2. Give the erase keys to Vercel without showing them
+
+**STOP (owner runs this).**
+
+```bash
+umask 077; K=$(mktemp)
+aws iam create-access-key --user-name skin-check-eraser --output json > "$K"
+jq -r .AccessKey.AccessKeyId "$K"     | vercel env add S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID production --sensitive
+jq -r .AccessKey.SecretAccessKey "$K" | vercel env add S3_SKIN_IMAGES_ERASE_SECRET_ACCESS_KEY production --sensitive
+rm -f "$K"
+```
+- Who: owner. The key file lives in a private temp file for a few seconds and is deleted; nothing is printed.
+- Good output: two `Added Environment Variable … to Project skin-check` lines.
+- Check (read-only): `vercel env ls production | grep S3_SKIN_IMAGES_ERASE` shows both names; `aws iam list-access-keys --user-name skin-check-eraser --query 'AccessKeyMetadata[].Status'` shows one `Active`.
+- Undo: `vercel env rm S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID production --yes; vercel env rm S3_SKIN_IMAGES_ERASE_SECRET_ACCESS_KEY production --yes`, then `aws iam delete-access-key --user-name skin-check-eraser --access-key-id <id from list-access-keys>`.
+
+### S3. Set `CRON_SECRET`
+
+**STOP (owner runs this).**
+
+```bash
+openssl rand -hex 32 | vercel env add CRON_SECRET production --sensitive
+```
+- Who: owner. Nobody needs to know the value: Vercel sends it on each cron call.
+- Good output: `Added Environment Variable CRON_SECRET to Project skin-check`.
+- Check (read-only): `vercel env ls production | grep CRON_SECRET`.
+- Undo: `vercel env rm CRON_SECRET production --yes` (the sweep then refuses, and late data and markers stay: a deploy blocker, TD-19).
+
+### S4. No development-only setting in Production (read-only)
+
+```bash
+vercel env ls production | grep -E 'ECHO_CONTEXT_PATH|ERASE_SWEEP_DELAY_SECONDS|GEMINI_DEV_API_KEY|GEMINI_LOCAL_BASE_URL|FAKE_GEMINI_PORT|S3_SKIN_IMAGES_ENDPOINT|EMULATOR_HOST' || echo "none"
+```
+- Who: owner.
+- Good output: `none`.
+- If any name prints:
+
+**STOP (owner runs this).** `vercel env rm <NAME> production --yes`. Undo: add it back (you should not need to).
+
+### S5. Photo retention rule on the bucket (decision 5; period chosen by the owner)
+
+Fill in `RETENTION_DAYS` with the decided number. **Do not run this until decision 5 is made and `IMAGE_RETENTION_PERIOD_DAYS` in `lib/consent.ts` and its copy are set to the same number** (otherwise photos disappear on a schedule no copy tells users about).
+
+```bash
+aws s3api get-bucket-lifecycle-configuration --bucket $BUCKET   # NoSuchLifecycleConfiguration today
+```
+**STOP (owner runs this).** `put-bucket-lifecycle-configuration` replaces the whole lifecycle configuration; the check above confirms there is none to lose.
+
+```bash
+RETENTION_DAYS=<OWNER FILLS IN>
+aws s3api put-bucket-lifecycle-configuration --bucket $BUCKET --lifecycle-configuration "{
+  \"Rules\": [ { \"ID\": \"expire-original-photos\", \"Status\": \"Enabled\",
+    \"Filter\": { \"Prefix\": \"users/\" }, \"Expiration\": { \"Days\": $RETENTION_DAYS } } ] }"
+```
+- Who: owner.
+- Good output: nothing.
+- Check (read-only): `aws s3api get-bucket-lifecycle-configuration --bucket $BUCKET` shows the one rule with your number.
+- S3 deletes objects some time after they pass the age (usually within a day or two), not on the second.
+- Undo: `aws s3api delete-bucket-lifecycle --bucket $BUCKET`. This only stops future deletions: versioning is off, so photos already expired **cannot be restored**.
+
+```
+==================== STOP: JOB S DONE ====================
+Owner confirms S1-S4 checks pass (S5 done or recorded as waiting on
+decision 5), tracker H01/TD-19 updated. Do not start job D before this.
+==========================================================
+```
+
+---
+
+## JOB D: the website, everything on the branch
 
 ### D0. Bring `infra/india-region` into `longitudinal-platform` (A14)
 
-- Who: owner. Follow docs/architecture/A14_RECONCILIATION_PROPOSAL.md steps 1-5 exactly. The only conflict is `docs/architecture/DECISION_LOG.md`.
-- Good output: a merge commit on `longitudinal-platform`.
+**STOP (owner runs this):** it rewrites the branch.
+
+- Follow docs/architecture/A14_RECONCILIATION_PROPOSAL.md steps 1-5 exactly. `DECISION_LOG.md` conflicts as before.
+- **New conflict since 2026-10-05: `vercel.json`.** Both sides added it. Keep both keys:
+  ```json
+  {
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "regions": ["bom1"],
+    "crons": [{ "path": "/api/account/erase/sweep", "schedule": "30 21 * * *" }]
+  }
+  ```
 - Check (read-only):
   ```bash
-  git show longitudinal-platform:vercel.json                               # "regions": ["bom1"]
+  git show longitudinal-platform:vercel.json | jq -c '{regions, crons}'   # regions ["bom1"] and the one cron
   grep -oE '^\*\*D-[0-9]+[a-z]?' docs/architecture/DECISION_LOG.md | sort | uniq -d   # prints nothing
-  npm run typecheck && npm run lint && npm test && npm run build          # all pass
+  npm run typecheck && npm run lint && npm run test:all                    # all pass, no production keys needed
   ```
-- Run these checks **before** A14 step 5 (`git stash drop`).
-- **After P2, `.env.local` no longer has the Firebase Admin and S3 variables. The checks still pass; they need no production keys.**
-  - None of the four checks needs an environment variable. Firebase client, Firebase Admin and S3 are all initialised lazily (`lib/firebase/client.ts`, `lib/firebase/admin.ts`, `lib/s3.ts`), so a missing value is a runtime error, not a build error.
-  - Verified 2026-10-03 at b0a7424 in a clean worktree with no `.env` file other than `.env.example`: `npm test` (217 passed, 24 skipped), `typecheck`, `lint` and `build` all passed. ff08107 adds no new `process.env` reads.
-  - The 24 skipped tests are the Firestore rules tests. Run them with `npm run test:rules`; it uses the local emulator and the demo project `demo-rules-check`, never production.
-  - If a check fails with `Firebase Admin is not configured` or `S3 image storage is not configured`, a test or page started calling them at build time. That is a bug to record in the tracker. Never put the production keys back to make the check pass.
-- A14_RECONCILIATION_PROPOSAL step 4 has the same `grep` bug: it matches `**D-03a` as `**D-03`. Use the fixed command above.
+- Run these checks **before** A14 step 5 (`git stash drop`). `test:all` runs the unit tests, the local stack (emulators, engine 0.1.6 by image ID, S3Mock, fake Gemini), the browser tests and `next build`; it uses no production key.
+- A14_RECONCILIATION_PROPOSAL step 4 has a `grep` bug (it matches `**D-03a` as `**D-03`). Use the command above.
 - Undo (before step 5 and before pushing): `git reset --hard ORIG_HEAD`, then `git stash pop` to restore the drafts.
 
 ### D1. Push `longitudinal-platform` and open the pull request
 
+**STOP (owner runs this).**
+
 ```bash
 git push -u origin longitudinal-platform
-gh pr create --base master --head longitudinal-platform --title "Longitudinal platform: gates 01-04 + India region" \
-  --body "Gates 01-04, skinstate-1, D-22 vercel.json bom1. Deploy per docs/PHASE_0_RUNBOOK.md job D."
+gh pr create --base master --head longitudinal-platform --title "Longitudinal platform: gates 01-04, India region, context Echo, privacy" \
+  --body "Everything on longitudinal-platform. Deploy per docs/PHASE_0_RUNBOOK.md job D."
 ```
 - Who: owner.
-- The push creates a Vercel **preview** deployment. Preview has no Firebase or S3 credentials (only the engine and Gemini variables), so sign-in and saving do not work there and it cannot write production data. It does call the production engine and Gemini.
-- Good output: `branch 'longitudinal-platform' set up to track 'origin/longitudinal-platform'`, then a PR URL.
-- Check (read-only): `gh pr view longitudinal-platform --json mergeable,baseRefName,headRefOid` shows `"mergeable": "MERGEABLE"`, base `master`.
-- Undo: `gh pr close longitudinal-platform`; `git push origin --delete longitudinal-platform`.
+- The push creates a Vercel **preview** deployment. Preview has no Firebase or S3 credentials (only the engine and Gemini variables), so sign-in fails there before any engine, Gemini or data call. Crons never run on previews.
+- Good output: a PR URL.
+- Check (read-only): `gh pr view longitudinal-platform --json mergeable,baseRefName` shows `"mergeable": "MERGEABLE"`, base `master`.
+- Undo: `gh pr close longitudinal-platform`.
 
 ### D2. Merge the pull request. This is the production deploy.
+
+**STOP (owner runs this).** Only after P3's blockers are committed (F06, H06, G1) and job S is done.
 
 ```bash
 gh pr merge longitudinal-platform --merge
 ```
-- Who: owner. Vercel deploys `master` to production automatically.
-- Gates 01 and 02 ship together in this one merge. GATE_02 §8 requires gate 01 first or together: deploying gate 02 without gate 01 would make every Echo request return 409 (GATE_02 §8).
-- Good output: `✓ Merged pull request #…`. Vercel then shows a new production deployment, status Ready.
+- Who: owner. Vercel deploys `master` to production automatically and registers the cron from `vercel.json`.
+- Gates 01 and 02 ship together (GATE_02 §8). The context path is the chat that ships (F12, TD-20).
+- Good output: `✓ Merged pull request #…`; Vercel shows a new production deployment, Ready.
 - Check (read-only):
   ```bash
   git fetch origin && git rev-parse origin/master
-  vercel api /v9/projects/skin-check | jq -c '{id: .targets.production.id, sha: .targets.production.meta.githubCommitSha}'
+  vercel api /v9/projects/skin-check | jq -c '{id: .targets.production.id, sha: .targets.production.meta.githubCommitSha, crons: .crons.definitions}'
   vercel api /v13/deployments/<id> | jq -c '{regions, readyState}'
   ```
-  - `sha` equals `origin/master`; `regions: ["bom1"]`; `readyState: "READY"`.
+  - `sha` equals `origin/master`; `regions: ["bom1"]`; `readyState: "READY"`; `crons` lists `/api/account/erase/sweep` with `30 21 * * *`.
 - Undo:
-  - Fast: `vercel rollback <deployment id from B2>`. This returns production to 1b39f88 in bom1. Records already written to `scanAnalyses` stay; the old site ignores them.
-  - Git: `git revert -m 1 <merge commit>` in a new PR. Its merge redeploys the old code.
+  - Fast: `vercel rollback <deployment id from B2>` (1b39f88 in bom1). Records already written stay; the old site ignores them. Then D3's undo, so the old site runs under its own rules.
+  - Git: `git revert -m 1 <merge commit>` in a new PR; its merge redeploys the old code.
 
-### D3. Application check (production, real phone)
+### D3. Deploy the branch rules and the chat-turn expiry policy (right after D2 is Ready)
 
-1. Sign in, complete a scan.
-2. Firebase console: `users/{uid}/scanAnalyses/{scanId}_{sha16}` exists with `source: "server"`, `engine_build: "sha-8dc37dc501ea974825427c665acd7019120c20ec"`, `pipeline_version: "scan-0.1.6-provisional"` and `region_raw_native`.
-3. Echo works for that scan while signed in. Calling it without signing in returns 401:
+**STOP (owner runs this).**
+
+```bash
+git fetch origin && git worktree add /tmp/skin-check-deployed origin/master && cd /tmp/skin-check-deployed \
+  && npx -y firebase-tools@latest deploy --only firestore:rules,firestore:indexes --project projectskin-a202c; cd -
+git worktree remove /tmp/skin-check-deployed
+```
+- Who: owner. Deploys `firestore.rules` (table above) and `firestore.indexes.json` (the `chatTurns.expireAt` TTL policy, H17).
+- Run it the moment D2 is Ready. Until D3, the new site runs under the live rules: they have no `consentLedger` or `chatTurns` read rules (and possibly no `scanAnalyses` one), so the dashboard's readings and privacy section can show their error state, and the erased and under-18 markers are not checked by the rules. Nothing is written wrongly: those collections are written by the server. Rules go after the code on purpose: the other order would put the live site's client writes under rules it was never tested against, and a refused write loses a user's check.
+- Good output: `✔ firestore: released rules firestore.rules to cloud.firestore` and `✔ Deploy complete!`. firebase-tools may take a few minutes to enable TTL.
+- Check (read-only):
+  - `npx -y firebase-tools@latest firestore:indexes --project projectskin-a202c` shows the `chatTurns` / `expireAt` override with `"ttl": true`.
+  - Firebase console → Firestore → Rules shows `function notUnder18` and `match /chatTurns/{turnId}`.
+  - Firebase console → Firestore → Time-to-live shows `chatTurns` · `expireAt` · Serving (it can show Creating for a while).
+- Undo:
+  - Rules only (leaves the TTL policy alone; deploying the old indexes file would prompt to delete the override):
+    ```bash
+    MASTER_SHA=<the value written down in A3>      # NOT git rev-parse origin/master: after D2 that is the new code
+    git worktree add /tmp/skin-check-master "$MASTER_SHA" && cd /tmp/skin-check-master \
+      && npx -y firebase-tools@latest deploy --only firestore:rules --project projectskin-a202c; cd -
+    git worktree remove /tmp/skin-check-master
+    ```
+  - TTL: deploying an indexes file without the override only offers to delete it (prompt, default no); turn it off explicitly instead:
+    ```bash
+    T=$(mktemp -d) && printf '%s' '{"indexes":[],"fieldOverrides":[{"collectionGroup":"chatTurns","fieldPath":"expireAt","ttl":false,"indexes":[]}]}' > "$T/firestore.indexes.json" \
+      && printf '%s' '{"firestore":{"indexes":"firestore.indexes.json"}}' > "$T/firebase.json" \
+      && (cd "$T" && npx -y firebase-tools@latest deploy --only firestore:indexes --project projectskin-a202c); rm -rf "$T"
+    ```
+    Turns already deleted by the policy cannot be restored.
+
+### D4. Checks after deploy that the local tests could not do (production, real phone)
+
+**STOP (owner runs this):** these use production, and item 7 deletes a made-up test account.
+
+The local stack uses emulators, S3Mock, a fake Gemini and the engine image by ID. These checks cover what it cannot. Use a **made-up test account**, never a real user's data. Record each result in the tracker (I01).
+
+1. **Real login token.** Sign in by phone on the live site. Then check a bad token is refused:
    ```bash
-   curl -s -o /dev/null -w '%{http_code}\n' -X POST https://skin-check-sigma.vercel.app/api/skin-check/chat -H 'content-type: application/json' -d '{}'
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST https://skin-check-sigma.vercel.app/api/skin-check/chat \
+     -H 'authorization: Bearer not-a-token' -H 'content-type: application/json' -d '{}'
    ```
-   prints `401`.
-4. `x-vercel-id` still shows `bom1::bom1::` (B2's curl).
+   prints `401`. Without the header it also prints `401`.
+2. **One real photo upload.** Complete a check with photo retention consent. Then (read-only):
+   - `aws s3api list-objects-v2 --bucket projectskin-skin-originals-prod --prefix users/<uid>/scans/<scanId>/ --query 'Contents[].Size'` shows one non-zero size. S3Mock never verified signatures, checksums or the signed size; this is the first real PUT of the presigned URL.
+   - Console: `users/<uid>/consentLedger` has an `image_retention` entry with `source: "presign"` and that `scanId`; the dashboard's privacy section then says "Photo of your newest photo check: kept." (H27).
+3. **The real engine.** Console: `users/<uid>/scanAnalyses/<scanId>_<sha16>` has `source: "server"`, `engine_build: "sha-8dc37dc501ea974825427c665acd7019120c20ec"`, `pipeline_version: "scan-0.1.6-provisional"`, `region_raw_native`; every value in `scores` and `region_scores` is between 0 and 1. The dashboard shows the reading.
+4. **The real Gemini model.** On that check, ask Echo an ordinary question ("what does my cheek reading mean?"). It answers. Console: each exchange writes two `users/<uid>/chatTurns` documents, both with `expireAt` 90 days ahead. The user-role one has `modelId: null` and `validator: null`; the echo-role one has `modelId` set to the model G1 approved and `validator.passed: true` (or `fallback: true` with a reason in `validator.failures`). Then ask a red-flag message ("I want to hurt myself"): the reply is the referral, with the F06 helpline, and its echo-role turn has `modelId: null` (Gemini was not called).
+5. **Rate limits.** In-memory and per instance, so a production check is only a smoke test:
+   ```bash
+   for i in $(seq 1 12); do curl -s -o /dev/null -w '%{http_code} ' -X POST https://skin-check-sigma.vercel.app/api/account/attestation -d '{}'; done; echo
+   ```
+   Expect `401` several times, then `429` (5 per minute per IP). No `429` at all means the requests landed on different instances: record it, it is not a rollback trigger. Never test the chat limit this way: the Gemini scope has a global budget of 18 calls a day (`GEMINI_ROUTE_LIMITS`), and a test would spend real users' budget.
+6. **Live trust boundary checks.**
+   - Echo about another account's `scanId` returns `409` (not found looks like not yours).
+   - Echo about the test account's older check returns `409 CHAT_NOT_NEWEST` (F13).
+   - A forged chat history (edit one earlier message in the browser devtools request) returns `400 CHAT_HISTORY_INVALID`.
+   - Console → Firestore → Rules Playground, signed in as the test uid: `create` on `users/<uid>/scanAnalyses/x` is denied; `get` on `erasedAccounts/<uid>` and on `under18Accounts/<uid>` is denied; `get` on another uid's `users/<other>` is denied.
+   - The sweep without the secret: `curl -s -o /dev/null -w '%{http_code}\n' https://skin-check-sigma.vercel.app/api/account/erase/sweep` prints `401`.
+7. **Erase and the sweep.** With a second made-up account that has one check with a photo: delete the account on `/account`. Right away (read-only): the S3 prefix `users/<uid2>/` lists nothing, the console has no `users/<uid2>` tree, Firebase Auth has no such user, and `erasedAccounts/<uid2>` exists. After the next cron run (03:00-03:59 India time, at least 70 minutes after the delete), `erasedAccounts/<uid2>` is gone. Vercel dashboard → project → Settings → Cron Jobs shows the run with status 200. To run it at once, use **Run** on that page (a STOP step; it only re-erases already erased accounts).
+8. **Region.** `curl -s -o /dev/null -D - -X POST https://skin-check-sigma.vercel.app/api/skin-scan | grep -i x-vercel-id` shows `bom1::bom1::`.
 
 - Who: owner.
 - Undo: as D2.
 
+### Clearing a mistaken under-18 record after deploy (H05)
+
+Support tool, run by the owner only when an account holder says their under-18 answer was a mistake. Export the Firebase Admin settings (`FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`) in that one shell from your password manager. vite-node fills any variable the shell does not set from `.env` and `.env.local`; `--mode production` keeps `.env.development.local`'s emulator hosts out, and `--project` must name the project the script ends up connected to, or it refuses.
+
+**STOP (owner runs this).**
+
+```bash
+env -u FIRESTORE_EMULATOR_HOST -u FIREBASE_AUTH_EMULATOR_HOST \
+  npx vite-node --mode production --config vitest.config.ts scripts/clear-under18.ts -- \
+  --project projectskin-a202c --phone +91XXXXXXXXXX --operator "<your name>" --reason "<what the user said>"
+```
+- Checked 2026-10-05 with this exact command shape on the Auth and Firestore emulators (no input and `no` stop; a wrong `--project` refuses; `CLEAR` clears).
+- It prints the Firebase project (and `REAL PROJECT` or `EMULATORS`), the uid, the masked phone, every age entry and the marker, and what it will change. It changes nothing unless you type `CLEAR`.
+- Then, together: one ledger entry `source: "support_clear"` with your operator name and reason (the ledger is never edited), and `under18Accounts/<uid>` deleted. The user is asked their age again.
+- Undo: the user answering "under 18" again blocks the account again (the attestation route writes a new entry and the marker).
+
 ```
 ==================== STOP: JOB D DONE ====================
-Owner confirms: D2 + D3 pass, tracker A13 updated, I01 (end-to-end
-production check) may start.
+Owner confirms: D2, D3 and D4 pass, tracker A13 and I01 updated.
 ==========================================================
 ```
 
 ## Known gaps, recorded in the tracker, not fixed here
 
 - Deny rules cannot read the current branch or expand variables. A bare `git push` or `git push origin HEAD` run while on `master`, and `git push origin "$BRANCH"` with `BRANCH=master`, are still allowed for agents. Only the CLAUDE.md hard rules stop those.
-- Fixed: `ENGINE_TABLE` now lists `scan-0.1.6-provisional` (A17). The deny rules now match the `npx -y firebase-tools@latest …` and `F …` forms (B05). They now also block `gh pr merge` (D2), `vercel rollback`, `aws ecs deregister-task-definition`, `aws ecr batch-delete-image`, `firestore:databases:update` in every Firebase form, `git push` to `master`, and `docker push` to this ECR registry, including any `docker push` whose target is a shell variable such as C1's `"$REPO:$TAG"` (B06). The owner runs these steps, so the rules do not affect them.
+- Fixed: `ENGINE_TABLE` now lists `scan-0.1.6-provisional` (A17). The deny rules match the `npx -y firebase-tools@latest …` and `F …` forms (B05) and block `gh pr merge` (D2), `vercel rollback`, `aws ecs deregister-task-definition`, `aws ecr batch-delete-image`, `firestore:databases:update` in every Firebase form, `git push` to `master`, and `docker push` to this ECR registry (B06). The owner runs these steps, so the rules do not affect them.
+- `GEMINI_ROUTE_LIMITS` allows 18 Gemini calls a day in total (a free-tier budget). With the context path in production that is 18 chat answers a day for all users. Raise it with the G1 decision (tracker row).
+- Revoked ID tokens still pass Firestore rules for up to an hour (H23, open).
