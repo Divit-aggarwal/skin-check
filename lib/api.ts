@@ -2,6 +2,7 @@ import { z } from "zod";
 import { getIdToken } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
+import { MAX_ORIGINAL_BYTES } from "@/lib/s3-key";
 import { SkinScanResultSchema } from "@/types/skin-scan";
 import type { CaptureMethod, SkinScanResult } from "@/types/skin-scan";
 import type { CaptureQuality } from "@/lib/capture-quality/types";
@@ -188,6 +189,8 @@ const UPLOAD_TIMEOUT_MS = 120_000;
  * scanId and gets back a URL that can only write one object.
  */
 export async function uploadOriginalImage(scanId: string, original: Blob): Promise<void> {
+  // TD-18 (3): the cap is 25 MB; say so plainly, before asking for a URL.
+  if (original.size > MAX_ORIGINAL_BYTES) throw new ApiError(413, UPLOAD_TOO_LARGE_MESSAGE, "upload/too-large");
   const idToken = await freshIdToken();
 
   const presignResponse = await fetch("/api/skin-scan/upload", {
@@ -208,6 +211,7 @@ export async function uploadOriginalImage(scanId: string, original: Blob): Promi
     if (presignResponse.status === 401) {
       throw new ApiError(401, "Your session expired. Please verify your phone number again.", "auth/required");
     }
+    if (presignResponse.status === 413) throw new ApiError(413, UPLOAD_TOO_LARGE_MESSAGE, "upload/too-large");
     throw new ApiError(presignResponse.status, "Couldn't prepare your photo for upload.", "upload/failed");
   }
 
@@ -310,8 +314,16 @@ export async function runSkinScan(opts: {
 }
 
 /** True when the ORIGINAL image upload failed — the analysis never ran. */
+/** TD-18 (3): shown when the original is over the 25 MB cap. */
+export const UPLOAD_TOO_LARGE_MESSAGE = "This photo is too large to save (the limit is 25 MB). Please take a new photo and try again.";
+
+/** Any upload failure, too large included: nothing was stored and the analysis did not run. */
 export function isUploadError(error: unknown): boolean {
-  return error instanceof ApiError && error.code === "upload/failed";
+  return error instanceof ApiError && (error.code === "upload/failed" || error.code === "upload/too-large");
+}
+
+export function isUploadTooLarge(error: unknown): boolean {
+  return error instanceof ApiError && error.code === "upload/too-large";
 }
 
 /**

@@ -266,10 +266,11 @@ describe("the brief's cases, with test-only tables", () => {
     }
   });
 
-  it("D06: the day is the UTC date of the server analyzedAt", () => {
-    // 23:00 on day 1 and 00:00 on day 2 (UTC) are two days; 00:00 and 23:00 on day 2 are one.
-    const s = [scan({ day: 1, hour: 23, value: 55 }), scan({ day: 2, hour: 0, value: 55 }), scan({ day: 2, hour: 23, value: 55 }), scan({ day: 3, value: 55 }), scan({ day: 10, value: 60 })];
-    expect(refsOf(run(s, TEST))).toEqual(["scan-1h23", "scan-2h0", "scan-3"]);
+  it("D06, TD-18 (2): the day is the India date of the server analyzedAt", () => {
+    // 18:00 UTC is 23:30 IST on day 1; 19:00 UTC is 00:30 IST on day 2, the same
+    // India day as 00:00 UTC on day 2 (05:30 IST). Under UTC this would pick scan-2h0.
+    const s = [scan({ day: 1, hour: 18, value: 55 }), scan({ day: 1, hour: 19, value: 55 }), scan({ day: 2, hour: 0, value: 55 }), scan({ day: 3, value: 55 }), scan({ day: 10, value: 60 })];
+    expect(refsOf(run(s, TEST))).toEqual(["scan-1h18", "scan-1h19", "scan-3"]);
   });
 
   it("the same record twice is bad input: one physical scan never fills the baseline", () => {

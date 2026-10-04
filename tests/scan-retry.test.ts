@@ -74,3 +74,29 @@ describe("retrySkinScan", () => {
     expect(canRetrySamePhoto(next)).toBe(false);
   });
 });
+
+// TD-18 (3): a too-large original says so, not "check your connection".
+describe("too-large original", () => {
+  it("the retry shows the too-large message and claims nothing stored", async () => {
+    const { UPLOAD_TOO_LARGE_MESSAGE } = await import("@/lib/api");
+    const run = vi.fn(async () => {
+      throw new ApiError(413, UPLOAD_TOO_LARGE_MESSAGE, "upload/too-large");
+    });
+    const next = (await retrySkinScan(failed({ original: new Blob(["o"]), retentionConsentVersion: "v" } as Partial<ErrorScan>), "scan-1", run)) as ErrorScan;
+    expect(next.message).toBe(UPLOAD_TOO_LARGE_MESSAGE);
+    expect(next.originalStored).toBe(false);
+  });
+
+  it("the first scan in PhotoCapture uses the same message", () => {
+    const src = readFileSync("components/skin-check/inputs/PhotoCapture.tsx", "utf8");
+    expect(src).toMatch(/isUploadTooLarge\(err\)\s*\?\s*UPLOAD_TOO_LARGE_MESSAGE/);
+  });
+
+  it("control: an ordinary upload failure still says check your connection", async () => {
+    const run = vi.fn(async () => {
+      throw new ApiError(0, "Couldn't upload your photo. Please try again.", "upload/failed");
+    });
+    const next = (await retrySkinScan(failed(), "scan-1", run)) as ErrorScan;
+    expect(next.message).toMatch(/Check your connection and retry/);
+  });
+});

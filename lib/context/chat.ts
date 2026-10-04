@@ -12,7 +12,7 @@ import type { SkinState2Result } from "@/lib/skin-state-2";
 import { answerFromPackage, comparisonAnswer, fallbackAnswer } from "./answer";
 import { buildContextPackage, PACKAGE_VERSION, packageSha256 } from "./builder";
 import { loadChatHistory, recordChatTurns, type EchoTurnRecord } from "./chat-turns";
-import { comparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY } from "./prefilter";
+import { comparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY, UNSUPPORTED_SCRIPT_COPY } from "./prefilter";
 import { PROMPT_VERSION } from "./renderer";
 
 // The chat route's context-package branch (docs/lanes/context-design.md §3.2).
@@ -70,9 +70,10 @@ async function longitudinalFor(uid: string, scanId: string): Promise<Longitudina
   }
 }
 
-/** A red-flag message caught before anything else ran: record it (best effort) as a pre-filter turn. */
-export async function recordReferral(uid: string, scanId: string, region: EchoRegion, message: string): Promise<void> {
-  await recordBestEffort(uid, scanId, region, message, REFERRAL_COPY, { ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: "red_flag", redFlag: true, latencyMs: 0 });
+/** A message caught before anything else ran (red flag, or an unsupported script): record it (best effort) as a pre-filter turn. */
+export async function recordReferral(uid: string, scanId: string, region: EchoRegion, message: string, kind: "red_flag" | "unsupported_script" = "red_flag"): Promise<void> {
+  const reply = kind === "red_flag" ? REFERRAL_COPY : UNSUPPORTED_SCRIPT_COPY;
+  await recordBestEffort(uid, scanId, region, message, reply, { ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: kind, redFlag: kind === "red_flag", latencyMs: 0 });
 }
 
 export async function handleContextChat(input: { uid: string; scanId: string; region: EchoRegion; message: string }): Promise<ContextChatResult> {

@@ -20,7 +20,7 @@ export interface EchoTurnRecord {
   promptVersion: string | null;
   modelId: string | null;
   validator: ValidatorRecord | null;
-  prefilter: "red_flag" | "comparison" | null;
+  prefilter: "red_flag" | "comparison" | "unsupported_script" | null;
   redFlag: boolean;
   latencyMs: number;
 }

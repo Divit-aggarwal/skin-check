@@ -33,12 +33,7 @@ const ENDPOINT_CONFIG = ENDPOINT ? { endpoint: ENDPOINT, forcePathStyle: true } 
 
 export const UPLOAD_URL_TTL_SECONDS = 300;
 
-/**
- * Largest original the presigned PUT accepts (second security review, H20).
- * PROVISIONAL: generous for a full-resolution phone photo; a refused presign
- * stops the scan, so too small would break real captures.
- */
-export const MAX_ORIGINAL_BYTES = 25 * 1024 * 1024;
+export { MAX_ORIGINAL_BYTES } from "@/lib/s3-key";
 
 export class S3NotConfiguredError extends Error {
   constructor(missing: string[]) {

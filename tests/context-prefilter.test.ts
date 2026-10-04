@@ -292,3 +292,37 @@ describe("red-flag pre-filter: the H20 narrowing keeps the old hits", () => {
     expect(redFlagHit(msg)).toBe(false);
   });
 });
+
+// TD-18 (1), tracker H22: a script Echo does not support never reaches Gemini.
+describe("unsupported script (H22)", () => {
+  it.each([
+    "என் தோல் எண்ணெய் பசையாக உள்ளது",
+    "আমার ত্বক তৈলাক্ত",
+    "నా చర్మం జిడ్డుగా ఉంది",
+    "എന്റെ ചർമ്മം",
+    "ನನ್ನ ಚರ್ಮ",
+    "મારી ત્વચા",
+    "ਮੇਰੀ ਚਮੜੀ",
+    "بشرتي دهنية",
+    "我的皮肤很油",
+    "my skin is தோல் oily",
+  ])("unsupported: %j", async (msg) => {
+    const { unsupportedScript } = await import("@/lib/context/prefilter");
+    expect(unsupportedScript(msg)).toBe(true);
+  });
+
+  it.each(["is my skin oily?", "mujhe pimples hai", "मेरी त्वचा तैलीय है", "Is γ-oryzanol good?", "café au lait spots? 😊", "thanks!! 👍", "1, 2, 3", "ｍｙ ｓｋｉｎ"])(
+    "supported: %j",
+    async (msg) => {
+      const { unsupportedScript } = await import("@/lib/context/prefilter");
+      expect(unsupportedScript(msg)).toBe(false);
+    }
+  );
+
+  it("the fixed reply names English and Hindi and carries the referral line", async () => {
+    const { UNSUPPORTED_SCRIPT_COPY, REFERRAL_LINE } = await import("@/lib/context/prefilter");
+    expect(UNSUPPORTED_SCRIPT_COPY).toMatch(/English and Hindi only/);
+    expect(UNSUPPORTED_SCRIPT_COPY.endsWith(REFERRAL_LINE)).toBe(true);
+    expect(UNSUPPORTED_SCRIPT_COPY).not.toMatch(/\d/);
+  });
+});

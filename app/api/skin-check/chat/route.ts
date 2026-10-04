@@ -14,7 +14,7 @@ import { ageStatus, latestGrant, withLedgerTimeout, type AgeStatus } from "@/app
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 import { contextChatEnabled } from "@/lib/context/switch";
 import { handleContextChat, recordReferral } from "@/lib/context/chat";
-import { joinedUserTurns, redFlagHit, REFERRAL_COPY, withoutReferrals } from "@/lib/context/prefilter";
+import { joinedUserTurns, redFlagHit, REFERRAL_COPY, UNSUPPORTED_SCRIPT_COPY, unsupportedScript, withoutReferrals } from "@/lib/context/prefilter";
 
 // firebase-admin needs Node APIs and hard-fails on the Edge runtime — same
 // explicit opt-in as /api/skin-scan.
@@ -136,7 +136,11 @@ export async function POST(request: NextRequest) {
   // refuse (Gemini key, history, consent ledger, 18+, quota). Only after auth:
   // nothing is read or spent. The token covers the client's history only if
   // it verified; a forged history is never signed.
-  if (redFlagHit(message)) {
+  // TD-18 (1), H22: a message in a script Echo does not support gets a fixed
+  // reply (with the referral line) the same way: we cannot screen it.
+  const fixedKind = redFlagHit(message) ? ("red_flag" as const) : unsupportedScript(message) ? ("unsupported_script" as const) : null;
+  if (fixedKind) {
+    const fixedReply = fixedKind === "red_flag" ? REFERRAL_COPY : UNSUPPORTED_SCRIPT_COPY;
     // The context path keeps a record of the turn, but only for a user the
     // gates would admit: an under-18, unattested or unconsented user's message
     // is never stored. Any ledger error or timeout means no record; the
@@ -144,19 +148,19 @@ export async function POST(request: NextRequest) {
     if (contextChatEnabled()) {
       try {
         const [age, aiShare] = await withLedgerTimeout(Promise.all([ageStatus(uid), latestGrant(uid, "ai_share", AI_SHARE_CONSENT_VERSION)]));
-        if (age === "over18" && aiShare === true) await recordReferral(uid, scanId, region, message);
+        if (age === "over18" && aiShare === true) await recordReferral(uid, scanId, region, message, fixedKind);
       } catch (err) {
         console.error("skin-check chat: referral not recorded:", (err as Error)?.name ?? "unknown");
       }
     }
-    const turns = [...(historyOk ? history : []), { role: "user" as const, text: message }, { role: "echo" as const, text: REFERRAL_COPY }];
+    const turns = [...(historyOk ? history : []), { role: "user" as const, text: message }, { role: "echo" as const, text: fixedReply }];
     let referralToken: string | undefined;
     try {
       referralToken = signHistory(uid, scanId, region, turns);
     } catch {
       referralToken = undefined; // not configured: the referral still goes out
     }
-    return NextResponse.json({ ok: true, reply: REFERRAL_COPY, ...(referralToken ? { historyToken: referralToken } : {}) });
+    return NextResponse.json({ ok: true, reply: fixedReply, ...(referralToken ? { historyToken: referralToken } : {}) });
   }
 
   if (historyError instanceof AdminNotConfiguredError) return misconfigured(historyError);

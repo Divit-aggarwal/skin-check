@@ -137,6 +137,14 @@ describe("switch on: the gates still refuse before any package is built", () => 
     for (const fn of [h.buildContextPackage, h.loadTrustedEchoContext, h.generateContent, h.consumeDailyQuota, h.recordChatTurns]) expect(fn).not.toHaveBeenCalled();
   });
 
+  it("H22: a message in an unsupported script gets the fixed reply, is recorded as such, and nothing is built", async () => {
+    const { UNSUPPORTED_SCRIPT_COPY } = await import("@/lib/context/prefilter");
+    const res = await post("আমার ত্বক তৈলাক্ত");
+    expect((await res.json()).reply).toBe(UNSUPPORTED_SCRIPT_COPY);
+    for (const fn of [h.buildContextPackage, h.generateContent]) expect(fn).not.toHaveBeenCalled();
+    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ prefilter: "unsupported_script", redFlag: false, modelId: null });
+  });
+
   it("a consented adult's early referral is still recorded as a red-flag turn", async () => {
     const res = await post("my mole is bleeding");
     expect((await res.json()).reply).toBe(REFERRAL_COPY);

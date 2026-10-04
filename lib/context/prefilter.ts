@@ -272,14 +272,35 @@ export const joinedUserTurns = (history: readonly { role: string; text: string }
  * them out (chat-turns.ts historyExcluded).
  */
 export function withoutReferrals<T extends { role: string; text: string }>(history: readonly T[]): T[] {
-  return history.filter((t, i) => t.text !== REFERRAL_COPY && !(t.role === "user" && history[i + 1]?.text === REFERRAL_COPY));
+  const fixed = (t: T | undefined) => t !== undefined && t.role === "echo" && PREFILTER_REPLIES.includes(t.text);
+  return history.filter((t, i) => !fixed(t) && !(t.role === "user" && fixed(history[i + 1])));
 }
 
 export const comparisonHit = (message: string): boolean => COMPARISON.test(fold(message)) || COMPARISON.test(message);
 
 // No helpline number until one is verified (GEMINI_BOUNDARY §6).
-export const REFERRAL_COPY =
-  "This is something a doctor or dermatologist should look at in person, so Echo can't answer it here. " +
+export const REFERRAL_LINE =
   "If you feel unsafe or might hurt yourself, please contact your local emergency services or someone you trust right now.";
+export const REFERRAL_COPY =
+  "This is something a doctor or dermatologist should look at in person, so Echo can't answer it here. " + REFERRAL_LINE;
+
+/** TD-18 (1), tracker H22: the fixed reply to a message in a script Echo does not support. Never sent to Gemini. */
+export const UNSUPPORTED_SCRIPT_COPY = "Echo understands English and Hindi only. Please write your question in English or Hindi. " + REFERRAL_LINE;
+
+// Letters Echo reads: Latin (folded to a-z), Devanagari, and Greek or Cyrillic
+// (a disguise, already referred by redFlagHit; "γ-oryzanol" stays a question).
+const SUPPORTED_LETTER = new RegExp(String.raw`[\p{Script=Latin}\p{Script=Devanagari}\p{Script=Greek}\p{Script=Cyrillic}]`, "u");
+const LETTER = new RegExp(String.raw`\p{L}`, "gu");
+
+/**
+ * TD-18 (1), H22: true when the message has a letter from any other script
+ * (Tamil, Bengali, Telugu, Arabic, CJK, ...). Such a message never goes to
+ * Gemini: we cannot screen it for red flags or self-harm.
+ */
+export const unsupportedScript = (message: string): boolean =>
+  (message.normalize("NFKC").replace(new RegExp(String.raw`[\p{Cf}${HANGUL_FILLERS}]`, "gu"), "").match(LETTER) ?? []).some((c) => !SUPPORTED_LETTER.test(c));
+
+/** Every fixed reply a pre-filter gives. An exchange answered with one is never sent to Gemini later. */
+export const PREFILTER_REPLIES: readonly string[] = [REFERRAL_COPY, UNSUPPORTED_SCRIPT_COPY];
 
 export const COMPARISON_LEAD = "Each check reads one photo on its own, so we can't compare checks yet. Here is what this check showed:";

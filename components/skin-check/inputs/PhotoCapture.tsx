@@ -4,7 +4,7 @@ import { useCallback, useEffect, useReducer, useRef, useState, type ChangeEvent 
 import { Camera, RotateCcw } from "lucide-react";
 import { useCameraStream } from "@/hooks/useCameraStream";
 import { useAuth } from "@/lib/auth-context";
-import { isAuthError, isUploadError, runSkinScan } from "@/lib/api";
+import { isAuthError, isUploadError, isUploadTooLarge, runSkinScan, UPLOAD_TOO_LARGE_MESSAGE } from "@/lib/api";
 import { OVERLAY_CATEGORIES } from "@/lib/skin-check-skus";
 import {
   IMAGE_RETENTION_CONSENT_COPY,
@@ -356,6 +356,8 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
             ? RETAKE_COPY[retakeReason]
             : isAuthError(err)
             ? "Your session expired before we could read your photo. Refresh the page to sign in again, then retry."
+            : isUploadTooLarge(err)
+            ? UPLOAD_TOO_LARGE_MESSAGE
             : isUploadError(err)
               // Upload failed, so the analysis never ran — retrying is the
               // fix, and the retry starts from the upload again.

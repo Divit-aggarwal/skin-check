@@ -21,7 +21,7 @@ describe("D01 baseline window", () => {
 
   it("D06 settings are named and marked provisional (TD-14 (3), (4))", () => {
     expect(BASELINE_CAPTURE_METHOD_RULE).toEqual({ rule: "skip_other_capture_method", status: "provisional" });
-    expect(BASELINE_ONE_PER_DAY_RULE).toEqual({ rule: "one_scan_per_calendar_day", timeZone: "UTC", status: "provisional" });
+    expect(BASELINE_ONE_PER_DAY_RULE).toEqual({ rule: "one_scan_per_calendar_day", timeZone: "Asia/Kolkata", status: "provisional" });
     expect(Object.isFrozen(BASELINE_CAPTURE_METHOD_RULE) && Object.isFrozen(BASELINE_ONE_PER_DAY_RULE)).toBe(true);
   });
 

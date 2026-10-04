@@ -1,4 +1,4 @@
-import { isAuthError, isUploadError, runSkinScan } from "@/lib/api";
+import { isAuthError, isUploadError, isUploadTooLarge, runSkinScan, UPLOAD_TOO_LARGE_MESSAGE } from "@/lib/api";
 import { isRetakeError, RETAKE_COPY, retakeReasonFromServerCode } from "@/lib/capture-quality/retake";
 import { OVERLAY_CATEGORIES } from "@/lib/skin-check-skus";
 import type { SkinScanState } from "@/types/skin-scan";
@@ -62,7 +62,9 @@ export async function retrySkinScan(scan: ErrorScan, scanId: string, run = runSk
         ? RETAKE_COPY[retakeReason]
         : isAuthError(err)
         ? "Your session expired. Refresh the page to sign in again, then retry."
-        : isUploadError(err)
+        : isUploadTooLarge(err)
+            ? UPLOAD_TOO_LARGE_MESSAGE
+            : isUploadError(err)
           ? "We couldn't save your photo just now. Check your connection and retry."
           : message,
       photo,

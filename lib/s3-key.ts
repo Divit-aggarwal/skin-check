@@ -32,6 +32,12 @@ export function scanImageKey(uid: string, scanId: string): string {
 export const ORIGINAL_CONTENT_TYPE = "image/jpeg";
 
 /**
+ * Largest original the presigned PUT accepts (H20; TD-18 (3): stays 25 MB).
+ * PROVISIONAL. Shared so the browser can say so before asking for a URL.
+ */
+export const MAX_ORIGINAL_BYTES = 25 * 1024 * 1024;
+
+/**
  * Everything one user has in the bucket (H01b erasure). The trailing slash is
  * load-bearing: without it, erasing "abc" would also match "abcd/…".
  */

@@ -96,6 +96,26 @@ describe("uploadOriginalImage", () => {
     stubFetch({ put: new Response("AccessDenied", { status: 403 }) });
     await expect(uploadOriginalImage(SCAN_ID, original)).rejects.toSatisfy(isUploadError);
   });
+
+  // TD-18 (3): the 25 MB cap with a clear message.
+  it("an original over 25 MB is refused before any request, with the too-large message", async () => {
+    const { isUploadTooLarge, UPLOAD_TOO_LARGE_MESSAGE } = await import("@/lib/api");
+    const calls = stubFetch();
+    const big = { size: 25 * 1024 * 1024 + 1, type: "image/jpeg" } as Blob;
+    const err = await uploadOriginalImage(SCAN_ID, big).catch((e: unknown) => e);
+    expect(isUploadTooLarge(err) && isUploadError(err)).toBe(true);
+    expect((err as Error).message).toBe(UPLOAD_TOO_LARGE_MESSAGE);
+    expect(UPLOAD_TOO_LARGE_MESSAGE).toMatch(/too large.*25 MB/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("a 413 from the presign route is the too-large error too; other refusals are not", async () => {
+    const { isUploadTooLarge } = await import("@/lib/api");
+    stubFetch({ presign: json({ code: "IMAGE_TOO_LARGE" }, 413) });
+    expect(isUploadTooLarge(await uploadOriginalImage(SCAN_ID, original).catch((e: unknown) => e))).toBe(true);
+    stubFetch({ presign: json({ error: "nope" }, 500) });
+    expect(isUploadTooLarge(await uploadOriginalImage(SCAN_ID, original).catch((e: unknown) => e))).toBe(false);
+  });
 });
 
 describe("runSkinScan", () => {

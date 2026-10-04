@@ -155,3 +155,30 @@ describe("history Gemini receives on today's Echo", () => {
     expect((await res.json()).reply).toBe("reply");
   });
 });
+
+// TD-18 (1), tracker H22.
+describe("a message in a script Echo does not support (H22)", () => {
+  it("gets the fixed reply before any gate, never reaches Gemini, and is left out of later history", async () => {
+    const { UNSUPPORTED_SCRIPT_COPY } = await import("@/lib/context/prefilter");
+    consumeDailyQuota.mockReturnValue(NextResponse.json({ code: "RATE_LIMITED" }, { status: 429 }));
+    const res = await post("என் தோல் எண்ணெய் பசையாக உள்ளது");
+    const { reply, historyToken } = await res.json();
+    expect(reply).toBe(UNSUPPORTED_SCRIPT_COPY);
+    expect(getSkinCheckChatReply).not.toHaveBeenCalled();
+    expect(consumeDailyQuota).not.toHaveBeenCalled();
+
+    consumeDailyQuota.mockReturnValue(null);
+    const prior: Turn[] = [{ role: "user", text: "என் தோல் எண்ணெய் பசையாக உள்ளது" }, { role: "echo", text: UNSUPPORTED_SCRIPT_COPY }];
+    const next = await post("what does oiliness mean?", prior, historyToken);
+    expect((await next.json()).reply).toBe("reply");
+    expect(getSkinCheckChatReply.mock.calls[0]![0]).toEqual([{ role: "user", text: "what does oiliness mean?" }]);
+  });
+
+  it("control: Hindi in Devanagari and Hinglish still reach Gemini", async () => {
+    for (const msg of ["मेरी त्वचा तैलीय है, क्या करूं?", "mujhe oily skin ke liye kya karna chahiye?"]) {
+      getSkinCheckChatReply.mockClear();
+      expect((await (await post(msg)).json()).reply).toBe("reply");
+      expect(getSkinCheckChatReply).toHaveBeenCalledTimes(1);
+    }
+  });
+});

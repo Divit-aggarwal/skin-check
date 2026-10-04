@@ -9,8 +9,8 @@
 //
 // D06 (TD-14 (3), (4), both PROVISIONAL): a scan whose capture method differs
 // from the latest's is skipped too (capture method is not an epoch, so this
-// cannot cross an engine change either), and then at most one scan per UTC
-// calendar day counts. The skips run first, so a day whose first scan is
+// cannot cross an engine change either), and then at most one scan per
+// calendar day (India time, TD-18) counts. The skips run first, so a day whose first scan is
 // skipped still counts its next usable one.
 
 import type { SkinState2 } from "@/lib/skin-state-2";

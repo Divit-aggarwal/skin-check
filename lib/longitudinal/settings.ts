@@ -12,9 +12,9 @@ export const BASELINE_CAPTURE_METHOD_RULE = Object.freeze({ rule: "skip_other_ca
 /**
  * D06, owner TD-14 (4), 2026-10-04: PROVISIONAL. At most one scan per calendar
  * day counts toward the baseline: the earliest usable one, by the server's
- * analyzedAt. The day is the UTC date (owner question: IST instead).
+ * analyzedAt. The day is the India date (TD-18 (2), owner 2026-10-04).
  */
-export const BASELINE_ONE_PER_DAY_RULE = Object.freeze({ rule: "one_scan_per_calendar_day", timeZone: "UTC", status: "provisional" } as const);
+export const BASELINE_ONE_PER_DAY_RULE = Object.freeze({ rule: "one_scan_per_calendar_day", timeZone: "Asia/Kolkata", status: "provisional" } as const);
 
 /** Production noise table. Empty until C05-C07 validate a quantity: every real pair is "not enough evidence" (D02, owner). */
 export const NOISE_TABLE: readonly NoiseTableEntry[] = Object.freeze([]);
