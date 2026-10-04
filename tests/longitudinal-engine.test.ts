@@ -34,10 +34,12 @@ const TEST: Required<Tables> = {
 interface Opt {
   day: number; value?: number; build?: string | null; pipeline?: string; sha?: string; capture?: "native" | "canvas" | null;
   px?: number; uid?: string; native?: boolean; cheeks?: boolean; persistAttempt?: "recovery"; captureQuality?: unknown;
+  /** UTC hour on that day; also makes the scan id unique, so a day can hold retakes. */
+  hour?: number;
 }
 
 function scan(o: Opt): SkinState2Result {
-  const scanId = `scan-${o.day}`;
+  const scanId = o.hour === undefined ? `scan-${o.day}` : `scan-${o.day}h${o.hour}`;
   const uid = o.uid ?? UID;
   const sha = o.sha ?? createHash("sha256").update(scanId).digest("hex");
   const result = { ...syntheticAnalysis(), ...(o.native === false ? {} : syntheticNative()) } as Record<string, any>;
@@ -56,7 +58,7 @@ function scan(o: Opt): SkinState2Result {
       scanId, inputSha256: sha, requestId: `r-${scanId}`, captureMethod: o.capture === null ? undefined : (o.capture ?? "native"),
       persistAttempt: o.persistAttempt, captureQuality: o.captureQuality as never,
     }),
-    createdAt: new Date(Date.UTC(2026, 9, 1 + o.day)),
+    createdAt: new Date(Date.UTC(2026, 9, 1 + o.day, o.hour ?? 0)),
   };
   const out = toSkinState2(record, `users/${uid}/scanAnalyses/${scanAnalysisDocId(scanId, sha)}`, uid);
   if (out.kind !== "skinstate") throw new Error(`fixture is not a SkinState: ${JSON.stringify(out)}`);
@@ -73,6 +75,7 @@ const LEGACY: SkinState2Result = { kind: "legacy_display", pipelineVersion: "sca
 const INVALID: SkinState2Result = { kind: "invalid", reasons: ["record.regions: missing or not a string array"] };
 
 const codes = (r: LongitudinalResult) => r.reasons.map((x) => x.code);
+const refsOf = (r: LongitudinalResult) => r.detail.baselineAnalysisRefs.map((ref) => ref.match(/scan-[\dh]+/)![0]);
 const ncReasons = (r: LongitudinalResult) => (r.comparability.verdict === "not_comparable" ? r.comparability.reasons : []);
 const allResults: LongitudinalResult[] = [];
 const run = (s: SkinState2Result[], tables?: Tables, q: QuantityPath = Q, region: SkinStateRegionKey = R) => {
@@ -231,11 +234,42 @@ describe("the brief's cases, with test-only tables", () => {
       expect(r.detail.baselineAnalysisRefs.map((ref) => ref.match(/scan-\d+/)![0])).toEqual(["scan-1", "scan-3", "scan-4"]);
     });
 
-  it("a baseline scan with a different capture method is not skipped: not_comparable", () => {
-    const s = [scan({ day: 1 }), scan({ day: 2, capture: "canvas" }), scan({ day: 3 }), scan({ day: 4 }), scan({ day: 10 })];
+  it("D06 (TD-14 (3)): a baseline scan with a different capture method is skipped and the next one is used", () => {
+    const s = [scan({ day: 1, value: 55 }), scan({ day: 2, value: 55, capture: "canvas" }), scan({ day: 3, value: 55 }), scan({ day: 4, value: 55 }), scan({ day: 10, value: 60 })];
     const r = run(s, TEST);
-    expect(codes(r)).toContain("not_comparable");
-    expect(ncReasons(r)).toContain("capture_method_differs");
+    expect(r).toMatchObject({ evidence: "pairwise", change: "beyond_noise" });
+    expect(refsOf(r)).toEqual(["scan-1", "scan-3", "scan-4"]);
+  });
+
+  it("D06: the latest's capture method decides; with no same-method scan before it there is no baseline, not a block", () => {
+    const r = run(series(flat(3), { capture: "canvas" }), TEST);
+    expect(codes(r)).toContain("too_few_scans_for_baseline");
+    expect(ncReasons(r)).not.toContain("capture_method_differs");
+    expect(r.detail.baselineAnalysisRefs).toEqual([]);
+  });
+
+  it("D06 (TD-14 (4)): retakes on one day count once, the earliest of the day", () => {
+    const s = [scan({ day: 1, hour: 9, value: 55 }), scan({ day: 1, hour: 10, value: 55 }), scan({ day: 1, hour: 11, value: 55 }), scan({ day: 2, value: 55 }), scan({ day: 3, value: 55 }), scan({ day: 10, value: 60 })];
+    const r = run(s, TEST);
+    expect(r).toMatchObject({ evidence: "pairwise", change: "beyond_noise" });
+    expect(refsOf(r)).toEqual(["scan-1h9", "scan-2", "scan-3"]);
+    // Three retakes alone are never a baseline.
+    const only = run([scan({ day: 1, hour: 9 }), scan({ day: 1, hour: 10 }), scan({ day: 1, hour: 11 }), scan({ day: 10 })], TEST);
+    expect(codes(only)).toContain("too_few_scans_for_baseline");
+    expect(refsOf(only)).toEqual(["scan-1h9"]);
+  });
+
+  it("D06: the skips run first, so a day whose first scan is skipped counts its next usable one", () => {
+    for (const bad of [{ px: 0 }, { capture: "canvas" as const }, { build: null }]) {
+      const s = [scan({ day: 1, hour: 9, value: 55, ...bad }), scan({ day: 1, hour: 10, value: 55 }), scan({ day: 2, value: 55 }), scan({ day: 3, value: 55 }), scan({ day: 10, value: 60 })];
+      expect(refsOf(run(s, TEST)), JSON.stringify(bad)).toEqual(["scan-1h10", "scan-2", "scan-3"]);
+    }
+  });
+
+  it("D06: the day is the UTC date of the server analyzedAt", () => {
+    // 23:00 on day 1 and 00:00 on day 2 (UTC) are two days; 00:00 and 23:00 on day 2 are one.
+    const s = [scan({ day: 1, hour: 23, value: 55 }), scan({ day: 2, hour: 0, value: 55 }), scan({ day: 2, hour: 23, value: 55 }), scan({ day: 3, value: 55 }), scan({ day: 10, value: 60 })];
+    expect(refsOf(run(s, TEST))).toEqual(["scan-1h23", "scan-2h0", "scan-3"]);
   });
 
   it("the same record twice is bad input: one physical scan never fills the baseline", () => {
@@ -282,11 +316,9 @@ const REACHABLE: Record<string, () => LongitudinalResult> = {
   engine_build_differs: () => run(series(flat(3), { build: B }), TEST),
   pipeline_version_differs: () => run(series(flat(3), { pipeline: "scan-0.1.7-provisional" }), TEST),
   capture_method_unknown: () => run(series(flat(3), { capture: null }), TEST),
-  capture_method_differs: () => run(series(flat(3), { capture: "canvas" }), TEST),
   native_stats_missing: () => run(series(flat(3), { native: false }), TEST),
   region_absent: () => run(series(flat(3), { px: 0 }), TEST),
   region_low_pixel_count: () => run(series(flat(3), { px: 1000 }), TEST),
-  lr_cheek_cross_capture_method: () => run(series(flat(3), { capture: "canvas" }, { cheeks: true }), TEST, Q, CHEEK),
   different_user: () => run(series(flat(3), { uid: "OTHER_UID" }), TEST),
 };
 /** Cannot arise in the engine, and why. If one becomes reachable, this list must change. */
@@ -297,6 +329,9 @@ const UNREACHABLE: Record<string, string> = {
   field_not_defined: "QuantityPath is exactly the comparability field list",
   input_variant_differs: "skinstate-2 maps input.variant to one constant",
   contract_version_differs: "the engine reads skinstate-2 states only",
+  // D06 (TD-14 (3)): a baseline scan with another capture method is skipped, so no candidate pair differs in it.
+  capture_method_differs: "D06 skips a baseline scan whose capture method differs from the latest",
+  lr_cheek_cross_capture_method: "D06 skips a baseline scan whose capture method differs from the latest",
 };
 
 describe("4. scans that cannot be compared", () => {

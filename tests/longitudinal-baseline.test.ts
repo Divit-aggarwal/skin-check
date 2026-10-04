@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { pickBaseline, sortStates } from "@/lib/longitudinal/baseline";
-import { BASELINE_RULE } from "@/lib/longitudinal/settings";
+import { BASELINE_CAPTURE_METHOD_RULE, BASELINE_ONE_PER_DAY_RULE, BASELINE_RULE } from "@/lib/longitudinal/settings";
 import type { SkinState2 } from "@/lib/skin-state-2";
 
 // D01 baseline window (design §2.4 steps 3-5). Minimal synthetic states: only the fields the window reads.
@@ -9,6 +9,7 @@ const st = (day: number, build: string | null = "A", pipeline = "scan-0.1.6-prov
     identity: { analysisRef: ref, scanId: `s${day}` },
     provenance: { analyzedAt: new Date(Date.UTC(2026, 9, day)).toISOString() },
     engine: { pipelineVersion: pipeline, build },
+    input: { captureMethod: "native" },
   }) as unknown as SkinState2;
 const days = (p: ReturnType<typeof pickBaseline>) => p.candidates.map((s) => s.identity.scanId);
 
@@ -16,6 +17,12 @@ describe("D01 baseline window", () => {
   it("the rule is first_3_comparable_scans, named and marked provisional", () => {
     expect(BASELINE_RULE).toEqual({ rule: "first_3_comparable_scans", scans: 3, status: "provisional" });
     expect(Object.isFrozen(BASELINE_RULE)).toBe(true);
+  });
+
+  it("D06 settings are named and marked provisional (TD-14 (3), (4))", () => {
+    expect(BASELINE_CAPTURE_METHOD_RULE).toEqual({ rule: "skip_other_capture_method", status: "provisional" });
+    expect(BASELINE_ONE_PER_DAY_RULE).toEqual({ rule: "one_scan_per_calendar_day", timeZone: "UTC", status: "provisional" });
+    expect(Object.isFrozen(BASELINE_CAPTURE_METHOD_RULE) && Object.isFrozen(BASELINE_ONE_PER_DAY_RULE)).toBe(true);
   });
 
   it("0 to 3 states give fewer than 3 candidates: one scan is never a baseline", () => {
