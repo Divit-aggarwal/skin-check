@@ -21,7 +21,11 @@ service cloud.firestore {
 
     match /users/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;
-      allow create, update: if request.auth != null && request.auth.uid == uid && notErased(uid);
+      // Red team (I02, area A F8): the profile holds exactly what the app
+      // writes (lib/auth-context.tsx), and the phone number is the token's own.
+      allow create, update: if request.auth != null && request.auth.uid == uid && notErased(uid)
+                            && request.resource.data.keys().hasOnly(['phoneNumber', 'lastSeenAt'])
+                            && request.resource.data.phoneNumber == request.auth.token.phone_number;
       allow delete: if false;
 
       // Completed Skin Check questionnaires. This is the whole server-side
@@ -33,6 +37,12 @@ service cloud.firestore {
         allow get, list: if request.auth != null && request.auth.uid == uid;
         allow create: if request.auth != null && request.auth.uid == uid
                       && notErased(uid)
+                      // Red team (I02, area A F5): the date is the server's and the
+                      // record names its own check, so a forged future date cannot pin
+                      // itself at the top of the history.
+                      && request.resource.data.createdAt == request.time
+                      && request.resource.data.get('scanId', checkId) == checkId
+                      && imageStoredIsBool()
                       && imageKeyIsOwn(uid, checkId)
                       && storedImageHasConsent();
         allow update, delete: if false;
@@ -48,10 +58,11 @@ service cloud.firestore {
 
       // PHASE 3 consent gate. A record may only claim that the original image
       // is stored if it also carries image-retention consent at the current
-      // version. The presign route asks the client for the same flag, but that
-      // is a client assertion — THIS is the check a tampered client cannot get
-      // past, and it is what keeps a stored object from being recorded as
-      // consented-to when it was not.
+      // version. Both fields are in the same client-written record, so this
+      // only stops the app's own flow from recording a stored image without
+      // consent; a tampered client can write both (red team I02, area C F6).
+      // The authoritative record is the image_retention ledger entry the
+      // presign route writes on the server.
       //
       // Nothing is asserted about the timestamp: serverTimestamp() resolves
       // after evaluation, and a client clock would be no evidence anyway.
@@ -71,6 +82,13 @@ service cloud.firestore {
       // user's key inside its own document — this makes that write fail
       // instead of relying on the client to be honest. A record that claims
       // nothing is stored (or no image at all) is unconstrained.
+      // Red team (I02, area A F7): "stored" is a boolean or absent; a string
+      // "true" would slip past the key and consent checks below.
+      function imageStoredIsBool() {
+        let img = request.resource.data.get('image', null);
+        return img == null || !('stored' in img) || img.stored is bool;
+      }
+
       function imageKeyIsOwn(uid, checkId) {
         let img = request.resource.data.get('image', null);
         return img == null

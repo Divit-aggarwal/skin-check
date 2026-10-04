@@ -5,7 +5,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { collection, doc, getDoc, getDocs, limit, orderBy, query, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc } from "firebase/firestore";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 // Runs only inside the Firestore emulator:
@@ -32,7 +32,7 @@ describe.skipIf(!EMULATOR)("firestore.rules — skinChecks image metadata", () =
     answers: {},
     status: "completed",
     result: null,
-    createdAt: new Date(),
+    createdAt: serverTimestamp(),
   };
 
   beforeAll(async () => {

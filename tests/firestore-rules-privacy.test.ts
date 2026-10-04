@@ -5,7 +5,7 @@ import {
   initializeTestEnvironment,
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
-import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc } from "firebase/firestore";
+import { collection, deleteDoc, doc, getDoc, getDocs, setDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { afterAll, beforeAll, describe, it } from "vitest";
 
 // Runs only inside the Firestore emulator (npm run test:local). Skipped
@@ -64,7 +64,8 @@ describe.skipIf(!EMULATOR)("firestore.rules — privacy: consent ledger", () => 
         schemaVersion: 1,
         answers: {},
         status: "completed",
-        createdAt: new Date(),
+        // The server's time, as the app writes it (rules require it since red team I02).
+        createdAt: serverTimestamp(),
       })
     );
   });

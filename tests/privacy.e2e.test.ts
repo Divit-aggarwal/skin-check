@@ -94,11 +94,20 @@ describe.skipIf(!WEB)("privacy: erasure end to end", () => {
 describe.skipIf(!WEB)("privacy: nothing written after an erase stays", () => {
   const C = { uid: "seed-privacy-late", phoneNumber: "+919999900104" };
   const FS = process.env.FIRESTORE_EMULATOR_HOST;
+  // A client create with a server timestamp, as the app writes it (rules require createdAt == request.time).
   const clientWrite = (idToken: string, docId: string) =>
-    fetch(`http://${FS}/v1/projects/${PROJECT}/databases/(default)/documents/users/${C.uid}/skinChecks?documentId=${docId}`, {
+    fetch(`http://${FS}/v1/projects/${PROJECT}/databases/(default)/documents:commit`, {
       method: "POST",
       headers: { authorization: `Bearer ${idToken}`, "content-type": "application/json" },
-      body: JSON.stringify({ fields: { status: { stringValue: "questionnaire_only" } } }),
+      body: JSON.stringify({
+        writes: [
+          {
+            update: { name: `projects/${PROJECT}/databases/(default)/documents/users/${C.uid}/skinChecks/${docId}`, fields: { scanId: { stringValue: docId }, status: { stringValue: "questionnaire_only" } } },
+            updateTransforms: [{ fieldPath: "createdAt", setToServerValue: "REQUEST_TIME" }],
+            currentDocument: { exists: false },
+          },
+        ],
+      }),
     });
 
   it("a late upload, a late server write and a client write with the old token are all gone after the sweep", async () => {

@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { assertFails, assertSucceeds, initializeTestEnvironment, type RulesTestEnvironment } from "@firebase/rules-unit-testing";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
 import { afterAll, beforeAll, describe, it } from "vitest";
 
 // H04 (TD-19): while erasedAccounts/{uid} exists, an ID token issued before
@@ -11,7 +11,7 @@ describe.skipIf(!EMULATOR)("firestore.rules — erased accounts", () => {
   let env: RulesTestEnvironment;
   const ERASED = "erased-uid";
   const OTHER = "other-uid";
-  const check = (scanId: string) => ({ schemaVersion: 1, scanId, answers: {}, status: "completed", result: null, createdAt: new Date(), image: null, consent: { imageRetention: false } });
+  const check = (scanId: string) => ({ schemaVersion: 1, scanId, answers: {}, status: "completed", result: null, createdAt: serverTimestamp(), image: null, consent: { imageRetention: false } });
 
   beforeAll(async () => {
     const [host, port] = EMULATOR!.split(":");
@@ -27,14 +27,14 @@ describe.skipIf(!EMULATOR)("firestore.rules — erased accounts", () => {
   afterAll(async () => env?.cleanup());
 
   it("the erased user's old token cannot create a check, create or update the profile", async () => {
-    const db = env.authenticatedContext(ERASED).firestore();
+    const db = env.authenticatedContext(ERASED, { phone_number: "+91" }).firestore();
     await assertFails(setDoc(doc(db, "users", ERASED, "skinChecks", "late-check-0001"), check("late-check-0001")));
-    await assertFails(setDoc(doc(db, "users", ERASED), { phoneNumber: "+91", lastSeenAt: new Date() }, { merge: true }));
+    await assertFails(setDoc(doc(db, "users", ERASED), { phoneNumber: "+91", lastSeenAt: serverTimestamp() }, { merge: true }));
   });
 
   it("control: another user (no marker) can still write their own", async () => {
-    const db = env.authenticatedContext(OTHER).firestore();
-    await assertSucceeds(setDoc(doc(db, "users", OTHER), { phoneNumber: "+91" }));
+    const db = env.authenticatedContext(OTHER, { phone_number: "+91" }).firestore();
+    await assertSucceeds(setDoc(doc(db, "users", OTHER), { phoneNumber: "+91", lastSeenAt: serverTimestamp() }));
     await assertSucceeds(setDoc(doc(db, "users", OTHER, "skinChecks", "ok-check-00001"), check("ok-check-00001")));
   });
 

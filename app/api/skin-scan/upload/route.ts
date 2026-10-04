@@ -73,9 +73,11 @@ export async function POST(request: NextRequest) {
   //
   // Honest about what this is: the flag is client-asserted, so it stops the
   // application's own flow from uploading without consent, not a client that
-  // deliberately lies. The check that actually holds is in firestore.rules,
-  // where a record claiming image.stored == true is rejected unless it also
-  // carries this exact consent version.
+  // deliberately lies. firestore.rules also rejects a record claiming
+  // image.stored == true unless it also
+  // carries this exact consent version. That rule reads the same client-written
+  // record, so it stops the app's own flow, not a tampered client (red team
+  // I02); the ledger entry written below is the authoritative record.
   const consent = (body as { imageRetentionConsent?: unknown } | null)?.imageRetentionConsent;
   const consentVersion = (body as { imageRetentionConsentVersion?: unknown } | null)?.imageRetentionConsentVersion;
   if (consent !== true || consentVersion !== IMAGE_RETENTION_CONSENT_VERSION) {

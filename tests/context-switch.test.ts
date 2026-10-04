@@ -12,6 +12,12 @@ describe("context chat switch", () => {
     ["development", undefined, false],
     ["development", "true", false],
     ["test", undefined, false],
+    ["test", "on", true],
+    // Red team (I02, area C): fails closed for anything but development or test.
+    ["", "on", false],
+    ["staging", "on", false],
+    ["Production", "on", false],
+    [" production", "on", false],
   ])("NODE_ENV=%s ECHO_CONTEXT_PATH=%s -> %s", (nodeEnv, flag, expected) => {
     vi.stubEnv("NODE_ENV", nodeEnv);
     vi.stubEnv("ECHO_CONTEXT_PATH", flag ?? "");
