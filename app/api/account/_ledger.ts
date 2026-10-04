@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
-import type { ConsentPurpose } from "@/lib/consent";
+import { AGE_ATTESTATION_VERSION, type ConsentPurpose } from "@/lib/consent";
 
 // SERVER ONLY (imports lib/firebase/admin.ts). The consent ledger (D-16):
 // users/{uid}/consentLedger/{auto-id}, append-only, written only here.
@@ -76,18 +76,23 @@ export async function latestGrant(uid: string, purpose: ConsentPurpose, version:
 }
 
 /**
- * Sticky (decision 4): ANY under-18 entry blocks the account, even after a
- * later 18+ answer. Self-attestation: it stops a blocked minor from getting
- * around the block, not one who lies the first time.
+ * Sticky (decision 4): ANY under-18 entry blocks the account, at any version,
+ * even after a later 18+ answer. Self-attestation: it stops a blocked minor
+ * from getting around the block, not one who lies the first time.
+ * H25 (owner TD-20, option a): an 18+ answer counts only at the current
+ * AGE_ATTESTATION_VERSION, so users are asked again when the copy changes.
  */
 export async function ageStatus(uid: string): Promise<AgeStatus> {
   // Two fixed-size reads (equality filters only, no composite index), so a
   // ledger flooded with 18+ entries can't slow this past the timeout and make
   // upload and scan fail open.
   const age = ledger(uid).where("purpose", "==", "age_18_plus");
-  const [under, any] = await Promise.all([age.where("granted", "==", false).limit(1).get(), age.limit(1).get()]);
+  const [under, over] = await Promise.all([
+    age.where("granted", "==", false).limit(1).get(),
+    age.where("granted", "==", true).where("version", "==", AGE_ATTESTATION_VERSION).limit(1).get(),
+  ]);
   if (!under.empty) return "under18";
-  return any.empty ? "missing" : "over18";
+  return over.empty ? "missing" : "over18";
 }
 
 /**

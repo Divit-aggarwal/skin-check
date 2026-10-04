@@ -52,6 +52,7 @@ function fakeCollection(path: string) {
 
 vi.mock("@/lib/firebase/admin", () => ({ adminDb: () => ({ collection: (name: string) => fakeCollection(name) }) }));
 
+import { AGE_ATTESTATION_VERSION } from "@/lib/consent";
 import { ageStatus, appendConsent, latestGrant, REQUIRE_AGE_ATTESTATION, scanAgeGate, sha256, withLedgerTimeout } from "@/app/api/account/_ledger";
 import { FieldValue } from "firebase-admin/firestore";
 
@@ -122,13 +123,27 @@ describe("ageStatus", () => {
   });
 
   it("over18 when every entry attests 18+", async () => {
-    seed("u", "1", { purpose: "age_18_plus", granted: true, recordedAt: ts(1) });
+    seed("u", "1", { purpose: "age_18_plus", granted: true, version: AGE_ATTESTATION_VERSION, recordedAt: ts(1) });
     expect(await ageStatus("u")).toBe("over18");
+  });
+
+  // H25 (owner TD-20, option a).
+  it("an 18+ answer at an older version does not count: missing, so the user is asked again", async () => {
+    seed("u", "1", { purpose: "age_18_plus", granted: true, version: "age 18 plus attestation version 0", recordedAt: ts(1) });
+    expect(await ageStatus("u")).toBe("missing");
+    seed("u", "2", { purpose: "age_18_plus", granted: true, version: AGE_ATTESTATION_VERSION, recordedAt: ts(2) });
+    expect(await ageStatus("u")).toBe("over18");
+  });
+
+  it("an under-18 answer at an older version still blocks (sticky at any version)", async () => {
+    seed("u", "1", { purpose: "age_18_plus", granted: false, version: "age 18 plus attestation version 0", recordedAt: ts(1) });
+    seed("u", "2", { purpose: "age_18_plus", granted: true, version: AGE_ATTESTATION_VERSION, recordedAt: ts(2) });
+    expect(await ageStatus("u")).toBe("under18");
   });
 
   it("sticky: an under-18 entry wins over a later 18+ entry (decision 4)", async () => {
     seed("u", "1", { purpose: "age_18_plus", granted: false, recordedAt: ts(1) });
-    seed("u", "2", { purpose: "age_18_plus", granted: true, recordedAt: ts(2) });
+    seed("u", "2", { purpose: "age_18_plus", granted: true, version: AGE_ATTESTATION_VERSION, recordedAt: ts(2) });
     expect(await ageStatus("u")).toBe("under18");
   });
 });
@@ -177,7 +192,7 @@ describe("scanAgeGate (upload and scan routes)", () => {
   });
 
   it("attested 18+: goes ahead", async () => {
-    seed("u", "1", { purpose: "age_18_plus", granted: true, recordedAt: ts(1) });
+    seed("u", "1", { purpose: "age_18_plus", granted: true, version: AGE_ATTESTATION_VERSION, recordedAt: ts(1) });
     expect(await scanAgeGate("u", "test", true)).toBeNull();
   });
 
@@ -187,12 +202,12 @@ describe("scanAgeGate (upload and scan routes)", () => {
   });
 
   it("reads are fixed-size: a flood of 18+ entries doesn't grow them", async () => {
-    for (let i = 0; i < 50; i++) seed("u", `e${i}`, { purpose: "age_18_plus", granted: true, recordedAt: ts(i) });
+    for (let i = 0; i < 50; i++) seed("u", `e${i}`, { purpose: "age_18_plus", granted: true, version: AGE_ATTESTATION_VERSION, recordedAt: ts(i) });
     calls.length = 0;
     expect(await ageStatus("u")).toBe("over18");
     expect(calls.sort()).toEqual([
       "query users/u/consentLedger purpose==age_18_plus granted==false limit 1",
-      "query users/u/consentLedger purpose==age_18_plus limit 1",
+      `query users/u/consentLedger purpose==age_18_plus granted==true version==${AGE_ATTESTATION_VERSION} limit 1`,
     ]);
   });
 
