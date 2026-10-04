@@ -82,6 +82,13 @@ describe("dashboard wording (D-12)", () => {
     }
   });
 
+  it("a band's style never depends on the band: every reading row has one fixed class", () => {
+    const src = readFileSync("components/dashboard/CheckReadings.tsx", "utf8");
+    const rows = Array.from(src.matchAll(/<(dt|dd)\b[^>]*>/g)).map((m) => m[0]);
+    expect(rows.length).toBe(2);
+    for (const r of rows) expect(r, r).toMatch(/^<d[dt] className="[^"{]*">$/);
+  });
+
   it("the dashboard never imports the rules feature or the longitudinal engine", () => {
     for (const f of files()) {
       const src = readFileSync(f, "utf8");

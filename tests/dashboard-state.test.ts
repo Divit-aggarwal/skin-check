@@ -78,10 +78,33 @@ describe("dashboard view model", () => {
     expect(d.echoScanId).toBeNull();
   });
 
-  it("a measured reading wins over a newer legacy one for the current state", () => {
+  it("a measured reading wins over a newer legacy one, and the newer check is named as not shown", () => {
     const d = deriveDashboard(UID, [check("m", 1), check("old", 2, { result: legacyResult })], [analysis("m", 1)]);
     if (d.current.kind !== "reading") throw new Error();
     expect(d.current.view.scanId).toBe("m");
+    expect(d.newerCheckNotShown).toBe(true);
+  });
+
+  it("names a newer check whose server reading is not in yet (pending or questions only), and only then", () => {
+    expect(deriveDashboard(UID, [check("m", 1)], [analysis("m", 1)]).newerCheckNotShown).toBe(false);
+    expect(deriveDashboard(UID, [check("m", 1), check("new", null)], [analysis("m", 1)]).newerCheckNotShown).toBe(true);
+    expect(deriveDashboard(UID, [check("m", 2), check("q", 1, { status: "questionnaire_only" })], [analysis("m", 2)]).newerCheckNotShown).toBe(false);
+    expect(deriveDashboard(UID, [check("m", 1), check("q", 2, { status: "questionnaire_only" })], [analysis("m", 1)]).newerCheckNotShown).toBe(true);
+  });
+
+  it("counts starting CHECKS: a retake never adds one, and an earlier record of the newest check is not one", () => {
+    const retake = analysis("a", 2, {}, {}, "b");
+    expect(deriveDashboard(UID, [check("a", 1)], [analysis("a", 1), retake]).trend.count).toBe(0);
+    expect(deriveDashboard(UID, [check("a", 1), check("c", 3)], [analysis("a", 1), retake, analysis("c", 3)]).trend.count).toBe(1);
+  });
+
+  it("an invalid primary record gives the scan no reading, as Echo then has none (no fallback to a recovery record)", () => {
+    const primary = analysis("s", 1);
+    primary.data.schemaVersion = 2;
+    const recovery = analysis("s", 2, {}, { persistAttempt: "recovery" }, "c");
+    const d = deriveDashboard(UID, [check("s", 1)], [primary, recovery]);
+    expect(d.current).toEqual({ kind: "none" });
+    expect(echoRecord(UID, "s", [primary, recovery])).toBeNull();
   });
 
   it("a legacy result with unreadable scores gives no bands, not a crash", () => {

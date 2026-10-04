@@ -78,7 +78,7 @@ async function main() {
         pipeline_version: "scan-0.1.6-provisional",
         engine_build: c.build ?? BUILD,
       } as unknown as SkinScanResult;
-      const legacy = { scores: result.scores, regions: result.regions, region_scores: result.region_scores, pipeline_version: "scan-0.1.4-provisional" };
+      const legacy = { scores: c.badScores ? { redness: "unreadable" } : result.scores, regions: result.regions, region_scores: result.region_scores, pipeline_version: "scan-0.1.4-provisional" };
 
       await userRef.collection("skinChecks").doc(scanId).set({
         schemaVersion: 1,

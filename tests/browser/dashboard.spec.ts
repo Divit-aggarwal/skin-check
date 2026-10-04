@@ -115,6 +115,7 @@ test("one past check at a time, with no readings; unknown id is not found", asyn
   await expect(page.getByText(C.history.onlyNewest)).toBeVisible();
   await expect(page.getByText(C.photoCheck.override)).toBeVisible();
   await expect(page.getByText("Redness")).toHaveCount(0);
+  await expect(page.locator("main")).not.toContainText(/\b(Low|Moderate|Elevated)\b/);
   await expect(page.getByRole("heading", { name: C.current.title })).toHaveCount(0);
   await shot(page, "past-check");
   await page.goto("/dashboard?check=not-a-check");
@@ -131,4 +132,44 @@ test("privacy: sharing on, with the stop button", async ({ page }) => {
   await expect(page.getByText(C.privacy.photoNotKept)).toBeVisible();
   await page.getByRole("heading", { name: C.privacy.title }).scrollIntoViewIfNeeded();
   await shot(page, "privacy-on");
+});
+
+test("unreadable: stored scores that do not parse", async ({ page }) => {
+  await dashboardAs(page, U.unreadable!.phoneNumber);
+  await expect(page.getByText(C.current.unreadable)).toBeVisible();
+  await shot(page, "unreadable");
+});
+
+test("a newer check without a server reading is named, not passed off as the newest", async ({ page }) => {
+  await dashboardAs(page, U.newer!.phoneNumber);
+  await expect(page.getByText(C.current.newerNotShown)).toBeVisible();
+  await shot(page, "newer-not-shown");
+});
+
+test("privacy: saving, failed and out-of-date withdrawal states", async ({ page }) => {
+  await dashboardAs(page, U.newer!.phoneNumber);
+  const stop = page.getByRole("button", { name: C.privacy.stop });
+  const privacy = page.getByRole("heading", { name: C.privacy.title });
+
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  await page.route("**/api/account/consent", async (route) => {
+    await held;
+    await route.fulfill({ status: 500, json: { code: "LEDGER_UNAVAILABLE" } });
+  });
+  await stop.click();
+  await expect(page.getByRole("button", { name: C.privacy.saving })).toBeDisabled();
+  await privacy.scrollIntoViewIfNeeded();
+  await shot(page, "privacy-saving");
+  release();
+  await expect(page.getByText(C.privacy.failed)).toBeVisible();
+  await shot(page, "privacy-failed");
+
+  await page.unroute("**/api/account/consent");
+  await page.route("**/api/account/consent", (route) => route.fulfill({ status: 409, json: { code: "VERSION_STALE" } }));
+  await stop.click();
+  await expect(page.getByText(C.privacy.stale)).toBeVisible();
+  // Nothing was withdrawn: sharing still reads as on.
+  await expect(page.getByText(C.privacy.aiOn)).toBeVisible();
+  await shot(page, "privacy-stale");
 });

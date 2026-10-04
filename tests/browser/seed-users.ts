@@ -2,7 +2,7 @@
 // scripts/seed-lane-dashboard.ts, signed in as by the browser tests. One user
 // per dashboard state and per browser test that changes data.
 
-export type Check = { days: number; kind: "measured" | "legacy" | "questions" | "failed"; build?: string; verdict?: "pass" | "override" | "unchecked"; lowForehead?: boolean };
+export type Check = { days: number; kind: "measured" | "legacy" | "questions" | "failed"; build?: string; verdict?: "pass" | "override" | "unchecked"; lowForehead?: boolean; badScores?: boolean };
 export type User = { uid: string; phoneNumber: string; checks: Check[]; aiShare?: boolean; fullAnswers?: boolean };
 
 const m = (days: number, extra: Partial<Check> = {}): Check => ({ days, kind: "measured", ...extra });
@@ -23,4 +23,6 @@ export const DASHBOARD_SEED: Record<string, User> = {
   routine: { uid: "seed-dash-routine", phoneNumber: "+919999900812", checks: [] },
   erase: { uid: "seed-dash-erase", phoneNumber: "+919999900813", checks: [m(4)] },
   capture: { uid: "seed-dash-capture", phoneNumber: "+919999900814", checks: [] },
+  unreadable: { uid: "seed-dash-unreadable", phoneNumber: "+919999900815", checks: [{ days: 3, kind: "legacy", badScores: true }] },
+  newer: { uid: "seed-dash-newer", phoneNumber: "+919999900816", checks: [m(5), { days: 1, kind: "questions" }], aiShare: true },
 };

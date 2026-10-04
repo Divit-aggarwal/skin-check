@@ -55,6 +55,8 @@ export const isEmpty = (d: Dashboard) => d.history.length === 0 && d.current.kin
 
 export interface Dashboard {
   current: Current;
+  /** A check exists that is newer than the reading shown. */
+  newerCheckNotShown: boolean;
   trend: Trend;
   history: HistoryRow[];
   /** The scan Echo is opened about: the newest measured reading. */
@@ -140,22 +142,34 @@ function legacyView(check: Doc, result: Obj): CheckView {
 }
 
 /**
- * One analysis per scanId, picked as Echo picks it (lib/echo-trusted-context.ts):
- * the primary record (no persistAttempt) first, then the newest. A retake or a
- * recovery run writes several records for one check.
+ * One analysis per scanId, picked exactly as Echo picks it
+ * (lib/echo-trusted-context.ts): over ALL records for the scan, the primary
+ * (no persistAttempt) first, then the newest. Validity is checked on the one
+ * picked: if it is not a valid skinstate, the scan has no reading here, as
+ * Echo then has nothing to load. A retake or a recovery run writes several
+ * records for one check.
  */
-function primaryPerScan(measured: Measured[]): Map<string, Measured> {
+function primaryPerScan(uid: string, analyses: readonly Doc[]): Map<string, Measured> {
+  const sorted = analyses
+    .filter((a) => typeof a.data.scanId === "string")
+    .sort(
+      (a, b) =>
+        Number(a.data.persistAttempt !== undefined) - Number(b.data.persistAttempt !== undefined) ||
+        newestFirst(toDate(a.data.createdAt), toDate(b.data.createdAt))
+    );
+  const picked = new Map<string, Doc>();
+  for (const a of sorted) if (!picked.has(a.data.scanId as string)) picked.set(a.data.scanId as string, a);
   const out = new Map<string, Measured>();
-  const sorted = [...measured].sort(
-    (a, b) => Number(a.record.persistAttempt !== undefined) - Number(b.record.persistAttempt !== undefined) || newestFirst(a.date, b.date)
-  );
-  for (const m of sorted) if (!out.has(m.scanId)) out.set(m.scanId, m);
+  for (const [scanId, a] of Array.from(picked.entries())) {
+    const m = measuredOf(uid, [a])[0];
+    if (m) out.set(scanId, m);
+  }
   return out;
 }
 
 export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: readonly Doc[]): Dashboard {
   const measured = measuredOf(uid, analyses);
-  const byScan = primaryPerScan(measured);
+  const byScan = primaryPerScan(uid, analyses);
   const sortedChecks = [...checks].sort((a, b) => newestFirst(toDate(a.data.createdAt), toDate(b.data.createdAt)));
 
   const history: HistoryRow[] = sortedChecks.map((c) => ({
@@ -173,10 +187,15 @@ export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: r
       : { kind: "none" };
 
   // Same picker and rule as the engine, over every valid record as the chat
-  // path passes them (retakes included); the newest is never a candidate (design gap G-1).
-  const { candidates, engineBoundary } = pickBaseline(measured.map((m) => m.state));
+  // path passes them; the newest is never a candidate. The page counts CHECKS,
+  // not records: a retake or recovery record never adds a starting check, and
+  // an earlier record of the newest check is not one (design gap G-1).
+  const { latest, candidates, engineBoundary } = pickBaseline(measured.map((m) => m.state));
+  const scanOf = new Map(measured.map((m) => [m.state, m.scanId] as const));
+  const startingScans = new Set(candidates.map((c) => scanOf.get(c)!));
+  if (latest) startingScans.delete(scanOf.get(latest)!);
   const needed = BASELINE_RULE.scans;
-  const count = Math.min(candidates.length, needed);
+  const count = Math.min(startingScans.size, needed);
   const trend: Trend = {
     kind: measured.length === 0 ? "empty" : count < needed ? "building" : "set",
     count,
@@ -185,9 +204,19 @@ export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: r
     legacyPresent: history.some((h) => h.kind === "legacy"),
   };
 
+  // A check newer than the reading shown (its server reading not in yet, a
+  // failed save, or questions only) is named, so an older reading is never
+  // taken for the check just made.
+  const shownAt = current.kind === "reading" ? current.view.date : null;
+  const newerCheckNotShown =
+    current.kind === "reading" &&
+    shownAt !== null &&
+    history.some((h) => h.scanId !== current.view.scanId && (h.date === null || h.date.getTime() > shownAt.getTime()));
+
   const withPhoto = sortedChecks.find((c) => isObj(c.data.image));
   return {
     current,
+    newerCheckNotShown,
     trend,
     history,
     echoScanId: newestMeasured?.scanId ?? null,
@@ -211,13 +240,13 @@ export interface PastCheck {
 export function pastCheck(uid: string, scanId: string, checks: readonly Doc[], analyses: readonly Doc[]): PastCheck | null {
   const row = deriveDashboard(uid, checks, analyses).history.find((h) => h.scanId === scanId);
   if (!row) return null;
-  const m = primaryPerScan(measuredOf(uid, analyses)).get(scanId);
+  const m = primaryPerScan(uid, analyses).get(scanId);
   return { ...row, photoCheck: m ? photoCheckOf(m.record) : null };
 }
 
 /** The analysis record Echo will load's session: the server loads the facts from its scanId. */
 export function echoRecord(uid: string, scanId: string, analyses: readonly Doc[]): Obj | null {
-  return primaryPerScan(measuredOf(uid, analyses)).get(scanId)?.record ?? null;
+  return primaryPerScan(uid, analyses).get(scanId)?.record ?? null;
 }
 
 export type AiShareStatus = "on" | "off" | "not_asked";

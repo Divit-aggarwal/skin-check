@@ -151,6 +151,7 @@ function CurrentSection({ dashboard }: { dashboard: Dashboard }) {
       ) : (
         <>
           <p className="text-sm text-text/60">{C.current.checkedOn(formatDate(current.view.date))}</p>
+          {dashboard.newerCheckNotShown && <p className="text-sm text-text/70">{C.current.newerNotShown}</p>}
           <CheckReadings view={current.view} />
           <KnownAndNotKnown />
         </>

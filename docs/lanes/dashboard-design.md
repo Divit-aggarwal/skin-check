@@ -69,10 +69,10 @@ the error-state browser test). Dates are formatted in `en-IN`.
 |---|---|---|
 | Checks (history rows, answers, photo storage) | `users/{uid}/skinChecks` | Client-written. Used for dates, status, `image.stored` and the app-only reading |
 | Measured readings | `users/{uid}/scanAnalyses` | Server-written. A record counts only when `toSkinState2(record, "users/{uid}/scanAnalyses/{id}", uid)` returns `kind: "skinstate"`. Bands come from `bandScores` on the record's `scores` (the results screen's table) |
-| One record per check | `scanAnalyses.scanId` | Picked exactly as Echo picks it (lib/echo-trusted-context.ts): the primary record (no `persistAttempt`) first, then the newest `createdAt`. So the bands shown and the scan Echo talks about are the same record |
+| One record per check | `scanAnalyses.scanId` | Picked exactly as Echo picks it (lib/echo-trusted-context.ts): over ALL records for the scan, the primary record (no `persistAttempt`) first, then the newest `createdAt`; validity is checked on the record picked. If it is not valid, the scan has no reading here (Echo then has nothing to load either); no fallback to another record. So the bands shown and the scan Echo talks about are the same record |
 | App-only reading ("legacy record") | `skinChecks.result` with no measured record for that scanId | Old client-written checks, and current checks whose server record is missing (failed persist, H13 restored draft). Labelled, shown as saved, never a starting check (D-23) |
 | Photo-check result | `scanAnalyses.captureQuality.verdict` | Client-asserted (D-26): every line says "Photo checks on your phone", and it is used for nothing else |
-| Starting-check count | `pickBaseline(states).candidates.length`, capped at `BASELINE_RULE.scans` (lib/longitudinal/baseline.ts, settings.ts) | `states` = every measured record, retakes and recovery records included, as the chat path passes them to the engine. The engine itself may not be imported outside the chat path (tests/longitudinal-guard). The newest is never a candidate. See gap G-1 |
+| Starting-check count | distinct checks (scanIds) among `pickBaseline(states).candidates`, minus the newest record's check, capped at `BASELINE_RULE.scans` (lib/longitudinal/baseline.ts, settings.ts) | `states` = every measured record, as the chat path passes them to the engine. The page counts checks, not records, so a retake or recovery record never moves the count (the copy says "photo checks"). The engine itself may not be imported outside the chat path (tests/longitudinal-guard). See gap G-1 |
 | AI-share status | `users/{uid}/consentLedger`, purpose `ai_share`, read on its own by `ConsentSection` | Newest entry at `AI_SHARE_CONSENT_VERSION` wins (the server's `latestGrant` rule); a pending `recordedAt` counts as newest. None → "not asked yet". A failed ledger read shows the privacy error only; the rest of the page still loads |
 | Withdraw | `POST /api/account/consent` `{ purpose: "ai_share", granted: false, version }` | Existing route (H03c). 2xx → re-read the ledger; 409 `VERSION_STALE` → "reload" message; anything else → "try again" |
 | Echo hand-off | `setSession` of the existing session provider: `scanId`, `answers`, `result` (the chosen record), `composite` (`summarizeConcerns(scores, bandScores(scores).bands)`, as the results screen builds it), `captureMethod`, and an empty Blob for the required `photo` (marked `ponytail:`) | Echo reads only `scanId` and `region_scores`; the chat server loads the facts from `scanId` |
@@ -92,8 +92,9 @@ engine's per-quantity count:
    dashboard uses `pickBaseline`'s default filter (known engine build only).
 2. TD-14 (3) and (4) (capture method must match; one scan per calendar day)
    are not in `pickBaseline` yet.
-3. Both count retakes and recovery records as separate scans, because the chat
-   path passes every record; that may itself be a gap in the engine.
+3. The engine counts records (retakes and recovery records included, as the
+   chat path passes every record); the page counts distinct checks. That may
+   itself be a gap in the engine.
 The page never states a change, so the worst case is "3 of 3" while the engine
 still says "too few scans", and the page says "not enough evidence" either
 way. Request to main: one shared `startingCheckCount(series)` exported from
@@ -114,7 +115,7 @@ here.
 | error | the check or analysis read fails, or 15 s pass with no answer | "We couldn't load your checks just now. Refresh the page to try again." (no error code) |
 | empty | signed in, no checks | "You have no skin checks yet." + "Take your first Skin Check"; starting point shows "Nothing to show yet."; chat shows "Echo needs a check with a photo reading."; routine and privacy still shown |
 | ready | at least one check | the six sections |
-| one check open | `?check={scanId}` of this user | only that check: "Check from {date}", its kind, its photo-check line, for an app-only check "This check was saved by the app on your phone and not checked by our server.", "Readings are shown for your newest photo reading only. Each reading is relative to its own photo, so past checks are listed by date.", "Back to your dashboard" |
+| one check open | `?check={scanId}` of this user | only that check: "Check from {date}", its kind, its photo-check line, for an app-only check "This check's reading was saved by the app on your phone. Our server has no readable copy of it.", "Readings are shown for your newest photo reading only. Each reading is relative to its own photo, so past checks are listed by date.", "Back to your dashboard" |
 | check not found | `?check=` unknown, malformed, or not this user's | "This check could not be found." + "Back to your dashboard" |
 
 Section 1, current state ("Your newest photo reading"):
@@ -122,7 +123,8 @@ Section 1, current state ("Your newest photo reading"):
 | State | When | Shows |
 |---|---|---|
 | reading | a measured record exists | "Checked on {date}", the bands, hard-to-read areas, the photo-check line, known / not known |
-| app-only reading | no measured record, a check has an app-only result | the same, without the photo-check line, plus "This reading was saved by the app on your phone and not checked by our server. It is shown as it was saved and is not used as a starting check." |
+| newer check not shown | a check is newer than the reading shown (server reading not in yet, failed save, app-only, or questions only) | adds "Your newest check is not shown here: it has no reading from our server yet. This is the most recent reading there is." so an older reading is never taken for the check just made |
+| app-only reading | no measured record, a check has an app-only result | the same, without the photo-check line, plus "This reading was saved by the app on your phone. Our server has no readable copy of it, so it is shown as it was saved and is not used as a starting check." |
 | unreadable | the stored scores do not parse | "The readings of this check could not be shown." |
 | no reading | checks exist, none with a reading | "None of your checks has a photo reading yet." + "Take a new Skin Check" |
 | orphan record | a measured record with no skinChecks doc | shown here; left out of Past checks (history lists checks) |
@@ -267,7 +269,12 @@ worker), against `npm run dev:local` on PORT_BASE 3800:
     questions, not at an old results screen; and Echo's own "Back to Skin
     Check" pinned as known defect K-1 (`test.fail`);
 11. every dashboard state in §3, each saved as `docs/lanes/dashboard-<state>.png`.
-    Error and loading are made with `page.route` on the Firestore emulator.
+    Error and loading are made with `page.route` on the Firestore emulator;
+    the privacy saving, failed and out-of-date states with `page.route` on the
+    consent POST. Two privacy states have no screenshot: "Loading your sharing
+    setting…" (too brief to hold without also holding the page's own reads)
+    and "could not be loaded" (the Firestore requests cannot be failed for the
+    ledger alone); both are plain branches of `ConsentSection`.
 
 Tests 2, 4, 5, 7 and 9 cover other lanes' flows; the owner's lane brief asks
 for them. A failure in code this lane does not own becomes a proposed tracker
@@ -299,6 +306,9 @@ tests/capture.e2e.test.ts does. Run: `npm run dev:local` in one terminal, then
   to this photo only" copy and a method-doc change.
 - **O-D5** Acknowledge the D-26 note in §2 (display-only skinstate-2 reading
   in the browser).
+- **O-D6** The owner-approved trend wording ("Not enough evidence yet.", "…has
+  not been measured yet, so no trend is shown.") says "yet", which promises a
+  trend later; O-D2 proposes the page never shows one. Keep "yet", or drop it.
 
 ## 9. Requests to main
 

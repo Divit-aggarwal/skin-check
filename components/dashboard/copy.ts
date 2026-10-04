@@ -17,6 +17,7 @@ export const DASHBOARD_COPY = {
     title: "Your newest photo reading",
     none: "None of your checks has a photo reading yet.",
     checkedOn: (date: string) => `Checked on ${date}`,
+    newerNotShown: "Your newest check is not shown here: it has no reading from our server yet. This is the most recent reading there is.",
     unreadable: "The readings of this check could not be shown.",
     hardToRead: (areas: string) => `Hard to read in this photo: ${areas}. Those readings are uncertain.`,
     knownTitle: "What this tells you",
@@ -37,9 +38,9 @@ export const DASHBOARD_COPY = {
     not_recorded: "Photo checks on your phone: not recorded for this check.",
   },
 
-  legacyPastNote: "This check was saved by the app on your phone and not checked by our server.",
+  legacyPastNote: "This check's reading was saved by the app on your phone. Our server has no readable copy of it.",
 
-  legacyNote: "This reading was saved by the app on your phone and not checked by our server. It is shown as it was saved and is not used as a starting check.",
+  legacyNote: "This reading was saved by the app on your phone. Our server has no readable copy of it, so it is shown as it was saved and is not used as a starting check.",
 
   trend: {
     title: "Starting point",
