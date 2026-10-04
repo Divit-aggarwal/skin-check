@@ -87,7 +87,7 @@ const RED_FLAG = re([
   "\\bunder\\s*(?:18|eighteen)\\b",
   "\\bminor\\b",
   "\\bmer[aie] (?:bet[aie]|bachch?[ae]|bacch?[ae])\\b",
-  "\\b(?:1[0-7]|[1-9]) ?saal\\b",
+  "\\b(?:1[0-7]|[1-9]) ?saal\\b(?! se\\b)",
   "\\bumr?a?r? (?:1[0-7]|[1-9])\\b",
   // requests for a diagnosis, prescription or dosage
   "\\bdiagnos\\w*",
@@ -99,7 +99,7 @@ const RED_FLAG = re([
   "\\b(?:adapalene|accutane|isotretinoin|tretinoin|clindamycin|doxycycline|spironolactone)\\b",
   "\\bmedicines?\\b",
   "\\bmedication\\w*",
-  "\\bdo i have\\b",
+  "\\bdo i have (?:\\w+ ){0,2}(?:acne|rosacea|eczema|psoriasis|melasma|infection|cancer|melanoma|disease|condition|fungal|allerg\\w*|dermatitis|hives|pcos)\\b",
   "\\b(?:tablets?|pills?)\\b",
   "\\b(?:what|which) (?:disease|condition|infection)\\b",
   "\\b(?:is|could|might|do|does|am|are|it'?s)\\b.{0,30}\\b(?:cancer\\w*|melanoma|rosacea|eczema|psoriasis|infect\\w*|fungal|melasma|dermatitis|hives|allerg\\w*|pcos)\\b",
@@ -138,7 +138,7 @@ const COMPARISON = re([
 // Lookalike letters from Cyrillic and Greek that read as Latin (security review, wave 2).
 const CONFUSABLE: Record<string, string> = {
   "а": "a", "в": "b", "е": "e", "ё": "e", "к": "k", "м": "m", "н": "h", "о": "o", "р": "p", "с": "c", "т": "t", "у": "y", "х": "x",
-  "і": "i", "ї": "i", "ј": "j", "ѕ": "s", "ԁ": "d", "ԛ": "q", "ԝ": "w", "ɡ": "g", "ı": "i", "ɑ": "a",
+  "і": "i", "ї": "i", "ј": "j", "ѕ": "s", "ԁ": "d", "ԛ": "q", "ԝ": "w", "ɡ": "g", "ı": "i", "ɑ": "a", "µ": "u", "μ": "u",
   "α": "a", "β": "b", "ε": "e", "η": "n", "ι": "i", "κ": "k", "ν": "v", "ο": "o", "ρ": "p", "τ": "t", "υ": "u", "χ": "x",
 };
 const LEET: Record<string, string> = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "$": "s", "@": "a", "!": "i", "|": "l" };
@@ -162,15 +162,23 @@ const unleet = (folded: string) => folded.replace(/[013457$@!|]/g, (c) => LEET[c
 /** Every non-letter removed: catches spaced letters, emoji or line breaks inside a word, and run-together phrases. */
 const squash = (folded: string) => unleet(folded).replace(new RegExp(String.raw`[^\p{L}]`, "gu"), "");
 
-// Self-harm stems matched against the squashed copy, typos included. Recall first.
-const SELF_HARM_SQUASHED = new RegExp(
-  [
-    "su+i?c+i?d", "sucid", "suicd", "suisid", "killmy?self", "kilmy?self", "killme(?:now|plz|please)?$", "endmylife", "endmyself", "endital",
-    "(?:want|wanna|wanted|going)(?:to)?die", "cutmy?self", "hurtmy?self", "selfharm", "unaliv", "betteroffdead",
-    "khudk?h?ush?i", "a+tma?h?atya", "(?:jee?na|jina)n(?:a|h)?h?i", "marnekam", "आत्महत्या", "जीनानहीं",
-  ].join("|"),
+// Self-harm words that are one word: matched on the squashed copy, typos included.
+const SELF_HARM_WORD = new RegExp(
+  ["su+i?c+i?d", "sucid", "suicd", "suisid", "selfharm", "unaliv", "khudk?h?ush?i", "a+tma?h?atya", "आत्महत्या"].join("|"),
   "u"
 );
+// Self-harm phrases: matched on a word-spaced copy (non-letters become spaces, so
+// emoji or line breaks between words do not hide them, but "skill myself" or
+// "diet" do not match), and on the squashed copy only when letters are spaced out.
+const SELF_HARM_PHRASE = [
+  "kil+ ?my ?self", "kil+ ?me", "end ?my ?(?:life|self)", "end ?it ?all", "(?:want|wanna|wanted|going) ?(?:to )?die",
+  "cut(?:ting)? ?my ?self", "hurt(?:ing)? ?my ?self", "better ?off ?dead", "(?:jee?na|jina) ?n(?:a|h)?h?i", "marne ?ka ?ma",
+];
+const PHRASE_SPACED = new RegExp(SELF_HARM_PHRASE.map((p) => String.raw`\b(?:${p})\b`).join("|"), "u");
+const PHRASE_SQUASHED = new RegExp(SELF_HARM_PHRASE.map((p) => p.replace(/ \?/g, "").replace(/ /g, "")).join("|"), "u");
+const LETTER_SPACED = new RegExp(String.raw`(?:(?<!\p{L})\p{L}(?!\p{L})\W*){3,}`, "u");
+/** Non-letters as single spaces, so words keep their boundaries. */
+const spaced = (folded: string) => unleet(folded).replace(new RegExp(String.raw`[^\p{L}]+`, "gu"), " ");
 const OTHER_SCRIPT_LOOKALIKE = new RegExp(String.raw`[\p{Script=Cyrillic}\p{Script=Greek}]`, "u");
 
 export const redFlagHit = (message: string): boolean => {
@@ -179,7 +187,9 @@ export const redFlagHit = (message: string): boolean => {
     RED_FLAG.test(folded) ||
     RED_FLAG.test(unleet(folded)) ||
     RED_FLAG.test(message) ||
-    SELF_HARM_SQUASHED.test(squash(folded)) ||
+    SELF_HARM_WORD.test(squash(folded)) ||
+    PHRASE_SPACED.test(spaced(folded)) ||
+    (LETTER_SPACED.test(folded) && PHRASE_SQUASHED.test(squash(folded))) ||
     // A Cyrillic or Greek letter left after mapping is a disguise, not a language this product serves.
     OTHER_SCRIPT_LOOKALIKE.test(folded)
   );

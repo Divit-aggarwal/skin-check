@@ -172,3 +172,21 @@ describe("comparison pre-filter: wave-2 security review phrasings", () => {
     expect(comparisonHit(msg)).toBe(true);
   });
 });
+
+describe("red-flag pre-filter: the wave-2 widening does not block ordinary questions", () => {
+  it.each([
+    "I want to diet to help my skin",
+    "mujhe 5 saal se acne hai",
+    "do I have oily skin?",
+    "what do I have to apply first?",
+    "I want to skill myself up in skincare",
+    "is 50 µg ok",
+    "I am going to dye my hair",
+  ])("passes: %j", (msg) => {
+    expect(redFlagHit(msg)).toBe(false);
+  });
+
+  it.each(["k i l l m y s e l f", "w a n t t o d i e", "i want to d.i.e"])("letter-spaced phrases still hit: %j", (msg) => {
+    expect(redFlagHit(msg)).toBe(true);
+  });
+});
