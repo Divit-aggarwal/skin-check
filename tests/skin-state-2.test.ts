@@ -64,7 +64,7 @@ describe("skinstate-2 reads the same record as skinstate-1", () => {
     expect(one.kind === "skinstate" && one.state.quality).toEqual(two.quality);
   });
 
-  it("keeps processingConsentVersion null (not stored on scanAnalyses)", () => {
+  it("keeps processingConsentVersion null (stored on scanAnalyses since 4ae015e, but not mapped by this contract version)", () => {
     expect(v2(record()).provenance.processingConsentVersion).toBeNull();
   });
 });

@@ -66,7 +66,7 @@ export const RED_FLAG_RULES: readonly Rule[] = [
   },
 ];
 
-/** Privacy decision 8. Same values as lib/gemini.ts EXTRA_CAUTION_TRIGGERS (tested). Any one turns the flag on. */
+/** Privacy decision 8. The one extra-caution list: evaluateSafety and extraCautionAnswers (today's Echo, the context builder) read it. Any one turns the flag on. */
 export const EXTRA_CAUTION_TRIGGERS: readonly Condition[] = [
   { field: "female_skin_context", anyOf: ["pregnant_or_breastfeeding"] },
   { field: "current_products", anyOf: ["prescription"] },
