@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { AllowedClaim, ContextPackage, ForbiddenClaim } from "@/lib/contracts/context-package";
-import { packageFacts, type CitableFact } from "./builder";
+import { packageFacts, type CitableFact, type FactKind } from "./builder";
 import {
   ACTIVE,
   BAND_WORD,
@@ -108,6 +108,15 @@ const TOLD = new RegExp(String.raw`\b(?:told|said|mentioned|noted|shared|listed|
 // Uncited claims: no comparison, and smalltalk does not talk about the skin or point back at a reading.
 const UNCITED_COMPARE = new RegExp(String.raw`\bthan\b`, "iu");
 const SMALLTALK_SKIN = new RegExp(String.raw`\b(?:skin|face|complexion|spots?|acne|pimples?|breakouts?|shine|shiny|oily|bumps?|marks?|tone|it|that|this)\b`, "iu");
+// clarify and out_of_scope may name the skin ("Which part of your face?") but not say how it is (H20, finding 5).
+const UNCITED_SKIN_NOUN = new RegExp(String.raw`\b(?:skin|face|complexion|acne|pimples?|breakouts?|bumps?|spots?|marks?|redness|rash\w*|oil\w*|pores?|texture|pigment\w*|scars?|daane|chehr\w*)\b`, "iu");
+const UNCITED_SKIN_STATE = new RegExp(
+  String.raw`\b(?:gone|cleared?|clearing|healthy|great|good|fine|normal|bad|severe|mild|serious|perfect|flawless|glow\w*|calm\w*|settled|subsid\w*|okay|ok|nothing to worry|chale? ga(?:ye|ya|yi)|theek|thik|saaf|kam ho\w*)\b`,
+  "iu"
+);
+const GOOD_QUESTION = new RegExp(String.raw`\b(?:good|great) question\b`, "giu");
+// An uncertainty or comparability claim cites the facts it is about (H20, finding 4).
+const NEEDS_KIND: Partial<Record<AllowedClaim, FactKind[]>> = { uncertainty: ["uncert", "missing", "long"], comparability: ["long", "missing", "confounder"] };
 // Roman numerals as numbers ("type III skin"), on the raw text, upper case only.
 const ROMAN = /\b(?:II|III|IV|VI|VII|VIII|IX|XI|XII)\b/;
 const wordsOf = (text: string) => text.toLowerCase().match(new RegExp(String.raw`\p{L}+`, "gu")) ?? [];
@@ -181,6 +190,13 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
       const skin = firstMatch(SMALLTALK_SKIN, text);
       if (skin) fail("citation_rule", i, skin);
     }
+    if (claim.claim_type === "clarify" || claim.claim_type === "out_of_scope") {
+      const plain = text.replace(GOOD_QUESTION, " ");
+      const state = UNCITED_SKIN_NOUN.test(plain) ? firstMatch(UNCITED_SKIN_STATE, plain) : null;
+      if (state) fail("citation_rule", i, state);
+    }
+    const needs = NEEDS_KIND[claim.claim_type];
+    if (needs && claim.fact_ids.length > 0 && !cited.some((f) => needs.includes(f.kind))) fail("citation_rule", i);
     const roman = firstMatch(ROMAN, claim.text);
     if (roman) fail("made_up_number", i, roman);
 
@@ -249,6 +265,13 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
     if (claim.claim_type === "descriptive") {
       const extra = extraWord(stripped, cited, DESCRIBE_FRAME, cited.flatMap((f) => (f.band ? [f.band.toLowerCase()] : [])));
       // No term: a common extra word ("about") must not read as the user's own premise and stop the retry.
+      if (extra) fail("contradicts_package", i);
+    }
+    // Uncertainty and comparability claims are the cited facts' own words in a
+    // frame too: no "Your breakouts have subsided", "Back in March ...", "down
+    // to the heat" (second security review, H20 finding 4).
+    if (claim.claim_type === "uncertainty" || claim.claim_type === "comparability") {
+      const extra = extraWord(stripped, cited, DESCRIBE_FRAME);
       if (extra) fail("contradicts_package", i);
     }
     if (kinds.has("rec")) {

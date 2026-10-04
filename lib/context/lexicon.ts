@@ -39,7 +39,7 @@ export function firstMatch(pattern: RegExp, text: string): string | null {
 export const NUMBER = re([
   "\\p{N}",
   "%",
-  "\\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|half|halves|double|twice|thrice|triple|dozen|percent|percentage|third|quarter|several|couple|first|second|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)s?\\b",
+  "\\b(?:zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|half|halves|once|double|twice|thrice|triple|dozen|percent|percentage|third|quarter|several|couple|first|second|fourth|fifth|sixth|seventh|eighth|ninth|tenth|eleventh|twelfth)s?\\b",
   "\\b(?:ek|teen|char|chaar|paanch|panch|chhe|chhah|saat|aath|nau|das|bees|pachees|tees|chalees|pachaas|sau|hazaar|hazar|lakh|crore|aadha|dedh|dhai|dugna)\\b",
 ]);
 

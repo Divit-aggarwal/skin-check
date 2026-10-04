@@ -70,7 +70,7 @@ describe("validator: each check has a passing and a failing answer", () => {
     const cheekRed = reading("state.cheeks.redness").band;
     expect(wholeRed).not.toBe(cheekRed); // fixture control: the bands differ
     expect(checksOf(ok([{ ...UNC, text: `Redness for the whole face is ${cheekRed}.` }]))).toContain("contradicts_package");
-    expect(checksOf(ok([{ ...UNC, text: `Redness for the whole face is ${wholeRed}.` }]))).not.toContain("contradicts_package");
+    expect(checksOf(ok([{ claim_type: "descriptive", text: `Redness for the whole face is ${wholeRed}.`, fact_ids: ["state.all.redness"] }, UNC]))).not.toContain("contradicts_package");
   });
 
   it("a rec item may be named and its claim quoted, but a recommendation verb always fails (design §3.6)", () => {
@@ -186,5 +186,37 @@ describe("validator: wave-2 security review bypasses are caught", () => {
     expect(validateAnswer(ok([{ claim_type: "self_reported_echo", text: "You said: Leaves a dark mark that fades over time.", fact_ids: ["self.all.pih_scar_tendency"] }]), pkg, "x").failures).toEqual([]);
     expect(validateAnswer(ok([UNC, { claim_type: "smalltalk", text: "Happy to help.", fact_ids: [] }]), pkg, "x").failures).toEqual([]);
     expect(validateAnswer(ok([UNC, { claim_type: "clarify", text: "Which area of your face do you mean?", fact_ids: [] }]), pkg, "x").failures).toEqual([]);
+  });
+});
+
+// Second security review (2026-10-04, tracker H20), findings 4 and 5.
+describe("validator: second security review bypasses", () => {
+  const MISSING_TREND = pkg.missing.find((m) => m.about === "trend") ?? pkg.missing[0]!;
+  it.each([
+    ["uncertainty: made-up change", { claim_type: "uncertainty", text: "Your breakouts have subsided.", fact_ids: [UNCERTAINTY.id] }],
+    ["comparability: made-up past event", { claim_type: "comparability", text: "Back in March your breakouts flared.", fact_ids: [UNCERTAINTY.id] }],
+    ["uncertainty: cause", { claim_type: "uncertainty", text: "Your oiliness is likely down to the heat.", fact_ids: [UNCERTAINTY.id] }],
+    ["uncertainty: Hinglish change", { claim_type: "uncertainty", text: "Aapke pimples chale gaye", fact_ids: [UNCERTAINTY.id] }],
+    ["uncertainty: Hinglish change 2", { claim_type: "uncertainty", text: "redness theek ho gayi", fact_ids: [UNCERTAINTY.id] }],
+    ["uncertainty citing a reading only", { claim_type: "uncertainty", text: "These readings compare areas within one photo.", fact_ids: ["state.all.redness"] }],
+    ["clarify: skin assertion", { claim_type: "clarify", text: "Your skin is in great shape and the bumps are gone.", fact_ids: [] }],
+    ["out_of_scope: skin assertion", { claim_type: "out_of_scope", text: "Your acne looks mild, nothing to worry about.", fact_ids: [] }],
+    ["clarify: Hinglish skin assertion", { claim_type: "clarify", text: "Aapke pimples chale gaye", fact_ids: [] }],
+    ["number word 'once'", { claim_type: "clarify", text: "Apply it once.", fact_ids: [] }],
+  ] as const)("fails: %s", (_name, claim) => {
+    expect(validateAnswer(ok([claim as never]), pkg, "x").passed).toBe(false);
+  });
+
+  // Controls: ordinary answers that must still pass.
+  it.each([
+    ["clarify: which part", { claim_type: "clarify", text: "Which part of your face do you mean?", fact_ids: [] }],
+    ["clarify: say more", { claim_type: "clarify", text: "Can you say more about that?", fact_ids: [] }],
+    ["clarify: good question", { claim_type: "clarify", text: "Good question! Which area of your skin do you mean?", fact_ids: [] }],
+    ["out_of_scope: plain", { claim_type: "out_of_scope", text: "I can only talk about your skin check here.", fact_ids: [] }],
+    ["uncertainty: quoted fact", UNC],
+    ["uncertainty: framed quote", { claim_type: "uncertainty", text: `This is an estimate: ${UNCERTAINTY.text}`, fact_ids: [UNCERTAINTY.id] }],
+    ["comparability: quoted missing trend fact", { claim_type: "comparability", text: MISSING_TREND.text, fact_ids: [MISSING_TREND.id] }],
+  ] as const)("passes: %s", (_name, claim) => {
+    expect(validateAnswer(ok([claim as never]), pkg, "x").failures).toEqual([]);
   });
 });

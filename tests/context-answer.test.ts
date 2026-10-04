@@ -10,7 +10,8 @@ const pkg = buildContextPackage(fullInput());
 const RED = pkg.skin!.readings.find((r) => r.id === "state.cheeks.redness")!;
 const UNC = { claim_type: "uncertainty" as const, text: UNCERTAINTY.text, fact_ids: [UNCERTAINTY.id] };
 const GOOD = answer({ claims: [{ claim_type: "descriptive", text: `Redness on the cheeks is ${RED.band}.`, fact_ids: [RED.id] }, UNC], needs_referral: false });
-const BAD = answer({ claims: [{ ...UNC, text: "This is caused by stress." }], needs_referral: false });
+// clarify: free text with no citation, so only the word check named in each test fails.
+const BAD = answer({ claims: [{ claim_type: "clarify", text: "This is caused by stress.", fact_ids: [] }], needs_referral: false });
 const REFER = answer({ claims: [{ claim_type: "out_of_scope", text: "Please see a doctor.", fact_ids: [] }], needs_referral: true });
 
 function fake(...texts: string[]) {
@@ -64,7 +65,7 @@ describe("answer path", () => {
   });
 
   it("a failure from the user's own premise: no retry", async () => {
-    const premise = answer({ claims: [{ ...UNC, text: "Yes, it is better now." }], needs_referral: false });
+    const premise = answer({ claims: [{ claim_type: "clarify", text: "Yes, it is better now.", fact_ids: [] }], needs_referral: false });
     const g = fake(premise, GOOD);
     const out = await run(g, { message: "is it better now?" });
     expect(g).toHaveBeenCalledTimes(1);
