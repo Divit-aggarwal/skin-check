@@ -2,6 +2,7 @@ import { z } from "zod";
 import { adminDb } from "@/lib/firebase/admin";
 import { SkinScanRegionLowConfidenceSchema, SkinScanScoresSchema, type SkinScanScores } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
+import { toSkinState2 } from "@/lib/skin-state-2";
 
 // SERVER ONLY (imports lib/firebase/admin.ts). Gate 02: client-provided
 // analysis measurements and analysis identity are never authoritative. Every
@@ -58,14 +59,20 @@ export async function loadTrustedEchoContext(uid: string, scanId: string): Promi
   ]);
 
   const docs = analyses.docs
-    .map((d) => d.data())
+    .map((d) => ({ id: d.id, data: d.data() }))
     .sort(
       (a, b) =>
-        Number(a.persistAttempt !== undefined) - Number(b.persistAttempt !== undefined) ||
-        millis(b.createdAt) - millis(a.createdAt)
+        Number(a.data.persistAttempt !== undefined) - Number(b.data.persistAttempt !== undefined) ||
+        millis(b.data.createdAt) - millis(a.data.createdAt)
     );
-  const analysis = AnalysisSchema.safeParse(docs[0]);
-  if (!analysis.success) return null;
+  const picked = docs[0];
+  const analysis = AnalysisSchema.safeParse(picked?.data);
+  if (!picked || !analysis.success) return null;
+  // Red team (I02, area A): the same validity the dashboard and the
+  // longitudinal contract use (schema version, doc id = scanId + input hash,
+  // owner, provenance), so Echo never talks about a record the dashboard
+  // shows as no reading.
+  if (toSkinState2(picked.data, `users/${uid}/scanAnalyses/${picked.id}`, uid).kind !== "skinstate") return null;
 
   // Echo still works without quiz context, so a missing or malformed answers
   // map degrades to {} instead of blocking the chat.

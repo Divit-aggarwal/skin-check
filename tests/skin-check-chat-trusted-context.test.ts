@@ -25,7 +25,7 @@ function fakeCollection(path: string) {
         reads.push(`${path}?${field}==${String(value)}`);
         const docs = Array.from(store.entries())
           .filter(([p, d]) => p.startsWith(`${path}/`) && !p.slice(path.length + 1).includes("/") && d[field] === value)
-          .map(([, d]) => ({ data: () => d }));
+          .map(([p, d]) => ({ id: p.slice(path.length + 1), data: () => d }));
         return { docs };
       },
     }),
@@ -55,22 +55,27 @@ vi.mock("@/app/api/account/_ledger", async () => {
 });
 import { POST } from "@/app/api/skin-check/chat/route";
 import { signHistory } from "@/lib/echo-history-token";
+import { buildScanAnalysisRecord, scanAnalysisDocId } from "@/lib/scan-analysis-record";
+import type { SkinScanResult } from "@/types/skin-scan";
+import { syntheticAnalysis, syntheticNative } from "./synthetic-scan";
 import { NextRequest } from "next/server";
 
 const SCAN_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 // Distinct per fixture, inside the real [0, 1] range (SkinScanScoresSchema).
 const scores = (n: number) => ({ redness: n / 10, oiliness: n / 10, texture: n / 10, pores: 0, blemishes: n / 10, hydration: n / 10, pigment: n / 10 });
-const ts = (ms: number) => ({ toMillis: () => ms });
+const ts = (ms: number) => ({ toMillis: () => ms, toDate: () => new Date(ms) });
 
+// A real server record (red team I02: Echo now requires a valid skinstate, as the
+// dashboard does), whose doc id is scanId + the first 16 hex of its input hash.
 function seedAnalysis(uid: string, docId: string, fields: Record<string, unknown>) {
-  store.set(`users/${uid}/scanAnalyses/${docId}`, {
-    scanId: SCAN_ID,
-    source: "server",
-    scores: scores(1),
-    region_scores: { cheeks: scores(2) },
-    createdAt: ts(1000),
-    ...fields,
+  const { scores: s = scores(1), region_scores = { cheeks: scores(2) }, persistAttempt, createdAt = ts(1000), ...rest } = fields;
+  const sha = docId.slice(docId.indexOf("_") + 1).padEnd(64, "0");
+  const result = { ...syntheticAnalysis(), ...syntheticNative(), scores: s, region_scores, pipeline_version: "scan-0.1.6-provisional", engine_build: "sha-test" };
+  const record = buildScanAnalysisRecord(result as unknown as SkinScanResult, {
+    scanId: SCAN_ID, inputSha256: sha, requestId: `r-${docId}`, captureMethod: "native", ...(persistAttempt ? { persistAttempt: persistAttempt as "recovery" } : {}),
   });
+  expect(scanAnalysisDocId(SCAN_ID, sha)).toBe(docId);
+  store.set(`users/${uid}/scanAnalyses/${docId}`, { ...record, createdAt, ...rest });
 }
 
 const ANSWERS = { skin_type: "oily", concerns: ["redness", "texture"] };
@@ -194,7 +199,7 @@ describe("Echo chat trusted context", () => {
 
   describe("record selection", () => {
     it("prefers the primary record over a newer recovery record", async () => {
-      seedAnalysis("user-a", `${SCAN_ID}_rrrrrrrrrrrrrrrr`, {
+      seedAnalysis("user-a", `${SCAN_ID}_eeeeeeeeeeeeeeee`, {
         persistAttempt: "recovery",
         scores: scores(6),
         createdAt: ts(5000),
@@ -205,7 +210,7 @@ describe("Echo chat trusted context", () => {
 
     it("falls back to the recovery record when there's no primary", async () => {
       store.delete(`users/user-a/scanAnalyses/${SCAN_ID}_aaaaaaaaaaaaaaaa`);
-      seedAnalysis("user-a", `${SCAN_ID}_rrrrrrrrrrrrrrrr`, { persistAttempt: "recovery", scores: scores(6) });
+      seedAnalysis("user-a", `${SCAN_ID}_eeeeeeeeeeeeeeee`, { persistAttempt: "recovery", scores: scores(6) });
       await post(BODY);
       expect(geminiArgs()[1].scores).toEqual(scores(6));
     });
