@@ -3,7 +3,7 @@ import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 import { buildScanAnalysisRecord, scanAnalysisDocId } from "@/lib/scan-analysis-record";
 import type { SkinScanResult } from "@/types/skin-scan";
 import { aiShareStatus, deriveDashboard, echoRecord, isEmpty, pastCheck, withdrawalOutcome, type Doc } from "@/components/dashboard/state";
-import { syntheticAnalysis, syntheticNative } from "./synthetic-scan";
+import { regionRaw, syntheticAnalysis, syntheticNative } from "./synthetic-scan";
 
 // G01 dashboard view model (docs/lanes/dashboard-design.md §3). All values synthetic.
 const UID = "SYNTH_UID";
@@ -299,5 +299,40 @@ describe("score range (A-F3)", () => {
     const low = { redness: 0, oiliness: 0, texture: 0, pores: 0, blemishes: 0, hydration: 1, pigment: 0 };
     const line = summarizeConcerns(low, bandScores(low).bands).summaryLine;
     expect(line).not.toMatch(/keep doing|routine|working/i);
+  });
+});
+
+// D07 (owner TD-20, option a): the page counts only checks usable on their own
+// account for every quantity in every measured region.
+describe("starting checks the page counts (D07)", () => {
+  const withNose = (px: number) => {
+    const raw = Object.fromEntries(["forehead", "nose", "chin", "cheeks"].map((r) => [r, regionRaw(r === "nose" ? px : 30000)]));
+    return { region_raw: raw, region_raw_corrected: raw, region_raw_native: raw };
+  };
+  const ids = ["a", "b", "c", "d"];
+
+  it.each([
+    ["a low-pixel region", 500],
+    ["a missing region", 0],
+  ])("a starting check with %s is not counted", (_name, px) => {
+    const d = deriveDashboard(UID, ids.map((s, i) => check(s, i + 1)), ids.map((s, i) => analysis(s, i + 1, i === 1 ? withNose(px) : {})));
+    expect(d.trend.count).toBe(2);
+    expect(d.trend.kind).toBe("building");
+  });
+
+  it("a check with no native statistics is not counted", () => {
+    const d = deriveDashboard(UID, ids.map((s, i) => check(s, i + 1)), ids.map((s, i) => {
+      const doc = analysis(s, i + 1);
+      if (i === 0) for (const k of Object.keys(doc.data)) if (k.endsWith("_native")) delete doc.data[k];
+      return doc;
+    }));
+    expect(d.trend.count).toBe(2);
+    expect(d.trend.kind).toBe("building");
+  });
+
+  it("control: three usable starting checks are counted and set", () => {
+    const d = deriveDashboard(UID, ids.map((s, i) => check(s, i + 1)), ids.map((s, i) => analysis(s, i + 1)));
+    expect(d.trend.count).toBe(3);
+    expect(d.trend.kind).toBe("set");
   });
 });

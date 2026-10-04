@@ -18,7 +18,7 @@ import type {
 } from "@/lib/contracts/longitudinal-result";
 import type { SkinStateRegionKey } from "@/lib/skin-state";
 import { SKIN_STATE_2_CONTRACT_VERSION, type SkinState2, type SkinState2Result } from "@/lib/skin-state-2";
-import { startingChecks } from "./baseline";
+import { SELF_UNUSABLE, startingChecks } from "./baseline";
 import { BASELINE_RULE, CONFOUNDERS, NOISE_TABLE } from "./settings";
 
 /** One plain sentence per reason. No digits, no percentages, no direction words; change is only "within" or "beyond". */
@@ -47,8 +47,7 @@ export interface Tables {
   comparable?: readonly ComparableQuantity[];
 }
 
-/** Reasons a single state has on its own account. Skipping on these cannot cross an engine change. */
-const SELF_UNUSABLE: readonly NotComparableReason[] = ["region_absent", "region_low_pixel_count", "native_stats_missing", "capture_method_unknown"];
+
 
 const isHistogram = (q: QuantityPath) => q.endsWith("Hist");
 

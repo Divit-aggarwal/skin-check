@@ -7,7 +7,7 @@
 // shows; one view holds one check.
 
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
-import { startingCheckCount, startingChecks } from "@/lib/longitudinal/baseline";
+import { startingCheckCount, startingChecks, usableForEveryQuantity } from "@/lib/longitudinal/baseline";
 import { BASELINE_RULE } from "@/lib/longitudinal/settings";
 import { bandScores, type Band, type BandableMetric } from "@/lib/skin-check-rules";
 import { METRIC_LABELS } from "@/lib/skin-check-skus";
@@ -189,7 +189,9 @@ export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: r
   // G-1: the engine's own starting checks (lib/longitudinal/baseline.ts), over
   // the record picked above for each check: a retake or recovery record never
   // adds or takes a place. The newest check is never a candidate.
-  const pick = startingChecks(Array.from(byScan.values()).map((m) => m.state));
+  // D07 (TD-20): a check counts only if it is usable on its own account for
+  // every quantity in every measured region (no missing or low-pixel region).
+  const pick = startingChecks(Array.from(byScan.values()).map((m) => m.state), usableForEveryQuantity);
   const { engineBoundary } = pick;
   const needed = BASELINE_RULE.scans;
   const count = startingCheckCount(pick);

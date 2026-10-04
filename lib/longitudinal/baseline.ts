@@ -13,6 +13,8 @@
 // calendar day (India time, TD-18) counts. The skips run first, so a day whose first scan is
 // skipped still counts its next usable one.
 
+import { compareStates, SKINSTATE_FIELD_PATHS, type NotComparableReason } from "@/lib/comparability";
+import type { SkinStateRegionKey } from "@/lib/skin-state";
 import type { SkinState2 } from "@/lib/skin-state-2";
 import { BASELINE_ONE_PER_DAY_RULE, BASELINE_RULE } from "./settings";
 
@@ -85,3 +87,24 @@ export function startingChecks(states: readonly SkinState2[], usable: (s: SkinSt
 
 /** G-1: how many starting-check places are filled, capped at BASELINE_RULE.scans. */
 export const startingCheckCount = (pick: BaselinePick): number => Math.min(pick.candidates.length, BASELINE_RULE.scans);
+
+/** Reasons a single state has on its own account. Skipping on these cannot cross an engine change. */
+export const SELF_UNUSABLE: readonly NotComparableReason[] = ["region_absent", "region_low_pixel_count", "native_stats_missing", "capture_method_unknown"];
+
+/** The regions the engine measures (0.1.6 writes no image-side cheek). */
+const MEASURED_REGIONS = ["forehead", "nose", "chin", "cheeks"] as const satisfies readonly SkinStateRegionKey[];
+
+/**
+ * D07 (owner TD-20, option a): the dashboard's one count for the page takes
+ * only checks usable on their own account for every quantity in every
+ * measured region, so it never counts a check the engine would skip for some
+ * quantity. Stricter than the engine's per-quantity `usable`, never looser.
+ */
+export function usableForEveryQuantity(s: SkinState2): boolean {
+  return MEASURED_REGIONS.every((region) =>
+    SKINSTATE_FIELD_PATHS.every((quantity) => {
+      const v = compareStates(s, s, quantity, region);
+      return v.verdict === "comparable" || !v.reasons.some((r) => SELF_UNUSABLE.includes(r));
+    })
+  );
+}
