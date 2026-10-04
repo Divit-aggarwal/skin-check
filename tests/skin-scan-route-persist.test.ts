@@ -111,6 +111,8 @@ describe("C2 analysis persistence", () => {
     expect(data.inputSha256).toBe(createHash("sha256").update("photo-bytes").digest("hex"));
     expect(data).not.toHaveProperty("overlays");
     expect(data).toHaveProperty("createdAt");
+    // The version the route verified, stored on the record (wave-2 wiring 6).
+    expect(data.processingConsentVersion).toBe(PROCESSING_CONSENT_VERSION);
   });
 
   it("persistAttempt=recovery is stored; absent or unknown values are not", async () => {

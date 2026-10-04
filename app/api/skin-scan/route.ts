@@ -450,7 +450,8 @@ async function persistScanAnalysis(
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   try {
     const inputSha256 = createHash("sha256").update(Buffer.from(await image.arrayBuffer())).digest("hex");
-    const record = buildScanAnalysisRecord(result, { scanId, inputSha256, requestId: randomUUID(), captureMethod, persistAttempt, captureQuality });
+    // Only reached after the route checked this exact version (R4 above).
+    const record = buildScanAnalysisRecord(result, { scanId, inputSha256, requestId: randomUUID(), captureMethod, persistAttempt, captureQuality, processingConsentVersion: PROCESSING_CONSENT_VERSION });
     const bytes = recordByteSize(record);
     if (bytes > MAX_RECORD_BYTES) {
       console.error(`skin-scan: analysis record too large (${bytes} bytes) — not persisted.`);

@@ -46,6 +46,13 @@ describe("loadTrustedSkinState2Series", () => {
     expect(b?.engine.build).toBeNull();
   });
 
+  it("a record that stores processingConsentVersion still maps; the approved contracts keep provenance null", async () => {
+    get.mockResolvedValue({ docs: [{ id: "SCANA_aaaaaaaaaaaaaaaa", data: () => ({ ...record("SCANA", "build-1"), processingConsentVersion: "processing DRAFT version 1" }) }] });
+    const [r] = await loadTrustedSkinState2Series("uid-1");
+    if (r?.kind !== "skinstate") throw new Error(JSON.stringify(r));
+    expect(r.state.provenance.processingConsentVersion).toBeNull();
+  });
+
   it("a broken record stays in the series as invalid (the engine then says bad raw data), never dropped", async () => {
     get.mockResolvedValue({ docs: [{ id: "SCANA_aaaaaaaaaaaaaaaa", data: () => ({ source: "client" }) }] });
     expect((await loadTrustedSkinState2Series("uid-1")).map((r) => r.kind)).toEqual(["invalid"]);

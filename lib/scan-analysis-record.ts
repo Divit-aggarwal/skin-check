@@ -48,6 +48,11 @@ export interface ScanAnalysisMeta {
   // CLIENT-ASSERTED (assertedBy: "client"), validated by the route, never
   // used for comparability (D-26, Q-2) and never mapped into skinstate-1.
   captureQuality?: CaptureQuality | undefined;
+  // The processing-consent version the route checked before writing (D-16,
+  // R4). Server-set from the version it verified, never echoed from input.
+  // skinstate-1 and skinstate-2 still map provenance.processingConsentVersion
+  // to null; mapping it needs a new contract version (tracker row).
+  processingConsentVersion?: string | undefined;
 }
 
 function hasNestedArray(value: unknown): boolean {
@@ -79,6 +84,7 @@ export function buildScanAnalysisRecord(result: SkinScanResult, meta: ScanAnalys
   if (meta.captureMethod) record.captureMethod = meta.captureMethod;
   if (meta.persistAttempt) record.persistAttempt = meta.persistAttempt;
   if (meta.captureQuality) record.captureQuality = meta.captureQuality;
+  if (meta.processingConsentVersion) record.processingConsentVersion = meta.processingConsentVersion;
   // Exact CV build (skin-scan `engine_build`, the immutable image tag). Kept
   // only as a non-empty string; anything else is absent, never guessed.
   const engineBuild = source.engine_build;

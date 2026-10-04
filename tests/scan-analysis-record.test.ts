@@ -70,6 +70,11 @@ describe("buildScanAnalysisRecord", () => {
     }
   });
 
+  it("processingConsentVersion is stored when given, absent otherwise", () => {
+    expect(buildScanAnalysisRecord(result(), META)).not.toHaveProperty("processingConsentVersion");
+    expect(buildScanAnalysisRecord(result(), { ...META, processingConsentVersion: "processing DRAFT version 1" }).processingConsentVersion).toBe("processing DRAFT version 1");
+  });
+
   it("persistAttempt is omitted by default and stored only when given", () => {
     expect(buildScanAnalysisRecord(result(), META)).not.toHaveProperty("persistAttempt");
     expect(buildScanAnalysisRecord(result(), { ...META, persistAttempt: "recovery" }).persistAttempt).toBe("recovery");
