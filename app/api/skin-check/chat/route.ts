@@ -13,8 +13,8 @@ import { summarizeConcerns } from "@/lib/skin-check-score";
 import { ageStatus, latestGrant, withLedgerTimeout, type AgeStatus } from "@/app/api/account/_ledger";
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 import { contextChatEnabled } from "@/lib/context/switch";
-import { handleContextChat } from "@/lib/context/chat";
-import { joinedUserTurns, redFlagHit, REFERRAL_COPY } from "@/lib/context/prefilter";
+import { handleContextChat, recordReferral } from "@/lib/context/chat";
+import { joinedUserTurns, redFlagHit, REFERRAL_COPY, withoutReferrals } from "@/lib/context/prefilter";
 
 // firebase-admin needs Node APIs and hard-fails on the Edge runtime — same
 // explicit opt-in as /api/skin-scan.
@@ -101,18 +101,6 @@ export async function POST(request: NextRequest) {
   // The ONLY source of identity for this request — never a uid from the body.
   const uid = verifiedUid;
 
-  // Fails loudly rather than letting getClient() throw deep inside the try
-  // block below and get flattened into the same 502 as a real Gemini outage
-  // — same reasoning as /api/skin-scan's SCAN_MISCONFIGURED check. An unset
-  // key is a deploy misconfiguration (500), not a provider failure (502).
-  if (!geminiApiKey()) {
-    console.error("Gemini API key is not set (GEMINI_API_KEY, or GEMINI_DEV_API_KEY in development) — refusing to call Gemini.");
-    return NextResponse.json(
-      { error: "Echo isn't configured yet.", code: "CHAT_MISCONFIGURED" },
-      { status: 500 }
-    );
-  }
-
   const contentLength = Number(request.headers.get("content-length") ?? "0");
   if (contentLength > MAX_BODY_BYTES) {
     return NextResponse.json({ error: "Request too large." }, { status: 413 });
@@ -134,18 +122,59 @@ export async function POST(request: NextRequest) {
 
   // Forged prior turns: a non-empty history is only accepted with a token this
   // server signed over exactly those turns, for this uid + scan + region.
-  // Checked before the quota so a rejected request doesn't spend it.
   let historyOk: boolean;
+  let historyError: unknown = null;
   try {
     historyOk = history.length === 0 || (!!historyToken && verifyHistory(uid, scanId, region, history, historyToken));
   } catch (err) {
-    if (err instanceof AdminNotConfiguredError) return misconfigured(err);
-    throw err;
+    historyOk = false;
+    historyError = err;
   }
+
+  // GEMINI_BOUNDARY §6, second security review (H20): a red-flag or
+  // self-harm message gets the referral before anything that can fail or
+  // refuse (Gemini key, history, consent ledger, 18+, quota). Only after auth:
+  // nothing is read or spent. The token covers the client's history only if
+  // it verified; a forged history is never signed.
+  if (redFlagHit(message)) {
+    if (contextChatEnabled()) await recordReferral(uid, scanId, region, message);
+    const turns = [...(historyOk ? history : []), { role: "user" as const, text: message }, { role: "echo" as const, text: REFERRAL_COPY }];
+    let referralToken: string | undefined;
+    try {
+      referralToken = signHistory(uid, scanId, region, turns);
+    } catch {
+      referralToken = undefined; // not configured: the referral still goes out
+    }
+    return NextResponse.json({ ok: true, reply: REFERRAL_COPY, ...(referralToken ? { historyToken: referralToken } : {}) });
+  }
+
+  if (historyError instanceof AdminNotConfiguredError) return misconfigured(historyError);
+  if (historyError) throw historyError;
   if (!historyOk) {
     return NextResponse.json(
       { error: "This conversation couldn't be verified.", code: "CHAT_HISTORY_INVALID" },
       { status: 400 }
+    );
+  }
+
+  // Today's Echo sends Gemini the signed history without referred exchanges,
+  // capped like runEchoChat (20 messages with the new one). The split-message
+  // check runs over exactly those turns, before the ledger and the quota.
+  const sentHistory = withoutReferrals(history).slice(-19);
+  if (!contextChatEnabled() && redFlagHit(joinedUserTurns(sentHistory, message))) {
+    const turns = [...history, { role: "user" as const, text: message }, { role: "echo" as const, text: REFERRAL_COPY }];
+    return NextResponse.json({ ok: true, reply: REFERRAL_COPY, historyToken: signHistory(uid, scanId, region, turns) });
+  }
+
+  // Fails loudly rather than letting getClient() throw deep inside the try
+  // block below and get flattened into the same 502 as a real Gemini outage
+  // — same reasoning as /api/skin-scan's SCAN_MISCONFIGURED check. An unset
+  // key is a deploy misconfiguration (500), not a provider failure (502).
+  if (!geminiApiKey()) {
+    console.error("Gemini API key is not set (GEMINI_API_KEY, or GEMINI_DEV_API_KEY in development) — refusing to call Gemini.");
+    return NextResponse.json(
+      { error: "Echo isn't configured yet.", code: "CHAT_MISCONFIGURED" },
+      { status: 500 }
     );
   }
 
@@ -190,14 +219,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, reply: result.reply, historyToken: signHistory(uid, scanId, region, turns) });
     }
 
-    // GEMINI_BOUNDARY §6 on today's Echo too (security review, wave 2): a red
-    // flag or self-harm message, alone or split over the signed history's
-    // user turns, gets the fixed referral and never reaches Gemini.
-    if (redFlagHit(joinedUserTurns(history, message))) {
-      const turns = [...history, { role: "user" as const, text: message }, { role: "echo" as const, text: REFERRAL_COPY }];
-      return NextResponse.json({ ok: true, reply: REFERRAL_COPY, historyToken: signHistory(uid, scanId, region, turns) });
-    }
-
     const context = await loadTrustedEchoContext(uid, scanId);
     // Not found, someone else's scanId, or a malformed record all look the
     // same. Retryable: the server write may simply not have landed yet.
@@ -213,7 +234,7 @@ export async function POST(request: NextRequest) {
     const focusScores = regionScores[region];
     const userTurn = { role: "user" as const, text: message };
 
-    const reply = await getSkinCheckChatReply([...history, userTurn], {
+    const reply = await getSkinCheckChatReply([...sentHistory, userTurn], {
       answers,
       scores,
       composite,

@@ -129,6 +129,10 @@ On failure: regenerate once. If it fails again, return a template built only fro
 - Any helpline number must be verified before it ships.
 - Ships with assert cases covering both false positives and false negatives.
 - Recall is favoured over precision.
+- **Order (second security review, tracker H20):** the message-only check runs right after authentication and body parsing, before the Gemini-key check, history verification, the consent ledger, the 18+ gate and the daily quota. A self-harm message never gets an error or a refusal instead of the referral. The returned history token covers the client's history only if it verified.
+- **Split messages:** the check also runs on the new message joined with every user turn Gemini will receive (today's Echo: the signed history minus referred exchanges, last 19 turns; context path: the stored history). A split padded with filler turns is a known limit (F07).
+- **No replay:** a referred message and its referral are never sent to Gemini as history on a later turn (today's Echo: `withoutReferrals`; context path: `historyExcluded`).
+- **Scripts:** Devanagari patterns run on their own copy (NFC, format characters and nukta removed). Greek or Cyrillic letters and non-a-z Latin letters left after folding are treated as a disguise. Other Indian scripts are not referred (open owner question).
 
 ## 6b. Comparison-intent pre-filter
 

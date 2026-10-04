@@ -70,6 +70,11 @@ async function longitudinalFor(uid: string, scanId: string): Promise<Longitudina
   }
 }
 
+/** A red-flag message caught before anything else ran: record it (best effort) as a pre-filter turn. */
+export async function recordReferral(uid: string, scanId: string, region: EchoRegion, message: string): Promise<void> {
+  await recordBestEffort(uid, scanId, region, message, REFERRAL_COPY, { ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: "red_flag", redFlag: true, latencyMs: 0 });
+}
+
 export async function handleContextChat(input: { uid: string; scanId: string; region: EchoRegion; message: string }): Promise<ContextChatResult> {
   const { uid, scanId, region, message } = input;
   const started = Date.now();

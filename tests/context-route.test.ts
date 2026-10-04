@@ -40,7 +40,7 @@ vi.mock("@/lib/context/builder", async () => {
 vi.mock("@/lib/context/chat", async () => {
   const actual = await vi.importActual<typeof import("@/lib/context/chat")>("@/lib/context/chat");
   h.handleContextChat.mockImplementation(actual.handleContextChat);
-  return { handleContextChat: h.handleContextChat, seriesUpTo: actual.seriesUpTo };
+  return { handleContextChat: h.handleContextChat, seriesUpTo: actual.seriesUpTo, recordReferral: actual.recordReferral };
 });
 vi.mock("@/lib/rate-limit", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
@@ -116,10 +116,24 @@ describe("switch on: the gates still refuse before any package is built", () => 
     ["no AI-share consent", () => h.latestGrant.mockResolvedValue(null), 403, "AI_CONSENT_REQUIRED"],
   ])("%s", async (_name, arrange, status, code) => {
     arrange();
-    const res = await post("my mole is bleeding"); // even a red-flag message is refused first
+    const res = await post("what does my cheek reading mean?");
     expect(res.status).toBe(status);
     expect((await res.json()).code).toBe(code);
     for (const fn of [h.buildContextPackage, h.loadTrustedEchoContext, h.generateContent, h.recordChatTurns, h.consumeDailyQuota]) expect(fn).not.toHaveBeenCalled();
+  });
+
+  // Second security review (H20): a red-flag message gets the referral before any gate can refuse it.
+  it.each([
+    ["under 18", () => h.ageStatus.mockResolvedValue("under18")],
+    ["unattested", () => h.ageStatus.mockResolvedValue("missing")],
+    ["no AI-share consent", () => h.latestGrant.mockResolvedValue(null)],
+    ["ledger down", () => h.ageStatus.mockImplementation(() => new Promise(() => {}))],
+  ])("%s: a red-flag message still gets the referral, nothing built, no quota spent", async (_name, arrange) => {
+    arrange();
+    const res = await post("my mole is bleeding");
+    expect(res.status).toBe(200);
+    expect((await res.json()).reply).toBe(REFERRAL_COPY);
+    for (const fn of [h.buildContextPackage, h.loadTrustedEchoContext, h.generateContent, h.consumeDailyQuota]) expect(fn).not.toHaveBeenCalled();
   });
 });
 

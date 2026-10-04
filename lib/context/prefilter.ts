@@ -251,9 +251,25 @@ export const redFlagHit = (message: string): boolean => {
     LATIN_LOOKALIKE.test(folded)
   );
 };
-/** The last few user turns and the new message, as one text for the pre-filter. */
+/**
+ * Every user turn of `history` and the new message, as one text for the
+ * pre-filter. Pass exactly the turns Gemini will receive, so the check and
+ * Gemini see the same window (H20). A split with filler turns in between
+ * ("i want to" / "ok" / "die") still passes: a known limit (tracker F07).
+ */
 export const joinedUserTurns = (history: readonly { role: string; text: string }[], message: string): string =>
-  [...history.filter((t) => t.role === "user").slice(-3).map((t) => t.text), message].join(" ");
+  [...history.filter((t) => t.role === "user").map((t) => t.text), message].join(" ");
+
+/**
+ * Today's Echo: the client's signed history without referred exchanges (a
+ * user turn answered with REFERRAL_COPY, and that answer), so a red-flag
+ * message never reaches Gemini on a later turn either (GEMINI_BOUNDARY §6;
+ * found while fixing H20). The context path's stored history already leaves
+ * them out (chat-turns.ts historyExcluded).
+ */
+export function withoutReferrals<T extends { role: string; text: string }>(history: readonly T[]): T[] {
+  return history.filter((t, i) => t.text !== REFERRAL_COPY && !(t.role === "user" && history[i + 1]?.text === REFERRAL_COPY));
+}
 
 export const comparisonHit = (message: string): boolean => COMPARISON.test(fold(message)) || COMPARISON.test(message);
 
