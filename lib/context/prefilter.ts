@@ -204,6 +204,15 @@ const RED_FLAG = re([
   "\\bburn(?:ing|ed)? myself\\b",
   "\\bzindagi se thak\\w*",
   "स्युसाइड|सुसाइड|सूसाइड|सुइसाइड",
+  // ── final-review recheck (I02) ──
+  "\\b(?:want to|wanna|going to|gonna|plan\\w* to|ready to|about to) end (?:things|everything|it all|it|my life)\\b(?!\\s+(?:with|on|in|at|for|by|before|now that|using)\\b)",
+  "\\bbetter off not (?:here|alive|around|existing)\\b",
+  "\\b(?:nobody|no one|no-one) would (?:care|notice)\\b",
+  "\\b(?:sick|fed up) (?:of|with) (?:living|life|being alive)\\b",
+  "\\bdone with (?:everything|it all)\\b",
+  "\\bdone\\W+(?:goodbye|bye)\\b",
+  "\\bnahi? jee?na\\b",
+  "\\bburn(?:ing|ed)? my (?:arms?|wrists?|thighs?|legs?)\\b",
 ]);
 
 const COMPARISON = re([
@@ -367,15 +376,19 @@ export const comparisonHit = (message: string): boolean => COMPARISON.test(fold(
 // or readings over time. The reply screen and the persona stop a change claim
 // in the answer itself. The context path keeps the recall-first COMPARISON
 // list (TD-16 (2)).
+const OWN_READING = "(?:it|this|that|my (?:\\w+ )?(?:skin|face|redness|oil\\w*|texture|blemish\\w*|pigment\\w*|spots?|acne|pores|breakouts?|marks?|readings?|cheeks?|forehead|nose|chin|tone)|the (?:redness|oil\\w*|texture|blemish\\w*|pigment\\w*|spots?|acne|readings?|breakouts?))";
 const CHECK_COMPARISON = re([
-  "\\b(?:last|previous|earlier|prior|old|first|other) (?:time|check|scan|photo|reading|result)s?\\b",
+  // A change question about the user's own readings ("is it better now?", "did my oiliness drop?") (recheck).
+  `\\b(?:is|has|did|are|have|was)\\s+${OWN_READING}\\s+(?:\\w+ ){0,2}(?:better|worse|improv\\w*|gone (?:down|up)|go(?:ne)? down|drop\\w*|reduc\\w*|increas\\w*|decreas\\w*|fad\\w*|clear\\w*|lower|higher|less|more|calm\\w*)\\b(?! (?:to|for|if|when)\\b)`,
+  "\\b(?:last|previous|earlier|prior) (?:time|check|scan|photo|reading|result)s?\\b",
   "\\b(?:my|the) (?:last|previous|earlier|two|past) (?:\\w+ )?(?:checks?|scans?|photos?|readings?|results?)\\b",
   "\\bcompar\\w* (?:my |the |these |those |two )?(?:\\w+ )?(?:checks?|scans?|photos?|readings?|results?)\\b",
   "\\b(?:since|from) (?:my |the )?(?:last|previous|earlier|first) (?:\\w+ )?(?:checks?|scans?|photos?|time)\\b",
-  "\\btrend\\w*",
-  "\\bover (?:my |the )?(?:checks|scans|photos|weeks|months)\\b",
-  "\\b(?:better|worse|improv\\w*|changed|different) (?:than|since|from) (?:before|last|earlier|my last|the last|then)\\b",
-  "\\bpehle se\\b",
+  "\\bmy (?:\\w+ )?trend\\b|\\btrend(?:s|ing)? (?:in|of) my\\b|\\btrending (?:up|down)\\b",
+  "\\bover (?:my |the )?(?:checks|scans|photos)\\b",
+  "\\b(?:better|worse|improv\\w*|changed) (?:than|since|from) (?:before|last (?:time|check|scan|photo|week|month)|earlier|my last|the last (?:check|scan|photo)|then)\\b",
+  "\\bpehle se (?:better|kam|behtar|acc?ha|zy?aa?da (?:red|oily|daane|dane))\\b",
+  "\\bpehle se\\b.{0,30}\\b(?:kam|zy?aa?da|behtar|better|acc?h[ai]) (?:hu(?:i|a|e)|ho (?:gay|gai))",
   "\\bpichh?l[ie] (?:baar|bar|scan|check)\\b",
   "पहले से|पिछली बार",
 ]);

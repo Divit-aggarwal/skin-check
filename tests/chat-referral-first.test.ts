@@ -244,6 +244,6 @@ describe("today's Echo: final-review fixes", () => {
     getSkinCheckChatReply.mockResolvedValue("आपकी लालिमा पिछली बार से कम हुई है। रेटिनॉल लगाइए।");
     const reply = (await (await post("मेरी त्वचा कैसी है?")).json()).reply as string;
     expect(reply.startsWith(ECHO_FALLBACK_LEAD)).toBe(true);
-    expect(reply).not.toMatch(/\p{Script=Devanagari}/u);
+    expect(reply).not.toMatch(new RegExp("\\p{Script=Devanagari}", "u"));
   });
 });

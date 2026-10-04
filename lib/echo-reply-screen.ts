@@ -24,6 +24,12 @@ const CHECKS: [string, RegExp][] = [
       "\\b(?:went|gone|go|going) (?:down|up)\\b", "\\bdrop(?:s|ped|ping)?\\b", "\\bincreas\\w*", "\\bdecreas\\w*", "\\breduced\\b",
       "\\bprogress\\w*", "\\bcompared? (?:to|with)\\b", "\\btrend\\w*", "\\bfad(?:ed|ing)\\b", "\\bcleared up\\b", "\\bsince your\\b",
       "\\b(?:kam|zy?aa?da|behtar) (?:hua|hui|ho)\\w*", "\\bpehle se\\b",
+      // Final-review recheck (I02): change in ordinary wording.
+      "\\b(?:lower|higher|less|more|calmer|clearer|smoother|brighter|lighter|darker|redder|oilier|drier|better|worse)\\s+(?:\\w+\\s+)?(?:than|now)\\b",
+      "\\b(?:has|have|had|is|are|looks?|seems?)\\s+(?:\\w+\\s+)?(?:eased|lessened|calmed(?: down)?|cleared(?: up)?|settled|subsided|clearer|calmer)\\b",
+      "\\b(?:is|are)\\s+(?:now\\s+)?(?:down|up)\\b",
+      "\\bthan before\\b",
+      "\\bbetter hu(?:i|a|e)\\b",
     ]),
   ],
   ["past_event", PAST_EVENT],

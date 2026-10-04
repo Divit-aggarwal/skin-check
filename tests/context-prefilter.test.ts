@@ -483,3 +483,46 @@ describe("check-comparison filter for today's Echo", () => {
     expect(checkComparisonHit(msg)).toBe(false);
   });
 });
+
+// Final-review recheck (I02).
+describe("final-review recheck", () => {
+  it.each([
+    "I'm planning to end it tonight",
+    "I wanna end things",
+    "I'd be better off not here",
+    "nobody would care if I was gone",
+    "sick of living",
+    "fed up of life",
+    "i'm so done with everything",
+    "I'm done, goodbye",
+    "ab aur nahi jeena",
+    "I keep burning my arm",
+  ])("self-harm hits: %j", (msg) => {
+    expect(redFlagHit(msg)).toBe(true);
+  });
+
+  it.each(["is it better now?", "has my redness gone down since last week?", "did my oiliness drop?", "is my skin better compared to my previous one?", "are my spots fading?", "is the redness lower now?"])(
+    "a change question about the user's own readings: %j",
+    async (msg) => {
+      const { checkComparisonHit } = await import("@/lib/context/prefilter");
+      expect(checkComparisonHit(msg)).toBe(true);
+    }
+  );
+
+  it.each([
+    "which is better for my first time using a serum?",
+    "Should I use the other cleanser for the first time tonight?",
+    "What should I use on my skin over the weeks of monsoon?",
+    "how is the trend in skincare now?",
+    "kya mujhe pehle se zyada paani peena chahiye?",
+    "Is it different from last year's products?",
+    "is it better to apply at night?",
+    "Is a gel or cream better for oily skin?",
+    "Should I apply moisturizer before sunscreen?",
+    "I want to end my routine with sunscreen, ok?",
+  ])("ordinary question passes both filters: %j", async (msg) => {
+    const { checkComparisonHit } = await import("@/lib/context/prefilter");
+    expect(checkComparisonHit(msg)).toBe(false);
+    expect(redFlagHit(msg)).toBe(false);
+  });
+});

@@ -27,6 +27,16 @@ describe("today's Echo reply screen", () => {
     ["Get help at bit.ly/skin-help", "blocked"],
     ["Join t.me/skintips for tips", "blocked"],
     ["Please share the verification code you just received.", "blocked"],
+    // Final-review recheck (I02): change claims in ordinary wording.
+    ["Your redness looks lower than before and has calmed down nicely.", "blocked"],
+    ["Your redness is lower now.", "blocked"],
+    ["Your cheeks look less red than before.", "blocked"],
+    ["Your skin looks calmer than before.", "blocked"],
+    ["Your redness has eased.", "blocked"],
+    ["Your redness has lessened.", "blocked"],
+    ["Your skin is clearer now.", "blocked"],
+    ["Good news, your redness is down.", "blocked"],
+    ["Aapki skin better hui hai.", "blocked"],
   ] as const)("%j is %s", (reply, kind) => {
     expect(screenEchoReply(reply).kind).toBe(kind);
   });
