@@ -23,7 +23,9 @@ function getClient(): GoogleGenAI {
   if (!client) {
     const apiKey = geminiApiKey();
     if (!apiKey) throw new Error("The Gemini API key is not set.");
-    client = new GoogleGenAI({ apiKey });
+    // Local stack only (scripts/fake-gemini.mjs): never in a production build.
+    const baseUrl = process.env.NODE_ENV !== "production" ? process.env.GEMINI_LOCAL_BASE_URL : undefined;
+    client = new GoogleGenAI({ apiKey, ...(baseUrl ? { httpOptions: { baseUrl } } : {}) });
   }
   return client;
 }

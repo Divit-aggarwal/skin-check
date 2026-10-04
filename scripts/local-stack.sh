@@ -11,7 +11,7 @@
 #
 # Ports come from PORT_BASE (default 3100; a lane worktree sets it in .env.lane):
 #   web +0, auth +1, firestore +2, firestore ws +3, hub +4, logging +5,
-#   emulator UI +6, engine +7, S3Mock +8
+#   emulator UI +6, engine +7, S3Mock +8, fake Gemini +9
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -20,7 +20,7 @@ case "$MODE" in up|test|browser) ;; *) echo "usage: $0 up|test|browser" >&2; exi
 
 [ -f .env.lane ] && . ./.env.lane
 B="${PORT_BASE:-3100}"
-WEB=$B AUTH=$((B + 1)) FS=$((B + 2)) FSWS=$((B + 3)) HUB=$((B + 4)) LOGP=$((B + 5)) UI=$((B + 6)) ENGINE=$((B + 7)) S3=$((B + 8))
+WEB=$B AUTH=$((B + 1)) FS=$((B + 2)) FSWS=$((B + 3)) HUB=$((B + 4)) LOGP=$((B + 5)) UI=$((B + 6)) ENGINE=$((B + 7)) S3=$((B + 8)) GEM=$((B + 9))
 PROJECT=demo-skin-check
 ENGINE_IMAGE=sha256:9a8f96c0a54025c4137b89dee181ba7fb140db1431fa95156cc20d8880e1fc2c   # tested 0.1.6 image, by ID
 S3MOCK_IMAGE=adobe/s3mock@sha256:ab01a6946750f451ca215a47e91030695b260e4003b8a5a6201d25029b8fca92
@@ -41,7 +41,7 @@ if [ "$MODE" = test ]; then
   env -u FIRESTORE_EMULATOR_HOST -u FIREBASE_AUTH_EMULATOR_HOST npx vitest run
 fi
 
-for p in $WEB $AUTH $FS $FSWS $HUB $LOGP $UI $ENGINE $S3; do
+for p in $WEB $AUTH $FS $FSWS $HUB $LOGP $UI $ENGINE $S3 $GEM; do
   if lsof -nP -iTCP:"$p" -sTCP:LISTEN >/dev/null 2>&1; then
     echo "port $p is busy: is the stack already running for PORT_BASE=$B? Stop it first." >&2
     exit 1
@@ -54,7 +54,7 @@ SCAN_SECRET="$(grep -E '^SCAN_API_SECRET=' .env.development.local | tail -1 | cu
 [ -n "$SCAN_SECRET" ] || { echo "SCAN_API_SECRET missing in .env.development.local" >&2; exit 1; }
 
 ENGINE_C="skin-scan-dev-$B" S3_C="s3mock-dev-$B"
-cleanup() { docker rm -f "$ENGINE_C" "$S3_C" >/dev/null 2>&1 || true; }
+cleanup() { docker rm -f "$ENGINE_C" "$S3_C" >/dev/null 2>&1 || true; [ -n "${GEM_PID:-}" ] && kill "$GEM_PID" 2>/dev/null || true; }
 trap cleanup EXIT INT TERM
 cleanup
 
@@ -96,6 +96,16 @@ export LOCAL_STACK_WEB="http://127.0.0.1:$WEB"
 # H04/H21 erase sweep (lib/erase.ts): local-only values, not secrets. A short
 # delay so the end-to-end test need not wait 70 minutes; ignored in production builds.
 export CRON_SECRET=local-dev-cron-secret ERASE_SWEEP_DELAY_SECONDS=2
+
+# A local stand-in for Gemini (scripts/fake-gemini.mjs): records every request
+# in .local-stack/fake-gemini/requests.jsonl and answers with scripted text. No
+# key and no request leaves the machine; production builds ignore the base URL.
+rm -rf "$STATE/fake-gemini"
+FAKE_GEMINI_PORT=$GEM node scripts/fake-gemini.mjs > "$STATE/fake-gemini.log" 2>&1 &
+GEM_PID=$!
+wait_for_port() { for _ in $(seq 1 30); do lsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1 && return 0; sleep 1; done; echo "fake Gemini did not start" >&2; return 1; }
+wait_for_port "$GEM"
+export GEMINI_LOCAL_BASE_URL="http://127.0.0.1:$GEM" GEMINI_DEV_API_KEY=local-fake-gemini-key
 
 # Base seed, then any lane seed (scripts/seed-lane-<lane>.ts), so lanes never
 # edit the shared seed file.
