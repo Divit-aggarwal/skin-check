@@ -62,6 +62,12 @@ function s3(): S3Client {
   client ??= new S3Client({
     region: REGION!,
     ...ENDPOINT_CONFIG,
+    // Red team (I02): by default the SDK puts the CRC32 of an EMPTY body in a
+    // presigned PUT, and real S3 then rejects the photo (BadDigest). The
+    // browser cannot compute it in advance, so no checksum is added unless an
+    // operation requires one.
+    requestChecksumCalculation: "WHEN_REQUIRED",
+    responseChecksumValidation: "WHEN_REQUIRED",
     ...(ACCESS_KEY_ID && SECRET_ACCESS_KEY
       ? { credentials: { accessKeyId: ACCESS_KEY_ID, secretAccessKey: SECRET_ACCESS_KEY } }
       : {}),

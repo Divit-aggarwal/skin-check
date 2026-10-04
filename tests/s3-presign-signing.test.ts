@@ -16,6 +16,9 @@ describe("presignOriginalUpload signing", () => {
     expect(url.searchParams.get("X-Amz-SignedHeaders")!.split(";").sort()).toEqual(["content-length", "content-type", "host"]);
     expect(url.searchParams.get("X-Amz-Expires")).toBe("300");
     expect(url.pathname).toContain("users/u/scans/s/original.jpg");
+    // Red team (I02, area A): no checksum of an empty body in the URL. Real S3
+    // rejects a non-empty PUT whose body does not match it (S3Mock does not check).
+    expect(Array.from(url.searchParams.keys()).filter((k) => /checksum/i.test(k))).toEqual([]);
     vi.unstubAllEnvs();
   });
 });
