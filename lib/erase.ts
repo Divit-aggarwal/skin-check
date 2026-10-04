@@ -48,7 +48,11 @@ export async function markErased(uid: string, now = Date.now()): Promise<void> {
 /** S3, then the Firestore tree, then the Auth user (already gone counts as done). Shared by the erase and the sweep. */
 export const eraseSteps = (uid: string) => ({
   s3: () => eraseUserPrefix(uid),
-  firestore: () => adminDb().recursiveDelete(adminDb().collection("users").doc(uid)),
+  // The user's tree, then the H24 under-18 marker (TD-10: the under-18 record goes with the account).
+  firestore: async () => {
+    await adminDb().recursiveDelete(adminDb().collection("users").doc(uid));
+    await adminDb().collection("under18Accounts").doc(uid).delete();
+  },
   auth: () =>
     adminAuth()
       .deleteUser(uid)

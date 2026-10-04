@@ -19,6 +19,14 @@ service cloud.firestore {
       return !exists(/databases/$(database)/documents/erasedAccounts/$(uid));
     }
 
+    // H24 (owner TD-20): under18Accounts/{uid} is written by the attestation
+    // route with an under-18 answer. The server already refuses scan, upload
+    // and chat; this stops a modified client storing a minor's questionnaire.
+    // Unmatched below: no client can read or write the marker.
+    function notUnder18(uid) {
+      return !exists(/databases/$(database)/documents/under18Accounts/$(uid));
+    }
+
     match /users/{uid} {
       allow get: if request.auth != null && request.auth.uid == uid;
       // Red team (I02, area A F8): the profile holds exactly what the app
@@ -37,6 +45,7 @@ service cloud.firestore {
         allow get, list: if request.auth != null && request.auth.uid == uid;
         allow create: if request.auth != null && request.auth.uid == uid
                       && notErased(uid)
+                      && notUnder18(uid)
                       // Red team (I02, area A F5): the date is the server's and the
                       // record names its own check, so a forged future date cannot pin
                       // itself at the top of the history.

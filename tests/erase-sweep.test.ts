@@ -10,6 +10,7 @@ const h = vi.hoisted(() => {
     markers,
     eraseUserPrefix: vi.fn(async (_uid: string) => 1),
     recursiveDelete: vi.fn(async (_ref: { path: string }) => undefined),
+    deleted: [] as string[],
     deleteUser: vi.fn(async (_uid: string) => undefined),
   };
 });
@@ -24,7 +25,7 @@ vi.mock("@/lib/firebase/admin", () => {
     adminAuth: () => ({ deleteUser: h.deleteUser }),
     adminDb: () => ({
       collection: (name: string) => ({
-        doc: (id: string) => ({ path: `${name}/${id}`, id }),
+        doc: (id: string) => ({ path: `${name}/${id}`, id, delete: async () => void h.deleted.push(`${name}/${id}`) }),
         where: (_f: string, _op: string, limit: { toMillis(): number }) => ({
           get: async () => ({
             docs: Array.from(h.markers.entries())
@@ -104,6 +105,7 @@ describe("sweepErasedAccounts", () => {
     expect(res).toEqual({ swept: 1, failed: 0 });
     expect(h.eraseUserPrefix).toHaveBeenCalledWith("due");
     expect(h.recursiveDelete).toHaveBeenCalledWith(expect.objectContaining({ path: "users/due" }));
+    expect(h.deleted).toContain("under18Accounts/due");
     expect(h.deleteUser).toHaveBeenCalledWith("due");
     expect(Array.from(h.markers.keys())).toEqual(["later"]);
   });

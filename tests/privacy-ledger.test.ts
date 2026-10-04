@@ -50,7 +50,21 @@ function fakeCollection(path: string) {
   };
 }
 
-vi.mock("@/lib/firebase/admin", () => ({ adminDb: () => ({ collection: (name: string) => fakeCollection(name) }) }));
+// A batch commits its writes together, or none of them.
+function fakeBatch() {
+  const ops: (() => Promise<unknown>)[] = [];
+  return {
+    create: (ref: { create: (d: Record<string, unknown>) => Promise<void> }, d: Record<string, unknown>) => void ops.push(() => ref.create(d)),
+    set: (ref: { set: (d: Record<string, unknown>) => Promise<unknown> }, d: Record<string, unknown>) => void ops.push(() => ref.set(d)),
+    commit: async () => {
+      if (fail.reads) throw new Error("firestore down");
+      calls.push("batch commit");
+      for (const op of ops) await op();
+    },
+  };
+}
+
+vi.mock("@/lib/firebase/admin", () => ({ adminDb: () => ({ collection: (name: string) => fakeCollection(name), batch: fakeBatch }) }));
 
 import { AGE_ATTESTATION_VERSION } from "@/lib/consent";
 import { ageStatus, appendConsent, latestGrant, REQUIRE_AGE_ATTESTATION, scanAgeGate, sha256, withLedgerTimeout } from "@/app/api/account/_ledger";
@@ -218,5 +232,24 @@ describe("scanAgeGate (upload and scan routes)", () => {
     await vi.advanceTimersByTimeAsync(2_001);
     expect(await result).toBeNull();
     vi.useRealTimers();
+  });
+});
+
+// H24 (owner TD-20, option a): an under-18 answer and the marker the rules check, in one batch.
+describe("under-18 marker (H24)", () => {
+  const event = (granted: boolean) => ({ purpose: "age_18_plus" as const, granted, version: AGE_ATTESTATION_VERSION, copy: "c", scanId: null, source: "attestation_route" as const });
+
+  it("an under-18 answer writes the ledger entry and under18Accounts/{uid} together", async () => {
+    calls.length = 0;
+    await appendConsent("minor", event(false));
+    expect(calls[0]).toBe("batch commit");
+    expect(calls).toContain("set under18Accounts/minor");
+    expect(calls.some((c) => c.startsWith("create users/minor/consentLedger/"))).toBe(true);
+  });
+
+  it("an 18+ answer writes no marker", async () => {
+    calls.length = 0;
+    await appendConsent("adult", event(true));
+    expect(calls.some((c) => c.includes("under18Accounts"))).toBe(false);
   });
 });

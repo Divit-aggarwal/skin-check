@@ -46,9 +46,18 @@ const ledger = (uid: string) => adminDb().collection("users").doc(uid).collectio
 
 export const sha256 = (text: string) => createHash("sha256").update(text, "utf8").digest("hex");
 
+/**
+ * H24 (owner TD-20, option a): under18Accounts/{uid} exists once an under-18
+ * answer is recorded; firestore.rules refuse a client skinCheck for that uid
+ * while it does (as erasedAccounts). It holds one time and nothing else. No
+ * client may read or write it. Removed by the erase and by the H05 support
+ * script (scripts/clear-under18.ts).
+ */
+export const under18Marker = (uid: string) => adminDb().collection("under18Accounts").doc(uid);
+
 /** `uid` must be a server-VERIFIED uid. `.create()` only: an entry is never changed. */
 export async function appendConsent(uid: string, event: ConsentEvent): Promise<void> {
-  await ledger(uid).doc().create({
+  const data = {
     schemaVersion: 1,
     purpose: event.purpose,
     granted: event.granted,
@@ -57,7 +66,16 @@ export async function appendConsent(uid: string, event: ConsentEvent): Promise<v
     scanId: event.scanId,
     source: event.source,
     recordedAt: FieldValue.serverTimestamp(),
-  });
+  };
+  if (event.purpose === "age_18_plus" && !event.granted) {
+    // The entry and the marker the rules check, together or not at all.
+    const batch = adminDb().batch();
+    batch.create(ledger(uid).doc(), data);
+    batch.set(under18Marker(uid), { markedAt: FieldValue.serverTimestamp() });
+    await batch.commit();
+    return;
+  }
+  await ledger(uid).doc().create(data);
 }
 
 const millis = (value: unknown): number =>

@@ -21,6 +21,7 @@ const { order, markErased, verifyFirebaseIdTokenClaims, revokeRefreshTokens, del
     };
   });
 
+const deletedDocs: string[] = [];
 vi.mock("@/lib/firebase/admin", async () => {
   const actual = await vi.importActual<typeof import("@/lib/firebase/admin")>("@/lib/firebase/admin");
   return {
@@ -30,7 +31,7 @@ vi.mock("@/lib/firebase/admin", async () => {
     adminAuth: () => ({ revokeRefreshTokens, deleteUser }),
     adminDb: () => ({
       collection: (name: string) =>
-        name === "erasures" ? receipts : { doc: (id: string) => ({ path: `${name}/${id}` }) },
+        name === "erasures" ? receipts : { doc: (id: string) => ({ path: `${name}/${id}`, delete: async () => void deletedDocs.push(`${name}/${id}`) }) },
       recursiveDelete,
     }),
   };
@@ -83,7 +84,9 @@ describe("erase route", () => {
     expect(markErased).toHaveBeenCalledWith(UID);
     expect(revokeRefreshTokens).toHaveBeenCalledWith(UID);
     expect(eraseUserPrefix).toHaveBeenCalledWith(UID);
-    expect(recursiveDelete).toHaveBeenCalledWith({ path: `users/${UID}` });
+    expect(recursiveDelete).toHaveBeenCalledWith(expect.objectContaining({ path: `users/${UID}` }));
+    // H24: the under-18 marker goes with the account (TD-10).
+    expect(deletedDocs).toContain(`under18Accounts/${UID}`);
     expect(deleteUser).toHaveBeenCalledWith(UID);
   });
 
