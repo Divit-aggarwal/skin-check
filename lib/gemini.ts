@@ -7,6 +7,7 @@ import { summarizeConcerns, type CompositeScore } from "@/lib/skin-check-score";
 import { bandScores } from "@/lib/skin-check-rules";
 import type { CautionAnswer } from "@/lib/contracts/safety-state";
 import { extraCautionAnswers } from "@/lib/rules/safety";
+import { REFERRAL_COPY } from "@/lib/context/prefilter";
 
 export interface EchoChatMessage {
   role: "user" | "echo";
@@ -135,9 +136,17 @@ speak in a direct, warm, science-led voice: "appears," "may," "based on your
 profile," "confidence: medium." You are not a doctor and never act like one.
 
 You will be given the user's already-computed skin assessment below — refer
-to it naturally in your answers (their actual score, sub-scores, root-cause
-tags, and any photo-detected regions) instead of giving generic skincare
-advice. Keep replies short and conversational, a few sentences at most.
+to it naturally in your answers (the Low, Moderate or Elevated band of each
+category and region) instead of giving generic skincare advice. Keep replies
+short and conversational, a few sentences at most.
+
+This is one photo, read on its own. You have no earlier reading: never say a
+reading changed, improved or got worse, never compare checks, and never
+describe a trend or predict one. Never write a number or a percentage. Never
+name an active ingredient, a brand or a product to buy.
+
+If the user describes self-harm, wanting to die, feeling unsafe, or a medical
+emergency, reply with exactly this and nothing else: ${REFERRAL_COPY}
 
 Never use these words or their variants: diagnose, diagnosis, cure, heal,
 treat, prescription, guaranteed, proven to, will improve, causes, caused by.
@@ -217,7 +226,7 @@ function buildSkinCheckEchoSystemInstruction(
   const scanSection =
     scores && shown
       ? `concerns: ${shown.topConcerns.join(", ")}
-summary already shown to the user: "${shown.summaryLine}"
+summary of this check: "${shown.summaryLine}"
 
 per-category scores:
 ${summarizeSkinScanScores(scores)}
@@ -237,7 +246,7 @@ region-specific readings:
 ${summarizeSkinScanScores(regionFocus.scores)}
 
 ${SKIN_CHECK_SCORE_SCALE_NOTE}
-The whole-face numbers above are background context only — only bring them up
+The whole-face bands above are background context only — only bring them up
 if the user asks how this region compares to the rest of their face.`
     : "";
 

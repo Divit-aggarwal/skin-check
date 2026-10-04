@@ -14,7 +14,10 @@ import { ageStatus, latestGrant, withLedgerTimeout, type AgeStatus } from "@/app
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 import { contextChatEnabled } from "@/lib/context/switch";
 import { handleContextChat, recordReferral } from "@/lib/context/chat";
-import { joinedUserTurns, redFlagHit, REFERRAL_COPY, UNSUPPORTED_SCRIPT_COPY, unsupportedScript, withoutReferrals } from "@/lib/context/prefilter";
+import { comparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY, UNSUPPORTED_SCRIPT_COPY, unsupportedScript, withoutReferrals } from "@/lib/context/prefilter";
+import { buildContextPackage } from "@/lib/context/builder";
+import { comparisonAnswer, fallbackLines } from "@/lib/context/answer";
+import { ECHO_FALLBACK_LEAD, screenEchoReply } from "@/lib/echo-reply-screen";
 
 // firebase-admin needs Node APIs and hard-fails on the Edge runtime — same
 // explicit opt-in as /api/skin-scan.
@@ -250,15 +253,35 @@ export async function POST(request: NextRequest) {
     const composite = summarizeConcerns(scores, bandScores(scores).bands);
     const focusScores = regionScores[region];
     const userTurn = { role: "user" as const, text: message };
+    const respond = (reply: string) =>
+      NextResponse.json({ ok: true, reply, historyToken: signHistory(uid, scanId, region, [...history, userTurn, { role: "echo", text: reply }]) });
+    // Our own band lines for this region (or the whole face) and one uncertainty line.
+    const pkg = () =>
+      buildContextPackage({
+        regionFocus: region,
+        message,
+        skin: { scores, regionScores, regionLowConfidence: context.regionLowConfidence, pipelineVersion: context.pipelineVersion, schemaVersion: context.schemaVersion },
+        answers,
+      });
 
-    const reply = await getSkinCheckChatReply([...sentHistory, userTurn], {
+    // Red team (I02, area E): a comparison question gets the fixed answer, no Gemini call (GEMINI_BOUNDARY §6b).
+    if (comparisonHit(message)) return respond(comparisonAnswer(pkg()));
+
+    const geminiReply = await getSkinCheckChatReply([...sentHistory, userTurn], {
       answers,
       scores,
       composite,
       regionFocus: focusScores ? { region: ECHO_REGION_LABELS[region], scores: focusScores } : null,
     });
-    const nextToken = signHistory(uid, scanId, region, [...history, userTurn, { role: "echo", text: reply }]);
-    return NextResponse.json({ ok: true, reply, historyToken: nextToken });
+    // Red team (I02, areas B and E): nothing Gemini says reaches the user or the
+    // signed history unchecked. What is signed is what the user saw.
+    const verdict = screenEchoReply(geminiReply);
+    if (verdict.kind === "referral") return respond(REFERRAL_COPY);
+    if (verdict.kind === "blocked") {
+      console.warn("skin-check Echo reply blocked:", verdict.check);
+      return respond([ECHO_FALLBACK_LEAD, ...fallbackLines(pkg())].join("\n"));
+    }
+    return respond(geminiReply);
   } catch (err) {
     // Category + message only — never the raw SDK error object, which can
     // carry request/response internals that don't belong in server logs.

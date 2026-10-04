@@ -20,7 +20,7 @@ vi.mock("@/lib/firebase/admin", async () => {
   const actual = await vi.importActual<typeof import("@/lib/firebase/admin")>("@/lib/firebase/admin");
   return { bearerToken: actual.bearerToken, AdminNotConfiguredError: actual.AdminNotConfiguredError, verifyFirebaseIdToken };
 });
-vi.mock("@/lib/gemini", () => ({ getSkinCheckChatReply }));
+vi.mock("@/lib/gemini", async () => ({ ...(await vi.importActual<typeof import("@/lib/gemini")>("@/lib/gemini")), getSkinCheckChatReply }));
 vi.mock("@/lib/echo-trusted-context", () => ({ loadTrustedEchoContext }));
 vi.mock("@/lib/rate-limit", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
@@ -59,7 +59,7 @@ beforeEach(() => {
   vi.stubEnv("ECHO_CONTEXT_PATH", "");
   verifyFirebaseIdToken.mockResolvedValue(UID);
   consumeDailyQuota.mockReturnValue(null);
-  loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: {}, answers: {} });
+  loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: {}, answers: {}, regionLowConfidence: {}, pipelineVersion: null, schemaVersion: 1 });
   getSkinCheckChatReply.mockResolvedValue("reply");
   ageStatus.mockResolvedValue("over18");
   latestGrant.mockResolvedValue(true);
@@ -180,5 +180,50 @@ describe("a message in a script Echo does not support (H22)", () => {
       expect((await (await post(msg)).json()).reply).toBe("reply");
       expect(getSkinCheckChatReply).toHaveBeenCalledTimes(1);
     }
+  });
+});
+
+// Red team (2026-10-04, tracker I02, areas B and E): today's Echo checks Gemini's reply and comparison questions.
+describe("today's Echo: Gemini's reply is checked before it is shown or signed", () => {
+  it("a made-up number or change: the fixed band answer is shown and signed, never Gemini's text", async () => {
+    const { ECHO_FALLBACK_LEAD } = await import("@/lib/echo-reply-screen");
+    getSkinCheckChatReply.mockResolvedValue("Your redness is 73.4% and it improved since last month.");
+    const res = await post("what does my redness mean?");
+    const body = await res.json();
+    const { reply, historyToken } = body;
+    expect(reply.startsWith(ECHO_FALLBACK_LEAD)).toBe(true);
+    expect(reply).not.toMatch(/73|improved/);
+    expect(reply).toMatch(/Redness, photo-based estimate for the cheeks: (Low|Moderate|Elevated)|Redness, photo-based estimate for the whole face/);
+    const shown: Turn[] = [{ role: "user", text: "what does my redness mean?" }, { role: "echo", text: reply }];
+    expect(verifyHistory(UID, SCAN, "cheeks", shown, historyToken)).toBe(true);
+    expect(verifyHistory(UID, SCAN, "cheeks", [shown[0]!, { role: "echo", text: "Your redness is 73.4% and it improved since last month." }], historyToken)).toBe(false);
+  });
+
+  it("a reply that endorses self-harm becomes the referral", async () => {
+    getSkinCheckChatReply.mockResolvedValue("If you feel like ending it all, that's understandable.");
+    expect((await (await post("i feel low today")).json()).reply).toBe(REFERRAL_COPY);
+  });
+
+  it("a comparison question gets the fixed comparison answer and no Gemini call", async () => {
+    const { COMPARISON_LEAD } = await import("@/lib/context/prefilter");
+    for (const msg of ["is my redness better than last time?", "compare my last two scans", "pehle se meri redness kam hui kya?"]) {
+      getSkinCheckChatReply.mockClear();
+      const reply = (await (await post(msg)).json()).reply as string;
+      expect(reply.startsWith(COMPARISON_LEAD), msg).toBe(true);
+      expect(getSkinCheckChatReply).not.toHaveBeenCalled();
+    }
+  });
+
+  it("control: an ordinary reply reaches the user unchanged", async () => {
+    getSkinCheckChatReply.mockResolvedValue("Your cheeks read Moderate for redness in this photo.");
+    expect((await (await post("what does my redness mean?")).json()).reply).toBe("Your cheeks read Moderate for redness in this photo.");
+  });
+
+  it("the persona tells Gemini: bands only, one photo, no change, no numbers, no actives, and the referral line", async () => {
+    const src = (await import("node:fs")).readFileSync("lib/gemini.ts", "utf8");
+    expect(src).not.toMatch(/root-cause\s+tags|sub-scores|actual score|whole-face numbers|already shown to the user/);
+    expect(src).toMatch(/never say a\s+reading changed/);
+    expect(src).toMatch(/Never write a number or a percentage/);
+    expect(src).toMatch(/reply with exactly this and nothing else: \$\{REFERRAL_COPY\}/);
   });
 });
