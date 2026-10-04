@@ -148,11 +148,10 @@ export interface MissingItem extends Fact {
   about: ContextSection | "hydration" | "pores" | "trend";
 }
 
-/** GEMINI_BOUNDARY §5 claim_type. */
+/** GEMINI_BOUNDARY §5 claim_type. routine_as_directed is removed (TD-16 (3), TD-17 (3); tracker F10). */
 export type AllowedClaim =
   | "descriptive"
   | "self_reported_echo"
-  | "routine_as_directed"
   | "uncertainty"
   | "comparability"
   | "smalltalk"

@@ -294,7 +294,6 @@ export function buildContextPackage(input: BuildInput): ContextPackage {
     routine: { status: "not_shared", decision: "R-1 A" },
     uncertainty: [UNCERTAINTY, UNCERTAINTY_BANDS],
     missing: missingItems,
-    // routine_as_directed is left out: R-1 A gives it nothing to cite.
     allowedClaims: ["descriptive", "self_reported_echo", "uncertainty", "comparability", "smalltalk", "clarify", "out_of_scope"],
     forbiddenClaims: [
       "unknown_fact_id", "citation_rule", "made_up_number", "medical_or_efficacy_term", "comparative_or_change", "non_latin_script",

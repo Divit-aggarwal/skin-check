@@ -81,16 +81,18 @@ Built deterministically on the server and versioned (`ctx-1`). Its hash is compu
 Output schema (`responseJsonSchema`, supported by `@google/genai` 2.17.1):
 
 ```
-{ claims: [ { claim_type: enum[descriptive, self_reported_echo, routine_as_directed, uncertainty,
+{ claims: [ { claim_type: enum[descriptive, self_reported_echo, uncertainty,
                                 comparability, smalltalk, clarify, out_of_scope],
               text: string,
               fact_ids: enum[<per-request fact ids>][] (maxItems 4) } ] (1..5),
   needs_referral: boolean }
 ```
 
+(`routine_as_directed` was removed from the claim types: owner decisions TD-16 (3) and TD-17 (3), tracker F10.)
+
 **Validator** (a pure function, shipped with an assert-based self-check):
 1. Every `fact_ids` entry exists in the package.
-2. Claims with types `descriptive`, `uncertainty`, `comparability`, `routine_as_directed` or `self_reported_echo` must cite at least one fact. Claims with `smalltalk`, `clarify` or `out_of_scope` must cite zero facts and must not contain band words or metric names.
+2. Claims with types `descriptive`, `uncertainty`, `comparability` or `self_reported_echo` must cite at least one fact. Claims with `smalltalk`, `clarify` or `out_of_scope` must cite zero facts and must not contain band words or metric names.
 3. **No numerals or number words** anywhere in the output unless the exact string appears in a cited fact's `text`.
    - Match with `\p{Nd}`, not `\d`: Devanagari "६२" fails `\d` (verified by Agent 6).
    - The number-word list covers English and Hinglish.

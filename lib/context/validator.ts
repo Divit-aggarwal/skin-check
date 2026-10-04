@@ -32,8 +32,8 @@ import {
 // causes your redness" still fails `cause` even though a label says "Shaving
 // often causes bumps or irritation".
 
-const CLAIM_TYPES = ["descriptive", "self_reported_echo", "routine_as_directed", "uncertainty", "comparability", "smalltalk", "clarify", "out_of_scope"] as const satisfies readonly AllowedClaim[];
-const MUST_CITE = new Set<AllowedClaim>(["descriptive", "uncertainty", "comparability", "routine_as_directed", "self_reported_echo"]);
+const CLAIM_TYPES = ["descriptive", "self_reported_echo", "uncertainty", "comparability", "smalltalk", "clarify", "out_of_scope"] as const satisfies readonly AllowedClaim[];
+const MUST_CITE = new Set<AllowedClaim>(["descriptive", "uncertainty", "comparability", "self_reported_echo"]);
 
 const AnswerSchema = z
   .object({

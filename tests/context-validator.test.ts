@@ -57,7 +57,8 @@ describe("validator: each check has a passing and a failing answer", () => {
     expect(checksOf("not json")).toEqual(["malformed_output"]);
     expect(checksOf(JSON.stringify({ claims: [UNC], needs_referral: false, extra: 1 }))).toEqual(["malformed_output"]);
     expect(checksOf(ok(Array(6).fill(UNC)))).toEqual(["malformed_output"]);
-    expect(checksOf(ok([{ claim_type: "routine_as_directed", text: "Use it as directed.", fact_ids: ["missing.all.routine"] }]))).toContain("citation_rule");
+    // routine_as_directed no longer exists (TD-17 (3), F10): an answer using it is malformed.
+    expect(checksOf(ok([{ claim_type: "routine_as_directed", text: "Use it as directed.", fact_ids: ["missing.all.routine"] } as never]))).toEqual(["malformed_output"]);
   });
 
   it("'condition' is a medical term", () => {

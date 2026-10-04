@@ -38,7 +38,7 @@ describe("context package builder", () => {
     expect(pkg.routine).toEqual({ status: "not_shared", decision: "R-1 A" });
     expect(pkg.recommendation!.items.map((i) => i.id)).toEqual(["rec.gentle-cleanser", "rec.light-gel"]);
     expect(pkg.uncertainty.length).toBeGreaterThan(0);
-    expect(pkg.allowedClaims).not.toContain("routine_as_directed");
+    expect(pkg.allowedClaims).not.toContain("routine_as_directed" as never);
     expect(pkg.forbiddenClaims).toHaveLength(16);
   });
 
