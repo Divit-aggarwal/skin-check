@@ -8,7 +8,7 @@
 // is known, and the result type refuses a pairwise answer without one.
 
 import {
-  comparabilityKey, compareKeys, compareStates, NOT_COMPARABLE_REASONS,
+  COMPARABLE_QUANTITIES, comparabilityKey, compareKeys, compareStates, NOT_COMPARABLE_REASONS,
   type ComparabilityKey, type ComparabilityVerdict, type ComparableQuantity,
 } from "@/lib/comparability";
 import type {
@@ -103,19 +103,11 @@ export function longitudinalResult(
   // Own properties only: a polluted Object.prototype can never supply a table.
   const own = <K extends keyof Tables>(k: K): Tables[K] | undefined => (Object.prototype.hasOwnProperty.call(tables, k) ? tables[k] : undefined);
   const noiseTable = own("noise") ?? NOISE_TABLE;
-  // ponytail: tests/comparability.test.ts lets no file outside tests/ hand a table to compareStates/compareKeys,
-  // so the engine always calls them with the production default and applies a TEST-ONLY comparable table
-  // here: it can only lift quantity_not_validated, by the same rule as lib/comparability.ts. Request to main:
-  // allow this file to forward `tables.comparable`, then delete `reasonsOf`'s table check.
-  const testComparable = own("comparable") ?? [];
-  const reasonsOf = (v: ComparabilityVerdict, a: ComparabilityKey, b: ComparabilityKey): NotComparableReason[] => {
-    const reasons = v.verdict === "comparable" ? [] : v.reasons;
-    const validated = a.pipelineVersion !== null && a.pipelineVersion === b.pipelineVersion &&
-      testComparable.some((q) => q.fieldPath === a.fieldPath && q.region === a.region && q.pipelineVersion === a.pipelineVersion);
-    return validated ? reasons.filter((r) => r !== "quantity_not_validated") : reasons;
-  };
-  const pairReasons = (x: SkinState2, y: SkinState2) =>
-    reasonsOf(compareStates(x, y, quantity, region), comparabilityKey(x, quantity, region), comparabilityKey(y, quantity, region));
+  // Forwarded as is: tests/comparability.test.ts allows this one name, and
+  // tests/longitudinal-guard.test.ts proves production never passes `tables`.
+  const comparableTable = own("comparable") ?? COMPARABLE_QUANTITIES;
+  const reasonsOf = (v: ComparabilityVerdict): NotComparableReason[] => (v.verdict === "comparable" ? [] : v.reasons);
+  const pairReasons = (x: SkinState2, y: SkinState2) => reasonsOf(compareStates(x, y, quantity, region, comparableTable));
   const asComparability = (reasons: NotComparableReason[], key: ComparabilityKey): Comparability =>
     reasons.length
       ? { verdict: "not_comparable", reasons: NOT_COMPARABLE_REASONS.filter((r) => reasons.includes(r)) as [NotComparableReason, ...NotComparableReason[]] }
@@ -139,7 +131,7 @@ export function longitudinalResult(
 
   // 1. Bad raw data: no partial answer, and no pair to evaluate.
   const notEvaluated: Comparability = { verdict: "not_evaluated" };
-  const noPair = (k: ComparabilityKey): Comparability => asComparability(reasonsOf(compareKeys(k, k), k, k), k);
+  const noPair = (k: ComparabilityKey): Comparability => asComparability(reasonsOf(compareKeys(k, k, comparableTable)), k);
   // The same record twice would let one physical scan fill the baseline: refuse it as bad input.
   const refs = series.flatMap((e) => (e.kind === "skinstate" ? [e.state.identity.analysisRef] : []));
   if (series.some((e) => e.kind === "invalid") || new Set(refs).size !== refs.length) {

@@ -175,30 +175,51 @@ describe("purity and the production table", () => {
     expect(Object.isFrozen(COMPARABLE_QUANTITIES)).toBe(true);
   });
 
-  // Only tests may pass a table: production code calls with the default.
-  it("no file outside tests/ passes a table argument", () => {
-    const MAX_ARGS: Record<string, number> = { compareKeys: 2, compareStates: 4 };
+  // Only tests may pass a table: production code calls with the default. One
+  // exception: the longitudinal engine forwards its own test-only table, and
+  // only under this name. tests/longitudinal-guard.test.ts proves no
+  // production caller hands the engine a table, so in production it is
+  // always COMPARABLE_QUANTITIES.
+  const MAX_ARGS: Record<string, number> = { compareKeys: 2, compareStates: 4 };
+  const FORWARDS: Record<string, string> = { [join("lib", "longitudinal", "engine.ts")]: "comparableTable" };
+  const tableOffences = (file: string, src: string): string[] => {
     const offenders: string[] = [];
+    const calls = /\b(compareKeys|compareStates)\s*\(/g;
+    for (let m = calls.exec(src); m; m = calls.exec(src)) {
+      let depth = 1, args = 1, i = m.index! + m[0].length, argStart = i;
+      const extra: string[] = [];
+      if (src[i] === ")") args = 0;
+      for (; i < src.length && depth > 0; i++) {
+        if ("([{".includes(src[i]!)) depth++;
+        else if (")]}".includes(src[i]!)) depth--;
+        if ((src[i] === "," && depth === 1) || depth === 0) {
+          if (args > MAX_ARGS[m[1]!]!) extra.push(src.slice(argStart, i).trim());
+          if (depth === 1) (args++, (argStart = i + 1));
+        }
+      }
+      const allowed = FORWARDS[file];
+      if (args > MAX_ARGS[m[1]!]! && !(allowed && extra.every((a) => a === allowed))) offenders.push(`${file}: ${m[1]}`);
+    }
+    return offenders;
+  };
+
+  it("no file outside tests/ passes a table argument", () => {
     const walk = (dir: string): string[] =>
       readdirSync(dir).flatMap((f) => {
         const p = join(dir, f);
         return statSync(p).isDirectory() ? walk(p) : /\.(ts|tsx)$/.test(f) ? [p] : [];
       });
-    for (const file of ["app", "components", "hooks", "lib", "scripts", "types"].flatMap(walk)) {
-      if (file === join("lib", "comparability.ts")) continue;
-      const src = readFileSync(file, "utf8");
-      const calls = /\b(compareKeys|compareStates)\s*\(/g;
-      for (let m = calls.exec(src); m; m = calls.exec(src)) {
-        let depth = 1, args = 1, i = m.index! + m[0].length;
-        if (src[i] === ")") args = 0;
-        for (; i < src.length && depth > 0; i++) {
-          if ("([{".includes(src[i]!)) depth++;
-          else if (")]}".includes(src[i]!)) depth--;
-          else if (src[i] === "," && depth === 1) args++;
-        }
-        if (args > MAX_ARGS[m[1]!]!) offenders.push(`${file}: ${m[1]}`);
-      }
-    }
-    expect(offenders).toEqual([]);
+    const files = ["app", "components", "hooks", "lib", "scripts", "types"].flatMap(walk).filter((f) => f !== join("lib", "comparability.ts"));
+    expect(files.flatMap((f) => tableOffences(f, readFileSync(f, "utf8")))).toEqual([]);
+  });
+
+  it("the table guard's engine exception is one name in one file (positive controls)", () => {
+    const engine = join("lib", "longitudinal", "engine.ts");
+    expect(tableOffences(engine, "compareStates(a, b, f, r, comparableTable)")).toEqual([]);
+    expect(tableOffences(engine, "compareKeys(k, k, comparableTable)")).toEqual([]);
+    expect(tableOffences(engine, "compareStates(a, b, f, r, [{ fieldPath }])")).toHaveLength(1);
+    expect(tableOffences(engine, "compareKeys(k, k, otherTable)")).toHaveLength(1);
+    expect(tableOffences(join("lib", "x.ts"), "compareStates(a, b, f, r, comparableTable)")).toHaveLength(1);
+    expect(tableOffences(join("lib", "x.ts"), "compareKeys(k, k)")).toEqual([]);
   });
 });
