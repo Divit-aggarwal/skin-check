@@ -4,14 +4,19 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { emulatorPhoneSignIn } from "./e2e-auth";
+import { adminDb } from "@/lib/firebase/admin";
+import { echoScanIdFrom } from "@/components/dashboard/state";
 
 const WEB = process.env.LOCAL_STACK_WEB;
 const RAVI = { uid: "seed-user-ravi", phoneNumber: "+919999900002" };
 
 describe.skipIf(!WEB)("fake Gemini on the local stack", () => {
   it("Echo calls it, and the recorded request has no phone, uid or name", async () => {
-    // A seeded check with a server analysis and quiz answers (including the name "Ravi", which must never be sent).
-    const scanId = "seed-ravi-1";
+    // Ravi's newest measured check (F13: Echo answers only about that one), a
+    // seeded check with quiz answers including the name "Ravi", which must never be sent.
+    const analyses = (await adminDb().collection("users").doc(RAVI.uid).collection("scanAnalyses").get()).docs.map((d) => ({ id: d.id, data: d.data() }));
+    const scanId = echoScanIdFrom(RAVI.uid, analyses);
+    expect(scanId).not.toBeNull();
 
     const { idToken } = await emulatorPhoneSignIn(RAVI.phoneNumber);
     const res = await fetch(`${WEB}/api/skin-check/chat`, {
