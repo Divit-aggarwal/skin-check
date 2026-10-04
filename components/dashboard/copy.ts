@@ -5,6 +5,8 @@
 
 export const DASHBOARD_COPY = {
   title: "Your skin checks",
+  // O-D3: the link to /dashboard from the results screen, /account and the signed-in start page.
+  entryLink: "See all your skin checks",
   signedOut: "Sign in to see your skin checks.",
   signIn: "Sign in",
   loading: "Loading your checks…",
@@ -44,11 +46,11 @@ export const DASHBOARD_COPY = {
 
   trend: {
     title: "Starting point",
-    empty: "Nothing to show yet.",
-    notEnough: "Not enough evidence yet.",
+    empty: "Nothing to show.",
+    notEnough: "Not enough evidence.",
     count: (n: number, of: number) => `Starting checks: ${n} of ${of}`,
     howItForms: (of: number) => `Your first ${of} photo checks form your starting point. Your newest check is never counted as one of them.`,
-    set: "Your starting point is set, but photo-to-photo variation has not been measured yet, so no trend is shown.",
+    set: "Your starting point is set, but photo-to-photo variation has not been measured, so no trend is shown.",
     boundary: "Your checks were read by different versions of the analysis software, so they are not used together.",
     legacy: "Readings saved only by the app on your phone are not starting checks.",
   },

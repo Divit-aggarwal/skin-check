@@ -2,6 +2,7 @@ import { PhoneOtpForm } from "@/components/auth/PhoneOtpForm";
 import { PreviousScans } from "@/components/skin-check/PreviousScans";
 import { ConsentSection } from "@/components/dashboard/ConsentSection";
 import { DeleteAccount } from "./DeleteAccount";
+import { DashboardLink } from "@/components/dashboard/DashboardLink";
 
 export const metadata = {
   title: "Account — The Project SKIN",
@@ -20,6 +21,8 @@ export default function AccountPage() {
         </p>
       </div>
       <PhoneOtpForm />
+      {/* O-D3: the account page links to /dashboard. */}
+      <DashboardLink />
       <PreviousScans />
       {/* H14: consent status and the AI-share withdrawal (also on /dashboard). */}
       <ConsentSection />

@@ -211,3 +211,20 @@ test("delete the account, sign in again, no history", async ({ page }) => {
   await expect(page.getByText(C.history.title)).toHaveCount(0);
   await shot(page, "after-delete");
 });
+
+// TD-18 O-D3: the dashboard is reached from the signed-in start page and /account (the results screen is pinned in tests/dashboard-copy.test.ts).
+test("O-D3: the signed-in start page and the account page link to the dashboard; signed out, no link", async ({ page }) => {
+  await page.goto("/skin-check");
+  await expect(page.getByText(NAME_PROMPT)).toBeVisible();
+  await expect(page.getByRole("link", { name: C.entryLink })).toHaveCount(0);
+
+  await signIn(page, U.one!.phoneNumber);
+  await page.goto("/skin-check");
+  await page.getByRole("link", { name: C.entryLink }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByText(C.title)).toBeVisible();
+
+  await page.goto("/account");
+  await page.getByRole("link", { name: C.entryLink }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+});

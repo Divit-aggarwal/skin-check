@@ -96,3 +96,32 @@ describe("dashboard wording (D-12)", () => {
     }
   });
 });
+
+// TD-18: O-D1, O-D3, O-D6.
+describe("dashboard owner decisions (TD-18)", () => {
+  it("O-D1: no recommendation in any build: no rules, catalogue or product import, no product wording", () => {
+    for (const f of [...files(), "app/(marketing)/dashboard/page.tsx"]) {
+      const src = readFileSync(f, "utf8");
+      expect(src, f).not.toMatch(/@\/lib\/rules|@\/lib\/catalog\/catalogue|recommend|RULES_ENABLED/i);
+    }
+    expect(JSON.stringify(DASHBOARD_COPY)).not.toMatch(/recommend|product|try this|you should use/i);
+  });
+
+  it("O-D3: the results screen, /account and the signed-in start page link to /dashboard", () => {
+    const link = readFileSync("components/dashboard/DashboardLink.tsx", "utf8");
+    expect(link).toMatch(/href="\/dashboard"/);
+    expect(link).toMatch(/if \(loading \|\| !user\) return null/);
+    const flow = readFileSync("components/skin-check/SkinCheckFlow.tsx", "utf8");
+    // Once on the results screen (complete) and once on the first section (start page).
+    expect(flow.match(/<DashboardLink\b/g)).toHaveLength(2);
+    expect(flow).toMatch(/isFirst && !complete && \(/);
+    expect(readFileSync("app/(marketing)/account/page.tsx", "utf8")).toMatch(/<DashboardLink \/>/);
+  });
+
+  it("O-D6: no trend text says 'yet'", () => {
+    for (const text of Object.values(DASHBOARD_COPY.trend)) {
+      const s = typeof text === "function" ? (text as (...a: number[]) => string)(1, 3) : text;
+      expect(s, s).not.toMatch(/\byet\b/i);
+    }
+  });
+});

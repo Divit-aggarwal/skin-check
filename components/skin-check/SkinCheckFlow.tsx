@@ -13,6 +13,7 @@ import { ProgressHeader } from "./ProgressHeader";
 import { EchoBubble } from "./EchoBubble";
 import { StepAnswer } from "./StepAnswer";
 import { SkinCheckDashboard } from "./SkinCheckDashboard";
+import { DashboardLink } from "@/components/dashboard/DashboardLink";
 
 // Section-to-section only — individual questions within a section never
 // slide, they fade in and accumulate on the growing page.
@@ -145,6 +146,12 @@ export function SkinCheckFlow() {
           </div>
         )}
       </div>
+      {/* O-D3: the signed-in start page links to /dashboard (its own row, so the progress bar keeps its width on a phone). */}
+      {isFirst && !complete && (
+        <div className="mx-auto flex max-w-xl justify-end px-6 pt-2">
+          <DashboardLink />
+        </div>
+      )}
 
       <AnimatePresence mode="wait" initial={false} custom={direction}>
         {confirmingUnder18 ? (
@@ -220,6 +227,8 @@ export function SkinCheckFlow() {
                   <Link href="/account">Your previous scans</Link>
                 </Button>
               </div>
+              {/* O-D3: the results screen links to /dashboard. */}
+              <DashboardLink className="mx-auto" />
             </div>
           </motion.div>
         ) : (
