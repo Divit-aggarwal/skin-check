@@ -17,6 +17,7 @@ import type { LongitudinalResult, NotEnoughEvidenceReasonCode, QuantityPath } fr
 import type { RecommendationResult } from "@/lib/contracts/recommendation-result";
 import type { SafetyState } from "@/lib/contracts/safety-state";
 import { GEMINI_FIELD_INVENTORY, withoutCautionAnswers } from "@/lib/gemini";
+import { PRODUCT_NAME_EXCEPTIONS } from "@/lib/catalog/catalogue";
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { describeStepAnswerParts } from "@/lib/skin-check-format";
 import { bandScores, SCORING_VERSION } from "@/lib/skin-check-rules";
@@ -156,6 +157,15 @@ export function screenExternalText(text: string): boolean {
   return !LOOKALIKE.test(folded) && !SCREENS.some((re) => re.test(folded));
 }
 
+/**
+ * TD-17 (2), tracker E08: an owner-approved name (PRODUCT_NAME_EXCEPTIONS)
+ * passes by exact match only: same characters, same case, no trimming. Any
+ * other name, and every claim text, still goes through the full screen.
+ */
+export function productNamePasses(name: string): boolean {
+  return PRODUCT_NAME_EXCEPTIONS.some((e) => e.name === name) || screenExternalText(name);
+}
+
 const SLUG = /^[a-z0-9-]{1,40}$/;
 
 export interface TrustedSkin {
@@ -262,7 +272,7 @@ function recommendation(input: NonNullable<BuildInput["recommendation"]>): { sec
     if (seen.has(item.productId)) continue;
     seen.add(item.productId);
     const product = products.find((p) => p.productId === item.productId);
-    if (!product || !SLUG.test(product.productId) || !screenExternalText(product.name) || !screenExternalText(product.claimText)) {
+    if (!product || !SLUG.test(product.productId) || !productNamePasses(product.name) || !screenExternalText(product.claimText)) {
       screened = true;
       continue;
     }
