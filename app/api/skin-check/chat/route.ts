@@ -230,8 +230,8 @@ export async function POST(request: NextRequest) {
   if (quotaLimited) return quotaLimited;
 
   try {
-    // lane:context (owner decision O-4): the context-package path, local only.
-    // Off, everything below runs exactly as before.
+    // F12 (TD-20): the context-package path is the chat that ships. Today's
+    // Echo below runs only behind the switch, in development or test.
     if (contextChatEnabled()) {
       const result = await handleContextChat({ uid, scanId, region, message });
       if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });

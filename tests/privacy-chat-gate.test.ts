@@ -51,6 +51,8 @@ async function expectRefused(status: number, code: string) {
 }
 
 beforeEach(() => {
+  // Today's Echo, which runs only behind the switch (F12, TD-20).
+  vi.stubEnv("ECHO_CONTEXT_PATH", "off");
   vi.clearAllMocks();
   vi.stubEnv("GEMINI_API_KEY", "test-key");
   vi.stubEnv("FIREBASE_PRIVATE_KEY", "test-private-key"); // seeds the history MAC

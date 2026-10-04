@@ -56,7 +56,7 @@ beforeEach(() => {
   vi.unstubAllEnvs();
   vi.stubEnv("GEMINI_API_KEY", "test-key");
   vi.stubEnv("FIREBASE_PRIVATE_KEY", "test-private-key");
-  vi.stubEnv("ECHO_CONTEXT_PATH", "");
+  vi.stubEnv("ECHO_CONTEXT_PATH", "off"); // today's Echo (F12: only behind the switch)
   verifyFirebaseIdToken.mockResolvedValue(UID);
   consumeDailyQuota.mockReturnValue(null);
   loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: {}, answers: {}, regionLowConfidence: {}, pipelineVersion: null, schemaVersion: 1 });

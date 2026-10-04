@@ -1,10 +1,11 @@
-// Owner decision O-4 (docs/lanes/context-design.md §3.1): the context-package
-// Echo path is on for local development only. `next build` / `next start` run
-// with NODE_ENV=production, so it is off in every production build whatever
-// ECHO_CONTEXT_PATH says. Off, the chat route runs today's Echo unchanged.
-// Fails closed (red team I02, area C): on only when NODE_ENV is exactly
-// "development" or "test", as the rules switch does; unset, "staging" or a
-// mistyped "Production" is off.
+// Owner decision F12 (TD-20, 2026-10-05): the context-package path is the
+// chat that ships. It is on in every build. Today's Echo stays in the code
+// behind this switch: it runs only when ECHO_CONTEXT_PATH is exactly "off"
+// AND NODE_ENV is exactly "development" or "test". A production build never
+// runs it, whatever ECHO_CONTEXT_PATH says, so a typo in a production setting
+// cannot fall back to the weaker path; going back to it in production is a
+// code change and a redeploy.
 export function contextChatEnabled(): boolean {
-  return (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test") && process.env.ECHO_CONTEXT_PATH === "on";
+  const devOrTest = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
+  return !(devOrTest && process.env.ECHO_CONTEXT_PATH === "off");
 }

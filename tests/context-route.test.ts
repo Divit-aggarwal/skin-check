@@ -94,13 +94,10 @@ beforeEach(async () => {
 });
 afterEach(() => vi.unstubAllEnvs());
 
-describe("switch off: today's Echo, unchanged", () => {
-  it.each([
-    ["unset", "test", ""],
-    ["production build, even with the switch set", "production", "on"],
-  ])("%s", async (_name, nodeEnv, flag) => {
-    vi.stubEnv("NODE_ENV", nodeEnv);
-    vi.stubEnv("ECHO_CONTEXT_PATH", flag);
+describe("switch: the context path ships; today's Echo only behind it (F12, TD-20)", () => {
+  it("development or test with ECHO_CONTEXT_PATH=off: today's Echo, unchanged", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("ECHO_CONTEXT_PATH", "off");
     const res = await post();
     expect(res.status).toBe(200);
     expect((await res.json()).reply).toBe("today's echo");
@@ -108,6 +105,19 @@ describe("switch off: today's Echo, unchanged", () => {
     expect(h.handleContextChat).not.toHaveBeenCalled();
     expect(h.buildContextPackage).not.toHaveBeenCalled();
     expect(h.recordChatTurns).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["production build, even with ECHO_CONTEXT_PATH=off", "production", "off"],
+    ["production build, unset", "production", ""],
+    ["test, unset", "test", ""],
+  ])("%s: the context path", async (_name, nodeEnv, flag) => {
+    vi.stubEnv("NODE_ENV", nodeEnv);
+    vi.stubEnv("ECHO_CONTEXT_PATH", flag);
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(h.handleContextChat).toHaveBeenCalledTimes(1);
+    expect(h.getSkinCheckChatReply).not.toHaveBeenCalled();
   });
 });
 
@@ -332,7 +342,7 @@ describe("context path: a safety error is never 'no red flag' (wiring 4)", () =>
 // ── wave-2 security review: red flags never reach Gemini on either path ──────
 describe("red-flag pre-filter on both chat paths (wave-2 security review)", () => {
   it("today's Echo (switch off): a self-harm message gets the referral, Gemini is never called", async () => {
-    vi.stubEnv("ECHO_CONTEXT_PATH", "");
+    vi.stubEnv("ECHO_CONTEXT_PATH", "off");
     const res = await post("I want to k1ll myself");
     expect((await res.json()).reply).toBe(REFERRAL_COPY);
     expect(h.getSkinCheckChatReply).not.toHaveBeenCalled();
@@ -340,14 +350,14 @@ describe("red-flag pre-filter on both chat paths (wave-2 security review)", () =
   });
 
   it("today's Echo (switch off): a message split over the signed history is caught", async () => {
-    vi.stubEnv("ECHO_CONTEXT_PATH", "");
+    vi.stubEnv("ECHO_CONTEXT_PATH", "off");
     const res = await post("die", [{ role: "user", text: "i want to" }, { role: "echo", text: "Could you say more?" }]);
     expect((await res.json()).reply).toBe(REFERRAL_COPY);
     expect(h.getSkinCheckChatReply).not.toHaveBeenCalled();
   });
 
   it("today's Echo (switch off): an ordinary question still reaches Echo", async () => {
-    vi.stubEnv("ECHO_CONTEXT_PATH", "");
+    vi.stubEnv("ECHO_CONTEXT_PATH", "off");
     const res = await post("what does my cheek reading mean?");
     expect((await res.json()).reply).toBe("today's echo");
   });
