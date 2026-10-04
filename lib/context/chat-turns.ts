@@ -1,0 +1,72 @@
+import { Timestamp } from "firebase-admin/firestore";
+import { adminDb } from "@/lib/firebase/admin";
+import type { EchoChatMessage } from "@/lib/gemini";
+import type { EchoRegion } from "@/lib/echo-regions";
+import type { ValidatorRecord } from "./answer";
+
+// SERVER ONLY. D-15 (approved for local use): users/{uid}/chatTurns are the
+// only history source; client-sent turns are never fed to Gemini. Written
+// only here, through the Admin SDK, with a path built from the verified uid.
+// `expireAt` is for a Firestore TTL policy, which is infrastructure (request
+// to main; design §3.8).
+
+export const CHAT_TURN_TTL_DAYS = 90;
+export const HISTORY_TURNS = 10;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+export interface EchoTurnRecord {
+  packageVersion: string | null;
+  packageSha256: string | null;
+  promptVersion: string | null;
+  modelId: string | null;
+  validator: ValidatorRecord | null;
+  prefilter: "red_flag" | "comparison" | null;
+  redFlag: boolean;
+  latencyMs: number;
+}
+
+const turns = (uid: string) => adminDb().collection("users").doc(uid).collection("chatTurns");
+
+/** Both turns of one exchange, in one batch. The echo turn carries the versions and the validator result. */
+export async function recordChatTurns(
+  uid: string,
+  scanId: string,
+  region: EchoRegion,
+  userText: string,
+  echoText: string,
+  meta: EchoTurnRecord,
+  now = Date.now()
+): Promise<void> {
+  const col = turns(uid);
+  const expireAt = Timestamp.fromMillis(now + CHAT_TURN_TTL_DAYS * DAY_MS);
+  // Left out of later Gemini history: pre-filter hits, referrals, and answers
+  // that ended in the fallback, so a rejected injection is not replayed.
+  const historyExcluded = meta.prefilter !== null || meta.redFlag || meta.validator?.fallback === true;
+  const common = { scanId, region, expireAt, prefilter: meta.prefilter, redFlag: meta.redFlag, historyExcluded };
+  const batch = adminDb().batch();
+  batch.create(col.doc(), {
+    ...common,
+    role: "user",
+    text: userText,
+    createdAt: Timestamp.fromMillis(now),
+    packageVersion: null, packageSha256: null, promptVersion: null, modelId: null, validator: null, latencyMs: null,
+  });
+  batch.create(col.doc(), { ...common, ...meta, role: "echo", text: echoText, createdAt: Timestamp.fromMillis(now + 1) });
+  await batch.commit();
+}
+
+/**
+ * The last HISTORY_TURNS stored turns of this (scan, region) thread, oldest
+ * first. Pre-filter, referral and fallback turns are left out, so a red-flag
+ * message or a rejected injection never reaches Gemini again. Equality-only query, filtered and sorted in code: no composite index.
+ */
+// ponytail: reads every turn of the scan; add a region field index and a limit when threads get long.
+export async function loadChatHistory(uid: string, scanId: string, region: EchoRegion): Promise<EchoChatMessage[]> {
+  const snap = await turns(uid).where("scanId", "==", scanId).get();
+  return snap.docs
+    .map((d) => d.data())
+    .filter((t) => t.region === region && t.historyExcluded === false && (t.role === "user" || t.role === "echo") && typeof t.text === "string")
+    .sort((a, b) => (a.createdAt as Timestamp).toMillis() - (b.createdAt as Timestamp).toMillis())
+    .slice(-HISTORY_TURNS)
+    .map((t) => ({ role: t.role as "user" | "echo", text: t.text as string }));
+}

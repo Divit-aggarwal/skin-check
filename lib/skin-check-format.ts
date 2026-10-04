@@ -13,42 +13,49 @@ export function formatPrompt(prompt: string, answers: SkinCheckAnswers): string 
 // Turns a raw /skin-check answer (a value slug, e.g. "4" or ["papules_pustules"])
 // into the human-readable label/reflection text a person would recognize — used
 // to ground Echo's chat context in plain language instead of opaque slugs.
-function describeStepAnswer(step: StepConfig, value: StepAnswerValue | undefined): string | null {
-  if (value === undefined) return null;
-  if (Array.isArray(value) && value.length === 0) return null;
-  if (typeof value === "string" && !value.trim()) return null;
+// One entry per selected option (the context builder keeps them apart).
+export function describeStepAnswerParts(step: StepConfig, value: StepAnswerValue | undefined): string[] {
+  if (value === undefined) return [];
+  if (typeof value === "string" && !value.trim()) return [];
 
   switch (step.type) {
     case "text":
-      return typeof value === "string" ? value : null;
+      return typeof value === "string" ? [value] : [];
     case "phone":
     case "photo-capture":
       // Contact info and the capture action itself carry no skin signal.
-      return null;
-    case "single-select-chips":
-      return step.options.find((o) => o.value === value)?.label ?? null;
+      return [];
+    case "single-select-chips": {
+      const label = step.options.find((o) => o.value === value)?.label;
+      return label ? [label] : [];
+    }
     case "single-select-cards": {
       const option = step.options.find((o) => o.value === value);
-      return option ? `${option.label} — ${option.description}` : null;
+      return option ? [`${option.label} — ${option.description}`] : [];
     }
     case "multi-select-cards":
-    case "body-map": {
-      if (!Array.isArray(value)) return null;
+    case "body-map":
+      if (!Array.isArray(value)) return [];
       // Unknown values are dropped, never echoed: answers are browser-written
       // (users/{uid}/skinChecks) and this text lands in Echo's systemInstruction
       // (gate 02). Only option labels from our own config reach the prompt.
-      const labels = value.flatMap((v) => step.options.find((o) => o.value === v)?.label ?? []);
-      return labels.length > 0 ? labels.join(", ") : null;
+      return value.flatMap((v) => step.options.find((o) => o.value === v)?.label ?? []);
+    case "scale-1-5": {
+      const reflection = typeof value === "string" ? step.reflections[value] : undefined;
+      return reflection ? [reflection] : [];
     }
-    case "scale-1-5":
-      return typeof value === "string" ? step.reflections[value] ?? null : null;
     case "segmented-slider": {
       const option = step.options.find((o) => o.value === value);
-      return option ? `${option.label} (${option.sublabel})` : null;
+      return option ? [`${option.label} (${option.sublabel})`] : [];
     }
     default:
-      return null;
+      return [];
   }
+}
+
+function describeStepAnswer(step: StepConfig, value: StepAnswerValue | undefined): string | null {
+  const parts = describeStepAnswerParts(step, value);
+  return parts.length > 0 ? parts.join(", ") : null;
 }
 
 // Human-readable grounding text for Echo's chat context (lib/gemini.ts) — the

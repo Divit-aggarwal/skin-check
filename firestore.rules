@@ -87,6 +87,16 @@ service cloud.firestore {
         allow write: if false;
       }
       // ── end lane:privacy ──
+      // ── lane:context ──
+      // D-15 chat turns (docs/lanes/context-design.md §3.8). Written ONLY by
+      // the chat route through the Admin SDK, which bypasses these rules. The
+      // owner may read their own turns; no client may create, change or
+      // delete one, so stored history cannot be forged.
+      match /chatTurns/{turnId} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+      // ── end lane:context ──
     }
   }
 }

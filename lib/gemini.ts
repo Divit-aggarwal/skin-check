@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, type HarmBlockThreshold, type HarmCategory } from "@google/genai";
 import { geminiApiKey } from "@/lib/gemini-key";
 import { summarizeSkinCheckAnswers, summarizeSkinScanScores } from "@/lib/skin-check-format";
 import type { SkinCheckAnswers } from "@/types/skin-check";
@@ -88,7 +88,7 @@ mention a reason for this.`;
 // With the flag on, the trigger answers are hidden too (e.g. "A prescription
 // product" under current_products). Otherwise a caution sentence with no
 // visible reason would point straight at the hidden one.
-function withoutTriggerValues(answers: SkinCheckAnswers): SkinCheckAnswers {
+export function withoutTriggerValues(answers: SkinCheckAnswers): SkinCheckAnswers {
   const out: SkinCheckAnswers = { ...answers };
   for (const [stepId, values] of Object.entries(EXTRA_CAUTION_TRIGGERS)) {
     const answer = out[stepId];
@@ -292,4 +292,46 @@ export async function getSkinCheckChatReply(
       context.regionFocus ?? null
     )
   );
+}
+
+// ─── Context-package call (lane:context, F02) ───────────────────────────────
+
+// Explicit, because the platform default for these models is OFF
+// (GEMINI_BOUNDARY §8). String values, so a test that mocks @google/genai
+// with only GoogleGenAI still loads this module.
+const CONTEXT_SAFETY_SETTINGS = [
+  "HARM_CATEGORY_HARASSMENT",
+  "HARM_CATEGORY_HATE_SPEECH",
+  "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+  "HARM_CATEGORY_DANGEROUS_CONTENT",
+].map((category) => ({ category: category as HarmCategory, threshold: "BLOCK_MEDIUM_AND_ABOVE" as HarmBlockThreshold }));
+
+/**
+ * One structured-output call over a context package (docs/lanes/context-design.md
+ * §3.5). No tools and no Search grounding. Same client, timeout and transport
+ * retry as today's Echo. Returns the raw JSON text for the validator, and the
+ * model id for the chatTurns record.
+ */
+export async function generateContextAnswer(
+  systemInstruction: string,
+  messages: EchoChatMessage[],
+  responseJsonSchema: Record<string, unknown>
+): Promise<{ text: string; modelId: string }> {
+  const modelId = getSynthesisModel();
+  const firstUserIndex = messages.findIndex((m) => m.role === "user");
+  const conversation = firstUserIndex === -1 ? [] : messages.slice(firstUserIndex);
+  const response = await withGeminiRetry(() =>
+    getClient().models.generateContent({
+      model: modelId,
+      contents: conversation.map((m) => ({ role: m.role === "user" ? ("user" as const) : ("model" as const), parts: [{ text: m.text }] })),
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseJsonSchema,
+        safetySettings: CONTEXT_SAFETY_SETTINGS,
+        httpOptions: { timeout: GEMINI_REQUEST_TIMEOUT_MS },
+      },
+    })
+  );
+  return { text: response.text?.trim() ?? "", modelId };
 }

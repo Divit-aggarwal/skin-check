@@ -171,3 +171,78 @@ describe("extra caution flag (owner decision 8)", () => {
     });
   });
 });
+
+// ── lane:context (add-only) ──────────────────────────────────────────────────
+// The context-package path (D-14, approved for local use): the same pins,
+// on the real generateContent argument of generateContextAnswer.
+describe("context-package path (lane:context)", () => {
+  const MESSAGE = "ZZMESSAGEZZ what about my cheeks?";
+
+  async function captureContextCall(answers: SkinCheckAnswers = ANSWERS) {
+    const { buildContextPackage } = await import("@/lib/context/builder");
+    const { answerFromPackage } = await import("@/lib/context/answer");
+    const { generateContextAnswer } = await import("@/lib/gemini");
+    const pkg = buildContextPackage({
+      regionFocus: "cheeks",
+      message: MESSAGE,
+      skin: { scores: SCORES, regionScores: { cheeks: SCORES }, regionLowConfidence: {}, pipelineVersion: null },
+      answers,
+    });
+    generateContent.mockResolvedValue({ text: "{}" });
+    await answerFromPackage(pkg, MESSAGE, [], { generate: generateContextAnswer, redFlag: false });
+    const arg = generateContent.mock.calls[0]![0] as {
+      contents: { role: string; parts: { text: string }[] }[];
+      config: { systemInstruction: string; responseJsonSchema?: unknown; safetySettings?: unknown[]; tools?: unknown };
+    };
+    return { arg, pkg, instruction: arg.config.systemInstruction, all: JSON.stringify([arg.config.systemInstruction, arg.contents]) };
+  }
+
+  it("never sends names, phones, unknown keys, numeric scores or not-sent steps", async () => {
+    const { all } = await captureContextCall();
+    for (const banned of [NAME, PHONE, "9999999999", "ZZUNKNOWNZZ", "0.731", "731", "How old are you?", "What's your gender?", "Dryness"]) {
+      expect(all, banned).not.toContain(banned);
+    }
+    expect(all).not.toMatch(/\d{3,}/);
+  });
+
+  it("female context never leaks, and the caution trigger answer is dropped", async () => {
+    const { all, instruction } = await captureContextCall({ ...ANSWERS, current_products: ["actives", "prescription"] });
+    expect(all).not.toMatch(/pregnan|breastfeed|contracepti|menopaus|\bperiods?\b|hormon|reproductive|female/i);
+    expect(all).not.toContain("A prescription product");
+    expect(instruction).toContain(EXTRA_CAUTION_INSTRUCTION);
+  });
+
+  // Quiz labels the user chose (e.g. "Small bumps or clogged pores") are self-reports, sent today too.
+  it("hydration and pores appear only as missing items or the user's own quiz labels, never as a reading", async () => {
+    const { pkg, instruction } = await captureContextCall();
+    const quoted = [...pkg.missing, ...(pkg.selfReported ?? [])].map((f) => JSON.stringify(f.text));
+    const withoutMissing = quoted.reduce((t, q) => t.split(q).join(""), instruction).replace(/"about":"(hydration|pores)"|"missing\.all\.(hydration|pores)"/g, "");
+    expect(withoutMissing).not.toMatch(/hydrat|\bpores?\b|Pore visibility/i);
+    expect(pkg.skin!.readings.map((r) => r.metric).sort()).toEqual(["blemishes", "blemishes", "oiliness", "oiliness", "pigment", "pigment", "redness", "redness", "texture", "texture"]);
+  });
+
+  it("the user's message goes only in contents; structured output, explicit safety settings, no tools", async () => {
+    const { arg, instruction } = await captureContextCall();
+    expect(instruction).not.toContain("ZZMESSAGEZZ");
+    expect(JSON.stringify(arg.contents)).toContain("ZZMESSAGEZZ");
+    expect(arg.config.responseJsonSchema).toBeTruthy();
+    expect(arg.config.safetySettings).toHaveLength(4);
+    expect(arg.config.tools).toBeUndefined();
+    expect(instruction).not.toMatch(/digital twin|confidence: (low|medium|high)/i);
+  });
+});
+
+describe("context-package path with every internal input (lane:context)", () => {
+  it("no uid, scanId, rule id, trigger, date, ref or internal number from the internal results reaches Gemini", async () => {
+    const { buildContextPackage } = await import("@/lib/context/builder");
+    const { answerFromPackage } = await import("@/lib/context/answer");
+    const { generateContextAnswer } = await import("@/lib/gemini");
+    const { fullInput, withExtraKeys, SECRETS } = await import("./context-fixtures");
+    const input = withExtraKeys(fullInput());
+    generateContent.mockResolvedValue({ text: "{}" });
+    await answerFromPackage(buildContextPackage(input), input.message, [], { generate: generateContextAnswer, redFlag: false });
+    const all = JSON.stringify(generateContent.mock.calls[0]![0]);
+    for (const secret of SECRETS) expect(all, secret).not.toContain(secret);
+    expect(all).not.toMatch(/redFlag|raisedBy|ruleId|triggeredBy|inputSha256|ZZSECRET/);
+  });
+});
