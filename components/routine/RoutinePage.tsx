@@ -98,14 +98,14 @@ export function RoutinePage() {
           const slots = item.schedule.slot === "AM_PM" ? (["AM", "PM"] as const) : [item.schedule.slot];
           const others = choices.filter((c) => c.id !== item.productId);
           return (
-            <div key={item.productId} className="flex flex-col gap-2 rounded-lg border border-text/10 p-4">
-              <div className="font-medium text-text">{nameOf(item.productId)}</div>
+            <div key={item.productId} className="flex min-w-0 flex-col gap-2 rounded-lg border border-text/10 p-4">
+              <div className="break-words font-medium text-text">{nameOf(item.productId)}</div>
               <div className="text-sm text-text/60">
                 {C.slot[item.schedule.slot]} · {item.schedule.days.map((d) => C.weekdays[d]).join(", ")} · {C.since(item.since)}
               </div>
               {item.schedule.days.includes(todayWeekday) &&
                 slots.map((slot) => (
-                  <div key={slot} className="flex items-center gap-2 text-sm">
+                  <div key={slot} className="flex flex-wrap items-center gap-2 text-sm">
                     <span className="text-text/70">
                       {C.today}, {C.slot[slot]}: {C.status[statusOf(item.productId, slot) ?? "unknown"]}
                     </span>
@@ -121,10 +121,11 @@ export function RoutinePage() {
                 <button className={button} disabled={busy} onClick={() => send({ type: "stop", productId: item.productId })}>
                   {C.stop}
                 </button>
-                <label className="text-sm text-text/70">
-                  {C.swapFor}{" "}
+                {/* R-6: a long product name in the list must not widen the card past a phone screen. */}
+                <label className="flex w-full min-w-0 flex-col gap-1 text-sm text-text/70">
+                  {C.swapFor}
                   <select
-                    className="rounded-md border border-text/20 bg-transparent px-2 py-1"
+                    className="w-full min-w-0 max-w-full rounded-md border border-text/20 bg-transparent px-2 py-1"
                     disabled={busy}
                     value=""
                     onChange={(e) =>
@@ -183,7 +184,7 @@ function AddProduct({
       <h2 className="font-display text-lg text-text">{C.add}</h2>
       <label className="flex flex-col gap-1 text-sm text-text/70">
         {C.product}
-        <select className="rounded-md border border-text/20 bg-transparent px-2 py-1" value={productId} onChange={(e) => setProductId(e.target.value)}>
+        <select className="w-full min-w-0 max-w-full rounded-md border border-text/20 bg-transparent px-2 py-1" value={productId} onChange={(e) => setProductId(e.target.value)}>
           <option value="">…</option>
           {choices.map((c) => (
             <option key={c.id} value={c.id}>
@@ -195,7 +196,7 @@ function AddProduct({
       <label className="flex flex-col gap-1 text-sm text-text/70">
         {C.when}
         <select
-          className="rounded-md border border-text/20 bg-transparent px-2 py-1"
+          className="w-full min-w-0 max-w-full rounded-md border border-text/20 bg-transparent px-2 py-1"
           value={slot}
           onChange={(e) => setSlot(e.target.value as Schedule["slot"])}
         >

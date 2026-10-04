@@ -9,8 +9,8 @@ export const metadata = {
   openGraph: { title: "Routine — The Project SKIN", description: C.purpose },
 };
 
-// Reached by URL only: no link from the scan dashboard until G02 is reviewed
-// under D-12 (docs/lanes/routine-design.md §5).
+// Reached from the dashboard's routine link (owner lane decision 7, which
+// supersedes routine-design.md §5) and by URL. No link from the results screen.
 export default function RoutineRoute() {
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col gap-8 px-6 py-24">

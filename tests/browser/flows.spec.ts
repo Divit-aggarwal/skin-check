@@ -169,6 +169,12 @@ test("routine: add a product, mark used, mark skipped, add other product, reload
   await page.reload();
   await expect(card(first!).getByText(`${R.today}, ${R.slot.AM}: ${R.status.used}`)).toBeVisible();
   await expect(card(R.otherProduct).getByText(`${R.today}, ${R.slot.AM}: ${R.status.skipped}`)).toBeVisible();
+  // R-6: the page fits a 390 px phone screen, with long product names in every list.
+  expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+  for (const el of await page.locator("select, div.rounded-lg").all()) {
+    const box = await el.boundingBox();
+    expect(box!.x + box!.width, await el.evaluate((n) => n.outerHTML.slice(0, 80))).toBeLessThanOrEqual(390);
+  }
   await page.screenshot({ path: "docs/lanes/dashboard-flow-routine.png", fullPage: true });
 });
 
