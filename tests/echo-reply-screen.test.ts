@@ -21,6 +21,12 @@ describe("today's Echo reply screen", () => {
     ["Visit www.example.com for more.", "blocked"],
     ["Have you thought about just ending everything?", "referral"],
     ["I can't go on anymore either.", "referral"],
+    // Final review (I02 H1): a Hindi reply is not screened by English lists, so it is not shown.
+    ["आपकी लालिमा पिछली बार से कम हुई है। यह मुंहासे हैं, रेटिनॉल लगाइए, इससे ठीक हो जाएगा।", "blocked"],
+    // Final review M3/M4: shorteners, chat links and code requests.
+    ["Get help at bit.ly/skin-help", "blocked"],
+    ["Join t.me/skintips for tips", "blocked"],
+    ["Please share the verification code you just received.", "blocked"],
   ] as const)("%j is %s", (reply, kind) => {
     expect(screenEchoReply(reply).kind).toBe(kind);
   });

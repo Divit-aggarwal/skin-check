@@ -14,7 +14,7 @@ import { ageStatus, latestGrant, withLedgerTimeout, type AgeStatus } from "@/app
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 import { contextChatEnabled } from "@/lib/context/switch";
 import { handleContextChat, recordReferral } from "@/lib/context/chat";
-import { comparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY, UNSUPPORTED_SCRIPT_COPY, unsupportedScript, withoutReferrals } from "@/lib/context/prefilter";
+import { checkComparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY, UNSUPPORTED_SCRIPT_COPY, unsupportedScript, withoutReferrals } from "@/lib/context/prefilter";
 import { buildContextPackage } from "@/lib/context/builder";
 import { comparisonAnswer, fallbackLines } from "@/lib/context/answer";
 import { ECHO_FALLBACK_LEAD, screenEchoReply } from "@/lib/echo-reply-screen";
@@ -264,8 +264,9 @@ export async function POST(request: NextRequest) {
         answers,
       });
 
-    // Red team (I02, area E): a comparison question gets the fixed answer, no Gemini call (GEMINI_BOUNDARY §6b).
-    if (comparisonHit(message)) return respond(comparisonAnswer(pkg()));
+    // Red team (I02, area E): a question that compares checks gets the fixed answer, no Gemini call
+    // (GEMINI_BOUNDARY §6b). Narrower than the context path's list (final review H3).
+    if (checkComparisonHit(message)) return respond(comparisonAnswer(pkg()));
 
     const geminiReply = await getSkinCheckChatReply([...sentHistory, userTurn], {
       answers,

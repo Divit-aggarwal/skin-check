@@ -428,3 +428,58 @@ describe("red-flag pre-filter: red-team pass 2", () => {
     }
   );
 });
+
+// Final review (I02 H2): close variants of the self-harm phrases.
+describe("red-flag pre-filter: final-review variants", () => {
+  it.each([
+    "I want to sleep and not wake up",
+    "I want to end things",
+    "I'd be better off gone",
+    "I want it all to stop",
+    "no point living with skin like this",
+    "I'm thinking of ending it",
+    "I've been cutting again",
+    "I'm tired of living",
+    "tired of being alive",
+    "how many paracetamol would be too many",
+    "I've been burning myself with a lighter",
+    "everyone would be better without me",
+    "स्युसाइड",
+    "zindagi se thak gayi hu",
+  ])("hits: %j", (msg) => {
+    expect(redFlagHit(msg)).toBe(true);
+  });
+
+  // Controls, including the final review's low false positives.
+  it.each(["I'm expecting a lot of sun this weekend", "class 12 exams are stressing my skin", "I'm tired of my oily skin", "how many drops of serum should I use?", "I want it all to stop shining by noon", "is it better to end my routine with sunscreen?"])(
+    "ordinary question still passes: %j",
+    (msg) => {
+      expect(redFlagHit(msg)).toBe(false);
+    }
+  );
+});
+
+// Final review (I02 H3): today's Echo asks Gemini ordinary questions that merely contain "before" or "better".
+describe("check-comparison filter for today's Echo", () => {
+  it.each(["is my redness better than last time?", "compare my last two scans", "pehle se meri redness kam hui kya?", "meri skin pehle se better hai?", "last time my redness was Elevated, now it says Low. So it improved, right?", "Is the redness trending down over my checks?", "has my oiliness gone down since my previous scan?"])(
+    "a comparison of checks: %j",
+    async (msg) => {
+      const { checkComparisonHit } = await import("@/lib/context/prefilter");
+      expect(checkComparisonHit(msg)).toBe(true);
+    }
+  );
+
+  it.each([
+    "Should I apply moisturizer before sunscreen?",
+    "what should I do before bed",
+    "Should I change my cleanser?",
+    "How can I improve my skin texture?",
+    "Is a gel or cream better for oily skin?",
+    "What's the difference between toner and serum?",
+    "Since my skin is oily, what should I use?",
+    "meri skin zyada oily kyun hai?",
+  ])("an ordinary question: %j", async (msg) => {
+    const { checkComparisonHit } = await import("@/lib/context/prefilter");
+    expect(checkComparisonHit(msg)).toBe(false);
+  });
+});

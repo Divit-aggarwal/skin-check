@@ -40,8 +40,11 @@ const CHECKS: [string, RegExp][] = [
   ],
   ["cause", re(["\\bcaus\\w*", "\\bdue to\\b", "\\bthanks to\\b", "\\bresult(?:s|ed)? (?:from|in)\\b", "\\bled to\\b", "\\bleads? to\\b", "\\bresponsible for\\b"])],
   // TD-17 (1), H19: no active ingredient for anyone, and no product push.
+  // Final review (I02 H1): the lists below are English and Hinglish, so a reply in
+  // another script cannot be checked and is not shown (the persona asks for Latin letters).
+  ["script", new RegExp(String.raw`(?![a-zA-Z])\p{L}`, "u")],
   // Red team pass 2 (I02 P2-1): never a link, a sign-in, a code or a phone request.
-  ["link", re(["https?:", "www\\.", "\\b\\w+\\.(?:com|in|org|net|io|app)\\b", "\\b\\w+\\s+dot\\s+(?:com|in|org|net|io|app|example)\\b", "\\bsign (?:in|up)\\b", "\\blog ?in\\b", "\\botp\\b", "\\bpassword\\b", "\\bphone number\\b"])],
+  ["link", re(["https?:", "www\\.", "\\b\\w+\\.(?:com|in|org|net|io|app)\\b", "\\b\\w+\\s+dot\\s+(?:com|in|org|net|io|app|example)\\b", "\\bsign (?:in|up)\\b", "\\blog ?in\\b", "\\botp\\b", "\\bpassword\\b", "\\bphone number\\b", "\\bbit\\.ly\\b", "\\bt\\.me\\b", "\\b[a-z0-9-]+\\.[a-z]{2,6}/\\S", "\\b(?:verification |one[- ]time |otp )?code (?:you|we) (?:just )?(?:got|received|sent)\\b", "\\bwhats ?app\\b"])],
   ["product", re([ACTIVE.source, "\\brecommend\\w*", "\\byou should (?:use|try|apply|start|add|buy)\\b", "\\b(?:try|start) using\\b", "\\bbuy\\b"])],
 ];
 

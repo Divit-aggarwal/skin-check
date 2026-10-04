@@ -227,3 +227,23 @@ describe("today's Echo: Gemini's reply is checked before it is shown or signed",
     expect(src).toMatch(/reply with exactly this and nothing else: \$\{REFERRAL_COPY\}/);
   });
 });
+
+// Final review (I02 H1, H3), on today's Echo route.
+describe("today's Echo: final-review fixes", () => {
+  it("H3: ordinary questions with 'before', 'better' or 'change' reach Gemini", async () => {
+    getSkinCheckChatReply.mockResolvedValue("Your cheeks read Moderate for redness in this photo.");
+    for (const msg of ["Should I apply moisturizer before sunscreen?", "Is a gel or cream better for oily skin?", "Should I change my cleanser?", "How can I improve my skin texture?"]) {
+      getSkinCheckChatReply.mockClear();
+      expect((await (await post(msg)).json()).reply, msg).toBe("Your cheeks read Moderate for redness in this photo.");
+      expect(getSkinCheckChatReply).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("H1: a reply in Devanagari is not shown or signed; the fixed band answer is", async () => {
+    const { ECHO_FALLBACK_LEAD } = await import("@/lib/echo-reply-screen");
+    getSkinCheckChatReply.mockResolvedValue("आपकी लालिमा पिछली बार से कम हुई है। रेटिनॉल लगाइए।");
+    const reply = (await (await post("मेरी त्वचा कैसी है?")).json()).reply as string;
+    expect(reply.startsWith(ECHO_FALLBACK_LEAD)).toBe(true);
+    expect(reply).not.toMatch(/\p{Script=Devanagari}/u);
+  });
+});

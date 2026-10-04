@@ -172,11 +172,12 @@ const RED_FLAG = re([
   "\\bis (?:it|this|that) serious\\b",
   // age and pregnancy
   "\\bmy age is (?:1[0-7]|[1-9])\\b",
-  "\\b(?:class|grade|std|standard)\\s*(?:[1-9]|1[0-2])(?:st|nd|rd|th)?\\b(?!\\s*(?:years?|yrs?))",
-  "\\b(?:[1-9]|1[0-2])(?:st|nd|rd|th) (?:grade|class|std|standard)\\b",
+  // Classes 1-10 only: many class 11-12 students are 18 (final review).
+  "\\b(?:class|grade|std|standard)\\s*(?:[1-9]|10)(?:st|nd|rd|th)?\\b(?!\\s*(?:years?|yrs?))",
+  "\\b(?:[1-9]|10)(?:st|nd|rd|th) (?:grade|class|std|standard)\\b",
   "\\bschool (?:student|kid|going)\\b",
   "\\b(?:i'?m|i am|im) (?:a )?teen(?:ager)?\\b",
-  "\\b(?:i'?m|i am|im|am) expecting\\b(?! (?:a |an |the )?(?:parcel|delivery|package|call|order|reply|answer|result))",
+  "\\b(?:i'?m|i am|im|am) expecting\\b(?! (?:a |an |the |a lot of |lots of |some )?(?:parcel|delivery|package|call|order|reply|answer|result|sun|rain|heat|guests|visitors|trip))",
   // ── red team pass 2 (context path, I02 P2-2) ──
   "\\bcan'?t go on (?:anymore|any more|like this|living)\\b|\\bcan'?t go on\\W*$",
   "\\bpoint (?:of|in) (?:living|life|going on)\\b",
@@ -188,6 +189,21 @@ const RED_FLAG = re([
   "\\bzinda nahi? (?:rehna|rahna)\\b",
   "नहीं जी सकत|नही जी सकत",
   "जिंदा नहीं रहना|जिंदा नही रहना",
+  // ── final review (I02 H2): close variants ──
+  "\\bsleep and (?:not|never) wake\\b",
+  "\\b(?:want|wanna|going) to end (?:things|everything|it all)\\b",
+  "\\b(?:thinking|think|thought) (?:of|about) ending\\b",
+  "\\bbetter off (?:dead|gone|without me)\\b",
+  "\\b(?:everyone|everybody|they|the world|people) (?:would be|'?d be|are|is) better (?:off )?without me\\b",
+  "\\bwant (?:it all|it|everything) to (?:stop|end)\\b(?! (?:being|shining|looking|feeling|getting))",
+  "\\bno point (?:in )?(?:living|life|going on)\\b",
+  "\\bcutting (?:again|myself)\\b|\\b(?:been|started|keep) cutting\\b",
+  "\\btired of (?:living|life|being alive|existing)\\b",
+  "\\bhow many\\b.{0,20}\\b(?:paracetamol|pills|tablets|sleeping pills)\\b.{0,30}\\b(?:too many|overdose|lethal|kill|die)\\b",
+  "\\btoo many (?:paracetamol|pills|tablets)\\b",
+  "\\bburn(?:ing|ed)? myself\\b",
+  "\\bzindagi se thak\\w*",
+  "स्युसाइड|सुसाइड|सूसाइड|सुइसाइड",
 ]);
 
 const COMPARISON = re([
@@ -344,6 +360,26 @@ export function withoutReferrals<T extends { role: string; text: string }>(histo
 }
 
 export const comparisonHit = (message: string): boolean => COMPARISON.test(fold(message)) || COMPARISON.test(message);
+
+// Final review (I02 H3): today's Echo answers ordinary questions that only
+// contain "before", "better", "change" or "improve" ("moisturizer before
+// sunscreen?"), and gives the fixed answer only when the user compares checks
+// or readings over time. The reply screen and the persona stop a change claim
+// in the answer itself. The context path keeps the recall-first COMPARISON
+// list (TD-16 (2)).
+const CHECK_COMPARISON = re([
+  "\\b(?:last|previous|earlier|prior|old|first|other) (?:time|check|scan|photo|reading|result)s?\\b",
+  "\\b(?:my|the) (?:last|previous|earlier|two|past) (?:\\w+ )?(?:checks?|scans?|photos?|readings?|results?)\\b",
+  "\\bcompar\\w* (?:my |the |these |those |two )?(?:\\w+ )?(?:checks?|scans?|photos?|readings?|results?)\\b",
+  "\\b(?:since|from) (?:my |the )?(?:last|previous|earlier|first) (?:\\w+ )?(?:checks?|scans?|photos?|time)\\b",
+  "\\btrend\\w*",
+  "\\bover (?:my |the )?(?:checks|scans|photos|weeks|months)\\b",
+  "\\b(?:better|worse|improv\\w*|changed|different) (?:than|since|from) (?:before|last|earlier|my last|the last|then)\\b",
+  "\\bpehle se\\b",
+  "\\bpichh?l[ie] (?:baar|bar|scan|check)\\b",
+  "पहले से|पिछली बार",
+]);
+export const checkComparisonHit = (message: string): boolean => CHECK_COMPARISON.test(fold(message)) || CHECK_COMPARISON.test(message);
 
 // No helpline number until one is verified (GEMINI_BOUNDARY §6).
 export const REFERRAL_LINE =
