@@ -218,8 +218,9 @@ export function EchoPage() {
     <div className="mx-auto flex min-h-dvh max-w-lg flex-col bg-surface px-6 pb-6 pt-6">
       <div className="flex shrink-0 items-center gap-3">
         <Link
-          href="/skin-check"
-          aria-label="Back to Skin Check"
+          // K-1: a hand-off from the dashboard goes back there, not to an old results screen.
+          href={session.fromDashboard ? "/dashboard" : "/skin-check"}
+          aria-label={session.fromDashboard ? "Back to your skin checks" : "Back to Skin Check"}
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text/60 transition-opacity hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
         >
           <ChevronLeft className="h-5 w-5" />

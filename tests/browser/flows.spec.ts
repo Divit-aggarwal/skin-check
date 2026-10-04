@@ -183,15 +183,14 @@ test("Ask Echo, back to the dashboard, a new check starts at the questions", asy
   await expect(page.getByText("Your skin, understood.")).toHaveCount(0);
 });
 
-test("known defect K-1: Echo's own Back to Skin Check after a dashboard hand-off reopens a results screen", async ({ page }) => {
-  // Expected to fail until main fixes EchoPage or useSkinCheckFlow (design §9 K-1).
-  test.fail();
+test("K-1 fixed: Echo's back link after a dashboard hand-off returns to the dashboard", async ({ page }) => {
   await signIn(page, U.echo!.phoneNumber);
   await page.goto("/dashboard");
   await page.getByRole("button", { name: C.chat.button }).click();
   await expect(page).toHaveURL(/\/echo/);
-  await page.getByRole("link", { name: "Back to Skin Check" }).click();
-  await expect(page.getByText(NAME_PROMPT)).toBeVisible({ timeout: 10_000 });
+  await page.getByRole("link", { name: "Back to your skin checks" }).click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByText(C.title)).toBeVisible();
 });
 
 test("delete the account, sign in again, no history", async ({ page }) => {

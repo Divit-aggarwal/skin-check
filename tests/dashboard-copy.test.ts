@@ -125,3 +125,16 @@ describe("dashboard owner decisions (TD-18)", () => {
     }
   });
 });
+
+// K-1: a dashboard hand-off to Echo is never reopened as a results screen.
+describe("K-1", () => {
+  it("the dashboard marks its Echo session, Echo's back link follows it, and the flow ignores it", () => {
+    expect(readFileSync("components/dashboard/DashboardPage.tsx", "utf8")).toMatch(/fromDashboard: true/);
+    const echo = readFileSync("components/skin-check/EchoPage.tsx", "utf8");
+    expect(echo).toMatch(/href=\{session\.fromDashboard \? "\/dashboard" : "\/skin-check"\}/);
+    const flow = readFileSync("lib/useSkinCheckFlow.ts", "utf8");
+    expect(flow).toMatch(/const session = liveSession\?\.fromDashboard \? null : liveSession;/);
+    // Every later use reads the filtered `session`, never the raw one.
+    expect(flow.match(/liveSession/g)).toHaveLength(3);
+  });
+});

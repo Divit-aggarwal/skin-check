@@ -161,7 +161,10 @@ export function useSkinCheckFlow() {
   // user tapped "back" from /echo. Land them back on the finished dashboard
   // instead of resetting to section 0; this hook has no other memory of a
   // prior visit since its own state is local to the component instance.
-  const { session, setSession } = useSkinCheckSession();
+  // K-1: a dashboard hand-off to Echo is not a scan in progress: it has no
+  // photo, so it is never reopened as a results screen here.
+  const { session: liveSession, setSession } = useSkinCheckSession();
+  const session = liveSession?.fromDashboard ? null : liveSession;
 
   // Minted once per scan attempt and stable from the questionnaire's first
   // answer through to the Firestore write, where it becomes the document id.

@@ -25,6 +25,12 @@ export interface SkinCheckSession {
   /** Set only if the user consented to retention for this scan. */
   retentionConsentVersion?: string | undefined;
   captureMethod: CaptureMethod;
+  /**
+   * K-1: set by the dashboard's Echo hand-off. Echo's back link then leads to
+   * /dashboard, and /skin-check never reopens it as a results screen (it has
+   * no photo).
+   */
+  fromDashboard?: boolean | undefined;
 }
 
 export interface EchoThread {

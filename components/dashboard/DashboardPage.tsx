@@ -230,6 +230,7 @@ function ChatSection({ uid, dashboard, data }: { uid: string; dashboard: Dashboa
       // ponytail: no photo is held here; Echo never reads it. Load the stored original if Echo ever shows it.
       photo: new Blob(),
       captureMethod: (record.captureMethod as CaptureMethod | undefined) ?? "native",
+      fromDashboard: true,
     });
     router.push("/echo");
   }
