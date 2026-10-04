@@ -3,28 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
-import { listSkinChecks, type SkinCheckSummary } from "@/lib/firebase/skin-checks";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DASHBOARD_COPY } from "@/components/dashboard/copy";
+import { formatDate } from "@/components/dashboard/CheckReadings";
+import { loadDashboard } from "@/components/dashboard/data";
+import { deriveDashboard, type HistoryRow } from "@/components/dashboard/state";
 
-// What each terminal status means to the person who made the scan — not the
-// raw enum. "questionnaire_only" in particular must not read as a failure:
-// they answered the questions and chose not to (or couldn't) add a photo.
-const STATUS_LABEL: Record<SkinCheckSummary["status"], string> = {
-  completed: "Photo analyzed",
-  analysis_failed: "Photo couldn't be analyzed",
-  questionnaire_only: "Questionnaire only",
-};
-
-function formatWhen(date: Date | null): string {
-  // A serverTimestamp() this client just wrote hasn't resolved yet — that's
-  // an expected state on the first render after saving, not an error.
-  if (!date) return "Just now";
-  return date.toLocaleDateString(undefined, {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
-}
+// R-5 (dashboard report): the same check gets the same label here and on
+// /dashboard. Both read the check and its server analysis records and classify
+// them with deriveDashboard (a server reading, a reading saved by the app only,
+// a photo that could not be read, or questions only), and both format the date
+// the same way.
+type Row = HistoryRow & { imageStored: boolean };
 
 /**
  * A signed-in user's own previous scans, newest first.
@@ -35,7 +25,7 @@ function formatWhen(date: Date | null): string {
  */
 export function PreviousScans() {
   const { user, loading } = useAuth();
-  const [scans, setScans] = useState<SkinCheckSummary[] | null>(null);
+  const [scans, setScans] = useState<Row[] | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -46,9 +36,11 @@ export function PreviousScans() {
     }
     let active = true;
     setFailed(false);
-    listSkinChecks(user.uid)
-      .then((result) => {
-        if (active) setScans(result);
+    loadDashboard(user.uid)
+      .then(({ checks, analyses }) => {
+        if (!active) return;
+        const stored = new Set(checks.filter((c) => (c.data.image as { stored?: unknown } | undefined)?.stored === true).map((c) => c.id));
+        setScans(deriveDashboard(user.uid, checks, analyses).history.map((row) => ({ ...row, imageStored: stored.has(row.scanId) })));
       })
       .catch((error) => {
         // Never surface the Firestore error code — it says nothing the user
@@ -95,8 +87,8 @@ export function PreviousScans() {
               className="flex items-center justify-between gap-4 rounded-lg bg-canvas px-4 py-3"
             >
               <div className="flex flex-col gap-0.5">
-                <span className="text-body text-text">{formatWhen(scan.createdAt)}</span>
-                <span className="text-sm text-text/60">{STATUS_LABEL[scan.status]}</span>
+                <span className="text-body text-text">{formatDate(scan.date)}</span>
+                <span className="text-sm text-text/60">{DASHBOARD_COPY.history.kind[scan.kind]}</span>
               </div>
               {/* Only claimed when the object really landed in S3 — the record
                   under-claims rather than over-claims (lib/firebase/skin-checks.ts). */}

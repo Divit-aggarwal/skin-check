@@ -138,3 +138,14 @@ describe("K-1", () => {
     expect(flow.match(/liveSession/g)).toHaveLength(3);
   });
 });
+
+// R-5: /account and /dashboard give the same check the same label.
+describe("R-5", () => {
+  it("PreviousScans classifies with deriveDashboard and labels with the dashboard's own copy and date format", () => {
+    const src = readFileSync("components/skin-check/PreviousScans.tsx", "utf8");
+    expect(src).toMatch(/deriveDashboard\(user\.uid, checks, analyses\)\.history/);
+    expect(src).toMatch(/DASHBOARD_COPY\.history\.kind\[scan\.kind\]/);
+    expect(src).toMatch(/formatDate\(scan\.date\)/);
+    expect(src).not.toMatch(/Photo analyzed|Questionnaire only|STATUS_LABEL|toLocaleDateString/);
+  });
+});

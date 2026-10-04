@@ -233,3 +233,21 @@ test("O-D3: the signed-in start page and the account page link to the dashboard;
   await page.getByRole("link", { name: C.entryLink }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
 });
+
+// R-5: the same checks, the same labels, on /account and /dashboard.
+for (const key of ["noreading", "legacy", "building"] as const) {
+  test(`R-5: /account and /dashboard label each check the same way (${key})`, async ({ page }) => {
+    const user = U[key]!;
+    const kinds = Object.values(C.history.kind);
+    const label = new RegExp(`^(${kinds.join("|")})$`);
+    await signIn(page, user.phoneNumber);
+    await page.goto("/dashboard");
+    await expect(page.getByText(label).first()).toBeVisible();
+    const onDashboard = (await page.getByText(label).allTextContents()).sort();
+    await page.goto("/account");
+    await expect(page.getByText(label).first()).toBeVisible();
+    const onAccount = (await page.getByText(label).allTextContents()).sort();
+    expect(onAccount).toEqual(onDashboard);
+    expect(onAccount).toHaveLength(user.checks.length);
+  });
+}
