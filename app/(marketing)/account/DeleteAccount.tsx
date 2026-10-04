@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { clearDraft } from "@/lib/skin-check-draft";
-import { clearUnder18Chosen, ERASE_CONFIRMATION, ERASE_MAX_AUTH_AGE_SECONDS } from "@/lib/consent";
+import { clearUnder18Chosen, ERASE_CONFIRMATION, ERASE_COPY, ERASE_MAX_AUTH_AGE_SECONDS } from "@/lib/consent";
 import { Button } from "@/components/ui/button";
 
 // H01b: a signed-in user deletes their account and every copy of their data
@@ -24,7 +24,12 @@ export function DeleteAccount() {
   const [state, setState] = useState<State>({ kind: "idle" });
 
   if (state.kind === "done") {
-    return <p className="text-body text-text/70">Your account and your data have been deleted.</p>;
+    return (
+      <div className="flex flex-col gap-1">
+        <p className="text-body text-text/70">{ERASE_COPY.done}</p>
+        <p className="text-body text-text/70">{ERASE_COPY.doneLate}</p>
+      </div>
+    );
   }
   if (!user) return null;
 
@@ -62,9 +67,9 @@ export function DeleteAccount() {
   return (
     <section className="flex flex-col gap-3 border-t border-text/10 pt-6">
       <h2 className="font-display text-lg text-text">Delete your account</h2>
-      <p className="text-body text-text/60">
-        This permanently deletes your photos, your scans, your answers and your sign-in account. It can&apos;t be undone.
-      </p>
+      <p className="text-body text-text/60">{ERASE_COPY.explain}</p>
+      <p className="text-body text-text/60">{ERASE_COPY.gemini}</p>
+      <p className="text-body text-text/60">{ERASE_COPY.otherBrowsers}</p>
       {state.kind === "idle" && (
         <Button variant="outline" onClick={() => setState({ kind: "confirming", typed: "" })}>
           Delete my account and data

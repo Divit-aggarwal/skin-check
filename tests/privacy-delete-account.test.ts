@@ -38,3 +38,31 @@ describe("DeleteAccount", () => {
     expect(src).not.toMatch(/within 5 minutes/);
   });
 });
+
+// H26 (red team D F1): the delete copy promises only what the system does.
+describe("delete copy (H26)", () => {
+  it("does not promise a permanent delete of Google's copy or of another browser's draft", async () => {
+    const { ERASE_COPY } = await import("@/lib/consent");
+    const all = Object.values(ERASE_COPY).join(" ");
+    expect(src).not.toMatch(/permanently deletes/i);
+    expect(all).not.toMatch(/permanent/i);
+    expect(ERASE_COPY.gemini).toMatch(/Google/);
+    expect(ERASE_COPY.gemini).toMatch(/can't delete Google's copy/);
+    expect(ERASE_COPY.otherBrowsers).toMatch(/another browser/);
+    for (const key of ["explain", "gemini", "otherBrowsers", "done", "doneLate"] as const) expect(src).toContain(`ERASE_COPY.${key}`);
+  });
+
+  it("the promised time covers the sweep delay plus the longest gap between two runs of the configured cron", async () => {
+    const { ERASE_LATE_DATA_DAYS, ERASE_SWEEP_SCHEDULE, ERASE_COPY } = await import("@/lib/consent");
+    const { ERASE_SWEEP_DELAY_SECONDS } = await import("@/lib/erase");
+    const vercel = JSON.parse(readFileSync("vercel.json", "utf8")) as { crons?: { path: string; schedule: string }[] };
+    expect(vercel.crons).toContainEqual({ path: "/api/account/erase/sweep", schedule: ERASE_SWEEP_SCHEDULE });
+    // A fixed minute and hour, every day: one run a day (the Hobby plan limit),
+    // and Hobby may fire anywhere in that hour, so two runs can be up to 24 h 59 min apart.
+    expect(ERASE_SWEEP_SCHEDULE).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/);
+    const longestGapSeconds = 24 * 3600 + 59 * 60;
+    expect(ERASE_SWEEP_DELAY_SECONDS + longestGapSeconds).toBeLessThanOrEqual(ERASE_LATE_DATA_DAYS * 86400);
+    expect(ERASE_COPY.explain).toContain(`within ${ERASE_LATE_DATA_DAYS} days`);
+    expect(ERASE_COPY.doneLate).toContain(`within ${ERASE_LATE_DATA_DAYS} days`);
+  });
+});

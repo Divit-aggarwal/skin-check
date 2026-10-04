@@ -69,6 +69,30 @@ export const ERASE_CONFIRMATION = "DELETE MY DATA";
 /** How recent the sign-in must be to erase, in seconds. Named setting, PROVISIONAL (design §2.3). */
 export const ERASE_MAX_AUTH_AGE_SECONDS = 300;
 
+/**
+ * H26 (TD-19): the erase sweep (GET /api/account/erase/sweep) runs from the
+ * Vercel cron in vercel.json. The Hobby plan allows one run a day, at any
+ * minute of the scheduled hour; this is 03:00-03:59 India time. Change both
+ * together: tests/privacy-delete-account.test.ts pins them to each other.
+ */
+export const ERASE_SWEEP_SCHEDULE = "30 21 * * *";
+
+/**
+ * What the delete copy promises for data still arriving as the account is
+ * deleted: the sweep delay (70 min) plus the longest gap between two daily
+ * runs (just under 25 hours) fits inside this many days (tested).
+ */
+export const ERASE_LATE_DATA_DAYS = 2;
+
+/** H26: the delete copy promises only what the system does (no "permanently" for Google's copy, no other browser's draft). */
+export const ERASE_COPY = {
+  explain: `This deletes your photos, your checks, your answers, your chats with Echo and your sign-in account. It can't be undone. Most of it goes at once; anything still arriving as you delete is removed within ${ERASE_LATE_DATA_DAYS} days.`,
+  gemini: "Messages you already sent to Echo were processed by Google, which may keep them under its own terms. We can't delete Google's copy.",
+  otherBrowsers: "Unsent answers saved in another browser stay there until you clear them or save them.",
+  done: "Your account and your data have been deleted.",
+  doneLate: `Anything still arriving is removed within ${ERASE_LATE_DATA_DAYS} days.`,
+} as const;
+
 // H02a: an under-18 answer is blocked in the browser BEFORE sign-in, so there
 // is no uid to record it against yet. This tab remembers that it was chosen,
 // and the attestation sent after sign-in says "under-18" even if the user went
