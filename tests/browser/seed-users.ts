@@ -3,7 +3,7 @@
 // per dashboard state and per browser test that changes data.
 
 export type Check = { days: number; kind: "measured" | "legacy" | "questions" | "failed"; build?: string; verdict?: "pass" | "override" | "unchecked"; lowForehead?: boolean };
-export type User = { uid: string; phoneNumber: string; checks: Check[]; aiShare?: boolean };
+export type User = { uid: string; phoneNumber: string; checks: Check[]; aiShare?: boolean; fullAnswers?: boolean };
 
 const m = (days: number, extra: Partial<Check> = {}): Check => ({ days, kind: "measured", ...extra });
 
@@ -19,7 +19,7 @@ export const DASHBOARD_SEED: Record<string, User> = {
   withdraw: { uid: "seed-dash-withdraw", phoneNumber: "+919999900808", checks: [m(3)], aiShare: true },
   echo: { uid: "seed-dash-echo", phoneNumber: "+919999900809", checks: [m(2)] },
   scan: { uid: "seed-dash-scan", phoneNumber: "+919999900810", checks: [] },
-  returning: { uid: "seed-dash-returning", phoneNumber: "+919999900811", checks: [m(7)] },
+  returning: { uid: "seed-dash-returning", phoneNumber: "+919999900811", checks: [m(7)], fullAnswers: true },
   routine: { uid: "seed-dash-routine", phoneNumber: "+919999900812", checks: [] },
   erase: { uid: "seed-dash-erase", phoneNumber: "+919999900813", checks: [m(4)] },
   capture: { uid: "seed-dash-capture", phoneNumber: "+919999900814", checks: [] },

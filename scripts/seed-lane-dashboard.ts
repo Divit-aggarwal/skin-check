@@ -14,6 +14,8 @@ import { AGE_ATTESTATION_COPY, AGE_ATTESTATION_VERSION, AI_SHARE_CONSENT_COPY, A
 import { sha256 } from "@/app/api/account/_ledger";
 import { buildScanAnalysisRecord, scanAnalysisDocId } from "@/lib/scan-analysis-record";
 import type { SkinScanResult } from "@/types/skin-scan";
+import type { SkinCheckAnswers } from "@/types/skin-check";
+import { SECTIONS } from "@/lib/skin-check-steps";
 import { syntheticAnalysis, syntheticNative } from "../tests/synthetic-scan";
 import { DASHBOARD_SEED } from "../tests/browser/seed-users";
 
@@ -25,6 +27,23 @@ if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_
 
 const BUILD = "sha-8dc37dc501ea974825427c665acd7019120c20ec";
 const ANSWERS = { name: "Seed", age: "25-34", gender: "other", primary_concerns: ["redness", "texture"], skin_type: "combination" };
+
+/** A complete questionnaire (female, so both re-confirmed steps apply), as tests/reusable-answers.test.ts builds it. */
+function fullAnswers(): SkinCheckAnswers {
+  const answers: SkinCheckAnswers = { age: "25-34", gender: "female" };
+  for (const section of SECTIONS) {
+    for (const step of section.steps) {
+      if (step.id in answers) continue;
+      if (step.type === "phone") answers[step.id] = "+919999900811";
+      else if (step.type === "photo-capture") answers[step.id] = "done";
+      else if (step.type === "text") answers[step.id] = "Meera";
+      else if (step.type === "scale-1-5") answers[step.id] = "3";
+      else if (step.type === "multi-select-cards" || step.type === "body-map") answers[step.id] = [step.options[0]!.value];
+      else answers[step.id] = step.options[0]!.value;
+    }
+  }
+  return answers;
+}
 
 const ledgerEntry = (purpose: string, granted: boolean, version: string, copy: string, source: string) => ({
   schemaVersion: 1, purpose, granted, version, copySha256: sha256(copy), scanId: null, source, recordedAt: Timestamp.now(),
@@ -64,7 +83,7 @@ async function main() {
       await userRef.collection("skinChecks").doc(scanId).set({
         schemaVersion: 1,
         scanId,
-        answers: ANSWERS,
+        answers: user.fullAnswers ? fullAnswers() : ANSWERS,
         status: c.kind === "failed" ? "analysis_failed" : c.kind === "questions" ? "questionnaire_only" : "completed",
         image: c.kind === "questions" ? null : { stored: false, captureMethod: "native" },
         consent: { imageRetention: false },
