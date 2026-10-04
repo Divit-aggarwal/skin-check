@@ -16,7 +16,8 @@ import type {
 import type { LongitudinalResult, NotEnoughEvidenceReasonCode, QuantityPath } from "@/lib/contracts/longitudinal-result";
 import type { RecommendationResult } from "@/lib/contracts/recommendation-result";
 import type { SafetyState } from "@/lib/contracts/safety-state";
-import { GEMINI_FIELD_INVENTORY, extraCautionFor, withoutTriggerValues } from "@/lib/gemini";
+import { GEMINI_FIELD_INVENTORY, withoutCautionAnswers } from "@/lib/gemini";
+import { extraCautionAnswers } from "@/lib/rules/safety";
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { describeStepAnswerParts } from "@/lib/skin-check-format";
 import { bandScores, SCORING_VERSION } from "@/lib/skin-check-rules";
@@ -270,7 +271,11 @@ function recommendation(input: NonNullable<BuildInput["recommendation"]>): { sec
 }
 
 export function buildContextPackage(input: BuildInput): ContextPackage {
-  const extraCaution = (input.safety?.extraCaution ?? false) || extraCautionFor(input.answers);
+  // One list (lib/rules/settings.ts). The answers evaluateSafety named, plus the
+  // same matcher over these answers in case the two inputs ever differ: the
+  // flag can only be added, never removed.
+  const raised = [...(input.safety?.extraCautionRaisedBy ?? []), ...extraCautionAnswers(input.answers)];
+  const extraCaution = raised.length > 0;
   const missingItems: MissingItem[] = [
     missing("hydration", "hydration", MISSING_TEXT.hydration),
     missing("pores", "pores", MISSING_TEXT.pores),
@@ -320,7 +325,7 @@ export function buildContextPackage(input: BuildInput): ContextPackage {
   if (!rec?.section || rec.screened) missingItems.push(missing("recommendation", "recommendation", MISSING_TEXT.recommendation));
 
   // While extraCaution is on, the answer that set it is left out (privacy-report §5).
-  const statements = selfReported(extraCaution ? withoutTriggerValues(input.answers) : input.answers);
+  const statements = selfReported(withoutCautionAnswers(input.answers, raised));
   if (statements.length > 0) pkg.selfReported = statements;
   else missingItems.push(missing("self_reported", "selfReported", MISSING_TEXT.selfReported));
 

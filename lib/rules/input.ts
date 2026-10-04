@@ -38,6 +38,13 @@ function stepFor(field: RuleInputField) {
   return step;
 }
 
+/** Sorted, unique, trimmed and lower-cased string values of one raw answer. Never throws. */
+export function normalisedValues(raw: unknown): string[] {
+  const list = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
+  const strings = list.filter((v): v is string => typeof v === "string");
+  return Array.from(new Set(strings.map((v) => v.trim().toLowerCase()).filter((v) => v !== ""))).sort();
+}
+
 export function readInput(input: RulesInput): Readings {
   if (input === null || typeof input !== "object") throw new TypeError("rules: input must be an object");
   const { answers, confirmedThisScan } = input;
@@ -60,7 +67,7 @@ export function readInput(input: RulesInput): Readings {
     // Matching uses trimmed, lower-cased values, so a sloppy caution value
     // still counts. Validity uses the exact strings, so a sloppy value can
     // never make an answer readable enough to unlock the active.
-    const values = Array.from(new Set(strings.map((v) => v.trim().toLowerCase()).filter((v) => v !== ""))).sort();
+    const values = normalisedValues(raw);
     const exact = Array.from(new Set(strings));
     const options = new Set<string>(step.options.map((o) => o.value));
     const exclusive = "exclusiveValue" in step ? step.exclusiveValue : undefined;

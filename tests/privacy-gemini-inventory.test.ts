@@ -9,7 +9,9 @@ vi.mock("@google/genai", () => ({
   },
 }));
 
-import { EXTRA_CAUTION_INSTRUCTION, EXTRA_CAUTION_TRIGGERS, GEMINI_FIELD_INVENTORY, getSkinCheckChatReply } from "@/lib/gemini";
+import { EXTRA_CAUTION_INSTRUCTION, GEMINI_FIELD_INVENTORY, getSkinCheckChatReply } from "@/lib/gemini";
+// One list since the wave-2 merge (wiring 3): the rules list that evaluateSafety reads.
+import { EXTRA_CAUTION_TRIGGERS } from "@/lib/rules/settings";
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { bandScores } from "@/lib/skin-check-rules";
 import { summarizeConcerns } from "@/lib/skin-check-score";
@@ -133,8 +135,8 @@ describe("extra caution flag (owner decision 8)", () => {
   const FEMALE_WORDS = /pregnan|breastfeed|contracepti|menopaus|\bperiods?\b|hormon|reproductive|female/i;
 
   it("each trigger alone turns it on: one fixed sentence, and no trigger value or reason leaks", async () => {
-    for (const [stepId, values] of Object.entries(EXTRA_CAUTION_TRIGGERS)) {
-      for (const value of values) {
+    for (const { field: stepId, anyOf } of EXTRA_CAUTION_TRIGGERS) {
+      for (const value of anyOf) {
         generateContent.mockClear();
         const answers = { primary_concerns: ["blemishes"], gender: "female", [stepId]: [value] };
         const { instruction, all } = await captureCall(answers);
@@ -158,6 +160,13 @@ describe("extra caution flag (owner decision 8)", () => {
     expect(EXTRA_CAUTION_INSTRUCTION).not.toMatch(/prescri|retinoid|acid|vitamin|why/i);
   });
 
+  it("a trigger value with stray case or spaces still turns it on and is still hidden", async () => {
+    const { instruction, all } = await captureCall({ primary_concerns: ["blemishes"], current_products: ["actives", " Prescription "] });
+    expect(instruction).toContain(EXTRA_CAUTION_INSTRUCTION);
+    expect(all).not.toContain("A prescription product");
+    expect(all).toContain("Actives");
+  });
+
   it("with the flag on, the other current products are still sent", async () => {
     const { instruction } = await captureCall({ current_products: ["actives", "prescription"] });
     expect(instruction).toContain("Actives");
@@ -165,10 +174,10 @@ describe("extra caution flag (owner decision 8)", () => {
   });
 
   it("the trigger list is the provisional one awaiting clinical review (E05)", () => {
-    expect(EXTRA_CAUTION_TRIGGERS).toEqual({
-      female_skin_context: ["pregnant_or_breastfeeding"],
-      current_products: ["prescription"],
-    });
+    expect(EXTRA_CAUTION_TRIGGERS).toEqual([
+      { field: "female_skin_context", anyOf: ["pregnant_or_breastfeeding"] },
+      { field: "current_products", anyOf: ["prescription"] },
+    ]);
   });
 });
 

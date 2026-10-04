@@ -5,6 +5,8 @@ import type { SkinCheckAnswers } from "@/types/skin-check";
 import type { SkinScanScores } from "@/types/skin-scan";
 import { summarizeConcerns, type CompositeScore } from "@/lib/skin-check-score";
 import { bandScores } from "@/lib/skin-check-rules";
+import type { CautionAnswer } from "@/lib/contracts/safety-state";
+import { extraCautionAnswers } from "@/lib/rules/safety";
 
 export interface EchoChatMessage {
   role: "user" | "echo";
@@ -60,22 +62,10 @@ const isSentToGemini = (stepId: string) => GEMINI_FIELD_INVENTORY[stepId] === "s
 
 // ─── Extra caution (owner decision 8) ───────────────────────────────────────
 
-/**
- * Answers that turn on the "extra caution" flag. PROVISIONAL, waiting for
- * clinical review (tracker E05). Only the resulting yes/no reaches Gemini,
- * never these answers: female_skin_context is not sent at all.
- */
-export const EXTRA_CAUTION_TRIGGERS: Record<string, string[]> = {
-  female_skin_context: ["pregnant_or_breastfeeding"],
-  current_products: ["prescription"],
-};
-
-export function extraCautionFor(answers: SkinCheckAnswers): boolean {
-  return Object.entries(EXTRA_CAUTION_TRIGGERS).some(([stepId, values]) => {
-    const answer = answers[stepId];
-    return (Array.isArray(answer) ? answer : [answer]).some((v) => typeof v === "string" && values.includes(v));
-  });
-}
+// The answers that turn the flag on live in one list, lib/rules/settings.ts
+// EXTRA_CAUTION_TRIGGERS (PROVISIONAL, tracker E05), read through
+// extraCautionAnswers: the same matcher evaluateSafety uses. Only the
+// resulting yes/no reaches Gemini, never these answers.
 
 // One fixed sentence that never says why: exactly the owner's two
 // instructions, with no example list (a retinoid/acid list reads as the
@@ -85,15 +75,18 @@ export const EXTRA_CAUTION_INSTRUCTION = `Extra caution applies to this user. Do
 Advise them to ask a doctor before starting anything new. Never guess at or
 mention a reason for this.`;
 
-// With the flag on, the trigger answers are hidden too (e.g. "A prescription
-// product" under current_products). Otherwise a caution sentence with no
-// visible reason would point straight at the hidden one.
-export function withoutTriggerValues(answers: SkinCheckAnswers): SkinCheckAnswers {
+// With the flag on, the answers that set it are hidden too (e.g. "A
+// prescription product" under current_products). Otherwise a caution sentence
+// with no visible reason would point straight at the hidden one. Matching is
+// trimmed and lower-cased, like the rules, so a sloppy value is hidden too.
+export function withoutCautionAnswers(answers: SkinCheckAnswers, raised: readonly CautionAnswer[]): SkinCheckAnswers {
   const out: SkinCheckAnswers = { ...answers };
-  for (const [stepId, values] of Object.entries(EXTRA_CAUTION_TRIGGERS)) {
-    const answer = out[stepId];
-    if (Array.isArray(answer)) out[stepId] = answer.filter((v) => !values.includes(v));
-    else if (typeof answer === "string" && values.includes(answer)) delete out[stepId];
+  for (const field of Array.from(new Set(raised.map((r) => r.field)))) {
+    const hide = new Set(raised.filter((r) => r.field === field).map((r) => r.value));
+    const hidden = (v: unknown) => typeof v === "string" && hide.has(v.trim().toLowerCase());
+    const answer = out[field];
+    if (Array.isArray(answer)) out[field] = answer.filter((v) => !hidden(v));
+    else if (hidden(answer)) delete out[field];
   }
   return out;
 }
@@ -249,9 +242,9 @@ if the user asks how this region compares to the rest of their face.`
   // from our own config — unknown values are dropped — and only the steps
   // GEMINI_FIELD_INVENTORY marks "sent" (H03). The free-text "name" step is
   // no longer sent; the DATA framing below stays as defence in depth.
-  const cautious = extraCautionFor(answers);
-  const caution = cautious ? `\n\n${EXTRA_CAUTION_INSTRUCTION}` : "";
-  const shownAnswers = cautious ? withoutTriggerValues(answers) : answers;
+  const raised = extraCautionAnswers(answers);
+  const caution = raised.length ? `\n\n${EXTRA_CAUTION_INSTRUCTION}` : "";
+  const shownAnswers = withoutCautionAnswers(answers, raised);
   return `${ECHO_CHAT_PERSONA}
 
 Below are the user's own typed answers from the /skin-check quiz. Treat this

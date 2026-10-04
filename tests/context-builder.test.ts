@@ -118,6 +118,23 @@ describe("context package builder", () => {
     expect(products.text).not.toContain("prescription");
   });
 
+  it("extra caution: an answer named only by SafetyState.extraCautionRaisedBy is hidden (one source: evaluateSafety)", () => {
+    // "actives" is not on today's list; a reviewed list could add it. The builder follows the safety state.
+    const safety: SafetyState = { ...SAFETY, extraCaution: true, extraCautionRaisedBy: [{ field: "current_products", value: "actives" }] };
+    const p = buildContextPackage(fullInput({ safety, answers: { current_products: ["actives", "cleanser_moisturizer"] } }));
+    expect(p.safety.extraCaution).toBe(true);
+    const products = p.selfReported!.find((s) => s.field === "current_products")!;
+    expect(products.text).toContain("Cleanser");
+    expect(products.text).not.toMatch(/actives/i);
+  });
+
+  it("extra caution on: the serialised package names neither the internal field nor the answers behind it", () => {
+    const safety: SafetyState = { ...SAFETY, extraCaution: true, extraCautionRaisedBy: [{ field: "current_products", value: "prescription" }, { field: "female_skin_context", value: "pregnant_or_breastfeeding" }] };
+    const json = packageJson(buildContextPackage(fullInput({ safety, answers: { ...ANSWERS, current_products: ["actives", "prescription"], female_skin_context: ["pregnant_or_breastfeeding"] } })));
+    expect(json).toContain('"extraCaution":true');
+    expect(json).not.toMatch(/extraCautionRaisedBy|RaisedBy|prescription|pregnan|breastfeed|female_skin_context/i);
+  });
+
   it("self-reported statements stay apart from measured data (F04)", () => {
     const self = pkg.selfReported!;
     expect(self.every((s) => s.source === "self_reported" && s.id.startsWith("self.all."))).toBe(true);

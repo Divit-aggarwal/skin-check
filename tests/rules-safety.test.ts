@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { evaluateSafety } from "@/lib/rules/safety";
+import { evaluateSafety, extraCautionAnswers } from "@/lib/rules/safety";
 
 const safety = (answers: Record<string, unknown>, confirmedThisScan: string[] = []) =>
   evaluateSafety({ answers, confirmedThisScan });
@@ -72,6 +72,15 @@ describe("red flags (PROVISIONAL list, rules-design §5.1)", () => {
 });
 
 describe("extra caution (privacy decision 8)", () => {
+  it("extraCautionAnswers: the same answers as evaluateSafety, switch-independent, never throws", () => {
+    const answers = { current_products: [" Prescription "], gender: "female", female_skin_context: ["pregnant_or_breastfeeding"] };
+    expect(extraCautionAnswers(answers)).toEqual(safety(answers).extraCautionRaisedBy);
+    for (const bad of [null, undefined, 7, "x", [], ["prescription"], { snapshot: { current_products: ["prescription"] } }]) {
+      expect(extraCautionAnswers(bad)).toEqual([]);
+    }
+    expect(extraCautionAnswers(Object.create({ current_products: ["prescription"] }))).toEqual([]); // own keys only
+  });
+
   it("names exactly the answers that turned it on (internal extraCautionRaisedBy), normalised", () => {
     expect(safety({ current_products: ["cleanser", " PRESCRIPTION "], gender: "female", female_skin_context: ["pregnant_or_breastfeeding"] })).toMatchObject({
       extraCaution: true,

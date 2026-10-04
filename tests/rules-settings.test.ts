@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { EXTRA_CAUTION_TRIGGERS as GEMINI_EXTRA_CAUTION } from "@/lib/gemini";
+import { readFileSync } from "node:fs";
 import { bannedWordsIn } from "@/lib/catalog/wording";
 import { SECTIONS } from "@/lib/skin-check-steps";
 import {
@@ -84,9 +84,12 @@ describe("clinical lists", () => {
     }
   );
 
-  it("extra-caution triggers equal lib/gemini.ts (privacy decision 8; one source after integration)", () => {
-    const ours = Object.fromEntries(EXTRA_CAUTION_TRIGGERS.map((c) => [c.field, [...c.anyOf]]));
-    expect(ours).toEqual(GEMINI_EXTRA_CAUTION);
+  it("one extra-caution list (rules report 6.3): lib/gemini.ts and the context builder hold no copy and use the rules matcher", () => {
+    for (const f of ["lib/gemini.ts", "lib/context/builder.ts"]) {
+      const src = readFileSync(f, "utf8");
+      expect(src, f).not.toMatch(/pregnant_or_breastfeeding|"prescription"|EXTRA_CAUTION_TRIGGERS\s*[:=]/);
+      expect(src, f).toContain('import { extraCautionAnswers } from "@/lib/rules/safety";');
+    }
   });
 
   // The reviewer signs this exact list at this version. Changing a list means
