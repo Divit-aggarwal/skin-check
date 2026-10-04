@@ -3,12 +3,13 @@ import { loadTrustedEchoContext } from "@/lib/echo-trusted-context";
 import type { EchoRegion } from "@/lib/echo-regions";
 import { SKINSTATE_FIELD_PATHS } from "@/lib/comparability";
 import type { LongitudinalResult } from "@/lib/contracts/longitudinal-result";
+import type { SafetyState } from "@/lib/contracts/safety-state";
 import { longitudinalResult } from "@/lib/longitudinal/engine";
 import { evaluateSafety } from "@/lib/rules/safety";
 import type { SkinStateRegionKey } from "@/lib/skin-state";
 import { loadTrustedSkinState2Series } from "@/lib/skin-state-2-loader";
 import type { SkinState2Result } from "@/lib/skin-state-2";
-import { answerFromPackage, comparisonAnswer } from "./answer";
+import { answerFromPackage, comparisonAnswer, fallbackAnswer } from "./answer";
 import { buildContextPackage, PACKAGE_VERSION, packageSha256 } from "./builder";
 import { loadChatHistory, recordChatTurns, type EchoTurnRecord } from "./chat-turns";
 import { comparisonHit, redFlagHit, REFERRAL_COPY } from "./prefilter";
@@ -87,12 +88,29 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
   // rules are off in production builds, and nothing calls recommend() yet.
   // No server record says which answers were confirmed on this check
   // (tracker row), so every answer counts as reused: caution is never removed.
-  const safety = evaluateSafety({ answers: trusted.answers, confirmedThisScan: [] });
+  const skin = { scores: trusted.scores, regionScores: trusted.regionScores, regionLowConfidence: trusted.regionLowConfidence, pipelineVersion: trusted.pipelineVersion };
+  let safety: SafetyState;
+  try {
+    safety = evaluateSafety({ answers: trusted.answers, confirmedThisScan: [] });
+  } catch (err) {
+    // Rules report 6.4: ANY throw (RulesDisabledError, a TypeError for answers
+    // with no rule field, a bug) means the fixed fallback: our own reading
+    // text and one uncertainty line, no Gemini call, no products. Never "no
+    // red flag". The builder still applies the caution matcher to the answers.
+    console.error("context chat: safety unavailable, fixed fallback:", (err as Error)?.name ?? "unknown");
+    const pkg = buildContextPackage({ regionFocus: region, message, skin, answers: trusted.answers });
+    const reply = fallbackAnswer(pkg);
+    await recordChatTurns(
+      uid, scanId, region, message, reply,
+      meta({ ...NO_CALL, packageVersion: PACKAGE_VERSION, packageSha256: packageSha256(pkg), validator: { passed: false, failures: ["safety_unavailable"], regenerated: false, fallback: true }, prefilter: null, redFlag: false })
+    );
+    return { ok: true, reply };
+  }
   const longitudinal = await longitudinalFor(uid, scanId);
   const pkg = buildContextPackage({
     regionFocus: region,
     message,
-    skin: { scores: trusted.scores, regionScores: trusted.regionScores, regionLowConfidence: trusted.regionLowConfidence, pipelineVersion: trusted.pipelineVersion },
+    skin,
     answers: trusted.answers,
     longitudinal,
     safety,

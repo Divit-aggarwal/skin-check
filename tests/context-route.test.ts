@@ -15,6 +15,7 @@ const h = vi.hoisted(() => ({
   buildContextPackage: vi.fn(),
   handleContextChat: vi.fn(),
   loadTrustedSkinState2Series: vi.fn(),
+  evaluateSafety: vi.fn(),
 }));
 
 vi.mock("@google/genai", () => ({ GoogleGenAI: class { models = { generateContent: h.generateContent }; } }));
@@ -25,6 +26,11 @@ vi.mock("@/lib/firebase/admin", async () => {
 vi.mock("@/lib/gemini", async () => ({ ...(await vi.importActual<typeof import("@/lib/gemini")>("@/lib/gemini")), getSkinCheckChatReply: h.getSkinCheckChatReply }));
 vi.mock("@/lib/echo-trusted-context", () => ({ loadTrustedEchoContext: h.loadTrustedEchoContext }));
 vi.mock("@/lib/skin-state-2-loader", () => ({ loadTrustedSkinState2Series: h.loadTrustedSkinState2Series }));
+vi.mock("@/lib/rules/safety", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/rules/safety")>("@/lib/rules/safety");
+  h.evaluateSafety.mockImplementation(actual.evaluateSafety);
+  return { ...actual, evaluateSafety: h.evaluateSafety };
+});
 vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory }));
 vi.mock("@/lib/context/builder", async () => {
   const actual = await vi.importActual<typeof import("@/lib/context/builder")>("@/lib/context/builder");
@@ -240,5 +246,51 @@ describe("context path: real longitudinal and safety inputs (wiring 2)", () => {
     expect(h.generateContent).toHaveBeenCalledTimes(1);
     // The red flag itself never reaches Gemini.
     expect(geminiCall()).not.toMatch(/redFlag|deep_painful|red_flag\./);
+  });
+});
+
+// ── wave-2 wiring 4: any rules/safety error means the fixed fallback ─────────
+describe("context path: a safety error is never 'no red flag' (wiring 4)", () => {
+  const actualSafety = async () => (await vi.importActual<typeof import("@/lib/rules/safety")>("@/lib/rules/safety")).evaluateSafety;
+  beforeEach(async () => {
+    h.evaluateSafety.mockImplementation(await actualSafety());
+  });
+
+  const expectFixedFallback = async (res: Response) => {
+    expect(res.status).toBe(200);
+    const { reply } = await res.json();
+    // Our own reading text for the focus region plus the uncertainty line: nothing else.
+    expect(reply.split("\n").at(-1)).toBe(UNCERTAINTY.text);
+    expect(reply).toMatch(/photo-based estimate/);
+    expect(reply).not.toMatch(/product|routine|cleanser|serum|dermatologist/i);
+    expect(h.generateContent).not.toHaveBeenCalled();
+    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({
+      prefilter: null, modelId: null, validator: { passed: false, failures: ["safety_unavailable"], regenerated: false, fallback: true },
+    });
+  };
+
+  it("rules switched off (RulesDisabledError, as in production builds)", async () => {
+    const { RulesDisabledError } = await import("@/lib/rules/settings");
+    h.evaluateSafety.mockImplementation(() => { throw new RulesDisabledError(); });
+    await expectFixedFallback(await post());
+  });
+
+  it("malformed input (TypeError) and any other error", async () => {
+    h.evaluateSafety.mockImplementation(() => { throw new TypeError("rules: answers must be an object"); });
+    await expectFixedFallback(await post());
+    vi.clearAllMocks();
+    h.evaluateSafety.mockImplementation(() => { throw new Error("bug"); });
+    await expectFixedFallback(await post());
+  });
+
+  it("a check with no quiz answers (the real evaluateSafety throws): fixed fallback, not a guess", async () => {
+    h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers: {} });
+    await expectFixedFallback(await post());
+  });
+
+  it("a chat red flag still gets the referral first (the pre-filter runs before safety)", async () => {
+    h.evaluateSafety.mockImplementation(() => { throw new Error("bug"); });
+    const res = await post("I don't want to live anymore");
+    expect((await res.json()).reply).toBe(REFERRAL_COPY);
   });
 });
