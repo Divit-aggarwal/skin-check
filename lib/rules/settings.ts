@@ -9,9 +9,13 @@ export const RULESET_VERSION = "rules-0-provisional";
 export const REVIEW_STATUS: "provisional" | "clinically_reviewed" = "provisional";
 
 /**
- * Fails closed: before clinical sign-off, on only when NODE_ENV is exactly
- * "test" or "development" (off in production builds, and when unset).
- * No environment override, on purpose.
+ * Product recommendations (recommend). Fails closed: before clinical sign-off,
+ * on only when NODE_ENV is exactly "test" or "development" (off in production
+ * builds, and when unset). No environment override, on purpose.
+ *
+ * The red-flag and extra-caution check (evaluateSafety) is not behind this
+ * switch: it runs in every build, marked provisional by REVIEW_STATUS, because
+ * it can only add caution (owner decision TD-20, 2026-10-05).
  */
 export function rulesEnabledFor(nodeEnv: string | undefined, reviewStatus: typeof REVIEW_STATUS): boolean {
   return reviewStatus === "clinically_reviewed" || nodeEnv === "test" || nodeEnv === "development";
@@ -21,7 +25,7 @@ export const RULES_ENABLED = rulesEnabledFor(process.env.NODE_ENV, REVIEW_STATUS
 
 export class RulesDisabledError extends Error {
   constructor() {
-    super("Rules are off in production builds until clinical sign-off (tracker E05).");
+    super("Product recommendations are off in production builds until clinical sign-off (tracker E05).");
   }
 }
 

@@ -101,7 +101,8 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
   if (!trusted) return { ok: false, status: 409, code: "CHAT_ANALYSIS_UNAVAILABLE", error: "This scan's analysis isn't available yet." };
 
   // Real inputs (wave-2 wiring 2). The recommendation section stays empty:
-  // rules are off in production builds, and nothing calls recommend() yet.
+  // recommend() is off in production builds (TD-20) and nothing calls it yet.
+  // evaluateSafety runs in every build, marked provisional.
   // No server record says which answers were confirmed on this check
   // (tracker row), so every answer counts as reused: caution is never removed.
   const skin = { scores: trusted.scores, regionScores: trusted.regionScores, regionLowConfidence: trusted.regionLowConfidence, pipelineVersion: trusted.pipelineVersion, schemaVersion: trusted.schemaVersion };
@@ -109,7 +110,7 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
   try {
     safety = evaluateSafety({ answers: trusted.answers, confirmedThisScan: [] });
   } catch (err) {
-    // Rules report 6.4: ANY throw (RulesDisabledError, a TypeError for answers
+    // Rules report 6.4: ANY throw (a TypeError for answers
     // with no rule field, a bug) means the fixed fallback: our own reading
     // text and one uncertainty line, no Gemini call, no products. Never "no
     // red flag". The builder still applies the caution matcher to the answers.

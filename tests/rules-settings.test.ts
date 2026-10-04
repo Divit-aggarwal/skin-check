@@ -47,14 +47,23 @@ describe("production switch (tracker E05: off in production until clinical sign-
     expect(settings.RULES_ENABLED).toBe(false);
   });
 
-  it("both public functions refuse in a production build", async () => {
+  // TD-20 (owner, 2026-10-05): the switch is split. The safety check only adds
+  // caution, so it runs in production builds, marked provisional; product
+  // recommendations stay off there until clinical sign-off.
+  it("in a production build the safety check runs, marked provisional, and recommendations refuse", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.resetModules();
     const { evaluateSafety } = await import("@/lib/rules/safety");
     const { recommend } = await import("@/lib/rules/recommend");
     const { CATALOGUE } = await import("@/lib/catalog/catalogue");
-    const input = { answers: { breakout_pattern: ["deep_painful"] }, confirmedThisScan: [] };
-    expect(() => evaluateSafety(input)).toThrow(/clinical sign-off/);
+    const input = { answers: { breakout_pattern: ["deep_painful"], current_products: ["prescription"] }, confirmedThisScan: [] };
+    expect(evaluateSafety(input)).toMatchObject({
+      redFlag: true,
+      raisedBy: ["red_flag.deep_painful_breakouts"],
+      extraCaution: true,
+      reviewStatus: "provisional",
+      rulesetVersion: RULESET_VERSION,
+    });
     expect(() => recommend(input, CATALOGUE)).toThrow(/clinical sign-off/);
   });
 

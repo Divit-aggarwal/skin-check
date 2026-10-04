@@ -303,7 +303,7 @@ describe("context path: a safety error is never 'no red flag' (wiring 4)", () =>
     });
   };
 
-  it("rules switched off (RulesDisabledError, as in production builds)", async () => {
+  it("a disabled-rules error (RulesDisabledError)", async () => {
     const { RulesDisabledError } = await import("@/lib/rules/settings");
     h.evaluateSafety.mockImplementation(() => { throw new RulesDisabledError(); });
     await expectFixedFallback(await post());
