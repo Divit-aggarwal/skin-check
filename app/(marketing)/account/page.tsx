@@ -1,5 +1,6 @@
 import { PhoneOtpForm } from "@/components/auth/PhoneOtpForm";
 import { PreviousScans } from "@/components/skin-check/PreviousScans";
+import { ConsentSection } from "@/components/dashboard/ConsentSection";
 import { DeleteAccount } from "./DeleteAccount";
 
 export const metadata = {
@@ -20,7 +21,11 @@ export default function AccountPage() {
       </div>
       <PhoneOtpForm />
       <PreviousScans />
-      <DeleteAccount />
+      {/* H14: consent status and the AI-share withdrawal (also on /dashboard). */}
+      <ConsentSection />
+      <div id="delete-account">
+        <DeleteAccount />
+      </div>
     </main>
   );
 }
