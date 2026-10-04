@@ -196,7 +196,7 @@ test("K-1 fixed: Echo's back link after a dashboard hand-off returns to the dash
   await expect(page).toHaveURL(/\/echo/);
   await page.getByRole("link", { name: "Back to your skin checks" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByText(C.title)).toBeVisible();
+  await expect(page.getByRole("heading", { name: C.title })).toBeVisible();
 });
 
 test("delete the account, sign in again, no history", async ({ page }) => {
@@ -227,7 +227,7 @@ test("O-D3: the signed-in start page and the account page link to the dashboard;
   await page.goto("/skin-check");
   await page.getByRole("link", { name: C.entryLink }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByText(C.title)).toBeVisible();
+  await expect(page.getByRole("heading", { name: C.title })).toBeVisible();
 
   await page.goto("/account");
   await page.getByRole("link", { name: C.entryLink }).click();
