@@ -79,7 +79,7 @@ describe.skipIf(!WEB)("privacy: erasure end to end", () => {
       body: JSON.stringify({ confirm: "DELETE MY DATA" }),
     });
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, steps: { revoke: "done", s3: "done", firestore: "done", auth: "done" } });
+    expect(await res.json()).toEqual({ ok: true, steps: { mark: "done", revoke: "done", s3: "done", firestore: "done", auth: "done" } });
 
     // A is gone from every place.
     expect(await objects(A.uid)).toBe(0);
@@ -105,5 +105,86 @@ describe.skipIf(!WEB)("privacy: erasure end to end", () => {
     const receipts = await db.collection("erasures").get();
     expect(receipts.size).toBeGreaterThanOrEqual(1);
     expect(JSON.stringify(receipts.docs.map((d) => d.data()))).not.toContain(A.uid);
+  }, 120_000);
+});
+
+// H04 + H21 (TD-19): after an erase, a late photo upload with a link issued
+// before the delete, a late server write and a client write with the old
+// token leave nothing behind once the sweep has run.
+describe.skipIf(!WEB)("privacy: nothing written after an erase stays", () => {
+  const C = { uid: "seed-privacy-late", phoneNumber: "+919999900104" };
+  const FS = process.env.FIRESTORE_EMULATOR_HOST;
+  const clientWrite = (idToken: string, docId: string) =>
+    fetch(`http://${FS}/v1/projects/${PROJECT}/databases/(default)/documents/users/${C.uid}/skinChecks?documentId=${docId}`, {
+      method: "POST",
+      headers: { authorization: `Bearer ${idToken}`, "content-type": "application/json" },
+      body: JSON.stringify({ fields: { status: { stringValue: "questionnaire_only" } } }),
+    });
+
+  it("a late upload, a late server write and a client write with the old token are all gone after the sweep", async () => {
+    const { initializeApp } = await import("firebase-admin/app");
+    const { getAuth } = await import("firebase-admin/auth");
+    const { getFirestore } = await import("firebase-admin/firestore");
+    const app = initializeApp({ projectId: PROJECT! }, `privacy-late-${Date.now()}`);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const s3 = new S3Client({
+      region: "ap-south-1",
+      endpoint: process.env.S3_SKIN_IMAGES_ENDPOINT!,
+      forcePathStyle: true,
+      credentials: { accessKeyId: "local-dev", secretAccessKey: "local-dev" },
+    });
+    const objects = async () =>
+      (await s3.send(new ListObjectsV2Command({ Bucket: "skin-originals-dev", Prefix: `users/${C.uid}/` }))).KeyCount ?? 0;
+    const tree = async () => {
+      const ref = db.collection("users").doc(C.uid);
+      const [doc, subs] = await Promise.all([ref.get(), ref.listCollections()]);
+      return { exists: doc.exists, collections: subs.map((c) => c.id).sort() };
+    };
+    const marker = () => db.collection("erasedAccounts").doc(C.uid).get();
+
+    const { idToken } = await emulatorPhoneSignIn(C.phoneNumber);
+    const bearer = { authorization: `Bearer ${idToken}`, "content-type": "application/json" };
+
+    // Control: before the erase, this token can write.
+    expect((await clientWrite(idToken, "late-before-0001")).status).toBe(200);
+
+    // An upload link issued BEFORE the delete.
+    const photo = Buffer.from("late photo bytes");
+    const presign = await fetch(`${WEB}/api/skin-scan/upload`, {
+      method: "POST",
+      headers: bearer,
+      body: JSON.stringify({ scanId: "late-scan-000001", contentLength: photo.length, imageRetentionConsent: true, imageRetentionConsentVersion: "skin image retention version 1" }),
+    });
+    expect(presign.status).toBe(200);
+    const { uploadUrl, contentType } = (await presign.json()) as { uploadUrl: string; contentType: string };
+
+    const erased = await fetch(`${WEB}/api/account/erase`, { method: "POST", headers: bearer, body: JSON.stringify({ confirm: "DELETE MY DATA" }) });
+    expect(erased.status).toBe(200);
+    expect(await objects()).toBe(0);
+    expect(await tree()).toEqual({ exists: false, collections: [] });
+    expect((await marker()).exists).toBe(true);
+
+    // Late arrivals. Each is shown to land (or be refused) before the sweep.
+    expect((await fetch(uploadUrl, { method: "PUT", headers: { "content-type": contentType }, body: photo })).status).toBe(200);
+    expect(await objects()).toBe(1);
+    // A scan request that passed verification before the revoke and writes when it finishes.
+    await db.collection("users").doc(C.uid).collection("scanAnalyses").doc("inflight_seed").set({ scanId: "late-scan-000001", source: "server" });
+    expect((await tree()).collections).toEqual(["scanAnalyses"]);
+    // The old ID token: Firestore does not check revocation, the marker refuses it.
+    expect((await clientWrite(idToken, "late-after-00001")).status).toBe(403);
+
+    // Not swept before the delay; then the sweep (the stack's delay is 2 s).
+    const sweep = () => fetch(`${WEB}/api/account/erase/sweep`, { headers: { authorization: "Bearer local-dev-cron-secret" } });
+    expect((await fetch(`${WEB}/api/account/erase/sweep`, { headers: { authorization: "Bearer wrong" } })).status).toBe(401);
+    await new Promise((r) => setTimeout(r, 2_500));
+    const swept = await sweep();
+    expect(swept.status).toBe(200);
+    expect(await swept.json()).toMatchObject({ ok: true, failed: 0 });
+
+    expect(await objects()).toBe(0);
+    expect(await tree()).toEqual({ exists: false, collections: [] });
+    expect((await marker()).exists).toBe(false);
+    await expect(auth.getUser(C.uid)).rejects.toMatchObject({ code: "auth/user-not-found" });
   }, 120_000);
 });

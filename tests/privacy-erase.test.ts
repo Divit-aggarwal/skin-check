@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // H01b erase route with fakes: order, stop-on-failure, identity only from the
 // token, fresh sign-in, and the decision 9(b) receipt.
-const { order, verifyFirebaseIdTokenClaims, revokeRefreshTokens, deleteUser, recursiveDelete, eraseUserPrefix, receipts, assertEraseConfigured } =
+const { order, markErased, verifyFirebaseIdTokenClaims, revokeRefreshTokens, deleteUser, recursiveDelete, eraseUserPrefix, receipts, assertEraseConfigured } =
   vi.hoisted(() => {
     const order: string[] = [];
     return {
       order,
+      markErased: vi.fn(async () => void order.push("mark")),
       verifyFirebaseIdTokenClaims: vi.fn(),
       revokeRefreshTokens: vi.fn(async () => void order.push("revoke")),
       deleteUser: vi.fn(async () => void order.push("auth")),
@@ -37,6 +38,10 @@ vi.mock("@/lib/firebase/admin", async () => {
 vi.mock("@/lib/s3", async () => {
   const actual = await vi.importActual<typeof import("@/lib/s3")>("@/lib/s3");
   return { ...actual, eraseUserPrefix, assertEraseConfigured };
+});
+vi.mock("@/lib/erase", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/erase")>("@/lib/erase");
+  return { ...actual, markErased };
 });
 vi.mock("@/lib/rate-limit", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
@@ -70,11 +75,12 @@ beforeEach(() => {
 });
 
 describe("erase route", () => {
-  it("runs revoke, then S3, then Firestore, then Auth, all for the token's uid", async () => {
+  it("marks the account erased first (H04, TD-19), then revoke, S3, Firestore, Auth, all for the token's uid", async () => {
     const res = await post();
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ok: true, steps: { revoke: "done", s3: "done", firestore: "done", auth: "done" } });
-    expect(order).toEqual(["revoke", "s3", "firestore", "auth"]);
+    expect(await res.json()).toEqual({ ok: true, steps: { mark: "done", revoke: "done", s3: "done", firestore: "done", auth: "done" } });
+    expect(order).toEqual(["mark", "revoke", "s3", "firestore", "auth"]);
+    expect(markErased).toHaveBeenCalledWith(UID);
     expect(revokeRefreshTokens).toHaveBeenCalledWith(UID);
     expect(eraseUserPrefix).toHaveBeenCalledWith(UID);
     expect(recursiveDelete).toHaveBeenCalledWith({ path: `users/${UID}` });
@@ -85,7 +91,7 @@ describe("erase route", () => {
     eraseUserPrefix.mockRejectedValueOnce(new Error("AccessDenied"));
     const res = await post();
     expect(res.status).toBe(500);
-    expect(await res.json()).toMatchObject({ ok: false, failedStep: "s3", completedSteps: ["revoke"] });
+    expect(await res.json()).toMatchObject({ ok: false, failedStep: "s3", completedSteps: ["mark", "revoke"] });
     expect(recursiveDelete).not.toHaveBeenCalled();
     expect(deleteUser).not.toHaveBeenCalled();
     expect(receipts.add).not.toHaveBeenCalled();
@@ -94,13 +100,13 @@ describe("erase route", () => {
   it("a Firestore failure stops Auth", async () => {
     recursiveDelete.mockRejectedValueOnce(new Error("unavailable"));
     const res = await post();
-    expect(await res.json()).toMatchObject({ failedStep: "firestore", completedSteps: ["revoke", "s3"] });
+    expect(await res.json()).toMatchObject({ failedStep: "firestore", completedSteps: ["mark", "revoke", "s3"] });
     expect(deleteUser).not.toHaveBeenCalled();
   });
 
   it("a revoke failure stops everything", async () => {
     revokeRefreshTokens.mockRejectedValueOnce(new Error("down"));
-    expect(await (await post()).json()).toMatchObject({ failedStep: "revoke", completedSteps: [] });
+    expect(await (await post()).json()).toMatchObject({ failedStep: "revoke", completedSteps: ["mark"] });
     expect(eraseUserPrefix).not.toHaveBeenCalled();
   });
 
@@ -110,7 +116,14 @@ describe("erase route", () => {
     order.length = 0;
     const res = await post();
     expect(res.status).toBe(200);
-    expect(order).toEqual(["revoke", "s3", "firestore", "auth"]);
+    expect(order).toEqual(["mark", "revoke", "s3", "firestore", "auth"]);
+  });
+
+  it("a failure to mark the account erased stops everything (nothing is deleted without the marker)", async () => {
+    markErased.mockRejectedValueOnce(new Error("down"));
+    expect(await (await post()).json()).toMatchObject({ failedStep: "mark", completedSteps: [] });
+    expect(revokeRefreshTokens).not.toHaveBeenCalled();
+    expect(eraseUserPrefix).not.toHaveBeenCalled();
   });
 
   it("an Auth user already gone counts as done", async () => {
@@ -185,6 +198,7 @@ describe("erase route", () => {
     expect(receipts.add).toHaveBeenCalledTimes(1);
     const receipt = receipts.add.mock.calls[0]![0] as Record<string, unknown>;
     expect(Object.keys(receipt).sort()).toEqual(["erasedAt", "s3ObjectsDeleted", "schemaVersion", "steps"]);
+    expect(Object.keys(receipt.steps as object)).toEqual(["mark", "revoke", "s3", "firestore", "auth"]);
     expect(JSON.stringify(receipt)).not.toContain(UID);
   });
 

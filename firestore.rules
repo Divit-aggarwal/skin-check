@@ -10,8 +10,18 @@ service cloud.firestore {
     // A user owns exactly their own profile doc and nothing else. No list
     // rule — phone numbers must not be enumerable, and nothing in the app
     // queries the collection.
+    // H04 (TD-19): after an erase, erasedAccounts/{uid} exists until the
+    // sweep. An ID token issued before the erase still verifies here (rules
+    // do not check revocation), so every client write for that uid is refused
+    // while the marker exists. erasedAccounts itself is unmatched: no client
+    // can read or write it.
+    function notErased(uid) {
+      return !exists(/databases/$(database)/documents/erasedAccounts/$(uid));
+    }
+
     match /users/{uid} {
-      allow get, create, update: if request.auth != null && request.auth.uid == uid;
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null && request.auth.uid == uid && notErased(uid);
       allow delete: if false;
 
       // Completed Skin Check questionnaires. This is the whole server-side
@@ -22,6 +32,7 @@ service cloud.firestore {
       match /skinChecks/{checkId} {
         allow get, list: if request.auth != null && request.auth.uid == uid;
         allow create: if request.auth != null && request.auth.uid == uid
+                      && notErased(uid)
                       && imageKeyIsOwn(uid, checkId)
                       && storedImageHasConsent();
         allow update, delete: if false;

@@ -9,15 +9,19 @@ import {
   bearerToken,
   verifyFirebaseIdTokenClaims,
 } from "@/lib/firebase/admin";
-import { assertEraseConfigured, eraseUserPrefix } from "@/lib/s3";
+import { assertEraseConfigured } from "@/lib/s3";
+import { eraseSteps, markErased } from "@/lib/erase";
 import { isPlainUid } from "@/lib/s3-key";
 import { ERASE_CONFIRMATION, ERASE_MAX_AUTH_AGE_SECONDS } from "@/lib/consent";
 
 // firebase-admin and the AWS SDK both need Node APIs.
 export const runtime = "nodejs";
 
-// H01b user erasure (D-17): revoke sessions, then S3 users/<uid>/, then the
-// Firestore users/<uid> tree, then the Auth user. Any failure stops the later
+// H01b user erasure (D-17): mark the account erased (H04/H21, TD-19: rules
+// then refuse every client write for it, and a sweep after every old token
+// and upload link has expired removes whatever lands late; lib/erase.ts),
+// revoke sessions, then S3 users/<uid>/, then the Firestore users/<uid> tree,
+// then the Auth user. Any failure stops the later
 // steps and names the failed step. Before the Auth step the uid still exists,
 // so the user can sign in again and rerun the route to finish the job.
 // D-17: "Immutability is a promise to clients, not a retention promise."
@@ -26,7 +30,7 @@ export const runtime = "nodejs";
 // Strict: a `uid` in the body is a 400, never an identity source.
 const BodySchema = z.object({ confirm: z.literal(ERASE_CONFIRMATION) }).strict();
 
-const STEPS = ["revoke", "s3", "firestore", "auth"] as const;
+const STEPS = ["mark", "revoke", "s3", "firestore", "auth"] as const;
 type Step = (typeof STEPS)[number];
 
 const unauthorized = () =>
@@ -97,22 +101,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const userRef = adminDb().collection("users").doc(uid);
   let s3ObjectsDeleted = 0;
+  const erase = eraseSteps(uid);
   const run: Record<Step, () => Promise<unknown>> = {
+    // First, before anything is deleted: from here no client write lands, and the sweep is due.
+    mark: () => markErased(uid),
     // Not a deletion step: it stops new uploads, scans and chats while the erase runs.
     revoke: () => adminAuth().revokeRefreshTokens(uid),
     s3: async () => {
-      s3ObjectsDeleted = await eraseUserPrefix(uid);
+      s3ObjectsDeleted = await erase.s3();
     },
-    firestore: () => adminDb().recursiveDelete(userRef),
+    firestore: erase.firestore,
     // Already gone counts as done, so a rerun after a lost response finishes cleanly.
-    auth: () =>
-      adminAuth()
-        .deleteUser(uid)
-        .catch((err: { code?: string }) => {
-          if (err?.code !== "auth/user-not-found") throw err;
-        }),
+    auth: erase.auth,
   };
 
   const completedSteps: Step[] = [];

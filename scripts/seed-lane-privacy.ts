@@ -29,8 +29,10 @@ const PRIVACY_SEED = {
   eraseA: { uid: "seed-privacy-erase", phoneNumber: "+919999900101" },
   eraseB: { uid: "seed-privacy-erase-2", phoneNumber: "+919999900102" },
   minor: { uid: "seed-privacy-minor", phoneNumber: "+919999900103" },
+  // H04/H21: erased with an upload link issued before the delete (tests/privacy.e2e.test.ts).
+  late: { uid: "seed-privacy-late", phoneNumber: "+919999900104" },
 };
-const ATTESTED = ["seed-user-asha", "seed-user-ravi", PRIVACY_SEED.eraseA.uid, PRIVACY_SEED.eraseB.uid];
+const ATTESTED = ["seed-user-asha", "seed-user-ravi", PRIVACY_SEED.eraseA.uid, PRIVACY_SEED.eraseB.uid, PRIVACY_SEED.late.uid];
 
 const app = initializeApp({ projectId: PROJECT }, "seed-privacy");
 const auth = getAuth(app);
@@ -79,7 +81,7 @@ async function main() {
     .add(entry("age_18_plus", false, AGE_ATTESTATION_VERSION, AGE_ATTESTATION_COPY, "attestation_route"));
 
   // Something in every place erasure must clear, for both erase users.
-  for (const { uid } of [PRIVACY_SEED.eraseA, PRIVACY_SEED.eraseB]) {
+  for (const { uid } of [PRIVACY_SEED.eraseA, PRIVACY_SEED.eraseB, PRIVACY_SEED.late]) {
     const userRef = db.collection("users").doc(uid);
     // Routine lane request (H01): routine events live under users/{uid} too.
     const event = RoutineEventInputSchema.parse({
@@ -121,7 +123,7 @@ async function main() {
 }
 
 main().then(
-  () => console.log(`seed-lane-privacy: ledger for ${ATTESTED.length} users, 1 under-18 user, 2 erase users (project ${PROJECT}).`),
+  () => console.log(`seed-lane-privacy: ledger for ${ATTESTED.length} users, 1 under-18 user, 3 erase users (project ${PROJECT}).`),
   (err) => {
     console.error("seed-lane-privacy failed:", (err as Error)?.message);
     process.exit(1);

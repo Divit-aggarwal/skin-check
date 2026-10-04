@@ -90,6 +90,9 @@ export NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST="127.0.0.1:$FS" FIRESTORE_EMULATOR_HO
 export SKIN_SCAN_API_URL="http://127.0.0.1:$ENGINE" S3_SKIN_IMAGES_ENDPOINT="http://127.0.0.1:$S3"
 export FIREBASE_PROJECT_ID=$PROJECT NEXT_PUBLIC_FIREBASE_PROJECT_ID=$PROJECT
 export LOCAL_STACK_WEB="http://127.0.0.1:$WEB"
+# H04/H21 erase sweep (lib/erase.ts): local-only values, not secrets. A short
+# delay so the end-to-end test need not wait 70 minutes; ignored in production builds.
+export CRON_SECRET=local-dev-cron-secret ERASE_SWEEP_DELAY_SECONDS=2
 
 # Base seed, then any lane seed (scripts/seed-lane-<lane>.ts), so lanes never
 # edit the shared seed file.
