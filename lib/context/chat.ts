@@ -1,6 +1,13 @@
 import { generateContextAnswer } from "@/lib/gemini";
 import { loadTrustedEchoContext } from "@/lib/echo-trusted-context";
 import type { EchoRegion } from "@/lib/echo-regions";
+import { SKINSTATE_FIELD_PATHS } from "@/lib/comparability";
+import type { LongitudinalResult } from "@/lib/contracts/longitudinal-result";
+import { longitudinalResult } from "@/lib/longitudinal/engine";
+import { evaluateSafety } from "@/lib/rules/safety";
+import type { SkinStateRegionKey } from "@/lib/skin-state";
+import { loadTrustedSkinState2Series } from "@/lib/skin-state-2-loader";
+import type { SkinState2Result } from "@/lib/skin-state-2";
 import { answerFromPackage, comparisonAnswer } from "./answer";
 import { buildContextPackage, PACKAGE_VERSION, packageSha256 } from "./builder";
 import { loadChatHistory, recordChatTurns, type EchoTurnRecord } from "./chat-turns";
@@ -26,6 +33,42 @@ async function recordBestEffort(...args: Parameters<typeof recordChatTurns>): Pr
   }
 }
 
+/** Every skinstate region key (DEFINED_REGIONS is private to the frozen lib/skin-state.ts). */
+const REGIONS = ["forehead", "nose", "chin", "cheeks", "cheek_image_left", "cheek_image_right"] as const satisfies readonly SkinStateRegionKey[];
+// Compile-time check that REGIONS names every key: a new key fails the build here.
+const ALL_REGIONS: Exclude<SkinStateRegionKey, (typeof REGIONS)[number]> extends never ? true : never = true;
+void ALL_REGIONS;
+
+/**
+ * The series up to the scan being discussed, so "latest" is that scan. Legacy
+ * and invalid entries stay in (the engine names them). If the scan has no
+ * skinstate-2 state, the whole series is used: with the production tables the
+ * answer is "not enough evidence" either way.
+ */
+export function seriesUpTo(series: readonly SkinState2Result[], scanId: string): SkinState2Result[] {
+  const times = series.flatMap((e) => (e.kind === "skinstate" && e.state.identity.scanId === scanId ? [e.state.provenance.analyzedAt] : []));
+  if (times.length === 0) return [...series];
+  const upTo = times.sort().at(-1)!;
+  return series.filter((e) => e.kind !== "skinstate" || e.state.provenance.analyzedAt <= upTo);
+}
+
+/**
+ * D02/D03 answers for every quantity in every region, from the trusted
+ * skinstate-2 series. Production tables only (three arguments; guarded by
+ * tests/longitudinal-guard.test.ts), so every answer is "not enough evidence"
+ * until C07. A read or engine failure leaves the section out, and the
+ * package's `missing` says so; it never invents a trend.
+ */
+async function longitudinalFor(uid: string, scanId: string): Promise<LongitudinalResult[] | undefined> {
+  try {
+    const series = seriesUpTo(await loadTrustedSkinState2Series(uid), scanId);
+    return SKINSTATE_FIELD_PATHS.flatMap((quantity) => REGIONS.map((region) => longitudinalResult(series, quantity, region)));
+  } catch (err) {
+    console.error("context chat: longitudinal section left out:", (err as Error)?.name ?? "unknown");
+    return undefined;
+  }
+}
+
 export async function handleContextChat(input: { uid: string; scanId: string; region: EchoRegion; message: string }): Promise<ContextChatResult> {
   const { uid, scanId, region, message } = input;
   const started = Date.now();
@@ -40,13 +83,19 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
   const trusted = await loadTrustedEchoContext(uid, scanId);
   if (!trusted) return { ok: false, status: 409, code: "CHAT_ANALYSIS_UNAVAILABLE", error: "This scan's analysis isn't available yet." };
 
-  // Longitudinal, recommendation and safety inputs are wired by the main
-  // session after the lanes merge; until then `missing` says they are absent.
+  // Real inputs (wave-2 wiring 2). The recommendation section stays empty:
+  // rules are off in production builds, and nothing calls recommend() yet.
+  // No server record says which answers were confirmed on this check
+  // (tracker row), so every answer counts as reused: caution is never removed.
+  const safety = evaluateSafety({ answers: trusted.answers, confirmedThisScan: [] });
+  const longitudinal = await longitudinalFor(uid, scanId);
   const pkg = buildContextPackage({
     regionFocus: region,
     message,
     skin: { scores: trusted.scores, regionScores: trusted.regionScores, regionLowConfidence: trusted.regionLowConfidence, pipelineVersion: trusted.pipelineVersion },
     answers: trusted.answers,
+    longitudinal,
+    safety,
   });
   const versions = { packageVersion: PACKAGE_VERSION, packageSha256: packageSha256(pkg) };
 
@@ -58,7 +107,7 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
   }
 
   const history = await loadChatHistory(uid, scanId, region);
-  const outcome = await answerFromPackage(pkg, message, history, { generate: generateContextAnswer, redFlag: false });
+  const outcome = await answerFromPackage(pkg, message, history, { generate: generateContextAnswer, redFlag: safety.redFlag });
   // Not best effort: an unrecorded reply would make the D-15 history diverge.
   await recordChatTurns(
     uid, scanId, region, message, outcome.reply,

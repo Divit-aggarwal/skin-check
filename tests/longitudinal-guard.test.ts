@@ -49,9 +49,17 @@ describe("longitudinal tables are test-only", () => {
     expect(rows).toEqual([]);
   });
 
-  it("while nothing is wired, no file outside lib/longitudinal imports the engine (closes alias, spread and .call bypasses)", () => {
+  it("the only file outside lib/longitudinal that imports the engine is the context chat path (closes alias, spread and .call bypasses)", () => {
     const importers = SOURCES.filter((f) => !f.startsWith(join("lib", "longitudinal")) && /longitudinal\/engine/.test(readFileSync(f, "utf8")));
-    expect(importers).toEqual([]);
+    expect(importers).toEqual([join("lib", "context", "chat.ts")]);
+  });
+
+  it("the context chat path calls the engine only with three arguments, and never re-exports or aliases it", () => {
+    const src = readFileSync(join("lib", "context", "chat.ts"), "utf8");
+    expect(argCounts(src, "longitudinalResult")).toEqual([3]);
+    expect(src).toContain('import { longitudinalResult } from "@/lib/longitudinal/engine";');
+    // Any other mention (an alias, a spread, a .call, an export) would let a table slip past the count above.
+    expect(src.match(/longitudinalResult/g)).toHaveLength(2);
   });
 
   it("the argument counter sees a fourth argument (positive control)", () => {

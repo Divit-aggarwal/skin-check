@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   loadChatHistory: vi.fn(),
   buildContextPackage: vi.fn(),
   handleContextChat: vi.fn(),
+  loadTrustedSkinState2Series: vi.fn(),
 }));
 
 vi.mock("@google/genai", () => ({ GoogleGenAI: class { models = { generateContent: h.generateContent }; } }));
@@ -23,6 +24,7 @@ vi.mock("@/lib/firebase/admin", async () => {
 });
 vi.mock("@/lib/gemini", async () => ({ ...(await vi.importActual<typeof import("@/lib/gemini")>("@/lib/gemini")), getSkinCheckChatReply: h.getSkinCheckChatReply }));
 vi.mock("@/lib/echo-trusted-context", () => ({ loadTrustedEchoContext: h.loadTrustedEchoContext }));
+vi.mock("@/lib/skin-state-2-loader", () => ({ loadTrustedSkinState2Series: h.loadTrustedSkinState2Series }));
 vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory }));
 vi.mock("@/lib/context/builder", async () => {
   const actual = await vi.importActual<typeof import("@/lib/context/builder")>("@/lib/context/builder");
@@ -32,7 +34,7 @@ vi.mock("@/lib/context/builder", async () => {
 vi.mock("@/lib/context/chat", async () => {
   const actual = await vi.importActual<typeof import("@/lib/context/chat")>("@/lib/context/chat");
   h.handleContextChat.mockImplementation(actual.handleContextChat);
-  return { handleContextChat: h.handleContextChat };
+  return { handleContextChat: h.handleContextChat, seriesUpTo: actual.seriesUpTo };
 });
 vi.mock("@/lib/rate-limit", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
@@ -49,6 +51,11 @@ import { REFERRAL_COPY, COMPARISON_LEAD } from "@/lib/context/prefilter";
 import { UNCERTAINTY } from "@/lib/context/builder";
 import { NextRequest } from "next/server";
 import { CHEEK_SCORES, SCORES } from "./context-fixtures";
+import { syntheticAnalysis } from "./synthetic-scan";
+import { toSkinState2 } from "@/lib/skin-state-2";
+import { SKINSTATE_FIELD_PATHS } from "@/lib/comparability";
+import { seriesUpTo } from "@/lib/context/chat";
+import type { BuildInput } from "@/lib/context/builder";
 
 const SCAN_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const GOOD = JSON.stringify({ claims: [{ claim_type: "uncertainty", text: UNCERTAINTY.text, fact_ids: [UNCERTAINTY.id] }], needs_referral: false });
@@ -67,7 +74,8 @@ beforeEach(() => {
   h.consumeDailyQuota.mockReturnValue(null);
   h.ageStatus.mockResolvedValue("over18");
   h.latestGrant.mockResolvedValue(true);
-  h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers: { skin_type: "oily" } });
+  h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers: { skin_type: "oily", primary_concerns: ["redness"] } });
+  h.loadTrustedSkinState2Series.mockResolvedValue([]);
   h.getSkinCheckChatReply.mockResolvedValue("today's echo");
   h.generateContent.mockResolvedValue({ text: GOOD });
   h.recordChatTurns.mockResolvedValue(undefined);
@@ -172,5 +180,65 @@ describe("switch on: the new path", () => {
     const res = await post();
     expect(res.status).toBe(502);
     expect(h.recordChatTurns).not.toHaveBeenCalled();
+  });
+});
+
+// ── wave-2 wiring 2: real longitudinal result and safety state ───────────────
+describe("context path: real longitudinal and safety inputs (wiring 2)", () => {
+  const rec = (scanId: string, sha: string, at: string) => ({
+    schemaVersion: 1, source: "server", scanId, inputSha256: sha.repeat(64), requestId: `r-${scanId}`, createdAt: new Date(at), ...syntheticAnalysis(),
+  });
+  const state = (scanId: string, sha: string, at: string) => toSkinState2(rec(scanId, sha, at), `users/uid-ctx/scanAnalyses/${scanId}_${sha.repeat(16)}`, "uid-ctx");
+  const builtWith = () => h.buildContextPackage.mock.calls[0]![0] as BuildInput;
+  const geminiCall = (i = 0) => JSON.stringify(h.generateContent.mock.calls[i]![0]);
+
+  it("the builder gets every quantity in every region from the trusted series, all 'not enough evidence', and the evaluateSafety state; no recommendation", async () => {
+    h.loadTrustedSkinState2Series.mockResolvedValue([state("a1", "a", "2026-10-01T10:00:00Z"), state("a2", "b", "2026-10-02T10:00:00Z"), state(SCAN_ID, "c", "2026-10-03T10:00:00Z")]);
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(h.loadTrustedSkinState2Series).toHaveBeenCalledWith("uid-ctx");
+    const input = builtWith();
+    expect(input.longitudinal).toHaveLength(SKINSTATE_FIELD_PATHS.length * 6);
+    expect(new Set(input.longitudinal!.map((r) => r.evidence))).toEqual(new Set(["not_enough_evidence"]));
+    expect(input.safety).toEqual({ rulesetVersion: "rules-0-provisional", reviewStatus: "provisional", extraCaution: false, extraCautionRaisedBy: [], redFlag: false });
+    expect(input.recommendation).toBeUndefined();
+    // The package Gemini sees carries the longitudinal facts and says products were left out.
+    expect(geminiCall()).toContain("long.");
+    expect(geminiCall()).toContain("Product suggestions were not included here.");
+  });
+
+  it("the series stops at the scan being discussed, so a later scan is never 'latest'", () => {
+    const series = [state("a1", "a", "2026-10-01T10:00:00Z"), state(SCAN_ID, "c", "2026-10-03T10:00:00Z"), state("later", "d", "2026-10-05T10:00:00Z")];
+    expect(seriesUpTo(series, SCAN_ID).map((e) => (e.kind === "skinstate" ? e.state.identity.scanId : e.kind))).toEqual(["a1", SCAN_ID]);
+    expect(seriesUpTo(series, "not-in-series")).toHaveLength(3);
+  });
+
+  it("a series read failure leaves the section out (missing 'trend'), never a made-up trend", async () => {
+    h.loadTrustedSkinState2Series.mockRejectedValue(new Error("unavailable"));
+    const res = await post();
+    expect(res.status).toBe(200);
+    expect(builtWith().longitudinal).toBeUndefined();
+    expect(geminiCall()).toContain("Readings from different checks cannot be lined up yet.");
+  });
+
+  it("extra caution from evaluateSafety: the caution sentence goes to Gemini, the answer behind it does not", async () => {
+    h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers: { primary_concerns: ["redness"], current_products: ["actives", "prescription"] } });
+    await post();
+    expect(builtWith().safety).toMatchObject({ extraCaution: true, extraCautionRaisedBy: [{ field: "current_products", value: "prescription" }] });
+    expect(geminiCall()).toContain("Extra caution applies to this user.");
+    expect(geminiCall()).not.toMatch(/A prescription product|extraCautionRaisedBy/);
+  });
+
+  it("a quiz red flag reaches answerFromPackage: a rejected answer is not retried", async () => {
+    const BAD = JSON.stringify({ claims: [{ claim_type: "uncertainty", text: "Your redness is 42.", fact_ids: [UNCERTAINTY.id] }], needs_referral: false });
+    h.generateContent.mockResolvedValue({ text: BAD });
+    await post();
+    expect(h.generateContent).toHaveBeenCalledTimes(2); // control: no red flag, one retry
+    h.generateContent.mockClear();
+    h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers: { primary_concerns: ["blemishes"], breakout_pattern: ["deep_painful"] } });
+    await post();
+    expect(h.generateContent).toHaveBeenCalledTimes(1);
+    // The red flag itself never reaches Gemini.
+    expect(geminiCall()).not.toMatch(/redFlag|deep_painful|red_flag\./);
   });
 });
