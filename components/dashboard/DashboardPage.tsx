@@ -120,7 +120,7 @@ export function DashboardPage() {
           {C.routine.link}
         </Link>
       </section>
-      <ConsentSection photoKept={dashboard.photoKept} deleteLink />
+      <ConsentSection photo={dashboard.photo} deleteLink />
     </Shell>
   );
 }

@@ -7,28 +7,32 @@ import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 import { Button } from "@/components/ui/button";
 import { DASHBOARD_COPY } from "./copy";
 import { loadLedger } from "./data";
-import { aiShareStatus, withdrawalOutcome, type AiShareStatus } from "./state";
+import { aiShareStatus, photoKeptFrom, withdrawalOutcome, type AiShareStatus, type Dashboard } from "./state";
 
 const C = DASHBOARD_COPY.privacy;
 
 // H14: consent status and the AI-share withdrawal, on /dashboard and /account.
 // A withdrawal is one more ledger entry (granted: false) through the existing
 // consent route (H03c); the server reads the newest entry, so Echo asks again.
-export function ConsentSection({ photoKept = null, deleteLink = false }: { photoKept?: boolean | null; deleteLink?: boolean }) {
+export function ConsentSection({ photo = null, deleteLink = false }: { photo?: Dashboard["photo"]; deleteLink?: boolean }) {
   const { user } = useAuth();
   const [status, setStatus] = useState<AiShareStatus | null>(null);
+  // H27: from the ledger too; until it loads (or if it fails) nothing is said.
+  const [photoKept, setPhotoKept] = useState<boolean | null>(null);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState<false | "load" | "retry" | "stale">(false);
 
   const refresh = useCallback(async () => {
     if (!user) return;
     try {
-      setStatus(aiShareStatus(await loadLedger(user.uid)));
+      const ledger = await loadLedger(user.uid);
+      setStatus(aiShareStatus(ledger));
+      setPhotoKept(photoKeptFrom(photo, ledger));
     } catch (error) {
       console.error("[dashboard] consent status not loaded", error instanceof Error ? error.name : error);
       setFailed("load");
     }
-  }, [user]);
+  }, [user, photo]);
 
   useEffect(() => {
     void refresh();

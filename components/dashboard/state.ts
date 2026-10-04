@@ -6,7 +6,7 @@
 // any direction. Bands are the per-photo bands the results screen already
 // shows; one view holds one check.
 
-import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
+import { AI_SHARE_CONSENT_VERSION, IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
 import { startingCheckCount, startingChecks, usableForEveryQuantity } from "@/lib/longitudinal/baseline";
 import { BASELINE_RULE } from "@/lib/longitudinal/settings";
 import { bandScores, type Band, type BandableMetric } from "@/lib/skin-check-rules";
@@ -61,8 +61,12 @@ export interface Dashboard {
   history: HistoryRow[];
   /** The scan Echo is opened about: the newest measured reading. */
   echoScanId: string | null;
-  /** Photo storage of the newest check that had a photo; null when none had one. */
-  photoKept: boolean | null;
+  /**
+   * The newest check that had a photo, and what its client-written record
+   * claims about storage; null when none had one. Not shown as is: see
+   * photoKeptFrom (H27).
+   */
+  photo: { scanId: string; claimsStored: boolean } | null;
 }
 
 type Obj = Record<string, unknown>;
@@ -221,7 +225,7 @@ export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: r
     history,
     // Red team (I02, E-F4): only a reading whose scores can be read is offered to Echo.
     echoScanId: newestMeasured && bandsOf(newestMeasured.record.scores) ? newestMeasured.scanId : null,
-    photoKept: withPhoto ? (withPhoto.data.image as Obj).stored === true : null,
+    photo: withPhoto ? { scanId: withPhoto.id, claimsStored: (withPhoto.data.image as Obj).stored === true } : null,
   };
 }
 
@@ -248,6 +252,26 @@ export function pastCheck(uid: string, scanId: string, checks: readonly Doc[], a
 /** The analysis record Echo will load's session: the server loads the facts from its scanId. */
 export function echoRecord(uid: string, scanId: string, analyses: readonly Doc[]): Obj | null {
   return primaryPerScan(uid, analyses).get(scanId)?.record ?? null;
+}
+
+/**
+ * H27 (owner TD-20, option a): "kept" needs the server's word, not only the
+ * client-written record: an image_retention entry the presign route wrote for
+ * that check. A claim the ledger does not back shows nothing (null), never
+ * "not kept"; a record that says it was not stored shows "not kept".
+ */
+export function photoKeptFrom(photo: Dashboard["photo"], ledger: readonly Doc[]): boolean | null {
+  if (!photo) return null;
+  if (!photo.claimsStored) return false;
+  const backed = ledger.some(
+    (e) =>
+      e.data.purpose === "image_retention" &&
+      e.data.granted === true &&
+      e.data.source === "presign" &&
+      e.data.version === IMAGE_RETENTION_CONSENT_VERSION &&
+      e.data.scanId === photo.scanId
+  );
+  return backed ? true : null;
 }
 
 export type AiShareStatus = "on" | "off" | "not_asked";

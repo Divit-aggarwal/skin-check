@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
+import { AI_SHARE_CONSENT_VERSION, IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
 import { buildScanAnalysisRecord, scanAnalysisDocId } from "@/lib/scan-analysis-record";
 import type { SkinScanResult } from "@/types/skin-scan";
-import { aiShareStatus, deriveDashboard, echoRecord, isEmpty, pastCheck, withdrawalOutcome, type Doc } from "@/components/dashboard/state";
+import { aiShareStatus, deriveDashboard, photoKeptFrom, echoRecord, isEmpty, pastCheck, withdrawalOutcome, type Doc } from "@/components/dashboard/state";
 import { regionRaw, syntheticAnalysis, syntheticNative } from "./synthetic-scan";
 
 // G01 dashboard view model (docs/lanes/dashboard-design.md §3). All values synthetic.
@@ -38,7 +38,7 @@ describe("dashboard view model", () => {
     expect(d.trend).toMatchObject({ kind: "empty", count: 0, needed: 3 });
     expect(d.history).toEqual([]);
     expect(d.echoScanId).toBeNull();
-    expect(d.photoKept).toBeNull();
+    expect(d.photo).toBeNull();
   });
 
   it("one reading: current state shows it, trend is building at 0 of 3 (the newest never counts)", () => {
@@ -168,8 +168,8 @@ describe("dashboard view model", () => {
 
   it("photo storage comes from the newest check that had a photo", () => {
     const d = deriveDashboard(UID, [check("a", 1, { image: { stored: true } }), check("b", 2, { image: null })], []);
-    expect(d.photoKept).toBe(true);
-    expect(deriveDashboard(UID, [check("a", 1)], []).photoKept).toBe(false);
+    expect(d.photo).toEqual({ scanId: "a", claimsStored: true });
+    expect(deriveDashboard(UID, [check("a", 1)], []).photo).toEqual({ scanId: "a", claimsStored: false });
   });
 
   it("carries no score: the only numbers in the view model are the starting-check count", () => {
@@ -334,5 +334,33 @@ describe("starting checks the page counts (D07)", () => {
     const d = deriveDashboard(UID, ids.map((s, i) => check(s, i + 1)), ids.map((s, i) => analysis(s, i + 1)));
     expect(d.trend.count).toBe(3);
     expect(d.trend.kind).toBe("set");
+  });
+});
+
+// H27 (owner TD-20, option a): "kept" is backed by the server's presign ledger entry.
+describe("photo kept (H27)", () => {
+  const presign = (scanId: string, extra: Record<string, unknown> = {}): Doc => ({
+    id: `l-${scanId}`,
+    data: { purpose: "image_retention", granted: true, version: IMAGE_RETENTION_CONSENT_VERSION, scanId, source: "presign", ...extra },
+  });
+  const claim = { scanId: "a", claimsStored: true };
+
+  it("a stored claim with the presign entry for that check: kept", () => {
+    expect(photoKeptFrom(claim, [presign("a")])).toBe(true);
+  });
+
+  it.each([
+    ["no ledger entry", []],
+    ["an entry for another check", [presign("b")]],
+    ["an entry not written by the presign route", [presign("a", { source: "consent_route" })]],
+    ["a refused entry", [presign("a", { granted: false })]],
+    ["an entry at another version", [presign("a", { version: "old" })]],
+  ])("a stored claim with %s says nothing (never 'kept', never 'not kept')", (_n, ledger) => {
+    expect(photoKeptFrom(claim, ledger as Doc[])).toBeNull();
+  });
+
+  it("a record that says it was not stored: not kept; no photo at all: nothing", () => {
+    expect(photoKeptFrom({ scanId: "a", claimsStored: false }, [])).toBe(false);
+    expect(photoKeptFrom(null, [presign("a")])).toBeNull();
   });
 });
