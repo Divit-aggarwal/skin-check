@@ -17,7 +17,6 @@ import type { LongitudinalResult, NotEnoughEvidenceReasonCode, QuantityPath } fr
 import type { RecommendationResult } from "@/lib/contracts/recommendation-result";
 import type { SafetyState } from "@/lib/contracts/safety-state";
 import { GEMINI_FIELD_INVENTORY, withoutCautionAnswers } from "@/lib/gemini";
-import { extraCautionAnswers } from "@/lib/rules/safety";
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { describeStepAnswerParts } from "@/lib/skin-check-format";
 import { bandScores, SCORING_VERSION } from "@/lib/skin-check-rules";
@@ -35,7 +34,8 @@ import {
 // our own text; nothing from an input object is spread or copied whole, and
 // serializePackage() then copies only allowlisted keys.
 
-export const PACKAGE_VERSION = "ctx-1";
+// ctx-2: no safety section (TD-17 (1), tracker H19).
+export const PACKAGE_VERSION = "ctx-2";
 
 const METRICS: ContextMetric[] = ["redness", "oiliness", "texture", "blemishes", "pigment"];
 
@@ -272,11 +272,6 @@ function recommendation(input: NonNullable<BuildInput["recommendation"]>): { sec
 }
 
 export function buildContextPackage(input: BuildInput): ContextPackage {
-  // One list (lib/rules/settings.ts). The answers evaluateSafety named, plus the
-  // same matcher over these answers in case the two inputs ever differ: the
-  // flag can only be added, never removed.
-  const raised = [...(input.safety?.extraCautionRaisedBy ?? []), ...extraCautionAnswers(input.answers)];
-  const extraCaution = raised.length > 0;
   const missingItems: MissingItem[] = [
     missing("hydration", "hydration", MISSING_TEXT.hydration),
     missing("pores", "pores", MISSING_TEXT.pores),
@@ -287,7 +282,6 @@ export function buildContextPackage(input: BuildInput): ContextPackage {
     packageVersion: PACKAGE_VERSION,
     regionFocus: input.regionFocus,
     routine: { status: "not_shared", decision: "R-1 A" },
-    safety: { extraCaution },
     uncertainty: [UNCERTAINTY, UNCERTAINTY_BANDS],
     missing: missingItems,
     // routine_as_directed is left out: R-1 A gives it nothing to cite.
@@ -325,8 +319,10 @@ export function buildContextPackage(input: BuildInput): ContextPackage {
   if (rec?.section) pkg.recommendation = rec.section;
   if (!rec?.section || rec.screened) missingItems.push(missing("recommendation", "recommendation", MISSING_TEXT.recommendation));
 
-  // While extraCaution is on, the answer that set it is left out (privacy-report §5).
-  const statements = selfReported(withoutCautionAnswers(input.answers, raised));
+  // An answer that turns extra caution on is left out: the ones evaluateSafety
+  // named, plus the same matcher over these answers (TD-17 (1), tracker H19).
+  // Extra caution itself is not in the package; it stays in our own rules.
+  const statements = selfReported(withoutCautionAnswers(input.answers, input.safety?.extraCautionRaisedBy ?? []));
   if (statements.length > 0) pkg.selfReported = statements;
   else missingItems.push(missing("self_reported", "selfReported", MISSING_TEXT.selfReported));
 
@@ -367,7 +363,6 @@ export function serializePackage(pkg: ContextPackage): Record<string, unknown> {
       items: pkg.recommendation.items.map((i) => ({ ...fact(i), productId: i.productId, productName: i.productName })),
     };
   }
-  out.safety = { extraCaution: pkg.safety.extraCaution };
   if (pkg.selfReported) out.selfReported = pkg.selfReported.map((s) => ({ ...fact(s), source: s.source, field: s.field, fresh: s.fresh }));
   out.uncertainty = pkg.uncertainty.map((u) => ({ ...fact(u), source: u.source }));
   out.missing = pkg.missing.map((m) => ({ ...fact(m), about: m.about }));

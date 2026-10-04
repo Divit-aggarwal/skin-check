@@ -90,10 +90,11 @@ describe("validator: each check has a passing and a failing answer", () => {
     expect(checksOf(ok([{ claim_type: "descriptive", text: `Your scan shows ${RED.band} redness.`, fact_ids: [RED.id] }, UNC]))).not.toContain("self_report_as_measurement");
   });
 
-  it("with extra caution on, an active ingredient fails even when a rec fact names it", () => {
-    const cautious = buildContextPackage(fullInput({ answers: { current_products: ["prescription"] } }));
+  it("for every user (TD-17, H19), an active ingredient fails even when a rec fact names it", () => {
     const raw = ok([{ claim_type: "comparability", text: "Some people use retinol.", fact_ids: ["rec.gentle-cleanser"] }]);
-    expect(validateAnswer(raw, cautious, "x").failures.map((f) => f.check)).toContain("product_claim");
+    for (const answers of [{ current_products: ["prescription"] }, { current_products: ["cleanser_moisturizer"] }, {}]) {
+      expect(validateAnswer(raw, buildContextPackage(fullInput({ answers })), "x").failures.map((f) => f.check)).toContain("product_claim");
+    }
   });
 });
 

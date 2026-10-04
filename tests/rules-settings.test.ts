@@ -88,8 +88,10 @@ describe("clinical lists", () => {
     for (const f of ["lib/gemini.ts", "lib/context/builder.ts"]) {
       const src = readFileSync(f, "utf8");
       expect(src, f).not.toMatch(/pregnant_or_breastfeeding|"prescription"|EXTRA_CAUTION_TRIGGERS\s*[:=]/);
-      expect(src, f).toContain('import { extraCautionAnswers } from "@/lib/rules/safety";');
     }
+    // The builder hides caution answers through lib/gemini.ts withoutCautionAnswers, which uses the rules matcher.
+    expect(readFileSync("lib/gemini.ts", "utf8")).toContain('import { extraCautionAnswers } from "@/lib/rules/safety";');
+    expect(readFileSync("lib/context/builder.ts", "utf8")).toMatch(/import \{[^}]*\bwithoutCautionAnswers\b[^}]*\} from "@\/lib\/gemini";/);
   });
 
   // The reviewer signs this exact list at this version. Changing a list means

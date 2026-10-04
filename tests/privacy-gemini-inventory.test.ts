@@ -9,7 +9,7 @@ vi.mock("@google/genai", () => ({
   },
 }));
 
-import { EXTRA_CAUTION_INSTRUCTION, GEMINI_FIELD_INVENTORY, getSkinCheckChatReply } from "@/lib/gemini";
+import { ECHO_SAFETY_INSTRUCTION, GEMINI_FIELD_INVENTORY, getSkinCheckChatReply } from "@/lib/gemini";
 // One list since the wave-2 merge (wiring 3): the rules list that evaluateSafety reads.
 import { EXTRA_CAUTION_TRIGGERS } from "@/lib/rules/settings";
 import { SECTIONS } from "@/lib/skin-check-steps";
@@ -131,46 +131,31 @@ describe("H03 Gemini field inventory", () => {
   });
 });
 
-describe("extra caution flag (owner decision 8)", () => {
+// TD-17 (1), tracker H19: one instruction for every user; the extra-caution
+// flag is not sent. Replaces the extraCaution part of owner decision 8a.
+describe("one safety instruction for every user (TD-17, H19)", () => {
   const FEMALE_WORDS = /pregnan|breastfeed|contracepti|menopaus|\bperiods?\b|hormon|reproductive|female/i;
 
-  it("each trigger alone turns it on: one fixed sentence, and no trigger value or reason leaks", async () => {
-    for (const { field: stepId, anyOf } of EXTRA_CAUTION_TRIGGERS) {
-      for (const value of anyOf) {
-        generateContent.mockClear();
-        const answers = { primary_concerns: ["blemishes"], gender: "female", [stepId]: [value] };
-        const { instruction, all } = await captureCall(answers);
-        expect(instruction, `${stepId}=${value}`).toContain(EXTRA_CAUTION_INSTRUCTION);
-        expect(instruction.split(EXTRA_CAUTION_INSTRUCTION)).toHaveLength(2);
-        expect(all).not.toMatch(FEMALE_WORDS);
-        expect(all).not.toContain("pregnant_or_breastfeeding");
-        // The answer that set the flag is hidden as well, so no reason is visible.
-        expect(all).not.toContain("A prescription product");
-      }
+  it("every user gets the same sentence exactly once, with or without a caution answer", async () => {
+    for (const answers of [{ primary_concerns: ["blemishes"] }, { primary_concerns: ["blemishes"], current_products: ["prescription"] }, ANSWERS]) {
+      generateContent.mockClear();
+      const { instruction, all } = await captureCall(answers);
+      expect(instruction.split(ECHO_SAFETY_INSTRUCTION)).toHaveLength(2);
+      expect(all).not.toMatch(/caution/i);
     }
   });
 
-  it("off without a trigger answer: the sentence is absent", async () => {
-    const { instruction } = await captureCall({ primary_concerns: ["blemishes"], current_products: ["actives"], female_skin_context: ["menopause"] });
-    expect(instruction).not.toContain("Extra caution");
+  it("the sentence gives no reason and no telltale example list, and avoids the persona's banned words", () => {
+    expect(ECHO_SAFETY_INSTRUCTION).not.toMatch(FEMALE_WORDS);
+    expect(ECHO_SAFETY_INSTRUCTION).not.toMatch(/prescri|retinoid|acid|vitamin|why|caution|this user/i);
+    expect(ECHO_SAFETY_INSTRUCTION).toMatch(/active ingredients or new products/);
+    expect(ECHO_SAFETY_INSTRUCTION).toMatch(/ask\s+a doctor before starting anything new/);
   });
 
-  it("the sentence itself gives no reason and no telltale example list", () => {
-    expect(EXTRA_CAUTION_INSTRUCTION).not.toMatch(FEMALE_WORDS);
-    expect(EXTRA_CAUTION_INSTRUCTION).not.toMatch(/prescri|retinoid|acid|vitamin|why/i);
-  });
-
-  it("a trigger value with stray case or spaces still turns it on and is still hidden", async () => {
-    const { instruction, all } = await captureCall({ primary_concerns: ["blemishes"], current_products: ["actives", " Prescription "] });
-    expect(instruction).toContain(EXTRA_CAUTION_INSTRUCTION);
+  it("a caution answer is still hidden, with stray case or spaces too; other current products are still sent", async () => {
+    const { all } = await captureCall({ primary_concerns: ["blemishes"], current_products: ["actives", " Prescription "] });
     expect(all).not.toContain("A prescription product");
     expect(all).toContain("Actives");
-  });
-
-  it("with the flag on, the other current products are still sent", async () => {
-    const { instruction } = await captureCall({ current_products: ["actives", "prescription"] });
-    expect(instruction).toContain("Actives");
-    expect(instruction).not.toContain("A prescription product");
   });
 
   it("the trigger list is the provisional one awaiting clinical review (E05)", () => {
@@ -178,6 +163,45 @@ describe("extra caution flag (owner decision 8)", () => {
       { field: "female_skin_context", anyOf: ["pregnant_or_breastfeeding"] },
       { field: "current_products", anyOf: ["prescription"] },
     ]);
+  });
+
+  // Two users who differ only in a hidden answer. Each pair is [with, without].
+  const BASE: SkinCheckAnswers = { primary_concerns: ["blemishes"], skin_type: "oily", male_skin_context: ["shaving_irritation"] };
+  const PAIRS: [string, SkinCheckAnswers, SkinCheckAnswers][] = [
+    ["pregnant vs no answer", { ...BASE, female_skin_context: ["pregnant_or_breastfeeding"] }, BASE],
+    ["pregnant vs another female answer", { ...BASE, female_skin_context: ["pregnant_or_breastfeeding"] }, { ...BASE, female_skin_context: ["menopause"] }],
+    ["actives+prescription vs actives", { ...BASE, current_products: ["actives", "prescription"] }, { ...BASE, current_products: ["actives"] }],
+    ["prescription vs no answer", { ...BASE, current_products: ["prescription"] }, BASE],
+    ["prescription vs empty list", { ...BASE, current_products: ["prescription"] }, { ...BASE, current_products: [] }],
+  ];
+
+  it.each(PAIRS)("today's Echo: Gemini receives the same request (%s)", async (_, withHidden, without) => {
+    generateContent.mockClear();
+    const a = await captureCall(withHidden);
+    generateContent.mockClear();
+    const b = await captureCall(without);
+    expect(a.all).toBe(b.all);
+  });
+
+  // Every call, including the retry: the first answer names an active, which
+  // the validator rejects for everyone, so both users get the same retry prompt.
+  it.each(PAIRS)("context path: every Gemini call is the same, retry included (%s)", async (_, withHidden, without) => {
+    const { buildContextPackage } = await import("@/lib/context/builder");
+    const { answerFromPackage } = await import("@/lib/context/answer");
+    const { generateContextAnswer } = await import("@/lib/gemini");
+    const { evaluateSafety } = await import("@/lib/rules/safety");
+    const run = async (answers: SkinCheckAnswers) => {
+      generateContent.mockReset();
+      generateContent.mockResolvedValue({ text: JSON.stringify({ claims: [{ claim_type: "smalltalk", text: "Try retinol.", fact_ids: [] }], needs_referral: false }) });
+      const safety = evaluateSafety({ answers, confirmedThisScan: [] });
+      const pkg = buildContextPackage({ regionFocus: "cheeks", message: "hi", skin: { scores: SCORES, regionScores: { cheeks: SCORES }, regionLowConfidence: {}, pipelineVersion: null }, answers, safety });
+      await answerFromPackage(pkg, "hi", [], { generate: generateContextAnswer, redFlag: safety.redFlag });
+      return JSON.stringify(generateContent.mock.calls.map((c) => c[0]));
+    };
+    const a = await run(withHidden);
+    expect(generateContent).toHaveBeenCalledTimes(2);
+    expect(a).toContain(ECHO_SAFETY_INSTRUCTION.split("\n")[0]);
+    expect(a).toBe(await run(without));
   });
 });
 
@@ -218,7 +242,8 @@ describe("context-package path (lane:context)", () => {
     const { all, instruction } = await captureContextCall({ ...ANSWERS, current_products: ["actives", "prescription"] });
     expect(all).not.toMatch(/pregnan|breastfeed|contracepti|menopaus|\bperiods?\b|hormon|reproductive|female/i);
     expect(all).not.toContain("A prescription product");
-    expect(instruction).toContain(EXTRA_CAUTION_INSTRUCTION);
+    expect(instruction.split(ECHO_SAFETY_INSTRUCTION)).toHaveLength(2);
+    expect(all).not.toMatch(/caution/i);
   });
 
   // Quiz labels the user chose (e.g. "Small bumps or clogged pores") are self-reports, sent today too.

@@ -133,7 +133,7 @@ describe("switch on: the new path", () => {
     expect(h.getSkinCheckChatReply).not.toHaveBeenCalled();
     expect(h.generateContent).toHaveBeenCalledTimes(1);
     const meta = h.recordChatTurns.mock.calls[0]![5];
-    expect(meta).toMatchObject({ packageVersion: "ctx-1", promptVersion: "ctx-prompt-1", modelId: expect.any(String), prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
+    expect(meta).toMatchObject({ packageVersion: "ctx-2", promptVersion: "ctx-prompt-2", modelId: expect.any(String), prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
     expect(meta.packageSha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
@@ -157,7 +157,7 @@ describe("switch on: the new path", () => {
     const res = await post("is my redness better than last time?");
     expect((await res.json()).reply.startsWith(COMPARISON_LEAD)).toBe(true);
     expect(h.generateContent).not.toHaveBeenCalled();
-    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ prefilter: "comparison", packageVersion: "ctx-1" });
+    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ prefilter: "comparison", packageVersion: "ctx-2" });
   });
 
   it("history comes from stored turns only; a client's (validly signed) turns never reach Gemini", async () => {
@@ -229,12 +229,12 @@ describe("context path: real longitudinal and safety inputs (wiring 2)", () => {
     expect(geminiCall()).toContain("Readings from different checks cannot be lined up yet.");
   });
 
-  it("extra caution from evaluateSafety: the caution sentence goes to Gemini, the answer behind it does not", async () => {
+  it("extra caution from evaluateSafety stays internal: Gemini gets the everyone sentence, not the answer behind it", async () => {
     h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers: { primary_concerns: ["redness"], current_products: ["actives", "prescription"] } });
     await post();
     expect(builtWith().safety).toMatchObject({ extraCaution: true, extraCautionRaisedBy: [{ field: "current_products", value: "prescription" }] });
-    expect(geminiCall()).toContain("Extra caution applies to this user.");
-    expect(geminiCall()).not.toMatch(/A prescription product|extraCautionRaisedBy/);
+    expect(geminiCall()).toContain("Do not suggest any active ingredients or new products.");
+    expect(geminiCall()).not.toMatch(/A prescription product|extraCaution|caution/i);
   });
 
   it("a quiz red flag reaches answerFromPackage: a rejected answer is not retried", async () => {

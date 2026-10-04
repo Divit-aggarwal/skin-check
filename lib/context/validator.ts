@@ -189,11 +189,11 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
       const term = firstMatch(pattern, stripped) ?? (check === "made_up_number" ? firstMatch(pattern, stripQuotes(claim.text, cited)) : null);
       if (term) fail(check, i, term);
     }
-    // With extra caution on, no active ingredient at all, even one a rec.* fact names.
-    if (pkg.safety.extraCaution) {
-      const active = firstMatch(ACTIVE, text);
-      if (active && !failures.some((f) => f.claimIndex === i && f.check === "product_claim")) fail("product_claim", i, active);
-    }
+    // No active ingredient at all, even one a rec.* fact names. For every user,
+    // like the instruction: a check only some users got would change their
+    // retry prompt and so point at a hidden answer (TD-17 (1), tracker H19).
+    const active = firstMatch(ACTIVE, text);
+    if (active && !failures.some((f) => f.claimIndex === i && f.check === "product_claim")) fail("product_claim", i, active);
 
     // §5 rule 6: a descriptive band word must be a band of a cited reading.
     if (claim.claim_type === "descriptive") {

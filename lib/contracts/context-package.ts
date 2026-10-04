@@ -4,7 +4,7 @@
 // are standalone types, not Omit<> views of the internal results: TypeScript
 // lets a wider object pass for an Omit<> type, which would leak numbers and
 // triggers. The builder constructs every field and serialises through an
-// allowlist. Every section except safety, uncertainty and missing is
+// allowlist. Every section except uncertainty and missing is
 // optional: send only what the user's question needs, and say in `missing`
 // what was left out and why.
 //
@@ -114,22 +114,20 @@ export interface ContextRecommendation {
   items: (Fact & { productId: string; productName: string })[];
 }
 
-/**
- * The extra-caution flag only (privacy decision 8; already in the privacy pin).
- * No red-flag boolean: a quiz red flag can come from female_skin_context (the
- * hormonal-pattern rule), so a bare flag would point at a hidden answer. A red
- * flag reaches the user through fixed referral copy and the base routine, and
- * chat red flags never reach Gemini (GEMINI_BOUNDARY §6).
+/*
+ * No safety section (TD-17 (1), tracker H19). The extra-caution flag is no
+ * longer sent: every user gets the same instruction (lib/gemini.ts
+ * ECHO_SAFETY_INSTRUCTION). No red-flag boolean either: a quiz red flag can
+ * come from female_skin_context (the hormonal-pattern rule), so a bare flag
+ * would point at a hidden answer. A red flag reaches the user through fixed
+ * referral copy and the base routine, and chat red flags never reach Gemini
+ * (GEMINI_BOUNDARY §6).
  */
-export interface ContextSafety {
-  extraCaution: boolean;
-}
 
 /**
  * What the user told us, kept apart from measured data. Labels come from our
- * own config. While extraCaution is on, the answer that set it is left out
- * (e.g. current_products "prescription"; privacy-report §5,
- * tests/privacy-gemini-inventory).
+ * own config. An answer that turns extra caution on is left out (e.g.
+ * current_products "prescription"; tests/privacy-gemini-inventory, TD-17).
  */
 export interface SelfReportedStatement extends Fact {
   source: "self_reported";
@@ -187,7 +185,6 @@ export interface ContextPackage {
   longitudinal?: ContextLongitudinal[];
   routine?: ContextRoutine;
   recommendation?: ContextRecommendation;
-  safety: ContextSafety;
   selfReported?: SelfReportedStatement[];
   /** Always at least one (CLAUDE.md: uncertainty is preserved). */
   uncertainty: [UncertaintyStatement, ...UncertaintyStatement[]];

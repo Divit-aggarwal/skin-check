@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, expectTypeOf, it } from "vitest";
 import type { ComparableKey, ComparedKey, LongitudinalResult, NotComparableReason, QuantityPath } from "@/lib/contracts/longitudinal-result";
-import type { ContextLongitudinal, ContextMetric, ContextPackage, ContextRegion, ContextSafety, GeminiAnswerField } from "@/lib/contracts/context-package";
+import type { ContextLongitudinal, ContextMetric, ContextPackage, ContextRegion, GeminiAnswerField } from "@/lib/contracts/context-package";
 import type { RuleTrigger } from "@/lib/contracts/recommendation-result";
 import type { SafetyState } from "@/lib/contracts/safety-state";
 import { NOT_COMPARABLE_REASONS, SKINSTATE_FIELD_PATHS, type ComparabilityKey } from "@/lib/comparability";
@@ -194,12 +194,14 @@ describe("Gemini-facing shapes", () => {
     expectTypeOf<Extract<DeepKeys<ContextPackage>, Banned>>().toEqualTypeOf<never>();
     // Positive control: DeepKeys does reach nested keys, so the check above can fail.
     expectTypeOf<Extract<DeepKeys<ContextPackage>, "lowConfidence" | "confounders" | "code">>().toEqualTypeOf<"lowConfidence" | "confounders" | "code">();
-    expectTypeOf<keyof ContextSafety>().toEqualTypeOf<"extraCaution">();
+    // TD-17 (1), H19: no safety section at all; the extra-caution flag is not sent.
+    expectTypeOf<Extract<keyof ContextPackage, "safety">>().toEqualTypeOf<never>();
+    expectTypeOf<Extract<DeepKeys<ContextPackage>, "extraCaution">>().toEqualTypeOf<never>();
   });
 
   it("routine can only be 'not shared' (R-1 A); uncertainty is never empty; regionFocus is a real region", () => {
     const base: ContextPackage = {
-      packageVersion: "ctx-2", regionFocus: "cheeks", safety: { extraCaution: false },
+      packageVersion: "ctx-2", regionFocus: "cheeks",
       uncertainty: [{ id: "uncert.all", text: "These readings compare areas within one photo.", source: "uncertainty" }],
       missing: [], allowedClaims: ["descriptive"], forbiddenClaims: ["made_up_number"],
     };
@@ -215,15 +217,13 @@ describe("Gemini-facing shapes", () => {
   });
 
   it("a full package fixture type-checks", () => {
-    const safety: SafetyState = { redFlag: true, rulesetVersion: "s-1", reviewStatus: "provisional", extraCaution: true, extraCautionRaisedBy: [{ field: "female_skin_context", value: "pregnant_or_breastfeeding" }], raisedBy: ["hormonal_pattern"] };
     const full: ContextPackage = {
       packageVersion: "ctx-2", regionFocus: "cheeks",
       skin: { contractVersion: "skinstate-1", scoringVersion: "scoring-1", pipelineVersion: "scan-0.1.6-provisional", readings: [{ id: "state.all.redness", text: "Redness, photo-based estimate: Moderate", source: "measured", region: "all", metric: "redness", band: "Moderate", lowConfidence: false }] },
       longitudinal: [{ ...fact, evidence: "not_enough_evidence", comparable: false, change: "not_evaluated", reasons: [why] }],
       routine: { status: "not_shared", decision: "R-1 A" },
       recommendation: { rulesetVersion: "r-1", items: [{ id: "rec.cleanser", text: "Cleanses without a tight feel.", productId: "cleanser", productName: "Cleanser" }] },
-      // Only the extra-caution flag crosses; the red flag and its rule stay internal.
-      safety: { extraCaution: safety.extraCaution },
+      // Nothing from the safety state crosses (TD-17 (1)): no red flag, no extra caution.
       selfReported: [{ id: "self.all.skin_type", text: "You told us: combination skin", source: "self_reported", field: "skin_type", fresh: true }],
       uncertainty: [{ id: "uncert.all", text: "These readings compare areas within one photo.", source: "uncertainty" }],
       missing: [{ id: "unk.hydration", text: "Photos cannot measure skin hydration.", about: "hydration" }],

@@ -27,7 +27,7 @@ describe("context package builder", () => {
   const json = packageJson(pkg);
 
   it("builds the expected sections from fixtures of every shape", () => {
-    expect(pkg.packageVersion).toBe("ctx-1");
+    expect(pkg.packageVersion).toBe("ctx-2");
     expect(pkg.regionFocus).toBe("cheeks");
     expect(pkg.skin!.readings.map((r) => r.id)).toEqual([
       "state.all.redness", "state.all.oiliness", "state.all.texture", "state.all.blemishes", "state.all.pigment",
@@ -58,7 +58,7 @@ describe("context package builder", () => {
     expect(json).not.toContain("PRODUCER TEXT");
     // Only version labels carry digits.
     const digits = json.match(/"[^"]*\d[^"]*"/g) ?? [];
-    expect(digits.every((d) => ['"ctx-1"', '"scan-analysis-1"', '"v0-provisional"', '"scan-0.1.6-provisional"', '"r-1"', '"R-1 A"'].includes(d) || /You told us your daily water/.test(d))).toBe(true);
+    expect(digits.every((d) => ['"ctx-2"', '"scan-analysis-1"', '"v0-provisional"', '"scan-0.1.6-provisional"', '"r-1"', '"R-1 A"'].includes(d) || /You told us your daily water/.test(d))).toBe(true);
   });
 
   it("routine is always not_shared (R-1 A)", () => {
@@ -96,10 +96,10 @@ describe("context package builder", () => {
     for (const id of ids) expect(id).toMatch(/^(?:rec\.[a-z0-9-]+|[a-z]+\.(?:all|forehead|cheeks|nose|chin)\.[a-z_]+)$/);
   });
 
-  it("safety carries only extraCaution; red flag and its rule never serialise", () => {
+  it("no safety section (TD-17, H19); red flag, extra caution and their rules never serialise", () => {
     const p = buildContextPackage(fullInput({ safety: RED_SAFETY }));
-    expect(Object.keys(serializePackage(p).safety as object)).toEqual(["extraCaution"]);
-    expect(packageJson(p)).not.toMatch(/redFlag|rule-ZZSECRET/);
+    expect(serializePackage(p)).not.toHaveProperty("safety");
+    expect(packageJson(p)).not.toMatch(/redFlag|rule-ZZSECRET|extraCaution|caution/i);
   });
 
   it("a red flag leaves the package identical to no red flag (no signal by omission)", () => {
@@ -110,9 +110,8 @@ describe("context package builder", () => {
     );
   });
 
-  it("extra caution: SafetyState false plus a prescription answer still turns it on and drops the trigger answer", () => {
+  it("extra caution: SafetyState false plus a prescription answer still drops the trigger answer", () => {
     const p = buildContextPackage(fullInput({ safety: SAFETY, answers: { current_products: ["actives", "prescription"] } }));
-    expect(p.safety.extraCaution).toBe(true);
     const products = p.selfReported!.find((s) => s.field === "current_products")!;
     expect(products.text).toContain("Actives");
     expect(products.text).not.toContain("prescription");
@@ -122,7 +121,6 @@ describe("context package builder", () => {
     // "actives" is not on today's list; a reviewed list could add it. The builder follows the safety state.
     const safety: SafetyState = { ...SAFETY, extraCaution: true, extraCautionRaisedBy: [{ field: "current_products", value: "actives" }] };
     const p = buildContextPackage(fullInput({ safety, answers: { current_products: ["actives", "cleanser_moisturizer"] } }));
-    expect(p.safety.extraCaution).toBe(true);
     const products = p.selfReported!.find((s) => s.field === "current_products")!;
     expect(products.text).toContain("Cleanser");
     expect(products.text).not.toMatch(/actives/i);
@@ -131,8 +129,7 @@ describe("context package builder", () => {
   it("extra caution on: the serialised package names neither the internal field nor the answers behind it", () => {
     const safety: SafetyState = { ...SAFETY, extraCaution: true, extraCautionRaisedBy: [{ field: "current_products", value: "prescription" }, { field: "female_skin_context", value: "pregnant_or_breastfeeding" }] };
     const json = packageJson(buildContextPackage(fullInput({ safety, answers: { ...ANSWERS, current_products: ["actives", "prescription"], female_skin_context: ["pregnant_or_breastfeeding"] } })));
-    expect(json).toContain('"extraCaution":true');
-    expect(json).not.toMatch(/extraCautionRaisedBy|RaisedBy|prescription|pregnan|breastfeed|female_skin_context/i);
+    expect(json).not.toMatch(/extraCaution|RaisedBy|prescription|pregnan|breastfeed|female_skin_context/i);
   });
 
   it("self-reported statements stay apart from measured data (F04)", () => {
