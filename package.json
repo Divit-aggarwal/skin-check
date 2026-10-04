@@ -14,7 +14,9 @@
     "test": "vitest run",
     "test:rules": "npx -y firebase-tools@latest emulators:exec --only firestore --project demo-rules-check \"vitest run tests/firestore-rules.test.ts\"",
     "dev:local": "bash scripts/local-stack.sh up",
-    "test:local": "bash scripts/local-stack.sh test"
+    "test:local": "bash scripts/local-stack.sh test",
+    "test:browser": "bash scripts/local-stack.sh browser",
+    "test:all": "npm run typecheck && npm run lint && npm run test:local && npm run test:browser && npm run build"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",

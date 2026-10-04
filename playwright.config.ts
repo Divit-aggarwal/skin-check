@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
 
-// Dashboard lane browser tests (docs/lanes/dashboard-design.md §6). Run
+// Dashboard lane browser tests (docs/lanes/dashboard-design.md §6). `npm run
+// test:browser` starts a fresh stack and runs them. Or run
 // against a stack already started with `npm run dev:local`; the ports come
 // from PORT_BASE in .env.lane, as scripts/local-stack.sh reads it.
 // The warm-up compiles each route once before the first test.

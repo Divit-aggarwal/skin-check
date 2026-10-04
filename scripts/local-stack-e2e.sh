@@ -16,6 +16,12 @@ for _ in $(seq 1 120); do
   sleep 1
 done
 
-# Every rules test (tests/firestore-rules*.test.ts) and every end-to-end test
-# (tests/*.e2e.test.ts), so a lane adds its own files instead of editing this one.
-npx vitest run firestore-rules e2e.test
+# `browser`: the Playwright tests (tests/browser, playwright.config.ts).
+# Otherwise every rules test (tests/firestore-rules*.test.ts) and every
+# end-to-end test (tests/*.e2e.test.ts), so a lane adds its own files instead
+# of editing this one.
+if [ "${1:-}" = browser ]; then
+  npx playwright test
+else
+  npx vitest run firestore-rules e2e.test
+fi

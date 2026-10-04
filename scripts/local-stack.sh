@@ -5,6 +5,9 @@
 #                        + S3Mock + seed data + next dev, in the foreground
 #   npm run test:local   unit tests, then the same stack in the background and
 #                        the rules + end-to-end tests against it
+#   npm run test:browser a fresh stack in the background and the Playwright
+#                        browser tests against it (they change seed data, so
+#                        every run starts from a fresh stack)
 #
 # Ports come from PORT_BASE (default 3100; a lane worktree sets it in .env.lane):
 #   web +0, auth +1, firestore +2, firestore ws +3, hub +4, logging +5,
@@ -13,7 +16,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 MODE="${1:-}"
-case "$MODE" in up|test) ;; *) echo "usage: $0 up|test" >&2; exit 2 ;; esac
+case "$MODE" in up|test|browser) ;; *) echo "usage: $0 up|test|browser" >&2; exit 2 ;; esac
 
 [ -f .env.lane ] && . ./.env.lane
 B="${PORT_BASE:-3100}"
@@ -102,6 +105,10 @@ if [ "$MODE" = up ]; then
   echo "== web on http://localhost:$WEB  (emulator UI http://127.0.0.1:$UI; sign-in codes print in this terminal)"
   $FIREBASE emulators:exec --config firebase.local.json --project "$PROJECT" --only auth,firestore --ui \
     "$SEED && npx next dev -p $WEB"
+elif [ "$MODE" = browser ]; then
+  echo "== browser tests (Playwright) against the stack"
+  $FIREBASE emulators:exec --config firebase.local.json --project "$PROJECT" --only auth,firestore \
+    "$SEED && bash scripts/local-stack-e2e.sh browser"
 else
   echo "== rules + end-to-end tests against the stack"
   $FIREBASE emulators:exec --config firebase.local.json --project "$PROJECT" --only auth,firestore \
