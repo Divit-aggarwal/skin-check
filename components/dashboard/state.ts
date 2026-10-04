@@ -171,6 +171,16 @@ function primaryPerScan(uid: string, analyses: readonly Doc[]): Map<string, Meas
   return out;
 }
 
+/**
+ * The scan Echo is offered about: the newest measured reading whose scores can
+ * be read (red team I02, E-F4), else null. F13 (owner TD-20): the chat route
+ * answers only about this scan, through lib/echo-newest-scan.ts.
+ */
+export function echoScanIdFrom(uid: string, analyses: readonly Doc[]): string | null {
+  const newest = Array.from(primaryPerScan(uid, analyses).values()).sort((a, b) => newestFirst(a.date, b.date))[0];
+  return newest && bandsOf(newest.record.scores) ? newest.scanId : null;
+}
+
 export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: readonly Doc[]): Dashboard {
   const measured = measuredOf(uid, analyses);
   const byScan = primaryPerScan(uid, analyses);
@@ -223,8 +233,7 @@ export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: r
     newerCheckNotShown,
     trend,
     history,
-    // Red team (I02, E-F4): only a reading whose scores can be read is offered to Echo.
-    echoScanId: newestMeasured && bandsOf(newestMeasured.record.scores) ? newestMeasured.scanId : null,
+    echoScanId: echoScanIdFrom(uid, analyses),
     photo: withPhoto ? { scanId: withPhoto.id, claimsStored: (withPhoto.data.image as Obj).stored === true } : null,
   };
 }

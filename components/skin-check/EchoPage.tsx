@@ -37,8 +37,10 @@ const CONFIG_ERROR_MESSAGE = "Echo isn't set up yet — this isn't something ret
 const GATE_MESSAGES: Record<string, string> = {
   UNDER_18: "Echo is only available to people aged 18 or over.",
   ATTESTATION_REQUIRED: "Please confirm your age in Skin Check before using Echo.",
+  // F13: a newer check exists; Echo talks about that one (open it from the dashboard).
+  CHAT_NOT_NEWEST: "Echo talks about your newest check only. Open it from your dashboard.",
 };
-const NOT_RETRYABLE = new Set(["CHAT_MISCONFIGURED", "UNDER_18", "ATTESTATION_REQUIRED", "AI_CONSENT_REQUIRED"]);
+const NOT_RETRYABLE = new Set(["CHAT_MISCONFIGURED", "UNDER_18", "ATTESTATION_REQUIRED", "AI_CONSENT_REQUIRED", "CHAT_NOT_NEWEST"]);
 
 function greetingFor(region: EchoRegion): string {
   return `Hey — let's talk about your ${ECHO_REGION_LABELS[region].toLowerCase()}. What would you like to know?`;
