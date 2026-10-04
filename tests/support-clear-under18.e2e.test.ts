@@ -30,7 +30,7 @@ describe.skipIf(!STACK)("scripts/clear-under18.ts (H05)", () => {
     const { ageStatus } = await import("@/app/api/account/_ledger");
     const uid = await under18User();
     const lines: string[] = [];
-    const code = await main(["--phone", PHONE, "--operator", "test", "--reason", "mis-tap"], async () => "no", (l) => lines.push(l));
+    const code = await main(["--project", process.env.FIREBASE_PROJECT_ID ?? "", "--phone", PHONE, "--operator", "test", "--reason", "mis-tap"], async () => "no", (l) => lines.push(l));
     expect(code).toBe(1);
     const out = lines.join("\n");
     expect(out).toMatch(/\(EMULATORS\)/);
@@ -49,7 +49,7 @@ describe.skipIf(!STACK)("scripts/clear-under18.ts (H05)", () => {
     const { ageStatus } = await import("@/app/api/account/_ledger");
     const { adminDb } = await import("@/lib/firebase/admin");
     const uid = await under18User();
-    const code = await main(["--phone", PHONE, "--operator", "owner", "--reason", "mis-tap, confirmed"], async () => "CLEAR", () => {});
+    const code = await main(["--project", process.env.FIREBASE_PROJECT_ID ?? "", "--phone", PHONE, "--operator", "owner", "--reason", "mis-tap, confirmed"], async () => "CLEAR", () => {});
     expect(code).toBe(0);
     expect(await ageStatus(uid)).toBe("missing");
     expect((await adminDb().collection("under18Accounts").doc(uid).get()).exists).toBe(false);
@@ -59,13 +59,13 @@ describe.skipIf(!STACK)("scripts/clear-under18.ts (H05)", () => {
     expect(entries.find((e) => e.granted === false)).toBeTruthy(); // the original answer is kept
     // Run again: nothing to clear.
     const lines: string[] = [];
-    expect(await main(["--uid", uid, "--operator", "owner", "--reason", "again"], async () => "CLEAR", (l) => lines.push(l))).toBe(0);
+    expect(await main(["--project", process.env.FIREBASE_PROJECT_ID ?? "", "--uid", uid, "--operator", "owner", "--reason", "again"], async () => "CLEAR", (l) => lines.push(l))).toBe(0);
     expect(lines.join("\n")).toMatch(/Nothing to clear/);
     expect(await ledgerCount(uid)).toBe(2);
   });
 
   it("refuses without an operator or a reason", async () => {
     const { main } = await import("../scripts/clear-under18");
-    expect(await main(["--phone", PHONE], async () => "CLEAR", () => {})).toBe(2);
+    expect(await main(["--project", process.env.FIREBASE_PROJECT_ID ?? "", "--phone", PHONE], async () => "CLEAR", () => {})).toBe(2);
   });
 });
