@@ -56,3 +56,32 @@ export function pickBaseline(states: readonly SkinState2[], usable: (s: SkinStat
   const builds = new Set(window.map((s) => s.engine.build).filter((b) => b !== null));
   return { latest, candidates, window, engineBoundary: pipelines.size > 1 || builds.size > 1 };
 }
+
+/**
+ * G-1: one state per check (scanId), picked as Echo picks a record
+ * (lib/echo-trusted-context.ts): the primary before a recovery run, then the
+ * newest. A retake or recovery run writes several records for one check, and
+ * a check is one starting-check place at most.
+ */
+export function onePerCheck(states: readonly SkinState2[]): SkinState2[] {
+  const ranked = [...states].sort(
+    (a, b) =>
+      Number(a.provenance.persistAttempt === "recovery") - Number(b.provenance.persistAttempt === "recovery") ||
+      (a.provenance.analyzedAt < b.provenance.analyzedAt ? 1 : a.provenance.analyzedAt > b.provenance.analyzedAt ? -1 : 0)
+  );
+  const picked = new Map<string, SkinState2>();
+  for (const s of ranked) if (!picked.has(s.identity.scanId)) picked.set(s.identity.scanId, s);
+  return Array.from(picked.values());
+}
+
+/**
+ * G-1: THE starting checks, for the engine (per quantity, with its `usable`)
+ * and the dashboard (one count for the page). Same reduction, same rule, so
+ * the two never disagree on what counts.
+ */
+export function startingChecks(states: readonly SkinState2[], usable: (s: SkinState2) => boolean = () => true): BaselinePick {
+  return pickBaseline(onePerCheck(states), usable);
+}
+
+/** G-1: how many starting-check places are filled, capped at BASELINE_RULE.scans. */
+export const startingCheckCount = (pick: BaselinePick): number => Math.min(pick.candidates.length, BASELINE_RULE.scans);

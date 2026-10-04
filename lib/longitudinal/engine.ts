@@ -18,7 +18,7 @@ import type {
 } from "@/lib/contracts/longitudinal-result";
 import type { SkinStateRegionKey } from "@/lib/skin-state";
 import { SKIN_STATE_2_CONTRACT_VERSION, type SkinState2, type SkinState2Result } from "@/lib/skin-state-2";
-import { pickBaseline } from "./baseline";
+import { startingChecks } from "./baseline";
 import { BASELINE_RULE, CONFOUNDERS, NOISE_TABLE } from "./settings";
 
 /** One plain sentence per reason. No digits, no percentages, no direction words; change is only "within" or "beyond". */
@@ -145,7 +145,8 @@ export function longitudinalResult(
   const usable = (s: SkinState2) => {
     return !pairReasons(s, s).some((r) => SELF_UNUSABLE.includes(r));
   };
-  const { latest, candidates, window, engineBoundary } = pickBaseline(states, usable);
+  // G-1: the shared starting checks, one state per check (same as the dashboard).
+  const { latest, candidates, window, engineBoundary } = startingChecks(states, usable);
   if (engineBoundary) codes.add("engine_boundary");
   if (candidates.length < BASELINE_RULE.scans) codes.add("too_few_scans_for_baseline");
 

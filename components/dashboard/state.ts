@@ -7,7 +7,7 @@
 // shows; one view holds one check.
 
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
-import { pickBaseline } from "@/lib/longitudinal/baseline";
+import { startingCheckCount, startingChecks } from "@/lib/longitudinal/baseline";
 import { BASELINE_RULE } from "@/lib/longitudinal/settings";
 import { bandScores, type Band, type BandableMetric } from "@/lib/skin-check-rules";
 import { METRIC_LABELS } from "@/lib/skin-check-skus";
@@ -186,13 +186,13 @@ export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: r
       ? { kind: "reading", view: legacyView(newestLegacy, legacyResultOf(newestLegacy)!) }
       : { kind: "none" };
 
-  // Same picker and rule as the engine, over ONE state per check (the record
-  // picked above), so the page counts checks: a retake or recovery record never
-  // adds or takes a starting-check place. The newest check is never a
-  // candidate. The engine is passed every record (design gap G-1).
-  const { candidates, engineBoundary } = pickBaseline(Array.from(byScan.values()).map((m) => m.state));
+  // G-1: the engine's own starting checks (lib/longitudinal/baseline.ts), over
+  // the record picked above for each check: a retake or recovery record never
+  // adds or takes a place. The newest check is never a candidate.
+  const pick = startingChecks(Array.from(byScan.values()).map((m) => m.state));
+  const { engineBoundary } = pick;
   const needed = BASELINE_RULE.scans;
-  const count = Math.min(candidates.length, needed);
+  const count = startingCheckCount(pick);
   const trend: Trend = {
     kind: measured.length === 0 ? "empty" : count < needed ? "building" : "set",
     count,

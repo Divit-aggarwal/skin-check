@@ -70,3 +70,35 @@ describe("D01 baseline window", () => {
     expect(sortStates([a, b]).map((s) => s.identity.analysisRef)).toEqual(["users/u/scanAnalyses/a", "users/u/scanAnalyses/b"]);
   });
 });
+
+// G-1: one shared starting-check count for the engine and the dashboard.
+describe("G-1 shared starting checks", () => {
+  const rec = (day: number, scanId: string, persist: "primary" | "recovery" = "primary", ref = `users/u/scanAnalyses/${scanId}-${day}-${persist}`) =>
+    ({
+      identity: { analysisRef: ref, scanId },
+      provenance: { analyzedAt: new Date(Date.UTC(2026, 9, day)).toISOString(), persistAttempt: persist },
+      engine: { pipelineVersion: "scan-0.1.6-provisional", build: "A" },
+      input: { captureMethod: "native" },
+    }) as unknown as SkinState2;
+
+  it("onePerCheck keeps one record per check: the primary before a recovery, then the newest", async () => {
+    const { onePerCheck } = await import("@/lib/longitudinal/baseline");
+    const picked = onePerCheck([rec(1, "a"), rec(2, "a"), rec(3, "a", "recovery"), rec(4, "b", "recovery")]);
+    expect(picked.map((s) => s.identity.analysisRef).sort()).toEqual(["users/u/scanAnalyses/a-2-primary", "users/u/scanAnalyses/b-4-recovery"]);
+  });
+
+  it("startingCheckCount counts checks, capped at the rule's number", async () => {
+    const { startingChecks, startingCheckCount } = await import("@/lib/longitudinal/baseline");
+    expect(startingCheckCount(startingChecks([rec(1, "a"), rec(2, "a"), rec(3, "b"), rec(9, "z")]))).toBe(2);
+    expect(startingCheckCount(startingChecks([rec(1, "a"), rec(2, "b"), rec(3, "c"), rec(4, "d"), rec(9, "z")]))).toBe(3);
+  });
+
+  it("the engine and the dashboard both use it, and nothing else picks a baseline", async () => {
+    const { readFileSync } = await import("node:fs");
+    expect(readFileSync("lib/longitudinal/engine.ts", "utf8")).toMatch(/startingChecks\(states, usable\)/);
+    const page = readFileSync("components/dashboard/state.ts", "utf8");
+    expect(page).toMatch(/startingChecks\(/);
+    expect(page).toMatch(/startingCheckCount\(pick\)/);
+    for (const f of ["lib/longitudinal/engine.ts", "components/dashboard/state.ts"]) expect(readFileSync(f, "utf8"), f).not.toMatch(/pickBaseline\(/);
+  });
+});

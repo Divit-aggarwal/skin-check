@@ -36,10 +36,12 @@ interface Opt {
   px?: number; uid?: string; native?: boolean; cheeks?: boolean; persistAttempt?: "recovery"; captureQuality?: unknown;
   /** UTC hour on that day; also makes the scan id unique, so a day can hold retakes. */
   hour?: number;
+  /** The check (scanId) this record belongs to, for a retake or recovery record of an earlier check. */
+  check?: string;
 }
 
 function scan(o: Opt): SkinState2Result {
-  const scanId = o.hour === undefined ? `scan-${o.day}` : `scan-${o.day}h${o.hour}`;
+  const scanId = o.check ?? (o.hour === undefined ? `scan-${o.day}` : `scan-${o.day}h${o.hour}`);
   const uid = o.uid ?? UID;
   const sha = o.sha ?? createHash("sha256").update(scanId).digest("hex");
   const result = { ...syntheticAnalysis(), ...(o.native === false ? {} : syntheticNative()) } as Record<string, any>;
@@ -264,6 +266,23 @@ describe("the brief's cases, with test-only tables", () => {
       const s = [scan({ day: 1, hour: 9, value: 55, ...bad }), scan({ day: 1, hour: 10, value: 55 }), scan({ day: 2, value: 55 }), scan({ day: 3, value: 55 }), scan({ day: 10, value: 60 })];
       expect(refsOf(run(s, TEST)), JSON.stringify(bad)).toEqual(["scan-1h10", "scan-2", "scan-3"]);
     }
+  });
+
+  it("G-1: a check is one starting-check place, even with records on two days (retake, recovery)", () => {
+    const s = [
+      scan({ day: 1, value: 55 }),
+      // A retake of the same check the next day, and a recovery run of it: neither takes a second place.
+      scan({ day: 2, value: 55, check: "scan-1", sha: "b".repeat(64) }),
+      scan({ day: 3, value: 55, check: "scan-1", sha: "c".repeat(64), persistAttempt: "recovery" }),
+      scan({ day: 4, value: 55 }),
+      scan({ day: 5, value: 55 }),
+      scan({ day: 10, value: 60 }),
+    ];
+    const r = run(s, TEST);
+    expect(r).toMatchObject({ evidence: "pairwise", change: "beyond_noise" });
+    // The primary record of scan-1 (its newest primary), then scan-4 and scan-5.
+    expect(r.detail.baselineAnalysisRefs).toHaveLength(3);
+    expect(new Set(r.detail.baselineAnalysisRefs.map((ref) => ref.split("/").at(-1)!.split("_")[0]))).toEqual(new Set(["scan-1", "scan-4", "scan-5"]));
   });
 
   it("D06, TD-18 (2): the day is the India date of the server analyzedAt", () => {
