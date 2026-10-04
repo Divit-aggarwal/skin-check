@@ -111,6 +111,13 @@ async function main() {
       );
     }
   }
+  // Wave-2 wiring 7: one stored chat turn (D-15, lib/context/chat-turns.ts
+  // shape) for erase user A only, so erasure is proven to remove chatTurns.
+  // B's collection list is asserted exactly, so B gets none.
+  await db.collection("users").doc(PRIVACY_SEED.eraseA.uid).collection("chatTurns").doc("seed-chat-turn").set({
+    role: "user", text: "seed question", scanId: "privacy-scan-1", region: "cheeks", prefilter: null, redFlag: false,
+    historyExcluded: false, createdAt: Timestamp.now(), expireAt: Timestamp.fromMillis(Date.now() + 90 * 24 * 60 * 60 * 1000),
+  });
 }
 
 main().then(
