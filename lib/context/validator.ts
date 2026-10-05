@@ -151,7 +151,7 @@ const SKIN_CHECK_NAME = new RegExp(String.raw`\byour skin[- ]checks?(?: results?
 // can or cannot do, a question to the user, a request to see a doctor or
 // pharmacist, or a closing. Anything else fails citation_rule ("statement").
 const OPENER = new RegExp(String.raw`^(?:(?:hello|hi|hey|hiya|namaste|thanks|thank you|sure|of course|okay|ok|absolutely|got it|no problem|good question|great question)\b[\s,!.:-]*)+`, "iu");
-const CLAUSE_SPLIT = new RegExp(String.raw`\s*(?:[;:]|,\s*(?:but|so|and|though|although|while|because|since|as|which)\b|\s(?:but|so that|because|since|as)\s)\s*`, "iu");
+const CLAUSE_SPLIT = new RegExp(String.raw`\s*(?:[;:]|,\s*(?:but|so|and|though|although|while|because|since|as|which)\b|\s(?:but|so that|because|since|as(?! (?:a|an)\b))\s)\s*`, "iu");
 const CLAUSE_FORMS = [
   // Echo on what it can or cannot do. Any verb, but not an opinion ("I think the
   // heat is ...", "I am sure ...") and not a reported clause ("I can tell you that ...").

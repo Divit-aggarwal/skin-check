@@ -421,3 +421,10 @@ describe("final live-run fixes: real answers pass, the same words elsewhere stil
     expect(checksOf(one("out_of_scope", "I cannot discuss skin conditions."))).toContain("medical_or_efficacy_term");
   });
 });
+
+describe("uncited claims (F17): 'as a' is not a new clause", () => {
+  it("'... or act as a medical professional' passes; 'as the heat is the issue' still fails", () => {
+    expect(validateAnswer(ok([{ claim_type: "out_of_scope", text: "I am not able to reveal internal system data or act as a medical professional.", fact_ids: [] }]), pkg, "x").failures.filter((f) => f.term === "statement")).toEqual([]);
+    expect(checksOf(ok([{ claim_type: "out_of_scope", text: "I cannot say for sure as the heat is the issue.", fact_ids: [] }]))).toContain("citation_rule");
+  });
+});
