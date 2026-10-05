@@ -194,7 +194,7 @@ test("Home: today's routine logs used or skipped in one tap, and the entry shows
   const used = today.getByRole("button", { name: R.logAs(R.status.used, name, R.slot.AM.toLowerCase()) });
   await used.click();
   await expect(used).toHaveAttribute("aria-pressed", "true");
-  await expect(today.getByText(`${R.slot.AM} · ${R.status.used}`)).toBeVisible();
+  await expect(today.locator("li", { hasText: name }).filter({ hasText: R.slot.AM }).getByText(`${R.slot.AM} · ${R.status.used}`)).toBeVisible();
   const recent = page.locator("section", { has: page.getByRole("heading", { name: T.recent }) });
   await expect(recent.getByText(T.routine.usage(name, R.slot.AM.toLowerCase(), R.status.used))).toBeVisible();
   await shot(page, "home-routine");

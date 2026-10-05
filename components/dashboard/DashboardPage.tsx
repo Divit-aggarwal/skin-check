@@ -21,14 +21,13 @@ import { CheckReadings, formatDate, KnownAndNotKnown } from "./CheckReadings";
 import { ConsentSection } from "./ConsentSection";
 import { DASHBOARD_COPY as C } from "./copy";
 import { loadDashboard, type DashboardData } from "./data";
-import { deriveDashboard, echoRecord, isEmpty, pastCheck, type Dashboard } from "./state";
+import { deriveDashboard, echoRecord, isEmpty, type Dashboard } from "./state";
 
 // G01 dashboard (docs/lanes/dashboard-design.md). Phone first, one column.
 // Six sections. Readings are shown for the newest photo reading only; a past
 // check opens on its own page with its date, kind and photo check, never its
 // readings (LONGITUDINAL_METHOD §1), so no two checks' readings meet.
 
-const link = "w-fit text-sm font-medium text-text underline underline-offset-4";
 
 type Load = { kind: "loading" } | { kind: "error" } | { kind: "ready"; data: DashboardData };
 
@@ -36,6 +35,7 @@ export function DashboardPage() {
   const { user, loading } = useAuth();
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const openId = useSearchParams().get("check");
+  const router = useRouter();
   const { setSession } = useSkinCheckSession();
   const routine = useRoutine();
 
@@ -43,6 +43,11 @@ export function DashboardPage() {
   // results screen (lib/useSkinCheckFlow.ts). Clear it here, so the dashboard's
   // own Ask Echo hand-off never leaks into the next new check.
   useEffect(() => setSession(null), [setSession]);
+
+  // The old /dashboard?check=<id> address opens the check on its own page now.
+  useEffect(() => {
+    if (openId) router.replace(`/checks/${encodeURIComponent(openId)}`);
+  }, [openId, router]);
 
   useEffect(() => {
     if (!user) return;
@@ -95,7 +100,6 @@ export function DashboardPage() {
     );
   }
 
-  if (openId) return <OneCheck uid={user.uid} scanId={openId} data={load.data} />;
 
   return (
     <Shell>
@@ -289,31 +293,5 @@ function ChatSection({ uid, dashboard, data }: { uid: string; dashboard: Dashboa
         <p className="text-brand-muted">{C.chat.needsReading}</p>
       )}
     </section>
-  );
-}
-
-function OneCheck({ uid, scanId, data }: { uid: string; scanId: string; data: DashboardData }) {
-  const check = pastCheck(uid, scanId, data.checks, data.analyses);
-  return (
-    <Shell>
-      <section aria-labelledby="check-title" className="flex flex-col gap-3">
-        {check === null ? (
-          <p className="text-body text-text/70">{C.history.notFound}</p>
-        ) : (
-          <>
-            <h2 id="check-title" className="font-display text-lg text-text">
-              {C.history.checkFrom(formatDate(check.date))}
-            </h2>
-            <p className="text-body text-text/70">{C.history.kind[check.kind]}</p>
-            {check.photoCheck && <p className="text-sm text-text/70">{C.photoCheck[check.photoCheck]}</p>}
-            {check.kind === "legacy" && <p className="text-sm text-text/70">{C.legacyPastNote}</p>}
-            <p className="text-sm text-text/60">{C.history.onlyNewest}</p>
-          </>
-        )}
-        <Link href="/dashboard" className={link}>
-          {C.history.back}
-        </Link>
-      </section>
-    </Shell>
   );
 }

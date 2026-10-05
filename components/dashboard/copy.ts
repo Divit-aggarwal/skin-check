@@ -76,7 +76,6 @@ export const DASHBOARD_COPY = {
     pastLine: "Photos differ in light and angle. Differences between checks are not yet a measured change.",
     allChecks: "All checks",
     notFound: "This check could not be found.",
-    onlyNewest: "Readings are shown for your newest photo reading only. Each reading is relative to its own photo, so past checks are listed by date.",
   },
 
   home: {

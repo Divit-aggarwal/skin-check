@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronRight, Repeat } from "lucide-react";
+import { Camera, ChevronRight, Repeat } from "lucide-react";
 import { DASHBOARD_COPY } from "@/components/dashboard/copy";
 import { formatDate } from "@/components/dashboard/format";
 import { ROUTINE_COPY } from "@/lib/routine/copy";
@@ -51,7 +51,11 @@ export function TimelineList({
               aria-label={T.openCheck(formatDate(i.row.date))}
               className="group flex min-h-14 items-center gap-4 py-3"
             >
-              {thumb && (thumb(i.row.scanId) ?? <span aria-hidden className="size-12 shrink-0" />)}
+              {(thumb && thumb(i.row.scanId)) ?? (
+                <span aria-hidden className={`grid shrink-0 place-items-center text-brand-muted ${thumb ? "size-12" : "size-6"}`}>
+                  <Camera size={18} />
+                </span>
+              )}
               <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3">
                 <span className="font-semibold">{formatDate(i.row.date)}</span>
                 <span className="text-sm text-brand-muted">{DASHBOARD_COPY.history.kind[i.row.kind]}</span>

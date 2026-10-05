@@ -55,13 +55,33 @@ test("dashboard loading and error", async ({ page }) => {
   await shots(page, "dashboard-error");
 });
 
-test("past check opened", async ({ page }) => {
-  await signIn(page, U.set!.phoneNumber);
-  await page.goto("/dashboard");
-  await page.getByRole("link", { name: /Open the check from/ }).nth(1).click();
-  await expect(page.getByText(/Check from/).first()).toBeVisible();
+test("checks: list with a kept photo, opened check, not found", async ({ page }) => {
+  await signIn(page, U.kept!.phoneNumber);
+  await page.goto("/checks");
+  await expect(page.getByRole("link", { name: /Open the check from/ }).first()).toBeVisible();
+  await page.waitForTimeout(1500);
+  await shots(page, "checks-list");
+  await page.goto("/checks/seed-dash-kept-1");
+  await expect(page.getByText(/Photos differ in light and angle/).first()).toBeVisible();
   await page.waitForTimeout(1500);
   await shots(page, "check-opened");
+  await page.goto("/checks/not-a-check");
+  await expect(page.getByText("This check could not be found.").first()).toBeVisible();
+  await shots(page, "check-not-found");
+});
+
+test("checks: empty", async ({ page }) => {
+  await signIn(page, U.empty!.phoneNumber);
+  await page.goto("/checks");
+  await page.waitForTimeout(1500);
+  await shots(page, "checks-empty");
+});
+
+test("checks: timeline with routine entries", async ({ page }) => {
+  await signIn(page, "+919999900001"); // seed user Asha: checks and routine events
+  await page.goto("/checks?view=timeline");
+  await page.waitForTimeout(2000);
+  await shots(page, "checks-timeline");
 });
 
 test("routine empty and with products", async ({ page }) => {

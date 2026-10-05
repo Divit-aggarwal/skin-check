@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
 import { TIMELINE_COPY as T } from "@/components/timeline/copy";
+import { CHECKS_COPY as K } from "@/components/checks/copy";
 import { ROUTINE_COPY as R } from "@/lib/routine/copy";
 import { DASHBOARD_SEED as U } from "./seed-users";
 import { shot, signIn } from "./helpers";
@@ -132,20 +133,56 @@ test("no reading: questions-only and failed checks", async ({ page }) => {
   await shot(page, "no-reading");
 });
 
-test("one past check at a time, with no readings; unknown id is not found", async ({ page }) => {
+// TD-24 (1) replaces O-D4: an opened check shows its own readings, always with the fixed line.
+test("one opened check: its own readings with the fixed line; unknown id is not found; the old address redirects", async ({ page }) => {
   await dashboardAs(page, U.building!.phoneNumber);
+  await page.goto("/checks");
   await page.getByRole("link", { name: /Open the check from/ }).nth(1).click(); // newest first: the middle check is the override one
-  await expect(page.getByText(C.history.onlyNewest)).toBeVisible();
-  await expect(page.getByText(C.photoCheck.override)).toBeVisible();
-  await expect(page.getByText("Redness")).toHaveCount(0);
-  await expect(page.locator("main")).not.toContainText(/\b(Low|Moderate|Elevated)\b/);
+  await expect(page).toHaveURL(/\/checks\/seed-dash-building-2$/);
+  const opened = page.locator("section", { has: page.getByRole("heading", { name: /Check from/ }) });
+  await expect(opened.getByText(C.history.pastLine)).toBeVisible();
+  await expect(opened.getByText(C.photoCheck.override)).toBeVisible();
+  await expect(opened.getByText("Redness")).toBeVisible();
+  await expect(opened).not.toContainText(/\/100|%|Dryness/);
+  // One check only: the newest reading's card is not on this page.
   await expect(page.getByRole("heading", { name: C.current.title })).toHaveCount(0);
   await shot(page, "past-check");
-  await page.goto("/dashboard?check=not-a-check");
+  await page.goto("/checks/not-a-check");
   await expect(page.getByText(C.history.notFound)).toBeVisible();
   await shot(page, "check-not-found");
-  await page.getByRole("link", { name: C.history.back }).click();
-  await expect(page.getByRole("heading", { name: C.current.title })).toBeVisible();
+  await page.goto("/dashboard?check=seed-dash-building-1");
+  await expect(page).toHaveURL(/\/checks\/seed-dash-building-1$/);
+  await expect(page.getByText(C.history.pastLine)).toBeVisible();
+});
+
+test("checks list: date, kind and photo check, never a reading; a kept photo shows as a small image, a check without one shows none", async ({ page }) => {
+  await dashboardAs(page, U.kept!.phoneNumber);
+  await page.goto("/checks");
+  const list = page.locator("section", { has: page.getByRole("heading", { name: C.history.title }) });
+  await expect(list.getByRole("link", { name: /Open the check from/ })).toHaveCount(2);
+  await expect(list).not.toContainText(/\b(Low|Moderate|Elevated)\b/);
+  const photo = list.getByRole("img", { name: /Your kept photo from/ });
+  await expect(photo).toHaveCount(1);
+  await expect.poll(() => photo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+  // The photo is only in the older check's row.
+  await expect(list.getByRole("link").nth(1).getByRole("img", { name: /Your kept photo/ })).toHaveCount(1);
+  await shot(page, "checks-kept-photo");
+});
+
+// TD-24 (2): checks and routine entries on one timeline, newest first, never a reading.
+test("timeline: checks and routine entries together in date order, with no reading", async ({ page }) => {
+  await signIn(page, "+919999900001"); // base seed user Asha: checks and routine events
+  await page.goto("/checks?view=timeline");
+  const timeline = page.getByRole("region", { name: K.timeline });
+  await expect(timeline.getByText(T.routineKind).first()).toBeVisible();
+  await expect(timeline.getByText(C.history.kind.reading).first()).toBeVisible();
+  await expect(timeline).not.toContainText(/\b(Low|Moderate|Elevated)\b|\/100|%/);
+  const days = await timeline.locator("li span.font-semibold").allTextContents();
+  const times = days.map((d) => Date.parse(d.replace("Sept", "Sep")));
+  expect(times.every((t) => !Number.isNaN(t))).toBe(true);
+  expect(times).toEqual([...times].sort((a, b) => b - a));
+  await expect(page.getByRole("link", { name: K.timeline })).toHaveAttribute("aria-current", "page");
+  await shot(page, "timeline");
 });
 
 test("privacy: sharing on, with the stop button", async ({ page }) => {

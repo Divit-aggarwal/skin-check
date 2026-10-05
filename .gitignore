@@ -74,3 +74,4 @@ firebase.local.json
 .local-stack/
 .env.lane
 !docs/lanes/*.md
+docs/design/wip/

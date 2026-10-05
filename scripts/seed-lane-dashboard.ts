@@ -18,6 +18,18 @@ import type { SkinCheckAnswers } from "@/types/skin-check";
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { syntheticAnalysis, syntheticNative } from "../tests/synthetic-scan";
 import { DASHBOARD_SEED } from "../tests/browser/seed-users";
+import { readFileSync } from "node:fs";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { scanImageKey } from "@/lib/s3-key";
+
+// A kept photo goes to the local S3 stand-in only (scripts/local-stack.sh
+// exports its endpoint). The image is a synthetic test pattern, no person.
+async function putKeptPhoto(key: string) {
+  const endpoint = process.env.S3_SKIN_IMAGES_ENDPOINT;
+  if (!endpoint || !/^http:\/\/127\.0\.0\.1:/.test(endpoint)) throw new Error("seed-lane-dashboard: kept photos go to the local S3 stand-in only.");
+  const s3 = new S3Client({ region: "ap-south-1", endpoint, forcePathStyle: true, credentials: { accessKeyId: "local-dev", secretAccessKey: "local-dev" } });
+  await s3.send(new PutObjectCommand({ Bucket: process.env.S3_SKIN_IMAGES_BUCKET ?? "skin-originals-dev", Key: key, Body: readFileSync("tests/browser/fixtures/kept-photo.jpg"), ContentType: "image/jpeg" }));
+}
 
 const PROJECT = process.env.FIREBASE_PROJECT_ID ?? "";
 if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST || !PROJECT.startsWith("demo-")) {
@@ -92,11 +104,12 @@ async function main() {
         scanId,
         answers: user.fullAnswers ? fullAnswers() : ANSWERS,
         status: c.kind === "failed" ? "analysis_failed" : c.kind === "questions" ? "questionnaire_only" : "completed",
-        image: c.kind === "questions" ? null : { stored: false, captureMethod: "native" },
+        image: c.kind === "questions" ? null : { stored: c.kept === true, captureMethod: "native" },
         consent: { imageRetention: false },
         result: c.kind === "measured" || c.kind === "legacy" ? legacy : null,
         createdAt,
       });
+      if (c.kept) await putKeptPhoto(scanImageKey(user.uid, scanId));
       if (c.kind !== "measured") continue;
 
       const inputSha256 = createHash("sha256").update(scanId).digest("hex");

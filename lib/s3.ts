@@ -1,4 +1,4 @@
-import { DeleteObjectsCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectsCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ORIGINAL_CONTENT_TYPE, userPrefix } from "@/lib/s3-key";
 
@@ -147,4 +147,67 @@ export async function eraseUserPrefix(uid: string): Promise<number> {
     }
     deleted += keys.length;
   }
+}
+
+// ─── G03 / TD-25 (2): the owner's own kept photo, read back ──────────────────
+// A THIRD credential pair, read-only (s3:GetObject on
+// users/*/scans/*/original.jpg): the upload pair can only PUT and the erase
+// pair can only list and delete, so neither is widened. Production needs the
+// owner's read IAM principal; locally these point at S3Mock. No fallback to
+// another pair or the provider chain: unset means fail closed.
+const READ_ACCESS_KEY_ID = process.env.S3_SKIN_IMAGES_READ_ACCESS_KEY_ID;
+const READ_SECRET_ACCESS_KEY = process.env.S3_SKIN_IMAGES_READ_SECRET_ACCESS_KEY;
+
+/** How long a photo link works. Short: the link is a bearer capability. */
+export const READ_URL_TTL_SECONDS = 60;
+
+let readClient: S3Client | null = null;
+
+function s3Read(): S3Client {
+  const missing: string[] = [];
+  if (!REGION) missing.push("S3_SKIN_IMAGES_REGION");
+  if (!BUCKET) missing.push("S3_SKIN_IMAGES_BUCKET");
+  if (!READ_ACCESS_KEY_ID) missing.push("S3_SKIN_IMAGES_READ_ACCESS_KEY_ID");
+  if (!READ_SECRET_ACCESS_KEY) missing.push("S3_SKIN_IMAGES_READ_SECRET_ACCESS_KEY");
+  if (missing.length > 0) throw new S3NotConfiguredError(missing);
+  readClient ??= new S3Client({
+    region: REGION!,
+    ...ENDPOINT_CONFIG,
+    credentials: { accessKeyId: READ_ACCESS_KEY_ID!, secretAccessKey: READ_SECRET_ACCESS_KEY! },
+  });
+  return readClient;
+}
+
+/**
+ * True when the object exists. `key` must come from scanImageKey() with a
+ * server-VERIFIED uid. A missing object (never kept, or erased) is false; any
+ * other error throws.
+ */
+export async function originalExists(key: string): Promise<boolean> {
+  try {
+    await s3Read().send(new HeadObjectCommand({ Bucket: BUCKET!, Key: key }));
+    return true;
+  } catch (err) {
+    const status = (err as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
+    if (status === 404 || (err as Error)?.name === "NotFound" || (err as Error)?.name === "NoSuchKey") return false;
+    throw err;
+  }
+}
+
+/**
+ * Short-lived presigned GET for one original. The response S3 sends is marked
+ * private and not storable, so no shared cache keeps the photo.
+ */
+export function presignOriginalRead(key: string): Promise<string> {
+  return getSignedUrl(
+    s3Read(),
+    new GetObjectCommand({
+      Bucket: BUCKET!,
+      Key: key,
+      ResponseCacheControl: "private, no-store, max-age=0",
+      ResponseContentType: ORIGINAL_CONTENT_TYPE,
+      ResponseContentDisposition: "inline",
+    }),
+    { expiresIn: READ_URL_TTL_SECONDS }
+  );
 }
