@@ -49,7 +49,7 @@ const config: Config = {
         },
         // Backgrounds
         skin: {
-          base: "#FAFAF8",       // warm white — page background
+          base: "#FFFFFF",       // store --color-paper — page background
           muted: "#F2EDE8",      // warm off-white — card backgrounds
           border: "#E8E0D8",     // warm border
         },
@@ -119,24 +119,48 @@ const config: Config = {
         // (AUDIT.md S0-2). Values match the raw hex already used ad hoc
         // for the same roles elsewhere in this feature (EchoPage.tsx,
         // SkinCheckFlow.tsx, the inputs/* components), not a new palette.
-        canvas:  "#FAF4EF",  // warm off-white panel background
-        surface: "#FFFFFF",  // card/photo-frame background
-        text:    "#1A1A1A",  // primary text
+        // G03 (docs/design/system.md): mapped to the Shopify store theme, so
+        // every screen that already uses these names takes the store's look.
+        canvas:  "#F5F3EE",  // store --color-linen (cards, panels)
+        surface: "#FFFFFF",  // store --color-paper
+        text:    "#2C2C2A",  // store --color-ink
 
         // Restrained accent for the Skin Check quiz + results redesign
         // (PART 4 of the redesign brief) — small selected-state touches
         // only (a filled chip, an underline), never a large fill. Not the
         // same as `rebel`/`confidence` above, which belong to the older
         // marketing-home palette this feature no longer draws from.
+        // G03: the old mauve accent now maps to the store's forest/mist, the
+        // one accent that passes contrast for text (system.md §2).
         blush: {
-          DEFAULT: "#9C6B76",
-          soft: "#F4E8E6",
+          DEFAULT: "#0F6E56",
+          soft: "#E1F5EE",
+        },
+        // The store theme by role (docs/design/system.md §1-2; source:
+        // docs/design/brand-source-root.css). `error` is the one value not
+        // from the store.
+        brand: {
+          paper: "#FFFFFF",
+          linen: "#F5F3EE",
+          linen2: "#EEEAE5",
+          line: "#DDD8CE",
+          ink: "#2C2C2A",
+          muted: "#6B6862",
+          action: "#252724",
+          "action-hover": "#111210",
+          forest: "#0F6E56",
+          mist: "#E1F5EE",
+          accent: "#B98783",
+          "accent-soft": "#F3E9E7",
+          taupe: "#B7A58F",
+          error: "#B42318",
         },
       },
 
       // ─── Typography ────────────────────────────────────────────────
       fontFamily: {
-        display: ["var(--font-fraunces)", "Georgia", "serif"],
+        // Store theme: Bai Jamjuree headings, Plus Jakarta Sans body (system.md §3).
+        display: ["var(--font-display)", "system-ui", "sans-serif"],
         body:    ["var(--font-jakarta)", "system-ui", "sans-serif"],
         mono:    ["var(--font-mono)", "monospace"],
       },

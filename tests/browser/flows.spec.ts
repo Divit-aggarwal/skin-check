@@ -59,7 +59,7 @@ test("a dark photo gives a named retake reason; 'Use this photo anyway' appears 
     await expect(page.getByText(RETAKE_COPY.too_dark)).toBeVisible();
   }
   await expect(anyway).toBeVisible();
-  await page.screenshot({ path: "docs/lanes/dashboard-flow-retake.png", fullPage: true });
+  await page.screenshot({ path: ".local-stack/browser-shots/dashboard-flow-retake.png", fullPage: true });
 });
 
 test("a normal scan finishes and shows on the dashboard", async ({ page }) => {
@@ -101,7 +101,7 @@ test("a returning user is asked the two questions again, with the 'Last time you
   // The next section replaces this one on screen, with its own hint.
   await expect(page.getByText(/hormonal or reproductive factors/)).toBeVisible();
   await expect(page.getByText("Last time you said: My breakouts change around my period")).toBeVisible();
-  await page.screenshot({ path: "docs/lanes/dashboard-flow-returning.png", fullPage: true });
+  await page.screenshot({ path: ".local-stack/browser-shots/dashboard-flow-returning.png", fullPage: true });
 });
 
 test("under 18 shows the confirm step; No goes back, Yes blocks", async ({ page }) => {
@@ -114,7 +114,7 @@ test("under 18 shows the confirm step; No goes back, Yes blocks", async ({ page 
   await expect(page.getByText("You chose under 18. Is that right?")).toBeVisible();
   await page.getByRole("button", { name: /Yes, I.m under 18/ }).click();
   await expect(page.getByText(/isn't available yet for users under 18/)).toBeVisible();
-  await page.screenshot({ path: "docs/lanes/dashboard-flow-under18.png", fullPage: true });
+  await page.screenshot({ path: ".local-stack/browser-shots/dashboard-flow-under18.png", fullPage: true });
 });
 
 async function askEcho(page: Page) {
@@ -130,7 +130,7 @@ test("Echo asks for AI-share consent first", async ({ page }) => {
   await expect(page.getByText(C.privacy.aiNotAsked)).toBeVisible();
   await askEcho(page);
   await expect(page.getByText(AI_SHARE_CONSENT_COPY)).toBeVisible();
-  await page.screenshot({ path: "docs/lanes/dashboard-flow-echo-consent.png", fullPage: true });
+  await page.screenshot({ path: ".local-stack/browser-shots/dashboard-flow-echo-consent.png", fullPage: true });
 });
 
 test("withdraw AI-share consent on the dashboard, then Echo asks again", async ({ page }) => {
@@ -175,7 +175,7 @@ test("routine: add a product, mark used, mark skipped, add other product, reload
     const box = await el.boundingBox();
     expect(box!.x + box!.width, await el.evaluate((n) => n.outerHTML.slice(0, 80))).toBeLessThanOrEqual(390);
   }
-  await page.screenshot({ path: "docs/lanes/dashboard-flow-routine.png", fullPage: true });
+  await page.screenshot({ path: ".local-stack/browser-shots/dashboard-flow-routine.png", fullPage: true });
 });
 
 test("Ask Echo, back to the dashboard, a new check starts at the questions", async ({ page }) => {

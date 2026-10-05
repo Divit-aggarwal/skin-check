@@ -4,7 +4,7 @@ import { DASHBOARD_SEED as U } from "./seed-users";
 import { shot, signIn } from "./helpers";
 
 // Every dashboard state in docs/lanes/dashboard-design.md §3, on a phone
-// screen, each saved as docs/lanes/dashboard-<state>.png.
+// screen, each saved as .local-stack/browser-shots/dashboard-<state>.png.
 
 const FS = process.env.PW_FIRESTORE_HOST!;
 const firestore = (page: Page) => (url: URL) => url.host === FS || url.href.includes("firestore.googleapis.com");
@@ -18,7 +18,8 @@ async function dashboardAs(page: Page, phone: string) {
 test("signed out: a sign-in link only", async ({ page }) => {
   await page.goto("/dashboard");
   await expect(page.getByText(C.signedOut)).toBeVisible();
-  await expect(page.getByRole("link", { name: C.signIn })).toHaveAttribute("href", "/account");
+  // The shell top bar has its own Sign in; this is the page's own link.
+  await expect(page.getByRole("main").getByRole("link", { name: C.signIn })).toHaveAttribute("href", "/account");
   await shot(page, "signed-out");
 });
 

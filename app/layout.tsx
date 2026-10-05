@@ -1,15 +1,16 @@
 import type { Metadata, Viewport } from "next";
-import { Fraunces, Plus_Jakarta_Sans } from "next/font/google";
+import { Bai_Jamjuree, Plus_Jakarta_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
 
-const fraunces = Fraunces({
+// The store theme's fonts (docs/design/system.md §1): Bai Jamjuree headings,
+// Plus Jakarta Sans body.
+const display = Bai_Jamjuree({
   subsets: ["latin"],
-  variable: "--font-fraunces",
+  variable: "--font-display",
   display: "swap",
-  weight: ["300", "400", "500", "600", "700"],
-  style: ["normal", "italic"],
+  weight: ["500", "600", "700"],
 });
 
 const jakarta = Plus_Jakarta_Sans({
@@ -40,12 +41,12 @@ export const metadata: Metadata = {
   },
 };
 
+// TD-25 (6): pinch-to-zoom stays on (WCAG 1.4.4): no zoom limit is set here.
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
-  themeColor: "#3D6B52",
+  viewportFit: "cover",
+  themeColor: "#ffffff",
 };
 
 export default function RootLayout({
@@ -56,11 +57,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${fraunces.variable} ${jakarta.variable}`}
+      className={`${display.variable} ${jakarta.variable}`}
       suppressHydrationWarning
     >
-      <body className="bg-skin-base font-body text-sage-900 antialiased">
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <body className="bg-surface font-body text-text antialiased">
+        {/* The store theme is light only (system.md); no dark variant is designed. */}
+        <ThemeProvider attribute="class" forcedTheme="light">
           <AuthProvider>{children}</AuthProvider>
         </ThemeProvider>
       </body>

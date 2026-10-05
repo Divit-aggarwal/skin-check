@@ -39,5 +39,5 @@ export async function signIn(page: Page, phoneNumber: string) {
   await expect(page.getByText(/Signed in as/)).toBeVisible();
 }
 
-/** Saves a full-page screenshot next to the lane report. */
-export const shot = (page: Page, name: string) => page.screenshot({ path: `docs/lanes/dashboard-${name}.png`, fullPage: true });
+/** Saves a full-page screenshot under .local-stack/ (gitignored); the lane report keeps its own copies in docs/lanes/. */
+export const shot = (page: Page, name: string) => page.screenshot({ path: `.local-stack/browser-shots/dashboard-${name}.png`, fullPage: true });

@@ -1,0 +1,48 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+import { SHELL_COPY } from "@/components/shell/copy";
+import { bannedWordsIn } from "@/lib/catalog/wording";
+import { CAUSE, CHANGE, DIAGNOSIS, FORECAST, MEDICAL } from "@/lib/context/lexicon";
+
+// G03 part 1: the app shell (docs/design/system.md §6, map.md).
+
+const strings = (v: unknown): string[] =>
+  typeof v === "string" ? [v] : typeof v === "function" ? [String(v("4821"))] : v && typeof v === "object" ? Object.values(v).flatMap(strings) : [];
+
+describe("app shell", () => {
+  it("every shell string passes the D-12 word checks", () => {
+    const all = strings(SHELL_COPY);
+    expect(all.length).toBeGreaterThan(8);
+    for (const s of all) {
+      expect(bannedWordsIn(s), s).toEqual([]);
+      for (const re of [CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST]) expect(re.test(s), s).toBe(false);
+    }
+  });
+
+  it("the navigation reaches the six main places, marks the current one, and is labelled", () => {
+    const nav = readFileSync("components/shell/Nav.tsx", "utf8");
+    for (const href of ["/dashboard", "/checks", "/skin-check", "/routine", "/echo", "/account"]) expect(nav).toContain(`href: "${href}"`);
+    expect(nav).toMatch(/aria-current=\{current\(/);
+    expect(nav.match(/aria-label=\{S\.navLabel\}/g)).toHaveLength(3);
+  });
+
+  it("every page is inside the shell, which starts with a skip link to the content", () => {
+    expect(readFileSync("app/(marketing)/layout.tsx", "utf8")).toMatch(/<AppShell>\{children\}<\/AppShell>/);
+    const shell = readFileSync("components/shell/AppShell.tsx", "utf8");
+    expect(shell).toMatch(/href="#content"/);
+    expect(shell).toMatch(/id="content"/);
+  });
+
+  it("TD-25 (6): pinch-to-zoom is on", () => {
+    const layout = readFileSync("app/layout.tsx", "utf8");
+    expect(layout).not.toMatch(/maximumScale|userScalable/);
+  });
+
+  it("the store fonts are loaded and the old ones are gone", () => {
+    const layout = readFileSync("app/layout.tsx", "utf8");
+    expect(layout).toMatch(/Bai_Jamjuree/);
+    expect(layout).toMatch(/Plus_Jakarta_Sans/);
+    expect(layout).not.toMatch(/Fraunces/);
+    expect(readFileSync("app/(marketing)/layout.tsx", "utf8")).not.toMatch(/Space_Grotesk|Inter\b/);
+  });
+});
