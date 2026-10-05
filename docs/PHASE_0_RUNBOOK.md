@@ -1,5 +1,53 @@
 # DEPLOY RUNBOOK: everything on `longitudinal-platform`
 
+## STAGE 1 CHECKLIST: test deploy for the owner's own test accounts
+
+Stage 1 puts everything on `longitudinal-platform` into production and checks it with the owner's made-up test accounts only. Real users come in Stage 2, after the Stage 2 items at the end of this list. Every step below is detailed further down in this runbook. **The owner runs every step**; the agent prepared this file only.
+
+**Know before you start:**
+- The Vercel project is on the Hobby plan: production cannot be password-protected. During Stage 1 the live site serves anyone who visits. Do not announce it.
+- Firebase Auth, the S3 bucket and the engine are shared with the current live site from the first step that touches them.
+- All production data is test data (owner decision, D-22).
+
+| # | Step (section) | Who | Time | Stop line after it |
+|---|---|---|---|---|
+| 0 | Log in: `aws login`, `npx -y firebase-tools@latest login --reauth`, `vercel login` if needed; re-read production (C0, the A0 checks, B1 check) and compare with "Production state checked 2026-10-06" below | Owner | 10 min | Stop if anything differs from what this runbook assumes |
+| 1 | P1: done (the engine branch is on GitHub, checked 2026-10-06); re-check only | Owner | 1 min | |
+| 2 | P2 / B01: remove the Admin and S3 keys from the laptop; rotate the Firebase Admin key and put the new one in Vercel Production | Owner | 20 min | Stop until `.env.local` holds no production key |
+| 3 | **Job C** from C2: task definition `skin-scan:2`, baseline, update service, watch 30 min, smoke scan, replay | Owner | 75 min | **STOP: JOB C DONE** |
+| 4 | **Job A**: Firestore `(default)` to asia-south1 (A1 cannot be undone; 5-10 min outage) | Owner | 30 min | **STOP: JOB A DONE** |
+| 5 | **Job B**: Vercel functions to bom1 | Owner | 15 min | **STOP: JOB B DONE** |
+| 6 | **Job S**: S1 erase user, S2 erase keys, S3 `CRON_SECRET`, S4 no dev settings, **S6 `GEMINI_MODEL_SYNTHESIS`** (Stage 1 needs it). Skip S5 (photo expiry) until decision 5 | Owner | 25 min | **STOP: JOB S DONE** |
+| 7 | **Job D**: D0 A14 merge (resolve `DECISION_LOG.md` and `vercel.json`), D1 push and PR, D2 merge = production deploy, D3 rules and chat-turn expiry right after Ready | Owner | 45 min | **STOP before D2**: tests green on the merged branch. **STOP before D3**: D2 Ready |
+| 8 | **D4** checks with two made-up test accounts: login, photo upload, engine, Gemini (English and Hinglish), rate limit, trust boundary, delete and the next daily sweep | Owner | 60 min + next sweep (03:00-03:59 IST) | **STOP: JOB D DONE**. Stage 1 is live |
+
+Total: about 4.5 hours of owner time, plus waiting for the next daily sweep (step 8).
+
+**What a Stage 1 test user sees, and why it is accepted for Stage 1 only:**
+- Echo's AI-share consent starts with "DRAFT:" (H06 not final).
+- The routine page lists three products named "Sample … (SYNTHETIC - replace)" (E01 not supplied).
+- A red-flag or self-harm message gets the referral with no helpline number (F06).
+- The Gemini key is whatever key is in production now (G1 undecided): use made-up answers only. Echo allows 18 chat requests a day across all users (F14).
+- Product recommendations are off; the safety check is on and marked provisional.
+
+**Must be done before Stage 2 (real users):** F06 helpline number, H06 final consent copy, G1 Gemini key and tier, F14 daily limit, E01 real catalogue (or hide the routine page), decision 5 and S5 photo expiry, and a review of everything the Stage 1 test accounts saw.
+
+## Production state checked 2026-10-06 (read-only)
+
+| Item | Found | Runbook assumes | Same? |
+|---|---|---|---|
+| Frontend in production | Vercel `dpl_7aCicWiHeqEJuer3grPWqpC3dTow`, commit 1b39f88, regions `[iad1]`, project region iad1, no crons; `x-vercel-id: bom1::iad1::…` | same (B not run) | Yes |
+| `origin/master` | 1b39f88 (the local `master` branch is an unrelated 55b6f74; use `origin/master`) | 1b39f88 | Yes |
+| Engine health | `scan-0.1.5-provisional`, cv2 4.11.0 | 0.1.5 live until C3 | Yes |
+| Engine branch on GitHub (P1) | `engine-build-identity` at 8dc37dc on the remote | P1 not run | **No: P1 is already done** |
+| ECS task definition, live image digest, 0.1.6 and rollback images in ECR | Not re-read: the AWS session was expired | `skin-scan:1` only, digest `668b1f56…`, 0.1.6 `9a8f96c0…` in ECR | **Cannot check**: re-read in step 0 |
+| Firestore `(default)` region | Not re-read: the Firebase session was expired | nam5 until A1 | **Cannot check**: re-read in step 0 (A0) |
+| Vercel Production settings | 20 names present; `CRON_SECRET`, `S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID`, `S3_SKIN_IMAGES_ERASE_SECRET_ACCESS_KEY` missing | same | Yes |
+| `GEMINI_MODEL_SYNTHESIS` value | Stored as a secret, not readable | the model G1 approves | **Cannot check**: S6 sets it |
+| Merge dry runs | `infra/india-region` into this branch: conflicts in `DECISION_LOG.md` and `vercel.json`; this branch into `origin/master`: clean | D0 | Yes (D0 now also covers `vercel.json`) |
+
+---
+
 Engine 0.1.6, India Firestore, Vercel bom1, website gates 01-04, and every feature built on the branch since (longitudinal engine, rules safety check, context-path Echo, dashboard, privacy: consent ledger, 18+ gate, erase and sweep).
 
 First prepared 2026-10-03; rewritten 2026-10-05 for the whole branch. **Nothing in this file has been executed except C0 and C1 (2026-10-03, TD-04).**
@@ -38,7 +86,7 @@ Names only. Set with `vercel env add <NAME> production` (the value is read from 
 | `S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID`, `S3_SKIN_IMAGES_ERASE_SECRET_ACCESS_KEY` | **Erase credentials**: a separate principal that may list and delete under `users/*` only (account erase and the sweep) | Owner (S1, S2) | keys of the new `skin-check-eraser` user | **Missing** |
 | `CRON_SECRET` | The erase sweep refuses without it; Vercel sends it as `Authorization: Bearer …` on every cron call | Owner (S3) | 32 random bytes, hex | **Missing** |
 | `GEMINI_API_KEY` | Echo (context path) | Owner, after G1 (paid tier, region) | the key G1 approves | Present (key ownership/tier unresolved, G1) |
-| `GEMINI_MODEL_SYNTHESIS` | Model id for Echo; unset means `gemini-3.6-flash` | Owner | the model G1 approves | Present |
+| `GEMINI_MODEL_SYNTHESIS` | Model id for Echo; unset means `gemini-3.6-flash`. The call always sends `thinkingLevel: MINIMAL`; the model must accept it. Older ids (`gemini-2.5-flash`, `gemini-2.0-flash`) now return 404 "no longer available" (checked 2026-10-06), and every answer would fail | Owner (S6) | `gemini-3.6-flash` for Stage 1; the model G1 approves for Stage 2 | Present, value not readable (stored as a secret) |
 | `GEMINI_MODEL_VISION` | Not read by the code any more | Owner | may be removed | Present (unused) |
 | `NEXT_PUBLIC_APP_ENV` | Only turns on full fetch-URL logging when `development` | Owner | `production` | Present |
 | `NEXT_PUBLIC_TERMS_URL` | Terms link on the photo step | Owner | the terms page URL | Present |
@@ -61,7 +109,7 @@ Names only. Set with `vercel env add <NAME> production` (the value is read from 
 | Path | Client read | Client write |
 |---|---|---|
 | `users/{uid}` | owner `get` | owner `create`/`update` with only `phoneNumber` (must equal the token's) and `lastSeenAt`, and only while no `erasedAccounts/{uid}`; never `delete` |
-| `users/{uid}/skinChecks/{checkId}` | owner `get`, `list` | owner `create` only: no `erasedAccounts/{uid}`, no `under18Accounts/{uid}` (H24), `createdAt == request.time`, `scanId` equals the doc id, `image.stored` boolean, `image.key` under the owner's own prefix, a stored image only with image-retention consent at the current version; never `update`/`delete` |
+| `users/{uid}/skinChecks/{checkId}` | owner `get`, `list` | owner `create` only: no `erasedAccounts/{uid}`, no `under18Accounts/{uid}` (H24), `createdAt == request.time`, `scanId` equals the doc id when present, `image.stored` boolean, `image.key` exactly `users/<uid>/scans/<checkId>/original.jpg`, a stored image only with image-retention consent at the current version; never `update`/`delete` |
 | `users/{uid}/scanAnalyses/{id}` | owner `get`, `list` | none (server only) |
 | `users/{uid}/routineEvents/{id}` | owner `get`, `list` | none (server only) |
 | `users/{uid}/consentLedger/{id}` | owner `get`, `list` | none (server only, append-only) |
@@ -92,7 +140,7 @@ Names only. Set with `vercel env add <NAME> production` (the value is read from 
 
 | # | Command | Who | Good output | Check | Undo |
 |---|---|---|---|---|---|
-| P1 | `git -C ../skin-scan push origin engine-build-identity` | Owner | `* [new branch] engine-build-identity -> engine-build-identity` | `git -C ../skin-scan ls-remote --heads origin engine-build-identity` shows `8dc37dc…` | `git -C ../skin-scan push origin --delete engine-build-identity` |
+| P1 | **Done** (checked 2026-10-06: the remote has `engine-build-identity` at 8dc37dc). Re-check only: `git -C ../skin-scan ls-remote --heads origin engine-build-identity` | Owner | `8dc37dc501ea974825427c665acd7019120c20ec refs/heads/engine-build-identity` | `git -C ../skin-scan ls-remote --heads origin engine-build-identity` shows `8dc37dc…` | `git -C ../skin-scan push origin --delete engine-build-identity` |
 | P2 | B01 items 1-3 from DEV_PROD_BOUNDARY.md (on ff08107): remove the Firebase Admin key (`FIREBASE_PRIVATE_KEY`, `FIREBASE_CLIENT_EMAIL`) and the `S3_SKIN_IMAGES_*` lines from `.env.local`, and move the Desktop `*-firebase-adminsdk-*.json` off this laptop | Owner | the variables and the file are gone | the P2 check command below the table prints `0`; `ls ~/Desktop/*adminsdk*.json` finds nothing | restore from your password manager |
 
 P2 check (outside the table, so the `|` characters are real):
@@ -170,6 +218,8 @@ docker push "$REPO:$TAG"
 - Undo: the image is only stored, nothing runs it. If it must go, and only before C3: `aws ecr batch-delete-image --region $REG --repository-name skin-scan --image-ids imageTag=$TAG`.
 
 ### C2. Register task definition `skin-scan:2`, pinned by digest
+
+> The steps below assume `skin-scan:1` is the only revision, so the new one is `:2` (true on 2026-10-03; not re-read since, the AWS session was expired on 2026-10-06). First run `aws ecs list-task-definitions --region $REG --family-prefix skin-scan --query taskDefinitionArns`. If it lists more than `:1`, the register below returns a higher number: use that number wherever C2-C4 say `skin-scan:2`.
 
 **STOP (owner runs this):** the register command below changes production configuration.
 
@@ -278,7 +328,9 @@ curl -s -H "X-Scan-Secret: $SCAN_SECRET" -F "image=@../skin-scan/fixtures/input_
 ```
 - Who: owner.
 - Good output: `{"pipeline_version": "scan-0.1.6-provisional", "engine_build": "sha-8dc37dc501ea974825427c665acd7019120c20ec", "n_scores": 7}`.
-- Check: this step is the check. Also complete one real scan on the live website (https://skin-check-sigma.vercel.app or the custom domain); it must finish normally.
+- Check: this step is the check.
+
+**STOP (owner runs this):** also complete one real scan on the live website (https://skin-check-sigma.vercel.app or the custom domain), with a made-up test account; it writes production data and must finish normally.
 - Undo: nothing to undo (read-only call). On failure, roll back as in C3.
 
 ### C5. Phase 0 replay against the live service, compared with the local run (`$BASE`)
@@ -420,6 +472,8 @@ F firestore:backups:schedules:create --database "(default)" --recurrence DAILY -
 
 ### A5. Application check (production, real phone)
 
+**STOP (owner runs this):** these steps write production data. Use a made-up test account.
+
 1. Sign in with an existing test account. It works, because Auth was untouched.
 2. Complete a scan with retention consent. `users/{uid}/skinChecks/{scanId}` appears in the console.
 3. The previous-scans list shows it.
@@ -476,7 +530,7 @@ vercel redeploy dpl_7aCicWiHeqEJuer3grPWqpC3dTow --target production
   ```
   - `regions: ["bom1"]`, `sha: 1b39f8851bb9224da0e3422e00edeeed1d9db9ac`.
   - `x-vercel-id: bom1::bom1::…`. The second part is the function region; today it is `iad1`.
-  - One real scan on the live website still completes, including the S3 upload. Use https://skin-check-sigma.vercel.app; `scan.theprojectskin.com` is also attached to this Vercel project (`vercel api /v9/projects/skin-check/domains`). `lib/s3.ts` signs with `S3_SKIN_IMAGES_REGION`, not the Vercel region.
+  - **STOP (owner runs this):** one real scan with a made-up test account on the live website still completes, including the S3 upload. Use https://skin-check-sigma.vercel.app; `scan.theprojectskin.com` is also attached to this Vercel project (`vercel api /v9/projects/skin-check/domains`). `lib/s3.ts` signs with `S3_SKIN_IMAGES_REGION`, not the Vercel region.
 - Undo: `vercel rollback dpl_7aCicWiHeqEJuer3grPWqpC3dTow`, then B1's undo.
 
 ```
@@ -565,6 +619,21 @@ vercel env ls production | grep -E 'ECHO_CONTEXT_PATH|ERASE_SWEEP_DELAY_SECONDS|
 
 **STOP (owner runs this).** `vercel env rm <NAME> production --yes`. Undo: add it back (you should not need to).
 
+### S6. The Gemini model for Echo (Stage 1 needs this)
+
+The context call always sends `thinkingLevel: MINIMAL`. Older model ids (`gemini-2.5-flash`, `gemini-2.0-flash`) now return 404 "no longer available" (checked with the dev key on 2026-10-06), so if production's `GEMINI_MODEL_SYNTHESIS` still names one, every Echo answer fails with `CHAT_SERVICE_ERROR`. Its value cannot be read (it is stored as a secret), so set it.
+
+**STOP (owner runs this).**
+
+```bash
+vercel env rm GEMINI_MODEL_SYNTHESIS production --yes
+printf 'gemini-3.6-flash' | vercel env add GEMINI_MODEL_SYNTHESIS production --no-sensitive
+```
+- Who: owner. For Stage 2, use the model G1 approves, and confirm it accepts `thinkingLevel: MINIMAL` before switching.
+- Good output: `Removed …` then `Added Environment Variable GEMINI_MODEL_SYNTHESIS to Project skin-check`.
+- Check (read-only): `vercel env ls production | grep GEMINI_MODEL_SYNTHESIS` shows it as a plain (non-secret) value; D4 item 4 shows `modelId: "gemini-3.6-flash"` on the echo turn.
+- Undo: `vercel env rm GEMINI_MODEL_SYNTHESIS production --yes` (the code then uses its default, `gemini-3.6-flash`). The old value cannot be restored, because it was never readable.
+
 ### S5. Photo retention rule on the bucket (decision 5; period chosen by the owner)
 
 Fill in `RETENTION_DAYS` with the decided number. **Do not run this until decision 5 is made and `IMAGE_RETENTION_PERIOD_DAYS` in `lib/consent.ts` and its copy are set to the same number** (otherwise photos disappear on a schedule no copy tells users about).
@@ -616,9 +685,13 @@ decision 5), tracker H01/TD-19 updated. Do not start job D before this.
   grep -oE '^\*\*D-[0-9]+[a-z]?' docs/architecture/DECISION_LOG.md | sort | uniq -d   # prints nothing
   npm run typecheck && npm run lint && npm run test:all                    # all pass, no production keys needed
   ```
-- Run these checks **before** A14 step 5 (`git stash drop`). `test:all` runs the unit tests, the local stack (emulators, engine 0.1.6 by image ID, S3Mock, fake Gemini), the browser tests and `next build`; it uses no production key.
+- Run these checks **after** the merge commit (A14 step 5's commit) and **before** its `git stash drop`: before the commit, `git show longitudinal-platform:vercel.json` still reads the old file, with no `regions`. `test:all` runs the unit tests, the local stack (emulators, engine 0.1.6 by image ID, S3Mock, fake Gemini), the browser tests and `next build`; it uses no production key.
 - A14_RECONCILIATION_PROPOSAL step 4 has a `grep` bug (it matches `**D-03a` as `**D-03`). Use the command above.
-- Undo (before step 5 and before pushing): `git reset --hard ORIG_HEAD`, then `git stash pop` to restore the drafts.
+- Undo (before the stash is dropped and before pushing): `git reset --hard ORIG_HEAD`, then restore the drafts from the A14 entry by name, never with a bare `git stash pop` (the stash list is shared with every worktree of this repository):
+  ```bash
+  REF=$(git stash list --format='%gd %gs' | grep 'A14 superseded drafts' | head -1 | cut -d' ' -f1)
+  [ -n "$REF" ] && git stash apply "$REF" && git stash drop "$REF"
+  ```
 
 ### D1. Push `longitudinal-platform` and open the pull request
 
@@ -704,15 +777,15 @@ The local stack uses emulators, S3Mock, a fake Gemini and the engine image by ID
    - `aws s3api list-objects-v2 --bucket projectskin-skin-originals-prod --prefix users/<uid>/scans/<scanId>/ --query 'Contents[].Size'` shows one non-zero size. S3Mock never verified signatures, checksums or the signed size; this is the first real PUT of the presigned URL.
    - Console: `users/<uid>/consentLedger` has an `image_retention` entry with `source: "presign"` and that `scanId`; the dashboard's privacy section then says "Photo of your newest photo check: kept." (H27).
 3. **The real engine.** Console: `users/<uid>/scanAnalyses/<scanId>_<sha16>` has `source: "server"`, `engine_build: "sha-8dc37dc501ea974825427c665acd7019120c20ec"`, `pipeline_version: "scan-0.1.6-provisional"`, `region_raw_native`; every value in `scores` and `region_scores` is between 0 and 1. The dashboard shows the reading.
-4. **The real Gemini model.** On that check, ask Echo an ordinary question ("what does my cheek reading mean?"). It answers. Console: each exchange writes two `users/<uid>/chatTurns` documents, both with `expireAt` 90 days ahead. The user-role one has `modelId: null` and `validator: null`; the echo-role one has `modelId` set to the model G1 approved and `validator.passed: true` (or `fallback: true` with a reason in `validator.failures`). Then ask a red-flag message ("I want to hurt myself"): the reply is the referral, with the F06 helpline, and its echo-role turn has `modelId: null` (Gemini was not called).
+4. **The real Gemini model.** Use a check whose questionnaire was **completed** (with no answers the reply is the fixed text plus "Finish the Skin Check questions…", F11, and Gemini is never called). Ask an ordinary question ("what does my cheek reading mean?") and one in Hinglish ("mere cheeks ki reading ka kya matlab hai?"). Both answer; the Hinglish one in Hinglish, never "only English". Console: each exchange writes two `users/<uid>/chatTurns` documents, both with `expireAt` 90 days ahead. The user-role one has `modelId: null` and `validator: null`. The echo-role one has `promptVersion: "ctx-prompt-4"`, `modelId` set to the model in S6, and one of: `validator.passed: true`; `fallback: true` with a reason in `validator.failures`; or, when the model asked for a doctor, `passed: false`, `fallback: false`, `redFlag: true` and the reply "This is a question for a doctor, dermatologist or pharmacist…". Then send a red-flag message ("I want to hurt myself"): the reply is the full referral (with the F06 helpline once P3 is in; today it has no number), and its echo-role turn has `modelId: null` (Gemini was not called).
 5. **Rate limits.** In-memory and per instance, so a production check is only a smoke test:
    ```bash
    for i in $(seq 1 12); do curl -s -o /dev/null -w '%{http_code} ' -X POST https://skin-check-sigma.vercel.app/api/account/attestation -d '{}'; done; echo
    ```
-   Expect `401` several times, then `429` (5 per minute per IP). No `429` at all means the requests landed on different instances: record it, it is not a rollback trigger. Never test the chat limit this way: the Gemini scope has a global budget of 18 calls a day (`GEMINI_ROUTE_LIMITS`), and a test would spend real users' budget.
+   Expect `401` several times, then `429` (5 per minute per IP). No `429` at all means the requests landed on different instances: record it, it is not a rollback trigger. This uses the same per-IP bucket as `/api/skin-scan` and the upload route: wait a minute before the next scan from this IP. Never test the chat limit this way: `GEMINI_ROUTE_LIMITS` allows 18 chat requests a day in total and 10 per IP, counted per request whether or not Gemini is called, and a test with a valid token spends that budget.
 6. **Live trust boundary checks.**
    - Echo about another account's `scanId` returns `409` (not found looks like not yours).
-   - Echo about the test account's older check returns `409 CHAT_NOT_NEWEST` (F13).
+   - F13: make a second check with a reading on the same test account. Then, in the browser devtools, resend an earlier chat request that names the first check ("Copy as fetch" from the Network tab, paste in the console): it returns `409 CHAT_NOT_NEWEST`. A check with no reading of its own returns `409 CHAT_ANALYSIS_UNAVAILABLE` instead.
    - A forged chat history (edit one earlier message in the browser devtools request) returns `400 CHAT_HISTORY_INVALID`.
    - Console → Firestore → Rules Playground, signed in as the test uid: `create` on `users/<uid>/scanAnalyses/x` is denied; `get` on `erasedAccounts/<uid>` and on `under18Accounts/<uid>` is denied; `get` on another uid's `users/<other>` is denied.
    - The sweep without the secret: `curl -s -o /dev/null -w '%{http_code}\n' https://skin-check-sigma.vercel.app/api/account/erase/sweep` prints `401`.
@@ -748,5 +821,5 @@ Owner confirms: D2, D3 and D4 pass, tracker A13 and I01 updated.
 
 - Deny rules cannot read the current branch or expand variables. A bare `git push` or `git push origin HEAD` run while on `master`, and `git push origin "$BRANCH"` with `BRANCH=master`, are still allowed for agents. Only the CLAUDE.md hard rules stop those.
 - Fixed: `ENGINE_TABLE` now lists `scan-0.1.6-provisional` (A17). The deny rules match the `npx -y firebase-tools@latest …` and `F …` forms (B05) and block `gh pr merge` (D2), `vercel rollback`, `aws ecs deregister-task-definition`, `aws ecr batch-delete-image`, `firestore:databases:update` in every Firebase form, `git push` to `master`, and `docker push` to this ECR registry (B06). The owner runs these steps, so the rules do not affect them.
-- `GEMINI_ROUTE_LIMITS` allows 18 Gemini calls a day in total (a free-tier budget). With the context path in production that is 18 chat answers a day for all users. Raise it with the G1 decision (tracker row).
+- `GEMINI_ROUTE_LIMITS` allows 18 chat requests a day in total and 10 per IP (a free-tier budget), counted per request, including requests that never reach Gemini. With the context path in production that is about 18 Echo replies a day for all users. Raise it with the G1 decision (tracker F14).
 - Revoked ID tokens still pass Firestore rules for up to an hour (H23, open).
