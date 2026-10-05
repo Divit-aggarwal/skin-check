@@ -381,3 +381,24 @@ describe("uncited claims (F17): our own fact text is not a statement; the known 
     expect(checksOf(ok([{ claim_type: "out_of_scope", text: "I can confirm the heat is the issue.", fact_ids: [] }]))).toEqual([]);
   });
 });
+
+// Final live run A (2026-10-06): three more real answers rejected for harmless wording.
+describe("live run A fixes: real answers pass, the same words elsewhere still fail", () => {
+  const one = (claim_type: string, text: string, fact_ids: string[] = []) => ok([{ claim_type, text, fact_ids } as never]);
+  const MISSING = pkg.missing[0]!;
+  it("'ask a doctor ... for advice before starting/changing' is not a change word", () => {
+    expect(checksOf(one("out_of_scope", "Please ask a doctor or dermatologist for advice before starting new products or changing your routine."))).toEqual([]);
+    expect(checksOf(one("out_of_scope", "Ask a doctor. Your skin was better before starting."))).toContain("comparative_or_change");
+    expect(checksOf(one("out_of_scope", "Before starting, your redness was worse."))).toContain("comparative_or_change");
+  });
+  it("'cannot explain' is a refusal, not a cause; a cause word next to it still fails", () => {
+    expect(checksOf(one("out_of_scope", "I cannot explain general skincare definitions."))).toEqual([]);
+    expect(checksOf(one("out_of_scope", "I cannot explain what causes a reading."))).toContain("cause");
+    expect(checksOf(one("out_of_scope", "This explains your redness."))).toContain("cause");
+  });
+  it("an out-of-scope claim may cite a missing fact it repeats as is; any other citation still fails", () => {
+    expect(checksOf(one("out_of_scope", MISSING.text, [MISSING.id]))).toEqual([]);
+    expect(checksOf(one("out_of_scope", RED.text, [RED.id]))).toContain("citation_rule");
+    expect(checksOf(one("out_of_scope", `${MISSING.text} Your redness is fine.`, [MISSING.id]))).toContain("citation_rule");
+  });
+});

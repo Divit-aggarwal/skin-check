@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { AllowedClaim, ContextPackage, ForbiddenClaim } from "@/lib/contracts/context-package";
 import { packageFacts, type CitableFact, type FactKind } from "./builder";
-import { redFlagHit } from "./prefilter";
+import { nonMedicalRedFlagHit, redFlagHit } from "./prefilter";
 import {
   ACTIVE,
   BAND_WORD,
@@ -67,6 +67,8 @@ export interface Validation {
   userPremise: boolean;
   /** A claim's own words (quotes of our facts removed) read as self-harm or another red flag: a referral (red team pass 2). */
   redFlag: boolean;
+  /** F16: a red flag in the model's own words other than a medical request (a crisis, a symptom, a child, pregnancy). */
+  crisis: boolean;
 }
 
 const WORD_CHECKS: [ForbiddenClaim, RegExp][] = [
@@ -132,7 +134,9 @@ const UNCITED_PHISH = new RegExp(String.raw`https?:|www\.|\b\w+\.(?:com|in|org|n
 // still fails. "before" only after "ask a doctor", "explain" only before
 // "your results/readings", and "skin check" (the product's name) only in small talk.
 const SAFE_PHRASES = [
-  new RegExp(String.raw`(?<=\b(?:doctor|dermatologist|pharmacist) )before (?:starting|using|trying|adding)\b`, "giu"),
+  new RegExp(String.raw`(?<=\b(?:doctor|dermatologist|pharmacist)\b[^.;:!?]{0,40}\s)before (?:starting|using|trying|adding|changing|switching)\b`, "giu"),
+  // a refusal: "I cannot explain general definitions" (still fails on "causes" or "because")
+  new RegExp(String.raw`(?<=\b(?:cannot|can't|can not|unable to|not able to)\s)explain\b`, "giu"),
   new RegExp(String.raw`\b(?:help(?:s)?|to) explain (?:your|the|these) (?:skin check )?(?:results?|readings?)\b`, "giu"),
 ];
 const neutral = (text: string) => SAFE_PHRASES.reduce((t, re) => t.replace(re, " "), text);
@@ -206,8 +210,9 @@ const metricsIn = (text: string) => (Object.keys(METRIC_WORDS) as (keyof typeof 
 
 export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: string): Validation {
   const answer = parseAnswer(raw);
-  if (!answer) return { passed: false, answer: null, failures: [{ check: "malformed_output", claimIndex: -1 }], userPremise: false, redFlag: false };
+  if (!answer) return { passed: false, answer: null, failures: [{ check: "malformed_output", claimIndex: -1 }], userPremise: false, redFlag: false, crisis: false };
   let redFlag = false;
+  let crisis = false;
 
   const facts = new Map(packageFacts(pkg).map((f) => [f.id, f]));
   const ownTexts = new Set(packageFacts(pkg).flatMap((f) => f.text.split(/(?<=[.!?])\s+/).map(sentenceKey)));
@@ -241,7 +246,9 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
     // §5 rule 2. A claim type the package does not allow is a citation failure too.
     if (!pkg.allowedClaims.includes(claim.claim_type)) fail("citation_rule", i, claim.claim_type);
     if (MUST_CITE.has(claim.claim_type) && claim.fact_ids.length === 0) fail("citation_rule", i);
-    if (!MUST_CITE.has(claim.claim_type) && (claim.fact_ids.length > 0 || BAND_WORD.test(text) || metricsIn(text).length > 0 || text.length > UNCITED_MAX)) {
+    // An uncited type may cite only a missing fact it repeats as is ("Product suggestions were not included here.").
+    const onlyMissingQuoted = cited.length === claim.fact_ids.length && cited.every((f) => f.kind === "missing");
+    if (!MUST_CITE.has(claim.claim_type) && ((claim.fact_ids.length > 0 && !onlyMissingQuoted) || BAND_WORD.test(text) || metricsIn(text).length > 0 || text.length > UNCITED_MAX)) {
       fail("citation_rule", i);
     }
     if (!MUST_CITE.has(claim.claim_type) && UNCITED_COMPARE.test(text)) fail("comparative_or_change", i, "than");
@@ -256,6 +263,7 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
     // (e.g. the user's own label "Deep or painful breakouts") is not the claim's own words.
     if (redFlagHit(stripped)) {
       redFlag = true;
+      if (nonMedicalRedFlagHit(stripped)) crisis = true;
       fail("contradicts_package", i);
     }
     if (!MUST_CITE.has(claim.claim_type)) {
@@ -374,5 +382,5 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
 
   const message = userMessage.toLowerCase();
   const userPremise = failures.some((f) => f.term !== undefined && f.check !== "unknown_fact_id" && message.includes(f.term.toLowerCase()));
-  return { passed: failures.length === 0, answer, failures, userPremise, redFlag };
+  return { passed: failures.length === 0, answer, failures, userPremise, redFlag, crisis };
 }
