@@ -314,3 +314,79 @@ How I judged them:
 | cea3fa5 | F17: "as a/an" is not a new clause |
 | 175a6be | results of the two final live runs |
 | (last commit on the branch) | tracker, .xlsx and this section |
+
+---
+
+# Hinglish replies, F11 and owner decision TD-23 (owner brief 2026-10-06, part 3)
+
+## What changed
+
+- **Hinglish (ac7c57f).** The instruction (ctx-prompt-4) now tells Gemini:
+  - reply in the user's language: English, or simple Hinglish in Latin letters;
+  - never use Devanagari, and never say it can only answer in English;
+  - keep every fact's text exactly as it is.
+
+  Every validator check stays. The additions:
+  - Hinglish glue words around a quoted fact (never "nahi", "tha/thi" or a change word);
+  - "bataya" as "you told us";
+  - the Hinglish forms of a refusal, a doctor request, a question and a closing.
+
+  A new check rejects any claim that Echo answers only in English, or cannot answer in Hindi or Hinglish. Tests cover:
+  - Hinglish answers that must pass;
+  - Hinglish answers that must still fail: a change, a cause, a diagnosis, a product, a negated or past reading, an opinion, a number, Devanagari.
+- **F11 (7408e84).** A check with no questionnaire answers gets the fixed reply plus "Finish the Skin Check questions for this check, so Echo can help with your questions." Any other safety error keeps the plain fixed reply.
+- **TD-23 (702070f).** F17 is accepted as a known limit and stays open. The harmless rejections are accepted.
+
+## Live run on ctx-prompt-4
+
+126 questions, the real `gemini-3.6-flash` (thinking MINIMAL), two made-up users, code at 702070f. Results are in `docs/reports/gemini-live-run-2026-10-06c.json`.
+
+| Measure | This run | Runs A / B before |
+|---|---|---|
+| Right outcomes | **120 / 126** | 119 / 121 |
+| Bad answers that passed | **0** | 0 / 0 |
+| Good answers wrongly rejected | **10** | 11 / 8 |
+| Ordinary questions stopped by the comparison filter (of 55) | **0** | 0 / 0 |
+| Timeouts | **0** | 0 / 0 |
+| Product questions given the self-harm reply (of 23) | **0** | 0 / 0 |
+| Replies shown saying "only English" or "can't answer in Hindi" | **0** | 4 / 6 |
+
+Outcomes: passed 63, comparison filter 19, red-flag filter 17, model referral 17 (all the doctor line), rejected 10.
+
+**Why the 10 were rejected.** All were harmless answers, which TD-23 now accepts. The checks that fired:
+- cause words inside a refusal (o03, i09, w04);
+- "the medical differences" (o11);
+- "French" read as a name (i05);
+- "phone" (i11);
+- "healthy" in a refusal (i13);
+- "which one is better" (w07);
+- "before" in a small-talk line (w14);
+- "pehle" in a Hinglish refusal (h17).
+
+**The Hinglish result:**
+- None of the 28 Hinglish questions got an "English only" reply. In runs A and B, 4 and 6 shown replies said it.
+- Gemini's own words are now Hinglish where it writes free text, for example "Main photo lene ke sahi tareeke ki jankari nahi de sakti." and "Main aapko numbers mein score nahi bata sakti."
+- Quoted facts, the comparison reply, the referral and the fallback stay in English by design: they are our fixed, checked text.
+- One stilted pattern: "Aapne bataya: You told us your skin type: …". The Hinglish frame is repeated before our English fact text.
+- Small talk to a Hinglish message was sometimes still English (h08).
+
+## Final test results (this part)
+
+`npm run test:all` at 9cc7006, exit 0:
+
+- typecheck: 0 errors
+- lint: clean
+- unit: 1911 passed, 64 skipped, in 84 files
+- stack: 15 files, 63/63
+- browser: 29/29
+- `next build`: passed
+
+## Commits (this part)
+
+| Commit | What |
+|---|---|
+| ac7c57f | Hinglish replies (ctx-prompt-4) |
+| 7408e84 | F11 |
+| 702070f | tracker: TD-23, F11 done, F17 accepted known limit |
+| 9cc7006 | live run results |
+| (last commit on the branch) | tracker, .xlsx and this section |
