@@ -331,9 +331,27 @@ describe("context path: a safety error is never 'no red flag' (wiring 4)", () =>
     await expectFixedFallback(await post());
   });
 
-  it("a check with no quiz answers (the real evaluateSafety throws): fixed fallback, not a guess", async () => {
-    h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers: {} });
-    await expectFixedFallback(await post());
+  // F11: the fixed reply also asks the user to finish the questionnaire.
+  it("a check with no quiz answers (the real evaluateSafety throws): fixed fallback plus 'finish the questions', no Gemini", async () => {
+    const { FINISH_QUESTIONNAIRE_COPY } = await import("@/lib/context/answer");
+    for (const answers of [{}, { name: "ZZ", skin_type: "oily" }]) {
+      vi.clearAllMocks();
+      h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers });
+      const { reply } = await (await post()).json();
+      const lines = reply.split("\n");
+      expect(lines.at(-1)).toBe(FINISH_QUESTIONNAIRE_COPY);
+      expect(lines.at(-2)).toBe(UNCERTAINTY.text);
+      expect(reply).toMatch(/photo-based estimate/);
+      expect(h.generateContent).not.toHaveBeenCalled();
+      expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ validator: { failures: ["no_answers"], fallback: true } });
+    }
+  });
+
+  it("control: any other safety error keeps the plain fixed reply, with no questionnaire line", async () => {
+    const { FINISH_QUESTIONNAIRE_COPY } = await import("@/lib/context/answer");
+    h.evaluateSafety.mockImplementation(() => { throw new Error("bug"); });
+    const { reply } = await (await post()).json();
+    expect(reply).not.toContain(FINISH_QUESTIONNAIRE_COPY);
   });
 
   it("a chat red flag still gets the referral first (the pre-filter runs before safety)", async () => {

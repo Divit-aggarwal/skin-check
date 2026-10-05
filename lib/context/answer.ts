@@ -30,6 +30,9 @@ export function fallbackLines(pkg: ContextPackage): string[] {
 }
 
 export const fallbackAnswer = (pkg: ContextPackage): string => fallbackLines(pkg).join("\n");
+
+/** F11: the line added to the fixed reply when the check has no questionnaire answers. */
+export const FINISH_QUESTIONNAIRE_COPY = "Finish the Skin Check questions for this check, so Echo can help with your questions.";
 export const comparisonAnswer = (pkg: ContextPackage): string => [COMPARISON_LEAD, ...fallbackLines(pkg)].join("\n");
 
 const NO_RETRY_CHECKS = new Set(["non_latin_script", "malformed_output"]);

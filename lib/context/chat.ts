@@ -9,7 +9,8 @@ import { evaluateSafety } from "@/lib/rules/safety";
 import type { SkinStateRegionKey } from "@/lib/skin-state";
 import { loadTrustedSkinState2Series } from "@/lib/skin-state-2-loader";
 import type { SkinState2Result } from "@/lib/skin-state-2";
-import { answerFromPackage, comparisonAnswer, fallbackAnswer } from "./answer";
+import { answerFromPackage, comparisonAnswer, fallbackAnswer, FINISH_QUESTIONNAIRE_COPY } from "./answer";
+import { RULE_INPUT_FIELDS } from "@/lib/rules/settings";
 import { buildContextPackage, PACKAGE_VERSION, packageSha256 } from "./builder";
 import { loadChatHistory, loadSplitCheckTurns, recordChatTurns, type EchoTurnRecord } from "./chat-turns";
 import { comparisonHit, joinedUserTurns, redFlagHit, referralCopyFor, UNSUPPORTED_SCRIPT_COPY } from "./prefilter";
@@ -119,10 +120,13 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
     // red flag". The builder still applies the caution matcher to the answers.
     console.error("context chat: safety unavailable, fixed fallback:", (err as Error)?.name ?? "unknown");
     const pkg = buildContextPackage({ regionFocus: region, message, skin, answers: trusted.answers });
-    const reply = fallbackAnswer(pkg);
+    // F11: a check with no questionnaire answers gets the same fixed reply plus
+    // a line asking the user to finish the questionnaire, so Echo can help.
+    const noAnswers = !RULE_INPUT_FIELDS.some((f) => Object.hasOwn(trusted.answers, f));
+    const reply = noAnswers ? `${fallbackAnswer(pkg)}\n${FINISH_QUESTIONNAIRE_COPY}` : fallbackAnswer(pkg);
     await recordChatTurns(
       uid, scanId, region, message, reply,
-      meta({ ...NO_CALL, packageVersion: PACKAGE_VERSION, packageSha256: packageSha256(pkg), validator: { passed: false, failures: ["safety_unavailable"], regenerated: false, fallback: true }, prefilter: null, redFlag: false })
+      meta({ ...NO_CALL, packageVersion: PACKAGE_VERSION, packageSha256: packageSha256(pkg), validator: { passed: false, failures: [noAnswers ? "no_answers" : "safety_unavailable"], regenerated: false, fallback: true }, prefilter: null, redFlag: false })
     );
     return { ok: true, reply };
   }
