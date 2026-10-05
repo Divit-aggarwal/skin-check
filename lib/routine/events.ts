@@ -5,7 +5,7 @@ import { IsoDate } from "@/lib/catalog/schema";
 // (docs/lanes/routine-design.md §2.2). Every change is a new, permanent event;
 // the current routine is computed from the events on every read, never stored.
 // Purpose (R-1 A): the user keeps and sees their own record. No analytics, no
-// Gemini, no join to scans.
+// Gemini. Shown next to the user's own checks on the dashboard (TD-24 (2)).
 export const ROUTINE_EVENT_SCHEMA_VERSION = 1 as const;
 
 /** R-5 B: the one unnamed "other product (not ours)" entry. Not a catalogue row. */

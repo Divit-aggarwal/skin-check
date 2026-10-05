@@ -21,7 +21,7 @@ This document defines:
 **Consequence:**
 - No delta, arrow, "improving", sparkline or side-by-side numeric comparison may be shown.
 - Gemini may not narrate change. Its package never contains two scans' values (GEMINI_BOUNDARY.md §4).
-- The previous-scans list may show dates and photos only.
+- The previous-scans list may show dates and photos only. An opened past check may show its own readings, always with the fixed line "Photos differ in light and angle. Differences between checks are not yet a measured change." (owner decision TD-24 (1), 2026-10-05; replaces O-D4).
 
 ## 2. The comparability table (code constant, all empty today)
 

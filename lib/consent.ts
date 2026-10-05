@@ -53,8 +53,11 @@ export const PROCESSING_CONSENT_COPY = `I agree to the ${PROCESSING_CONSENT_TERM
 
 // R-1 A (routine lane, D-16): the purpose of the user's own routine record.
 // Shown on /routine; not a ledger purpose (nothing to grant or revoke).
+// TD-24 (2): the routine is shown next to the user's own checks on the
+// dashboard and timeline; still never sent to Gemini. DRAFT until the owner's
+// final copy (decision 7a).
 export const ROUTINE_PURPOSE_COPY =
-  "So you can keep a record of your own routine and see it back. Only you see it. It is not used for analytics, not sent to Gemini and not joined to your scans.";
+  "DRAFT: So you can keep a record of your own routine and see it next to your own checks. Only you see it. It is not used for analytics and not sent to Gemini.";
 
 /**
  * How long original photos are kept, in days. Decision 5 is NOT made: no
