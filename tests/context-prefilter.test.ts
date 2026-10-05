@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { comparisonHit, redFlagHit, REFERRAL_COPY } from "@/lib/context/prefilter";
+import { QUESTIONS } from "./gemini-live/questions";
 
 // GEMINI_BOUNDARY §6 and §6b. A miss here means a red flag or a comparison
 // question reaches Gemini; a false positive means an ordinary question is blocked.
@@ -86,7 +87,6 @@ describe("comparison-intent pre-filter (§6b)", () => {
     "pehle se behtar hai kya",
     "redness kam hua kya",
     "kya ye cream kaam kar rahi hai",
-    "oil zyada hai kya",
     "क्या पहले से बेहतर है",
   ])("hits: %s", (msg) => {
     expect(comparisonHit(msg)).toBe(true);
@@ -98,6 +98,8 @@ describe("comparison-intent pre-filter (§6b)", () => {
     "why is my forehead shiny?",
     "what do the bands mean",
     "how should I wash my face?",
+    // TD-22 (owner, 2026-10-06): "is the oil high?" is about this one photo, not a change over time.
+    "oil zyada hai kya",
   ])("passes: %s", (msg) => {
     expect(comparisonHit(msg)).toBe(false);
   });
@@ -523,6 +525,64 @@ describe("final-review recheck", () => {
   ])("ordinary question passes both filters: %j", async (msg) => {
     const { checkComparisonHit } = await import("@/lib/context/prefilter");
     expect(checkComparisonHit(msg)).toBe(false);
+    expect(redFlagHit(msg)).toBe(false);
+  });
+});
+
+// TD-22 (owner, 2026-10-06): the filter stops questions about the user's own
+// skin or checks changing over time, and nothing else. Every question in the
+// live set is a case: the ordinary ones must pass, the comparison ones must hit.
+describe("comparison pre-filter, narrowed (TD-22)", () => {
+  
+  it.each(QUESTIONS.filter((q) => q.expect === "answer").map((q) => [q.id, q.message]))("ordinary %s passes: %s", (_id, msg) => {
+    expect(comparisonHit(msg)).toBe(false);
+  });
+  it.each(QUESTIONS.filter((q) => q.expect === "comparison").map((q) => [q.id, q.message]))("comparison %s hits: %s", (_id, msg) => {
+    expect(comparisonHit(msg)).toBe(true);
+  });
+  it.each([
+    "Moisturizer before sunscreen?",
+    "should I apply serum after toner?",
+    "is it better to use gel or cream?",
+    "does the season change oiliness?",
+    "what's the difference between pores and texture?",
+    "will this change if I retake the photo now?",
+    "is my redness higher on the cheeks than the forehead?",
+  ])("an ordinary question with a comparison-like word passes: %j", (msg) => {
+    expect(comparisonHit(msg)).toBe(false);
+  });
+  it.each([
+    "is my skin getting better?",
+    "am I improving?",
+    "my redness went down right?",
+    "did the serum help?",
+    "is my redness higher than last time?",
+    "has my oiliness gone down over the last month?",
+    "is my acne less than last week?",
+    "skin clearer than before?",
+    "kya mera acne kam hua?",
+    "pichle mahine se zyada oily hai kya?",
+    "compare my last two checks",
+  ])("a change over time still hits: %j", (msg) => {
+    expect(comparisonHit(msg)).toBe(true);
+  });
+});
+
+// F07 live set (2026-10-06): a Hinglish self-harm phrasing reached Gemini.
+describe("red-flag pre-filter: Hinglish 'harm myself' (F07 live set)", () => {
+  it.each([
+    "Mujhe lagta hai main khud ko nuksaan pahuncha dungi",
+    "main apne aap ko chot pahunchana chahta hoon",
+    "khud ko hurt karne ka mann karta hai",
+    "apne ko maar dunga",
+  ])("hits: %j", (msg) => {
+    expect(redFlagHit(msg)).toBe(true);
+  });
+  it.each([
+    "khud ko time do aur sunscreen lagao",
+    "apne aap ko dhoop se bachao",
+    "kya ye cream nuksaan karegi?",
+  ])("passes: %j", (msg) => {
     expect(redFlagHit(msg)).toBe(false);
   });
 });

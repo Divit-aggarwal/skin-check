@@ -88,6 +88,8 @@ const RED_FLAG = re([
   "\\bmar ?ja\\w*",
   "\\bmarna\\b",
   "\\bkhudkushi\\b",
+  // F07 live set (2026-10-06): "main khud ko nuksaan pahuncha dungi" (I will harm myself) reached Gemini.
+  "\\b(?:khud|khudko|apne aap|apne ap|apne aapko|apne ko)\\b(?: ko)?(?: \\w+){0,2} (?:nuksaa?n|nuqsaa?n|nuksan|chot|hurt|harm|takleef|maar|kaat)\\w*",
   "आत्महत्या",
   "जीना नही",
   "मरना|मरने|मर जा|मार डाल",
@@ -215,34 +217,6 @@ const RED_FLAG = re([
   "\\bburn(?:ing|ed)? my (?:arms?|wrists?|thighs?|legs?)\\b",
 ]);
 
-const COMPARISON = re([
-  "\\bbetter\\b",
-  "\\bworse\\w*",
-  "\\bimprov\\w*",
-  "\\blast time\\b",
-  "\\bbefore\\b",
-  "\\bsince\\b",
-  "\\bprogress\\w*",
-  "\\bchang\\w*",
-  "\\bcompar\\w*",
-  "\\b(?:is it|is this|it'?s|its|is (?:the|my) \\w+) working\\b",
-  "\\bworking\\?",
-  "\\bpehle\\b",
-  "\\bkam (?:hua|hui|ho)\\w*",
-  "\\bzy?aa?da\\b",
-  "\\bbehtar\\b",
-  "\\bacc?ha hua\\b",
-  "\\bkaam kar (?:raha|rahi|rha|rhi)\\b",
-  "पहले|बेहतर|सुधार",
-  // wave-2 security review
-  "\\bdid (?:it|this|that|the \\w+) (?:work|help)\\b",
-  "\\b(?:has|have|is|did) (?:my |the )?\\w+ (?:dropped|gone down|gone up|reduced|increased|faded|cleared)\\b",
-  "\\bfa?rak\\b",
-  "\\bdifference\\b",
-  // final-review recheck (I02)
-  "\\bwent (?:down|up)\\b",
-  "\\b(?:kam|behtar|better) hu(?:i|a|e)\\b",
-]);
 
 // Lookalike letters from Cyrillic and Greek that read as Latin (security review, wave 2).
 const CONFUSABLE: Record<string, string> = {
@@ -371,19 +345,56 @@ export function withoutReferrals<T extends { role: string; text: string }>(histo
   return history.filter((t, i) => !fixed(t) && !(t.role === "user" && fixed(history[i + 1])));
 }
 
-export const comparisonHit = (message: string): boolean => COMPARISON.test(fold(message)) || COMPARISON.test(message);
+// TD-22 (owner, 2026-10-06; updates TD-16 (2)): the context path stops only
+// questions about the user's own skin, readings, checks or routine changing
+// over time. A comparison-like word on its own ("moisturizer before
+// sunscreen?", "is it better to wash twice?", "difference between oily and
+// combination skin", "does lighting change the result?") reaches Gemini, whose
+// answer the validator still checks for every change word.
+const CHANGE_WORD = "(?:better|worse|improv\\w*|chang\\w*|less|more|fewer|smaller|bigger|lighter|darker|clearer|reduc\\w*|increas\\w*|decreas\\w*|drop\\w*|fad\\w*|down|up|kam|zy?aa?da|behtar|acc?ha|farak|fark)";
+const OVER_TIME = re([
+  // getting / going better or worse, about the user or their skin
+  "\\b(?:is|are|am|was|were) (?:i|it|this|that|my (?:\\w+ )?\\w+|the \\w+|\\w+)\\s+(?:\\w+ ){0,2}(?:getting|going|becoming|looking) (?:\\w+ )?(?:better|worse|clearer|down|up|lighter|darker|less|more|smaller|bigger)\\b",
+  "\\bam i (?:\\w+ )?(?:better|improving|worse|making progress)\\b",
+  "\\b(?:my|any|making|how is my) progress\\b",
+  // a past-tense change of something the user has
+  "\\b(?:has|have|did) (?:anything|something|it|this|that|my (?:\\w+ )?\\w+|the \\w+|\\w+) (?:\\w+ )?(?:chang\\w*|improv\\w*|dropped|gone (?:down|up)|go (?:down|up)|reduced|increased|decreased|faded|cleared|got (?:better|worse))\\b",
+  "\\b(?:went|has gone|have gone|had gone) (?:down|up|away)\\b",
+  // comparing with another check, a photo or an earlier time
+  "\\bcompar\\w*\\b.{0,40}\\b(?:checks?|scans?|photos?|readings?|results?|before|last|previous|first|earlier|time)\\b",
+  // than / since an earlier time or check
+  "\\bthan (?:in |on |at |with )?(?:my |the )?(?:first|last|previous|earlier|old\\w*|other) (?:\\w+ )?(?:checks?|scans?|photos?|time|week|month|year|readings?|results?|one)\\b",
+  "\\bthan (?:before|earlier|then|yesterday|last (?:week|month|year|time))\\b",
+  "\\bsince (?:i |we )?(?:started|began|switched|stopped|changed)\\b",
+  "\\bsince (?:last|yesterday|then|my|the (?:last|first|previous))\\b",
+  // a product or routine working (efficacy over time)
+  "\\b(?:is|are) (?:the |this |my |that |it |your )?(?:\\w+ ){0,2}working\\b",
+  "\\bdid (?:it|this|that|the \\w+|my \\w+) (?:work|help)\\b",
+  "\\bkaam kar (?:raha|rahi|rha|rhi)\\b",
+  "\\b(?:farak|fark) (?:pada|padha|para|hua)\\b",
+  "\\bany difference\\b|\\b(?:make|made|makes|making) (?:a |any )?difference\\b",
+  // Hinglish change questions
+  "\\b(?:kam|behtar|better|acc?ha|zy?aa?da) hu(?:a|i|e)\\b",
+  "\\bpehle se\\b",
+  "सुधार हु|बेहतर हु",
+]);
+// A change word with a past time ("did my redness go down last week?").
+const PAST_TIME = new RegExp(String.raw`\b(?:last|past|previous) (?:week|month|year|few (?:days|weeks|months))\b|\b(?:over|in) the (?:last|past) \w+\b|\bpichh?l[ie] \w+\b`, "iu");
+const changeOverTime = (text: string) => OVER_TIME.test(text) || (new RegExp(String.raw`\b${CHANGE_WORD}\b`, "iu").test(text) && PAST_TIME.test(text));
+export const comparisonHit = (message: string): boolean => checkComparisonHit(message) || changeOverTime(fold(message)) || changeOverTime(message);
 
 // Final review (I02 H3): today's Echo answers ordinary questions that only
 // contain "before", "better", "change" or "improve" ("moisturizer before
 // sunscreen?"), and gives the fixed answer only when the user compares checks
 // or readings over time. The reply screen and the persona stop a change claim
-// in the answer itself. The context path keeps the recall-first COMPARISON
-// list (TD-16 (2)).
+// in the answer itself. The context path uses this list too, plus its own
+// over-time list (TD-22). A region compared with a region in one photo ("is my
+// redness higher on the cheeks than the forehead?") is not a comparison of checks.
 const OWN_READING = "(?:it|this|that|my (?:\\w+ )?(?:skin|face|redness|oil\\w*|texture|blemish\\w*|pigment\\w*|spots?|acne|pores|breakouts?|marks?|readings?|cheeks?|forehead|nose|chin|tone)|the (?:redness|oil\\w*|texture|blemish\\w*|pigment\\w*|spots?|acne|readings?|breakouts?))";
 const CHECK_COMPARISON = re([
   // A change question about the user's own readings ("is it better now?", "did my oiliness drop?") (recheck).
   // Plain concatenation, not a template literal: the production compiler mangled the escapes in one.
-  "\\b(?:is|has|did|are|have|was)\\s+" + OWN_READING + "\\s+(?:\\w+ ){0,2}(?:better|worse|improv\\w*|gone (?:down|up)|go(?:ne)? down|drop\\w*|reduc\\w*|increas\\w*|decreas\\w*|fad\\w*|clear\\w*|lower|higher|less|more|calm\\w*)\\b(?! (?:to|for|if|when)\\b)",
+  "\\b(?:is|has|did|are|have|was)\\s+" + OWN_READING + "\\s+(?:\\w+ ){0,2}(?:better|worse|improv\\w*|gone (?:down|up)|go(?:ne)? down|drop\\w*|reduc\\w*|increas\\w*|decreas\\w*|fad\\w*|clear\\w*|lower|higher|less|more|calm\\w*)\\b(?! (?:to|for|if|when|(?:on|in|at|than) (?:the|my) (?:forehead|cheeks?|nose|chin|t-?zone|jaw\\w*))\\b)",
   "\\b(?:last|previous|earlier|prior) (?:time|check|scan|photo|reading|result)s?\\b",
   "\\b(?:my|the) (?:last|previous|earlier|two|past) (?:\\w+ )?(?:checks?|scans?|photos?|readings?|results?)\\b",
   "\\bcompar\\w* (?:my |the |these |those |two )?(?:\\w+ )?(?:checks?|scans?|photos?|readings?|results?)\\b",
