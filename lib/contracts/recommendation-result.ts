@@ -9,8 +9,9 @@ import type { SafetyState } from "./safety-state";
 
 /**
  * Self-reported quiz answers only (RECOMMENDATION_MODEL §2, §4: quiz-keyed).
- * Never image bands (D-09), and never the routine record: R-1 A keeps it
- * to the user's own view, with no join to anything else (TD-07).
+ * Never image bands (D-09), and never the routine record: the routine is
+ * the user's own record, shown to them beside their own checks (TD-24 (2),
+ * which replaced the no-join part of R-1 A), never an input to the rules.
  */
 export interface RuleTrigger {
   source: "self_reported";

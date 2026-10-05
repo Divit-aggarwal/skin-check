@@ -99,6 +99,8 @@ export type ContextLongitudinal = Fact & {
 /**
  * Owner decision R-1 A (TD-07): routine data is "not sent to Gemini", and
  * users are told so (ROUTINE_PURPOSE_COPY). The only value is "not shared".
+ * TD-24 (2) shows the routine beside the user's own checks on screen only;
+ * it did not change this.
  * A shared variant, and any adherence summary, needs the owner to reopen
  * R-1 A and change that copy, and then a new package version (tracker F05).
  */
