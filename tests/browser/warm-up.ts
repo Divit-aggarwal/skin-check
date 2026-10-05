@@ -3,7 +3,7 @@
 // (stuck on "Loading…") while next dev was still compiling (report §2).
 export default async function warmUp() {
   const base = `http://localhost:${process.env.PW_PORT}`;
-  for (const path of ["/dashboard", "/account", "/skin-check", "/echo", "/routine"]) {
+  for (const path of ["/", "/dashboard", "/account", "/skin-check", "/echo", "/routine", "/checks", "/checks/warm-up"]) {
     await fetch(base + path).catch(() => undefined);
   }
 }

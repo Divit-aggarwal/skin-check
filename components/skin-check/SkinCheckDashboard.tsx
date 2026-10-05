@@ -6,8 +6,10 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { canRetrySamePhoto, retrySkinScan } from "@/lib/scan-retry";
 import { summarizeConcerns } from "@/lib/skin-check-score";
-import { runSkinCheckRules, toConcern, type Band, type BandableMetric } from "@/lib/skin-check-rules";
-import { METRIC_LABELS, BAND_STYLE, OVERLAY_CATEGORIES, resolveStatedConcern } from "@/lib/skin-check-skus";
+import { runSkinCheckRules, type Band, type BandableMetric } from "@/lib/skin-check-rules";
+import { METRIC_LABELS, OVERLAY_CATEGORIES, resolveStatedConcern } from "@/lib/skin-check-skus";
+import { CheckReadings, KnownAndNotKnown } from "@/components/dashboard/CheckReadings";
+import { readingsOf } from "@/components/dashboard/state";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
 import type { SkinScanState } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
@@ -117,13 +119,10 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
           overlays={null}
           selected={null}
           onSelect={() => {}}
-          regionScores={null}
-          regions={[]}
-          regionLowConfidence={null}
           analyzed={false}
         />
-        <div className="flex flex-col gap-3 rounded border border-border bg-canvas p-4">
-          <p className="text-body text-text/70">{message}</p>
+        <div role="alert" className="flex flex-col items-start gap-3 rounded-2xl border border-brand-line bg-brand-linen p-5">
+          <p>{message}</p>
           {canRetrySamePhoto(scan) ? (
             // Resends the same photo, so it must not promise a new one.
             <Button type="button" variant="outlineLight" size="sm" onClick={handleRetry} className="self-start">
@@ -140,104 +139,44 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
     );
   }
 
-  const { scores, overlays, regions, region_scores, region_low_confidence } = scan.result;
+  const { overlays } = scan.result;
   const { bands } = runSkinCheckRules(scan.result);
-  const { summaryLine } = summarizeConcerns(scores, bands);
+  // TD-25 (3): the dashboard rule on the results screen. Band words only, no
+  // score, no Dryness ("a photo cannot measure it"); the area readings are
+  // the same component the dashboard and an opened check use.
+  const readings = readingsOf(scan.result as unknown as Record<string, unknown>);
+  const view = { scanId, date: null, source: "measured" as const, bands: readings.bands, areas: readings.areas, hardToRead: readings.hardToRead, photoCheck: null };
 
-  // The one real image-quality signal the service exposes — surfaced
-  // honestly instead of a fabricated "face detected"/"100% accurate" claim.
-  // Only present on pipeline_versions that report it (older rows predate the
-  // field entirely, see types/skin-scan.ts).
-  const lowConfidenceRegions = region_low_confidence
-    ? Object.entries(region_low_confidence)
-        .filter(([, isLow]) => isLow)
-        .map(([region]) => region.charAt(0).toUpperCase() + region.slice(1))
-    : [];
+  // Concern-ranked (Elevated first), so the tabs open on what stood out most.
+  const ranked = (Object.keys(METRIC_LABELS) as BandableMetric[])
+    .filter((key) => key !== "hydration")
+    .sort((a, b) => {
+      const order: Record<Band, number> = { Elevated: 0, Moderate: 1, Low: 2 };
+      return order[bands[a]] - order[bands[b]];
+    });
 
-  // Concern-ranked, so the thing that matters is at the top of the list —
-  // and the same order the category tabs use, so the two selectors agree.
-  const ranked = (Object.keys(METRIC_LABELS) as BandableMetric[]).sort((a, b) => {
-    const order: Record<Band, number> = { Elevated: 0, Moderate: 1, Low: 2 };
-    return order[bands[a]] - order[bands[b]];
-  });
-
-  const categories: AnalysisCategory[] = ranked.map((key) => ({
-    key,
-    label: METRIC_LABELS[key],
-    scorePct: Math.round(toConcern(scores, key) * 100),
-    band: bands[key],
-  }));
+  const categories: AnalysisCategory[] = ranked.map((key) => ({ key, label: METRIC_LABELS[key], band: bands[key] }));
+  const shown = selectedCategory && selectedCategory !== "hydration" ? selectedCategory : ranked[0] ?? null;
 
   return (
     <div className="flex flex-col gap-10">
-      <EchoTwin
-        photo={scan.photo}
-        categories={categories}
-        overlays={overlays}
-        selected={selectedCategory}
-        onSelect={setSelectedCategory}
-        regionScores={region_scores}
-        regions={regions}
-        regionLowConfidence={region_low_confidence ?? null}
-        analyzed
-      />
+      <div className="grid items-start gap-8 lg:grid-cols-2">
+        <EchoTwin photo={scan.photo} categories={categories} overlays={overlays} selected={shown} onSelect={setSelectedCategory} analyzed />
 
-      <p className="-mt-6 text-center text-body text-text/70">{summaryLine}</p>
-
-      {lowConfidenceRegions.length > 0 && (
-        <p className="-mt-6 text-center text-label text-muted-foreground">
-          {lowConfidenceRegions.join(" and ")} {lowConfidenceRegions.length > 1 ? "were" : "was"}{" "}
-          harder to read clearly in this photo — treat those readings as less certain.
-        </p>
-      )}
-
-      {/* Ivory band — the page alternates white (hero/face) and warm-ivory
-          (editorial content) sections rather than staying one flat white
-          canvas throughout (PART 22). Matches SkinCheckFlow's `complete`
-          container padding (px-6 sm:px-10) so the bleed lines up exactly. */}
-      <div className="-mx-6 flex flex-col gap-10 bg-canvas px-6 py-10 sm:-mx-10 sm:px-10">
-        <section className="flex flex-col gap-3">
-          <h2 className="text-label uppercase text-muted-foreground">What we read</h2>
-          <ul className="flex flex-col">
-            {ranked.map((key) => {
-              const score = Math.round(toConcern(scores, key) * 100);
-              const active = key === selectedCategory;
-              return (
-                <li key={key}>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCategory(key)}
-                    aria-current={active}
-                    className={
-                      // bg-white, not bg-canvas — this list now sits on the
-                      // ivory band below, so the "selected" highlight has to
-                      // read lighter than its surroundings, not the same tone.
-                      bands[key] === "Elevated"
-                        ? `flex w-full items-center justify-between border-l-2 py-3 pl-3 pr-1 text-left transition-colors duration-150 ${active ? "border-blush bg-white" : "border-blush"}`
-                        : `flex w-full items-center justify-between border-l-2 py-3 pl-3 pr-1 text-left transition-colors duration-150 ${active ? "border-text/30 bg-white" : "border-transparent"}`
-                    }
-                  >
-                    <span className="text-body text-text">{METRIC_LABELS[key]}</span>
-                    <span className="flex items-center gap-3">
-                      <span className="text-body tabular-nums text-muted-foreground">{score}/100</span>
-                      <span className={`text-body ${BAND_STYLE[bands[key]]}`}>{bands[key]}</span>
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-          {/* `pores` is deliberately absent from this list. It returns exactly
-              0.0 on every real photo, so it is excluded from banding upstream.
-              The previous version gave it 1/7 of the payoff screen to say
-              "Not measured yet". */}
-          <p className="text-label text-muted-foreground">
-            Scores are image-relative signals from this scan, not clinically
-            calibrated measurements — they compare what showed up in this
-            photo, not against other people or past scans.
+        <section aria-labelledby="readings-title" className="flex flex-col gap-5 rounded-2xl bg-brand-linen p-5 sm:p-6">
+          <h2 id="readings-title" className="font-display text-xl font-semibold sm:text-[22px]">
+            What this photo shows
+          </h2>
+          {view.bands ? <CheckReadings view={view} face={false} /> : <p>The readings of this check could not be shown.</p>}
+          <p className="text-sm text-brand-muted">
+            Each reading is relative to this one photo. It is not a medical opinion and does not set you against other people or other checks.
           </p>
+          {view.bands && (
+            <div className="border-t border-brand-line pt-5">
+              <KnownAndNotKnown />
+            </div>
+          )}
         </section>
-
       </div>
 
       {/* Echo chat, routed at /echo. Session data (scan result, answers,
@@ -248,9 +187,9 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
           of a long page and was easy to never see. Sticky rather than fixed,
           because the results container animates with a transform, which
           breaks `position: fixed`. */}
-      <div className="sticky bottom-0 z-raised -mx-6 -mt-10 border-t border-border bg-white/95 px-6 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur sm:-mx-10 sm:px-10">
-        <div className="mx-auto flex max-w-xl items-center justify-between gap-3">
-          <p className="text-sm text-text/70">Questions about your results?</p>
+      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-raised -mx-4 border-t border-brand-line bg-brand-paper/95 px-4 py-3 backdrop-blur sm:bottom-0 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:rounded-2xl lg:border lg:px-6">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+          <p className="text-sm text-brand-muted">Questions about this check?</p>
           <Button asChild variant="ink" size="lg" className="shrink-0 px-5">
             <Link href="/echo">Chat with Echo</Link>
           </Button>

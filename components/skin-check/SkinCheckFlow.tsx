@@ -125,13 +125,13 @@ export function SkinCheckFlow() {
 
   return (
     <div className="min-h-dvh bg-white">
-      <div ref={headerRef} className="mx-auto flex max-w-xl items-center gap-3 px-6 pt-6">
+      <div ref={headerRef} className="mx-auto flex max-w-2xl items-center gap-3 px-4 pt-6 sm:px-6">
         <button
           type="button"
           onClick={back}
           disabled={isFirst}
           aria-label="Go back"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text/60 transition-opacity hover:text-text disabled:opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-brand-muted hover:bg-brand-linen hover:text-brand-ink disabled:invisible"
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
@@ -148,7 +148,7 @@ export function SkinCheckFlow() {
       </div>
       {/* O-D3: the signed-in start page links to /dashboard (its own row, so the progress bar keeps its width on a phone). */}
       {isFirst && !complete && (
-        <div className="mx-auto flex max-w-xl justify-end px-6 pt-2">
+        <div className="mx-auto flex max-w-2xl justify-end px-4 pt-2 sm:px-6">
           <DashboardLink />
         </div>
       )}
@@ -163,7 +163,7 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto flex max-w-xl flex-col gap-5 px-6 pb-10 pt-10"
+            className="mx-auto flex max-w-2xl flex-col gap-5 px-4 pb-10 pt-10 sm:px-6"
           >
             <EchoBubble message="You chose under 18. Is that right?" />
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -184,7 +184,7 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto max-w-xl px-6 pb-10 pt-10"
+            className="mx-auto max-w-2xl px-4 pb-10 pt-10 sm:px-6"
           >
             <EchoBubble message="This experience isn't available yet for users under 18. If that's not right, tap back to change your answer." />
           </motion.div>
@@ -197,38 +197,30 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto max-w-5xl px-6 pb-16 pt-6 sm:px-10"
+            className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6"
           >
             <div className="flex flex-col gap-10">
-              <div className="flex flex-col gap-3 text-center">
-                <p className="text-label font-semibold uppercase tracking-label text-blush">
-                  Your Results
-                </p>
-                <h1 className="font-display text-4xl italic leading-tight text-text sm:text-5xl">
-                  Your skin, understood.
-                </h1>
-                <p className="mx-auto max-w-md text-body text-text/70">
-                  {formatPrompt("Thanks, {name} — here's a visual reading of your skin, based on your scan.", answers)}
+              <div className="flex flex-col gap-3">
+                <p className="text-xs font-semibold uppercase tracking-[0.06em] text-brand-muted">Your check</p>
+                <h1 className="font-display text-[28px] font-semibold leading-tight text-brand-ink sm:text-4xl">Your photo reading</h1>
+                <p className="max-w-prose text-brand-muted">
+                  {formatPrompt("Thanks, {name}. Here is how each area of your face showed up in this one photo.", answers)}
                 </p>
               </div>
               <SkinCheckDashboard scan={scan} scanId={scanId} onScanChange={setScan} onRetake={startNewScan} answers={answers} />
 
-              {/* The storage model has always allowed many scans per user
-                  (each is its own document); without this there was simply
-                  no way to start the next one without a hard reload.
-                  The /account link is the only in-app route to a returning
-                  user's saved scans — without it that page is reachable by
-                  typing the URL and nothing else. */}
-              <div className="mx-auto flex w-full max-w-md flex-col gap-3 sm:flex-row">
-                <Button type="button" variant="ink" size="lg" onClick={startNewScan} className="flex-1">
-                  Take a new scan
+              {/* A new check starts here without a reload; every past check is on
+                  /checks (one history list, TD-25 (6)); Home is one tap away. */}
+              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+                <Button type="button" variant="ink" size="lg" onClick={startNewScan}>
+                  Take a new check
                 </Button>
-                <Button asChild variant="outlineLight" size="lg" className="flex-1">
-                  <Link href="/account">Your previous scans</Link>
+                <Button asChild variant="outlineLight" size="lg">
+                  <Link href="/checks">All your checks</Link>
                 </Button>
+                {/* O-D3: the results screen links to /dashboard. */}
+                <DashboardLink />
               </div>
-              {/* O-D3: the results screen links to /dashboard. */}
-              <DashboardLink className="mx-auto" />
             </div>
           </motion.div>
         ) : (
@@ -240,7 +232,7 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto flex max-w-xl flex-col gap-10 px-6 pb-10 pt-10"
+            className="mx-auto flex max-w-2xl flex-col gap-10 px-4 pb-10 pt-10 sm:px-6"
           >
             {visibleSteps.map((step) => (
               <motion.div
@@ -258,7 +250,7 @@ export function SkinCheckFlow() {
                 {/* R9, decision 10a: re-confirmed steps start blank; last time's
                     answer is shown, never filled in. Only those steps have a hint. */}
                 {lastAnswerHints[step.id] && (
-                  <p className="text-sm text-text/60">{lastAnswerHints[step.id]}</p>
+                  <p className="text-sm text-brand-muted">{lastAnswerHints[step.id]}</p>
                 )}
                 <StepAnswer
                   step={step}

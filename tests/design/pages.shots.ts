@@ -227,7 +227,7 @@ test("check flow to results", async ({ page }) => {
   await expect(page.getByText("What are your main skin concerns?")).toBeVisible({ timeout: 60_000 });
   await shots(page, "flow-after-photo");
   // Answer every remaining question with its first option until the results show.
-  const results = page.getByText("Your skin, understood.");
+  const results = page.getByRole("heading", { name: "Your photo reading" });
   for (let i = 0; i < 80 && !(await results.isVisible()); i++) {
     const step = page.locator("div.flex.flex-col.gap-5").last();
     const confirm = step.getByRole("button", { name: "Confirm selection" });

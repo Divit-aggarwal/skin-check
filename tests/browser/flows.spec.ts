@@ -209,7 +209,7 @@ test("Ask Echo, back to the dashboard, a new check starts at the questions", asy
   await page.goBack();
   await page.getByRole("link", { name: C.newCheck }).first().click();
   await expect(page.getByText(NAME_PROMPT)).toBeVisible();
-  await expect(page.getByText("Your skin, understood.")).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "Your photo reading" })).toHaveCount(0);
 });
 
 test("Echo opened from the nav or after a refresh talks about the newest check; no reading leads to a new check", async ({ page }) => {

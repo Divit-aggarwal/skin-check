@@ -31,7 +31,7 @@ const problems = (text: string) => [
 ];
 
 /** "scan" as a word a user reads; paths, imports and identifiers (scanId) are not on screen. */
-export const saysScan = (s: string) => !/^[@./]/.test(s.trim()) && /(^|[^\w/-])scans?\b/i.test(s);
+export const saysScan = (s: string) => !/^[@./]/.test(s.trim()) && !/[={}()]/.test(s) && /(^|[^\w/-])scans?\b/i.test(s);
 
 describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
   it("self-check: the checks catch planted words", () => {
@@ -40,6 +40,7 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
     expect(saysScan("Your previous scans")).toBe(true);
     expect(saysScan("/api/skin-scan/upload")).toBe(false);
     expect(saysScan("scanId")).toBe(false);
+    expect(saysScan("onScanChange={setScan} scan={scan}")).toBe(false);
   });
 
   it("every Checks string passes", () => {
@@ -63,8 +64,10 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
   });
 
   it("TD-25 (6): the restyled Echo and check-flow screens never say scan (their lane wording keeps its own tests)", () => {
-    for (const f of ["components/skin-check/EchoPage.tsx"]) {
-      for (const s of sourceText(readFileSync(f, "utf8"))) expect(saysScan(s), `${f}: ${s}`).toBe(false);
+    for (const f of ["components/skin-check/EchoPage.tsx", "components/skin-check/SkinCheckFlow.tsx", "components/skin-check/SkinCheckDashboard.tsx", "components/skin-check/EchoTwin.tsx", "components/skin-check/inputs/PhotoCapture.tsx"]) {
+      // Log lines never reach the screen.
+      const shown = readFileSync(f, "utf8").replace(/console\.\w+\([^;]*\);/g, "");
+      for (const s of sourceText(shown)) expect(saysScan(s), `${f}: ${s}`).toBe(false);
     }
   });
 
@@ -74,6 +77,17 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
       expect(src, f).not.toMatch(/\/100|toConcern|BAND_STYLE|scorePct|ArrowUp|ArrowDown|Trending|Chart/);
       expect(src, f).not.toMatch(/text-(red|green|emerald|rose|amber)-|confidence-|subscore-/);
     }
+  });
+
+  it("TD-25 (3): the results screen follows the dashboard rule: band words only, no score, no Dryness, no band colour", () => {
+    for (const f of ["components/skin-check/SkinCheckDashboard.tsx", "components/skin-check/EchoTwin.tsx"]) {
+      const src = readFileSync(f, "utf8");
+      expect(src, f).not.toMatch(/\/100|toConcern|BAND_STYLE|scorePct|tabular-nums/);
+    }
+    const results = readFileSync("components/skin-check/SkinCheckDashboard.tsx", "utf8");
+    expect(results).toMatch(/\.filter\(\(key\) => key !== "hydration"\)/);
+    expect(results).toMatch(/readingsOf\(/);
+    expect(results).toMatch(/<CheckReadings view=\{view\}/);
   });
 
   it("TD-24 (1): the opened check always shows the fixed line", () => {

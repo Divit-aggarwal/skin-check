@@ -31,7 +31,7 @@ export function ImageCardMultiSelect({ step, value, onChange, onCommit }: ImageC
 
   return (
     <div className="flex flex-col gap-4">
-      {step.note && <p className="max-w-md text-xs text-text/55">{step.note}</p>}
+      {step.note && <p className="max-w-md text-sm text-brand-muted">{step.note}</p>}
       <div className="grid grid-cols-2 gap-2.5 sm:max-w-md">
         {step.options.map((opt) => {
           const selected = value.includes(opt.value);
@@ -45,10 +45,10 @@ export function ImageCardMultiSelect({ step, value, onChange, onCommit }: ImageC
               className={cn(
                 "relative flex flex-col gap-2 rounded-lg border p-3 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
                 selected
-                  ? "border-blush bg-blush-soft"
+                  ? "border-brand-action bg-brand-linen"
                   : disabled
-                    ? "cursor-not-allowed border-text/10 bg-white opacity-40"
-                    : "border-text/10 bg-white hover:border-blush/40"
+                    ? "cursor-not-allowed border-brand-line bg-white opacity-40"
+                    : "border-brand-line bg-white hover:border-brand-ink/40"
               )}
             >
               {opt.imagePlaceholder && (
@@ -58,10 +58,10 @@ export function ImageCardMultiSelect({ step, value, onChange, onCommit }: ImageC
               )}
               <span className="text-sm font-medium leading-snug text-text">{opt.label}</span>
               {opt.description && (
-                <span className="text-xs leading-snug text-text/55">{opt.description}</span>
+                <span className="text-xs leading-snug text-brand-muted">{opt.description}</span>
               )}
               {selected && (
-                <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-blush text-white">
+                <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-brand-action text-white">
                   <Check className="h-3 w-3" strokeWidth={3} />
                 </span>
               )}
@@ -74,7 +74,7 @@ export function ImageCardMultiSelect({ step, value, onChange, onCommit }: ImageC
           type="button"
           onClick={onCommit}
           aria-label="Confirm selection"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-blush text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-action text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
         >
           <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
         </button>

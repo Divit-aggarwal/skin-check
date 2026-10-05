@@ -40,17 +40,17 @@ export function BodyZoneChecklist({ step, value, onChange, onCommit }: BodyZoneC
               className={cn(
                 "flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
                 selected
-                  ? "border-blush bg-blush-soft"
+                  ? "border-brand-action bg-brand-linen"
                   : disabled
-                    ? "cursor-not-allowed border-text/10 bg-white opacity-40"
-                    : "border-text/10 bg-white hover:border-blush/40"
+                    ? "cursor-not-allowed border-brand-line bg-white opacity-40"
+                    : "border-brand-line bg-white hover:border-brand-ink/40"
               )}
             >
               <span className="text-sm font-medium text-text">{opt.label}</span>
               <span
                 className={cn(
                   "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border",
-                  selected ? "border-blush bg-blush text-white" : "border-text/20"
+                  selected ? "border-brand-action bg-brand-action text-white" : "border-brand-line"
                 )}
               >
                 {selected && <Check className="h-3 w-3" strokeWidth={3} />}
@@ -64,7 +64,7 @@ export function BodyZoneChecklist({ step, value, onChange, onCommit }: BodyZoneC
           type="button"
           onClick={onCommit}
           aria-label="Confirm selection"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-blush text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-action text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
         >
           <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
         </button>

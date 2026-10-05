@@ -3,15 +3,15 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { motion, AnimatePresence, type PanInfo, type Variants } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { METRIC_LABELS, BAND_STYLE } from "@/lib/skin-check-skus";
-import { bandScores, toConcern, type Band, type BandableMetric } from "@/lib/skin-check-rules";
-import { ECHO_REGION_LABELS, isEchoRegion } from "@/lib/echo-regions";
+import { METRIC_LABELS } from "@/lib/skin-check-skus";
+import type { Band, BandableMetric } from "@/lib/skin-check-rules";
 import type { SkinScanOverlays, SkinScanScores } from "@/types/skin-scan";
 
+// TD-25 (3): the results screen follows the dashboard rule. Band words only,
+// all in ink: no score out of 100, no Dryness, no band colour.
 export interface AnalysisCategory {
   key: BandableMetric;
   label: string;
-  scorePct: number;
   band: Band;
 }
 
@@ -29,11 +29,6 @@ interface EchoTwinProps {
    * the selector. Null only on the error path. */
   selected: BandableMetric | null;
   onSelect: (key: BandableMetric) => void;
-  /** Real per-region breakdown for the selected category — region_scores,
-   * keyed by the same region names as `regions`. Null on the error path. */
-  regionScores: Record<string, SkinScanScores> | null;
-  regions: string[];
-  regionLowConfidence: Record<string, boolean> | null;
   /** True only for an actual completed scan — never true on the error path. */
   analyzed: boolean;
 }
@@ -51,10 +46,8 @@ const scorePanelVariants: Variants = {
 };
 
 // Generic, image-relative, non-clinical — no per-metric fabricated content.
-// METRIC_LABELS is already written for the CONCERN (e.g. "Dryness" for
-// hydration), and toConcern()/bandScores() already put every metric in the
-// same "how much of a concern is this" space, so one template covers all six
-// without a flip for hydration.
+// METRIC_LABELS names each metric for its concern, so one template covers
+// every metric shown here (Dryness is not shown: TD-25 (3)).
 function interpretationFor(band: Band, noun: string): string {
   switch (band) {
     case "Low":
@@ -96,9 +89,6 @@ export function EchoTwin({
   overlays,
   selected,
   onSelect,
-  regionScores,
-  regions,
-  regionLowConfidence,
   analyzed,
 }: EchoTwinProps) {
   // Object URL creation and revocation must live in the SAME effect, not a
@@ -196,20 +186,6 @@ export function EchoTwin({
   // never shown while still analyzing.
   const overlayUnavailable = analyzed && Boolean(selected) && !overlaySrc;
 
-  const regionRows =
-    selected && regionScores
-      ? regions
-          .map((region) => {
-            const scores = regionScores[region];
-            if (!scores) return null;
-            const pct = Math.round(toConcern(scores, selected) * 100);
-            const band = bandScores(scores).bands[selected];
-            const label = isEchoRegion(region) ? ECHO_REGION_LABELS[region] : cap(region);
-            return { region, label, pct, band, lowConfidence: regionLowConfidence?.[region] ?? false };
-          })
-          .filter((r): r is NonNullable<typeof r> => r !== null)
-      : [];
-
   return (
     <div className="flex flex-col items-center gap-4">
       <motion.div
@@ -294,15 +270,12 @@ export function EchoTwin({
           // problem it was covering for is that a horizontally-clipped tab
           // ("TEXTU") looks broken, not scrollable — the mask fades it out
           // instead, which reads as "more to scroll" the way it's supposed to.
-          className="flex w-full max-w-[340px] gap-2 overflow-x-auto px-1 py-1 [mask-image:linear-gradient(to_right,transparent,black_12px,black_calc(100%-12px),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex w-full max-w-[420px] flex-wrap justify-center gap-2 px-1 py-1"
         >
           {categories.map((cat) => {
             const active = cat.key === selected;
             return (
-              // Underline treatment, not a SaaS pill (PART 19) — the border
-              // lives on the inner span, not the button itself, so it hugs
-              // the text instead of sitting at the bottom of the button's
-              // globals.css-enforced 44px touch-target height.
+              // G03: chips in the store style; the selected chip is filled ink, every other chip the same.
               <button
                 key={cat.key}
                 ref={(el) => {
@@ -314,15 +287,9 @@ export function EchoTwin({
                 tabIndex={active ? 0 : -1}
                 onClick={() => onSelect(cat.key)}
                 onKeyDown={handleTabKeyDown}
-                className="flex shrink-0 items-center px-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="min-h-11 shrink-0 rounded-full border border-brand-line bg-brand-paper px-4 text-sm font-medium aria-selected:border-brand-action aria-selected:bg-brand-action aria-selected:text-white"
               >
-                <span
-                  className={`border-b-2 pb-1 text-label uppercase tracking-label transition-colors duration-150 ${
-                    active ? "border-text text-text" : "border-transparent text-muted-foreground"
-                  }`}
-                >
-                  {cat.label}
-                </span>
+                {cat.label}
               </button>
             );
           })}
@@ -330,7 +297,7 @@ export function EchoTwin({
       )}
 
       {selectedCategory && (
-        <div className="relative w-full max-w-[340px] overflow-hidden">
+        <div className="relative w-full max-w-[420px] overflow-hidden">
           <AnimatePresence mode="wait" initial={false} custom={slideDirection.current}>
             <motion.div
               key={selectedCategory.key}
@@ -342,15 +309,9 @@ export function EchoTwin({
               transition={{ duration: 0.2, ease: [0.19, 1, 0.22, 1] }}
               className="flex flex-col items-center gap-1 text-center"
             >
-              <h2 className="text-label uppercase tracking-label text-muted-foreground">
-                {selectedCategory.label}
-              </h2>
-              <p className="flex items-baseline gap-1 tabular-nums text-text">
-                <span className="text-3xl font-semibold">{selectedCategory.scorePct}</span>
-                <span className="text-label text-muted-foreground">/100</span>
-              </p>
-              <p className={`text-body ${BAND_STYLE[selectedCategory.band]}`}>{selectedCategory.band}</p>
-              <p className="max-w-[85%] text-body text-text/70">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.06em] text-brand-muted">{selectedCategory.label}</h2>
+              <p className="font-display text-2xl font-semibold text-brand-ink">{selectedCategory.band}</p>
+              <p className="max-w-[85%] text-brand-muted">
                 {interpretationFor(selectedCategory.band, METRIC_LABELS[selectedCategory.key].toLowerCase())}
               </p>
               {overlayUnavailable && (
@@ -363,28 +324,6 @@ export function EchoTwin({
         </div>
       )}
 
-      {regionRows.length > 0 && (
-        <div className="w-full max-w-[340px]">
-          <h3 className="mb-2 text-label uppercase tracking-label text-muted-foreground">By region</h3>
-          <ul className="flex flex-col divide-y divide-border rounded border border-border">
-            {regionRows.map((row) => (
-              <li key={row.region} className="flex items-center justify-between px-3 py-2">
-                <span className="text-body text-text">
-                  {row.label}
-                  {row.lowConfidence && <span className="text-muted-foreground"> *</span>}
-                </span>
-                <span className="flex items-center gap-2">
-                  <span className="text-body tabular-nums text-muted-foreground">{row.pct}/100</span>
-                  <span className={`text-body ${BAND_STYLE[row.band]}`}>{row.band}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-          {regionRows.some((r) => r.lowConfidence) && (
-            <p className="mt-1 text-label text-muted-foreground">* harder to read clearly in this photo</p>
-          )}
-        </div>
-      )}
     </div>
   );
 }

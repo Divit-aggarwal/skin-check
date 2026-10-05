@@ -404,7 +404,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   if (value === "done") {
     const thumbSrc = previewUrl ?? donePreviewUrl;
     return (
-      <div className="flex flex-col gap-3 rounded-lg border border-text/10 bg-white p-4 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 rounded-2xl border border-brand-line bg-brand-linen p-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           {thumbSrc && (
             // eslint-disable-next-line @next/next/no-img-element -- transient object URL, not a static asset
@@ -415,13 +415,13 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
               ? "Analyzing your photo…"
               : scan.status === "error" && scan.retakeReason
                 ? RETAKE_COPY[scan.retakeReason]
-                : "Photo saved for this scan."}
+                : "Photo saved for this check."}
           </p>
         </div>
         <button
           type="button"
           onClick={handleRetakeFromDone}
-          className="text-sm font-medium text-text underline underline-offset-4 hover:text-blush sm:ml-auto"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-brand-forest underline-offset-4 hover:underline sm:ml-auto"
         >
           Retake photo
         </button>
@@ -442,7 +442,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="relative aspect-[3/4] w-full max-w-[280px] overflow-hidden rounded-lg bg-black">
+      <div className="relative aspect-[3/4] w-full max-w-[320px] overflow-hidden rounded-2xl bg-brand-ink">
         {!isMobile && !hasCaptured && (
           <video
             ref={videoRef}
@@ -480,13 +480,13 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
         />
       )}
 
-      <p className="max-w-sm text-xs text-text/45">{step.note}</p>
+      <p className="max-w-sm text-sm text-brand-muted">{step.note}</p>
 
       {!hasCaptured ? (
         <Button
           type="button"
           variant="ink"
-          size="sm"
+          size="lg"
           disabled={!isMobile && status !== "active"}
           onClick={isMobile ? () => fileInputRef.current?.click() : handleCapture}
           className="w-fit gap-2"
@@ -499,12 +499,12 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           {/* Required consent gate — the scan request below never fires
               until this is checked (PART 13). Unchecked by default, real
               <input type="checkbox">, keyboard- and screen-reader-visible. */}
-          <label className="flex max-w-sm items-start gap-2.5 text-sm text-text/70">
+          <label className="flex max-w-md items-start gap-3 text-sm text-brand-ink">
             <input
               type="checkbox"
               checked={hasConsented}
               onChange={(e) => dispatch({ type: "consent", analysis: e.target.checked })}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-text/30 text-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+              className="mt-0.5 h-5 w-5 shrink-0 rounded border-brand-line accent-brand-action"
             />
             <span>
               {PROCESSING_TERMS_BEFORE}
@@ -529,12 +529,12 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
               original is never uploaded (runSkinScan skips the S3 step). Never
               pre-checked, never inferred from the box above or from continuing
               the questionnaire. */}
-          <label className="flex max-w-sm items-start gap-2.5 text-sm text-text/70">
+          <label className="flex max-w-md items-start gap-3 text-sm text-brand-ink">
             <input
               type="checkbox"
               checked={hasRetentionConsent}
               onChange={(e) => dispatch({ type: "consent", retention: e.target.checked })}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-text/30 text-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+              className="mt-0.5 h-5 w-5 shrink-0 rounded border-brand-line accent-brand-action"
             />
             <span>
               {IMAGE_RETENTION_CONSENT_COPY}{" "}
@@ -551,26 +551,26 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
 
           {/* Gate status (C01). Instruction only: no score or number. */}
           <div aria-live="polite" className="max-w-sm text-sm">
-            {flow.gate === "pending" && <p className="text-text/60">Checking your photo…</p>}
+            {flow.gate === "pending" && <p className="text-brand-muted">Checking your photo…</p>}
             {flow.gate === "done" && flow.quality && flow.quality.retakeReasons.length > 0 && (
-              <p className="text-text/80">{RETAKE_COPY[flow.quality.retakeReasons[0]!]}</p>
+              <p className="rounded-xl border border-brand-line bg-brand-linen px-4 py-3 text-brand-ink">{RETAKE_COPY[flow.quality.retakeReasons[0]!]}</p>
             )}
           </div>
           {canOverride(flow) && (
             <button
               type="button"
               onClick={() => dispatch({ type: "override" })}
-              className="w-fit text-sm font-medium text-text underline underline-offset-4 hover:text-blush"
+              className="inline-flex min-h-11 w-fit items-center text-sm font-medium text-brand-forest underline-offset-4 hover:underline"
             >
               Use this photo anyway
             </button>
           )}
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant="outlineLight"
-              size="sm"
+              size="lg"
               disabled={scan.status === "loading"}
               onClick={handleRetake}
               className="gap-2"
@@ -581,7 +581,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
             <Button
               type="button"
               variant="ink"
-              size="sm"
+              size="lg"
               disabled={scan.status === "loading" || !canAnalyze(flow)}
               onClick={handleConfirm}
             >
