@@ -120,8 +120,20 @@ const UNCITED_SKIN_STATE = new RegExp(
 // Red team pass 2 (I02 P2-1): an uncited claim names no brand, day or other
 // proper noun (a capital letter inside a sentence, except "I"), and never
 // sends the user to a link, a sign-in or a code.
-const UNCITED_PROPER = new RegExp(String.raw`(?<=[\p{L},;:]\s+)(?!I\b)\p{Lu}\p{L}*`, "u");
+// F07 live run: the two languages Echo answers in are not brands ("I can only answer in English").
+const UNCITED_PROPER = new RegExp(String.raw`(?<=[\p{L},;:]\s+)(?!I\b|English\b|Hindi\b)\p{Lu}\p{L}*`, "u");
 const UNCITED_PHISH = new RegExp(String.raw`https?:|www\.|\b\w+\.(?:com|in|org|net|io|app)\b|\b\w+\s+dot\s+(?:com|in|org|net|io|app|example)\b|\bsign (?:in|up)\b|\blog ?in\b|\botp\b|\bpassword\b|\bphone\b|\bcode\b`, "iu");
+// F07 live run (real Gemini): our own fixed phrases that tripped a word list
+// without saying anything about the skin. Only these exact phrases are blanked,
+// for the word checks and the small-talk check; every other use of the word
+// still fails. "before" only after "ask a doctor", "explain" only before
+// "your results/readings", and "skin check" (the product's name) only in small talk.
+const SAFE_PHRASES = [
+  new RegExp(String.raw`(?<=\b(?:doctor|dermatologist|pharmacist) )before (?:starting|using|trying|adding)\b`, "giu"),
+  new RegExp(String.raw`\b(?:help(?:s)?|to) explain (?:your|the|these) (?:skin check )?(?:results?|readings?)\b`, "giu"),
+];
+const neutral = (text: string) => SAFE_PHRASES.reduce((t, re) => t.replace(re, " "), text);
+const SKIN_CHECK_NAME = new RegExp(String.raw`\b(?:with|about|on) your skin checks?(?: results?| readings?)?\b`, "giu");
 const GOOD_QUESTION = new RegExp(String.raw`\b(?:good|great) question\b`, "giu");
 // An uncertainty or comparability claim cites the facts it is about (H20, finding 4).
 const NEEDS_KIND: Partial<Record<AllowedClaim, FactKind[]>> = { uncertainty: ["uncert", "missing", "long"], comparability: ["long", "missing", "confounder"] };
@@ -196,7 +208,9 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
     }
     if (!MUST_CITE.has(claim.claim_type) && UNCITED_COMPARE.test(text)) fail("comparative_or_change", i, "than");
     if (claim.claim_type === "smalltalk") {
-      const skin = firstMatch(SMALLTALK_SKIN, text);
+      const named = text.replace(SKIN_CHECK_NAME, " ");
+      // Naming the product lets no state word in ("... with your skin check results, all good").
+      const skin = firstMatch(SMALLTALK_SKIN, named) ?? (named !== text ? firstMatch(UNCITED_SKIN_STATE, text) : null);
       if (skin) fail("citation_rule", i, skin);
     }
     // Red team pass 2 (I02 P2-1): a claim whose own words read as self-harm or another
@@ -224,7 +238,7 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
 
     for (const [check, pattern] of WORD_CHECKS) {
       // Numbers also on the raw text: NFKD folds "Ⅳ" to the letters "IV".
-      const term = firstMatch(pattern, stripped) ?? (check === "made_up_number" ? firstMatch(pattern, stripQuotes(claim.text, cited)) : null);
+      const term = firstMatch(pattern, neutral(stripped)) ?? (check === "made_up_number" ? firstMatch(pattern, stripQuotes(claim.text, cited)) : null);
       if (term) fail(check, i, term);
     }
     // No active ingredient at all, even one a rec.* fact names. For every user,
@@ -308,12 +322,14 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
   // The user reads the claims joined: a phrase split across two claims is checked too.
   const joined = answer.claims.map((c) => stripQuotes(normalizeForMatch(c.text), c.fact_ids.flatMap((id) => facts.get(id) ?? []))).join(" ");
   for (const [check, pattern] of WORD_CHECKS) {
-    const term = firstMatch(pattern, joined);
+    const term = firstMatch(pattern, neutral(joined));
     if (term && !failures.some((f) => f.check === check)) fail(check, -1, term);
   }
 
   // An answer that describes a reading also says what the reading cannot tell.
-  const describes = answer.claims.some((c) => c.claim_type === "descriptive");
+  // F07 live run: a descriptive claim that cites only what is missing ("Product
+  // suggestions were not included here.") describes no reading.
+  const describes = answer.claims.some((c) => c.claim_type === "descriptive" && c.fact_ids.some((id) => facts.get(id)?.kind === "state"));
   const uncertain = answer.claims.some((c) => c.fact_ids.some((id) => facts.get(id)?.kind === "uncert"));
   if (describes && !uncertain) fail("missing_uncertainty", -1);
 

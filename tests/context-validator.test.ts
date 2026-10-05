@@ -247,3 +247,50 @@ describe("validator: red-team pass 2", () => {
     expect(validateAnswer(ok(claims as never), pkg, "tell me about my skin").failures).toEqual([]);
   });
 });
+
+// ── F07 live run against the real Gemini model (2026-10-06) ─────────────────
+// Each answer below is what the real model wrote and the validator rejected
+// for a word that said nothing about the skin. Each fix blanks only that exact
+// phrase; the controls prove the same word still fails everywhere else.
+describe("F07 live-run fixes: real answers no longer rejected, bad answers still are", () => {
+  const MISSING = pkg.missing[0]!;
+  const passes = (claims: GeminiAnswer["claims"]) => expect(checksOf(ok(claims))).toEqual([]);
+  const fails = (claims: GeminiAnswer["claims"], check: string) => expect(checksOf(ok(claims))).toContain(check);
+
+  it("small talk may name the product ('skin check'), never the skin", () => {
+    passes([{ claim_type: "smalltalk", text: "Hello! How can I help you today with your skin check results?", fact_ids: [] }]);
+    fails([{ claim_type: "smalltalk", text: "Hello! Your skin looks lovely today.", fact_ids: [] }], "citation_rule");
+    fails([{ claim_type: "smalltalk", text: "Your skin check looks good.", fact_ids: [] }], "citation_rule");
+    fails([{ claim_type: "smalltalk", text: "Happy to help with your skin check results, all good.", fact_ids: [] }], "citation_rule");
+    fails([{ claim_type: "smalltalk", text: "Your skin check results are fine.", fact_ids: [] }], "citation_rule");
+  });
+
+  it("'ask a doctor before starting' is not a change word; 'before' elsewhere still is", () => {
+    passes([{ claim_type: "out_of_scope", text: "Please ask a doctor before starting any new product.", fact_ids: [] }]);
+    fails([{ claim_type: "out_of_scope", text: "Your redness was worse before starting.", fact_ids: [] }], "comparative_or_change");
+    fails([{ claim_type: "out_of_scope", text: "Ask a doctor. It was redder before.", fact_ids: [] }], "comparative_or_change");
+    fails([{ claim_type: "out_of_scope", text: "Before using it, your pores looked bigger.", fact_ids: [] }], "comparative_or_change");
+  });
+
+  it("'help explain your results' is not a cause word; 'explains your redness' still is", () => {
+    passes([{ claim_type: "out_of_scope", text: "I am here to help explain your skin check results, so I cannot share my internal instructions.", fact_ids: [] }]);
+    fails([{ claim_type: "out_of_scope", text: "Your diet explains your redness.", fact_ids: [] }], "cause");
+    fails([{ claim_type: "out_of_scope", text: "I can help explain why your skin is red: the sun.", fact_ids: [] }], "cause");
+  });
+
+  it("'English' and 'Hindi' are not brands; other capitalised names still are", () => {
+    passes([{ claim_type: "out_of_scope", text: "I can only answer in English or Hindi.", fact_ids: [] }]);
+    fails([{ claim_type: "out_of_scope", text: "You can buy one at Nykaa.", fact_ids: [] }], "citation_rule");
+  });
+
+  it("a description of only what is missing needs no uncertainty line; a reading still does", () => {
+    passes([{ claim_type: "descriptive", text: MISSING.text, fact_ids: [MISSING.id] }]);
+    fails([{ claim_type: "descriptive", text: `Your redness reads ${RED.band} for the whole face.`, fact_ids: [RED.id] }], "missing_uncertainty");
+    fails([{ claim_type: "descriptive", text: `Your redness reads ${RED.band} for the whole face.`, fact_ids: [RED.id, MISSING.id] }], "missing_uncertainty");
+  });
+
+  it("left as they are on purpose: a refusal that says 'phone', and a negated diagnosis", () => {
+    fails([{ claim_type: "out_of_scope", text: "I am unable to handle personal contact information like phone numbers.", fact_ids: [] }], "citation_rule");
+    fails([{ claim_type: "out_of_scope", text: "I cannot state what causes skin conditions or diagnose acne.", fact_ids: [] }], "diagnosis");
+  });
+});
