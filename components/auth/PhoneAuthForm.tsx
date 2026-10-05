@@ -42,6 +42,9 @@ export function PhoneAuthForm({
     <div className="flex flex-col gap-4">
       {auth.screen === "phone" ? (
         <div className="flex flex-col gap-3">
+          <label htmlFor="phone-auth-number" className="text-sm font-medium">
+            Mobile number
+          </label>
           <div className="flex max-w-sm items-stretch gap-2">
             <span
               aria-hidden

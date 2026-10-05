@@ -90,6 +90,7 @@ export const DASHBOARD_COPY = {
     body: "Ask Echo about your newest photo reading.",
     button: "Chat with Echo",
     needsReading: "Echo talks about a photo reading from our server. Take a new check to chat with Echo.",
+    needsFirst: "Echo talks about a photo reading. Take your first check to chat with Echo.",
   },
 
   routine: {

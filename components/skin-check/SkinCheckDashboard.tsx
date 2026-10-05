@@ -187,7 +187,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
           of a long page and was easy to never see. Sticky rather than fixed,
           because the results container animates with a transform, which
           breaks `position: fixed`. */}
-      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-raised -mx-4 border-t border-brand-line bg-brand-paper/95 px-4 py-3 backdrop-blur sm:bottom-0 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:rounded-2xl lg:border lg:px-6">
+      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-raised -mx-4 -mt-6 border-t border-brand-line bg-brand-paper/95 px-4 py-3 backdrop-blur sm:bottom-0 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:mt-0 lg:rounded-2xl lg:border lg:px-6">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 lg:max-w-none">
           <p className="text-sm text-brand-muted">Questions about this check?</p>
           <Button asChild variant="ink" size="lg" className="shrink-0 px-5">

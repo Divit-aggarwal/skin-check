@@ -276,7 +276,7 @@ function ChatSection({ uid, dashboard, data }: { uid: string; dashboard: Dashboa
           </button>
         </>
       ) : (
-        <p className="text-brand-muted">{C.chat.needsReading}</p>
+        <p className="text-brand-muted">{dashboard.history.length === 0 ? C.chat.needsFirst : C.chat.needsReading}</p>
       )}
     </section>
   );

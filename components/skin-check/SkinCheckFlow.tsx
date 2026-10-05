@@ -127,7 +127,7 @@ export function SkinCheckFlow() {
     <div className="min-h-dvh bg-white">
       {/* Back and the Home link share a row above the progress bar, so the bar
           and every question start on the same edge (design review G03). */}
-      <div ref={headerRef} className="mx-auto flex max-w-2xl flex-col gap-2 px-4 pt-4 sm:px-6 sm:pt-6">
+      <div ref={headerRef} className={`mx-auto flex flex-col gap-2 px-4 pt-4 sm:px-6 sm:pt-6 ${complete ? "max-w-6xl lg:px-8" : "max-w-2xl"}`}>
         <div className="flex min-h-11 items-center justify-between">
           <button
             type="button"

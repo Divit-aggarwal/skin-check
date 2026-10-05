@@ -97,7 +97,7 @@ export function DeleteAccount() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="inline-flex min-h-12 items-center justify-center rounded-full bg-brand-error px-6 font-medium text-white hover:opacity-90 disabled:bg-brand-linen2 disabled:text-brand-muted sm:min-h-11"
+              className="inline-flex min-h-12 items-center justify-center rounded-full bg-brand-error px-6 font-medium text-white hover:opacity-90 border border-transparent disabled:border-brand-line disabled:bg-brand-paper disabled:text-brand-muted sm:min-h-11"
               disabled={state.typed !== ERASE_CONFIRMATION}
               onClick={() => void erase()}
             >

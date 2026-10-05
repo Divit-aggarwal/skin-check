@@ -5,12 +5,11 @@ import { usePathname } from "next/navigation";
 import { AlertCircle, UserRound } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { SHELL_COPY } from "@/components/shell/copy";
-import { Skeleton } from "./skeleton";
 
 // Shared page pieces of the design system (docs/design/system.md §4-5).
 
 export const btnPrimary =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-brand-action px-6 font-medium text-white hover:bg-brand-action-hover disabled:pointer-events-none disabled:bg-brand-linen2 disabled:text-brand-muted aria-disabled:bg-brand-linen2 aria-disabled:text-brand-muted sm:min-h-11";
+  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-brand-action px-6 font-medium text-white hover:bg-brand-action-hover border border-transparent disabled:pointer-events-none disabled:border-brand-line disabled:bg-brand-paper disabled:text-brand-muted aria-disabled:border-brand-line aria-disabled:bg-brand-paper aria-disabled:text-brand-muted sm:min-h-11";
 export const btnSecondary =
   "inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-brand-ink bg-transparent px-6 font-medium text-brand-ink hover:bg-brand-linen disabled:pointer-events-none disabled:border-brand-line disabled:text-brand-muted aria-disabled:border-brand-line aria-disabled:text-brand-muted sm:min-h-11";
 export const textLink =
@@ -85,7 +84,7 @@ export function LoadingState({ label, blocks = ["h-56", "h-28", "h-28"] }: { lab
     <div role="status" className="flex flex-col gap-4 sm:gap-6">
       <span className="sr-only">{label}</span>
       {blocks.map((h, i) => (
-        <Skeleton key={i} aria-hidden className={`${h} w-full rounded-2xl bg-brand-linen2`} />
+        <div key={i} aria-hidden className={`${h} w-full animate-pulse rounded-2xl bg-brand-linen motion-reduce:animate-none`} />
       ))}
     </div>
   );

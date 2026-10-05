@@ -26,18 +26,19 @@ export function TextInput({ step, value, onChange, onCommit }: TextInputProps) {
           }
         }}
         placeholder={step.placeholder}
-        className="w-full rounded-lg border border-brand-line bg-white px-4 py-3 pr-11 text-[1.0625rem] text-text shadow-sm outline-none placeholder:text-text/35 focus:border-blush/50 focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+        aria-label={step.prompt}
+        className="h-12 w-full rounded-lg border border-brand-line bg-white px-4 pr-14 text-base text-brand-ink placeholder:text-brand-muted/70"
       />
-      {valid && (
-        <button
-          type="button"
-          onClick={onCommit}
-          aria-label="Confirm answer"
-          className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-brand-action text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
-        >
-          <ArrowRight className="h-3.5 w-3.5" strokeWidth={2.5} />
-        </button>
-      )}
+      {/* Always shown, so the way on is visible before typing (design review G03). */}
+      <button
+        type="button"
+        onClick={() => valid && onCommit()}
+        aria-disabled={!valid}
+        aria-label="Confirm answer"
+        className="absolute right-1 top-1/2 flex h-10 w-10 -translate-y-1/2 items-center justify-center rounded-full bg-brand-action text-white hover:bg-brand-action-hover aria-disabled:bg-brand-linen2 aria-disabled:text-brand-muted"
+      >
+        <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
+      </button>
     </div>
   );
 }

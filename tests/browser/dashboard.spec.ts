@@ -107,7 +107,7 @@ test("empty", async ({ page }) => {
   await dashboardAs(page, U.empty!.phoneNumber);
   await expect(page.getByText(C.empty)).toBeVisible();
   await expect(page.getByText(C.trend.empty)).toBeVisible();
-  await expect(page.getByText(C.chat.needsReading)).toBeVisible();
+  await expect(page.getByText(C.chat.needsFirst)).toBeVisible();
   await expect(page.getByText(C.privacy.aiNotAsked)).toBeVisible();
   await shot(page, "empty");
 });

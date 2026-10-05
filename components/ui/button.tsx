@@ -22,7 +22,7 @@ const buttonVariants = cva(
           "rounded-full border border-brand-ink bg-transparent text-brand-ink hover:bg-brand-linen disabled:border-brand-line disabled:text-brand-muted disabled:opacity-100",
         // Primary action for the Skin Check quiz/results redesign — near-
         // black, no gradient/glow, per the "restrained" brief (PART 25).
-        ink: "rounded-full bg-brand-action text-white hover:bg-brand-action-hover disabled:bg-brand-linen2 disabled:text-brand-muted disabled:opacity-100",
+        ink: "rounded-full border border-transparent bg-brand-action text-white hover:bg-brand-action-hover disabled:border-brand-line disabled:bg-brand-paper disabled:text-brand-muted disabled:opacity-100",
       },
       size: {
         default: "h-10 px-4 py-2",
