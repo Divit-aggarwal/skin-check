@@ -428,3 +428,54 @@ describe("uncited claims (F17): 'as a' is not a new clause", () => {
     expect(checksOf(ok([{ claim_type: "out_of_scope", text: "I cannot say for sure as the heat is the issue.", fact_ids: [] }]))).toContain("citation_rule");
   });
 });
+
+// ctx-prompt-4: Echo replies in simple Hinglish (Latin letters) to a Hinglish
+// message. Every check still applies; only Hinglish glue words, "bataya" and the
+// Hinglish forms of refusals, requests, questions and closings are added.
+describe("Hinglish replies (ctx-prompt-4)", () => {
+  const SELF = packageFacts(pkg).find((f) => f.kind === "self")!;
+  const one = (claim_type: string, text: string, fact_ids: string[] = []) => ({ claim_type, text, fact_ids }) as never;
+  it.each([
+    ["a reading with Hinglish words around it", [one("descriptive", `Yeh aapki reading hai: ${RED.text}`, [RED.id]), UNC]],
+    ["what the user told us", [one("self_reported_echo", `Aapne bataya: ${SELF.text}`, [SELF.id])]],
+    ["a refusal", [one("out_of_scope", "Main product suggest nahi kar sakti.")]],
+    ["a doctor request", [one("out_of_scope", "Please kisi doctor se poochein.")]],
+    ["a greeting and a question", [one("smalltalk", "Namaste! Main aapki kaise madad kar sakti hoon?")]],
+    ["a clarifying question", [one("clarify", "Aap chehre ke kis hisse ki baat kar rahe hain?")]],
+    ["a closing", [one("smalltalk", "Shukriya! Aapka swagat hai.")]],
+  ] as const)("passes: %s", (_n, claims) => {
+    expect(checksOf(ok(claims as never), "mere cheeks ki reading kya hai?")).toEqual([]);
+  });
+
+  it.each([
+    ["a change", [one("out_of_scope", "Aapki redness kam hui hai.")], "comparative_or_change"],
+    ["a cause", [one("out_of_scope", "Yeh dhoop ki wajah se hai.")], "cause"],
+    ["a diagnosis", [one("out_of_scope", "Aapko acne hai.")], "diagnosis"],
+    ["a product", [one("out_of_scope", "Yeh serum lagaiye.")], "product_claim"],
+    ["a negated reading", [one("descriptive", `${RED.text} nahi hai`, [RED.id]), UNC], "contradicts_package"],
+    ["a past reading", [one("descriptive", `${RED.text} tha`, [RED.id]), UNC], "contradicts_package"],
+    ["an opinion about a cause", [one("out_of_scope", "Mujhe lagta hai garmi issue hai.")], "citation_rule"],
+    ["a bare statement", [one("out_of_scope", "Garmi hi problem hai.")], "citation_rule"],
+    ["a number", [one("out_of_scope", "Aapka score 72 hai.")], "made_up_number"],
+    ["Devanagari", [one("smalltalk", "आपका स्वागत है")], "non_latin_script"],
+  ] as const)("still fails: %s", (_n, claims, check) => {
+    expect(checksOf(ok(claims as never))).toContain(check);
+  });
+
+  it.each(["I can only answer in English.", "Main Hindi mein jawab nahi de sakti.", "Sorry, I cannot reply in Hinglish.", "Main sirf English mein baat kar sakti hoon."])("never says it answers only in English: %j", (text) => {
+    expect(validateAnswer(ok([one("out_of_scope", text)]), pkg, "x").failures.map((f) => f.term)).toContain("english_only");
+  });
+
+  it("'English or Hindi' is not an English-only claim", () => {
+    expect(validateAnswer(ok([one("out_of_scope", "I can answer in English or Hindi.")]), pkg, "x").failures.map((f) => f.term)).not.toContain("english_only");
+  });
+
+  it("the instruction asks for Hinglish in Latin letters and forbids 'English only'", async () => {
+    const { renderSystemInstruction, PROMPT_VERSION } = await import("@/lib/context/renderer");
+    const sys = renderSystemInstruction(pkg);
+    expect(PROMPT_VERSION).toBe("ctx-prompt-4");
+    expect(sys).toMatch(/simple Hinglish in Latin letters if they write Hinglish/);
+    expect(sys).toMatch(/Never say you can only answer in English/);
+    expect(sys).not.toMatch(/Answer in English, in at most/);
+  });
+});

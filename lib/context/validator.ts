@@ -104,15 +104,18 @@ function quotable(f: CitableFact): string[] {
 const UNCITED_MAX = 240;
 
 // Words that may frame a quote. Anything else must come from the cited facts' own text.
+// Hinglish glue words (ctx-prompt-4) frame a quote the same way. Never "nahi", a past tense
+// ("tha", "thi") or a change word: those would change what the quoted fact says.
 const FRAME = new Set(
-  "you told us said say mentioned noted shared your that the a an and or is are was were for about on in of with we as it this these listed picked chose selected answered answer answers quiz here also so i me my our".split(" ")
+  ("you told us said say mentioned noted shared your that the a an and or is are was were for about on in of with we as it this these listed picked chose selected answered answer answers quiz here also so i me my our " +
+    "aap aapka aapke aapki aapne apna apne apni bataya batayi bataye hai hain ka ke ki ko se pe par mein me yeh ye is iss isme ismein aur ya bhi sirf wala wali wale").split(" ")
 );
 // A descriptive claim may add only these words to its cited facts' own words (security review, wave 2).
 const DESCRIBE_FRAME = new Set(
   Array.from(FRAME).concat("reads read reading readings shows show photo photos scan skin level at across whole face region area estimate based by".split(" "))
 );
 // A self-report echo must say it is what the user told us (security review, wave 2).
-const TOLD = new RegExp(String.raw`\b(?:told|said|mentioned|noted|shared|listed|picked|chose|selected|answered)\b`, "iu");
+const TOLD = new RegExp(String.raw`\b(?:told|said|mentioned|noted|shared|listed|picked|chose|selected|answered|bataya|batayi|bataye)\b`, "iu");
 // Uncited claims: no comparison, and smalltalk does not talk about the skin or point back at a reading.
 const UNCITED_COMPARE = new RegExp(String.raw`\bthan\b`, "iu");
 const SMALLTALK_SKIN = new RegExp(String.raw`\b(?:skin|face|complexion|spots?|acne|pimples?|breakouts?|shine|shiny|oily|bumps?|marks?|tone|it|that|this)\b`, "iu");
@@ -126,7 +129,7 @@ const UNCITED_SKIN_STATE = new RegExp(
 // proper noun (a capital letter inside a sentence, except "I"), and never
 // sends the user to a link, a sign-in or a code.
 // F07 live run: the two languages Echo answers in are not brands ("I can only answer in English").
-const UNCITED_PROPER = new RegExp(String.raw`(?<=[\p{L},;:]\s+)(?!I\b|English\b|Hindi\b)\p{Lu}\p{L}*`, "u");
+const UNCITED_PROPER = new RegExp(String.raw`(?<=[\p{L},;:]\s+)(?!I\b|English\b|Hindi\b|Hinglish\b)\p{Lu}\p{L}*`, "u");
 const UNCITED_PHISH = new RegExp(String.raw`https?:|www\.|\b\w+\.(?:com|in|org|net|io|app)\b|\b\w+\s+dot\s+(?:com|in|org|net|io|app|example)\b|\bsign (?:in|up)\b|\blog ?in\b|\botp\b|\bpassword\b|\bphone\b|\bcode\b`, "iu");
 // F07 live run (real Gemini): our own fixed phrases that tripped a word list
 // without saying anything about the skin. Only these exact phrases are blanked,
@@ -150,7 +153,7 @@ const SKIN_CHECK_NAME = new RegExp(String.raw`\byour skin[- ]checks?(?: results?
 // by word list: after an optional greeting, every clause is Echo saying what it
 // can or cannot do, a question to the user, a request to see a doctor or
 // pharmacist, or a closing. Anything else fails citation_rule ("statement").
-const OPENER = new RegExp(String.raw`^(?:(?:hello|hi|hey|hiya|namaste|thanks|thank you|sure|of course|okay|ok|absolutely|got it|no problem|good question|great question)\b[\s,!.:-]*)+`, "iu");
+const OPENER = new RegExp(String.raw`^(?:(?:hello|hi|hey|hiya|namaste|thanks|thank you|sure|of course|okay|ok|absolutely|got it|no problem|good question|great question|haan|ji|ji haan|theek hai|thik hai|accha|achha|bilkul|shukriya|dhanyavaad)\b[\s,!.:-]*)+`, "iu");
 const CLAUSE_SPLIT = new RegExp(String.raw`\s*(?:[;:]|,\s*(?:but|so|and|though|although|while|because|since|as|which)\b|\s(?:but|so that|because|since|as(?! (?:a|an)\b))\s)\s*`, "iu");
 const CLAUSE_FORMS = [
   // Echo on what it can or cannot do. Any verb, but not an opinion ("I think the
@@ -162,9 +165,19 @@ const CLAUSE_FORMS = [
   new RegExp(String.raw`^you (?:can|could|may)(?: also| always)? (?:ask|consult|talk|speak|see|check with|contact|tell me|share|try asking|rephrase)\b`, "iu"),
   // a closing
   new RegExp(String.raw`^(?:you(?:'re| are) (?:very |most |always )?welcome|anytime|happy to help|glad to help|glad (?:that|it|i could) help\w*)\b`, "iu"),
+  // The same forms in Hinglish (ctx-prompt-4): Echo on what it can or cannot do
+  // ("Main product suggest nahi kar sakti"), not an opinion ("mujhe lagta hai").
+  new RegExp(String.raw`^(?:main|mai|mein|echo)\b(?!.*\b(?:lagta|lagti|sochta|sochti|sochte|yakeen|pakka|shayad)\b).*\b(?:sakti|sakta|sakte|sakungi|sakunga|paungi|paunga|karti|karta|kar rahi|kar raha|hoon|hu|hun)\b`, "iu"),
+  // a request to ask a professional ("Please kisi doctor se poochein")
+  new RegExp(String.raw`^(?:please\s+)?(?:kisi\s+|apne\s+)?(?:doctor|dermatologist|pharmacist|skin specialist)\s+(?:se|ko)\b.*\b(?:poochein|poochiye|puchiye|puchein|poocho|pucho|dikhaiye|dikhayein|dikhao|milein|consult)\b`, "iu"),
+  new RegExp(String.raw`^(?:please\s+)?(?:mujhe\s+)?(?:batayein|bataiye|batao|bataein)\b`, "iu"),
+  // a closing
+  new RegExp(String.raw`^(?:aapka (?:bahut )?swagat hai|koi baat nahi|khushi hui|madad karke khushi hui|aur kuch poochna ho to batayein)\b`, "iu"),
 ];
+// F07 (ctx-prompt-4): a claim that Echo answers only in English, or cannot answer in Hindi or Hinglish, is false.
+const ENGLISH_ONLY = new RegExp(String.raw`\b(?:only|sirf|keval)\b[^.!?]*\b(?:english|angrezi)\b(?![^.!?]*\b(?:hindi|hinglish)\b)|\b(?:english|angrezi)\b[^.!?]*\b(?:only|hi|mein hi)\b[^.!?]*\b(?:answer|reply|respond|speak|baat|jawab)|\b(?:cannot|can't|can not|unable to|not able to|nahi)\b[^.!?]*\b(?:hindi|hinglish)\b|\b(?:hindi|hinglish)\b[^.!?]*\bnahi\b`, "iu");
 // A real question to the user; a negative question ("isn't it the heat?") asserts, so it is not one.
-const QUESTION = new RegExp(String.raw`^(?:(?:in|on|for|about|at|from|with|to) (?:which|what|where|whom)|how|what|which|where|when|who|could|can|would|will|do|does|did|is|are|may|should|shall|have|has)\b(?!n't)[^?]*\?$`, "iu");
+const QUESTION = new RegExp(String.raw`^(?:(?:in|on|for|about|at|from|with|to) (?:which|what|where|whom)|how|what|which|where|when|who|could|can|would|will|do|does|did|is|are|may|should|shall|have|has)\b(?!n't)[^?]*\?$|^(?=[^?]*\b(?:kya|kaun\w*|kab|kahan|kaise|kis\w*|kitn\w*)\b)[^?]*\?$`, "iu");
 const sentenceKey = (t: string) => normalizeForMatch(t).toLowerCase().replace(/[.!?\s]+$/, "").trim();
 /** `own`: this package's fact texts, which are our words, not a statement by Gemini. */
 function uncitedStatement(text: string, own: Set<string>): string | null {
@@ -276,6 +289,7 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
       if (phish) fail("citation_rule", i, phish);
     }
     if (!MUST_CITE.has(claim.claim_type) && uncitedStatement(claim.text, ownTexts) !== null) fail("citation_rule", i, "statement");
+    if (ENGLISH_ONLY.test(text)) fail("citation_rule", i, "english_only");
     if (claim.claim_type === "clarify" || claim.claim_type === "out_of_scope") {
       const plain = text.replace(GOOD_QUESTION, " ");
       const state = UNCITED_SKIN_NOUN.test(plain) ? firstMatch(UNCITED_SKIN_STATE, plain) : null;
