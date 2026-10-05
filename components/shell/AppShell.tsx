@@ -26,12 +26,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Nav phoneLast4={phone.length >= 4 ? phone.slice(-4) : null} />
       ) : (
         <header className="border-b border-brand-line">
-          <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-4 sm:px-6 lg:px-8">
             <Link href="/skin-check" className="flex min-h-11 items-center font-display text-xl font-semibold tracking-tight">
               {S.brand}
             </Link>
             {user === null && !path.startsWith("/account") && (
-              <Link href="/account" className="flex min-h-11 items-center rounded-full px-4 font-medium text-brand-forest hover:bg-brand-mist">
+              <Link href="/account" className="-mr-4 flex min-h-11 items-center rounded-full px-4 font-medium text-brand-forest hover:bg-brand-mist">
                 {S.signIn}
               </Link>
             )}

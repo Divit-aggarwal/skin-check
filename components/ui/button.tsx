@@ -19,10 +19,10 @@ const buttonVariants = cva(
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
         outlineLight:
-          "rounded-full border border-brand-ink bg-transparent text-brand-ink hover:bg-brand-linen",
+          "rounded-full border border-brand-ink bg-transparent text-brand-ink hover:bg-brand-linen disabled:border-brand-line disabled:text-brand-muted disabled:opacity-100",
         // Primary action for the Skin Check quiz/results redesign — near-
         // black, no gradient/glow, per the "restrained" brief (PART 25).
-        ink: "rounded-full bg-brand-action text-white hover:bg-brand-action-hover",
+        ink: "rounded-full bg-brand-action text-white hover:bg-brand-action-hover disabled:bg-brand-linen2 disabled:text-brand-muted disabled:opacity-100",
       },
       size: {
         default: "h-10 px-4 py-2",

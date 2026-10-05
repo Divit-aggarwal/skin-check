@@ -4,10 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
-import { ChevronLeft, ChevronRight, SendHorizontal } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, MessageCircle, SendHorizontal } from "lucide-react";
 import { TypingIndicator } from "@/components/primitives/TypingIndicator";
-import { EchoBubble } from "./EchoBubble";
-import { EchoMark } from "./EchoMark";
 import { ECHO_COPY as E } from "./echoCopy";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
 import { PhotoCheckLine, ReadingRows } from "@/components/dashboard/CheckReadings";
@@ -15,7 +13,7 @@ import { formatDate } from "@/components/dashboard/format";
 import { loadDashboard } from "@/components/dashboard/data";
 import { newestEchoSession } from "@/components/dashboard/echo-session";
 import { readingsOf, toDate } from "@/components/dashboard/state";
-import { btnPrimary, EmptyState, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
+import { AccountButton, btnPrimary, EmptyState, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getSkinCheckChatReply, ApiError } from "@/lib/api";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import { useAuth } from "@/lib/auth-context";
@@ -278,13 +276,14 @@ export function EchoPage() {
           </Link>
           <div className="min-w-0 flex-1">
             <h1 className="flex items-center gap-2 font-display text-[28px] font-semibold leading-tight sm:text-4xl">
-              <span aria-hidden className="grid size-9 place-items-center rounded-full bg-brand-mist">
-                <EchoMark className="h-4 w-4" />
+              <span aria-hidden className="grid size-9 place-items-center rounded-full bg-brand-mist text-brand-forest">
+                <MessageCircle size={18} />
               </span>
               {E.title}
             </h1>
             <p className="mt-1 text-sm text-brand-muted">{E.intro(date)}</p>
           </div>
+          <AccountButton />
         </header>
 
         <div role="group" aria-label={E.areaPicker} className="mt-4 flex shrink-0 gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
@@ -302,21 +301,21 @@ export function EchoPage() {
         </div>
 
         {/* Phone and tablet: the same readings, folded away until asked for. */}
-        <details className="mt-3 shrink-0 rounded-2xl bg-brand-linen px-4 py-2 lg:hidden">
-          <summary className="flex min-h-11 cursor-pointer items-center font-medium">{E.readingsSummary}</summary>
+        <details className="group mt-3 shrink-0 rounded-2xl bg-brand-linen px-4 py-2 lg:hidden">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between font-medium [&::-webkit-details-marker]:hidden">
+            {E.readingsSummary}
+            <ChevronDown aria-hidden size={18} className="transition-transform group-open:rotate-180" />
+          </summary>
           <div className="pb-3 pt-2">{panel}</div>
         </details>
 
         <div ref={scrollRef} role="log" aria-live="polite" className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pb-4">
-        {messages.length === 0 && <EchoBubble message={greetingFor(activeRegion)} />}
+        {messages.length === 0 && (
+          <p className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-linen px-4 py-3 leading-relaxed text-brand-ink">{greetingFor(activeRegion)}</p>
+        )}
         {messages.map((m) =>
           m.role === "echo" ? (
-            // Plain left-aligned body copy, no bubble/avatar chrome — same
-            // "doesn't read as a chatbot" intent as EchoBubble, sized for a
-            // running multi-turn reply rather than EchoBubble's single
-            // editorial question/prompt treatment (which EchoBubble is now
-            // used for elsewhere — see SkinCheckFlow.tsx).
-            <p key={m.id} className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-linen px-4 py-3 leading-relaxed text-brand-ink">
+<p key={m.id} className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-linen px-4 py-3 leading-relaxed text-brand-ink">
               {m.text}
             </p>
           ) : (
@@ -339,7 +338,7 @@ export function EchoPage() {
               type="button"
               onClick={() => void grantAiShare()}
               disabled={consentSaving || sendingRegion !== null}
-              className="inline-flex min-h-11 items-center font-semibold text-brand-forest underline underline-offset-2 disabled:opacity-50"
+              className={btnPrimary}
             >
               I agree
             </button>

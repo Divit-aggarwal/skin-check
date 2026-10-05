@@ -70,7 +70,7 @@ export function DeleteAccount() {
   }
 
   return (
-    <section aria-labelledby="delete-title" className="flex flex-col items-start gap-3 rounded-2xl border border-brand-error/40 p-5 sm:p-6">
+    <section aria-labelledby="delete-title" className="flex flex-col items-start gap-3 rounded-2xl border border-brand-error p-5 sm:p-6">
       <h2 id="delete-title" className={h2}>
         {A.deleteTitle}
       </h2>
@@ -97,7 +97,7 @@ export function DeleteAccount() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="inline-flex min-h-12 items-center justify-center rounded-full bg-brand-error px-6 font-medium text-white hover:opacity-90 disabled:opacity-40 sm:min-h-11"
+              className="inline-flex min-h-12 items-center justify-center rounded-full bg-brand-error px-6 font-medium text-white hover:opacity-90 disabled:bg-brand-linen2 disabled:text-brand-muted sm:min-h-11"
               disabled={state.typed !== ERASE_CONFIRMATION}
               onClick={() => void erase()}
             >

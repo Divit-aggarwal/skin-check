@@ -6,8 +6,6 @@ export const ACCOUNT_COPY = {
   signedIn: "Signed in",
   signedInAs: "Signed in as",
   signOut: "Sign out",
-  checksLink: "Your checks are on the Checks page.",
-  openChecks: "Open Checks",
   deleteTitle: "Delete your account",
   deleteButton: "Delete my account and data",
   typeToConfirm: (phrase: string) => `Type ${phrase} to confirm.`,

@@ -14,7 +14,7 @@ import { useRoutine } from "@/components/routine/useRoutine";
 import { mergeTimeline, dayOf } from "@/components/timeline/timeline";
 import { TimelineList } from "@/components/timeline/TimelineList";
 import { ROUTINE_COPY } from "@/lib/routine/copy";
-import { btnPrimary, btnSecondary, EmptyState, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";
+import { AccountButton, btnPrimary, btnSecondary, EmptyState, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";
 import { CHECKS_COPY as K } from "./copy";
 import { Thumb } from "./Thumb";
 
@@ -98,17 +98,18 @@ export function ChecksView({ openId }: { openId: string | null }) {
   return (
     <main className={page}>
       {openId ? (
-        <div className="pt-6 lg:hidden">
+        <div className="flex items-center justify-between pt-6 lg:hidden">
           <Link href="/checks" className={textLink}>
             <ChevronLeft aria-hidden size={16} />
             {K.back}
           </Link>
+          <AccountButton />
         </div>
       ) : null}
       <div className={openId ? "hidden lg:block" : undefined}>{header}</div>
       <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-6">
         <div className={`lg:col-span-5 ${openId ? "hidden lg:block" : ""}`}>
-          <CheckList dashboard={dashboard} data={load.data} uid={user.uid} selected={openId ? selected : null} />
+          <CheckList dashboard={dashboard} data={load.data} uid={user.uid} selected={selected} />
         </div>
         <div className={`lg:sticky lg:top-6 lg:col-span-7 ${openId ? "" : "hidden lg:block"}`}>
           <CheckDetail uid={user.uid} scanId={selected} data={load.data} dashboard={dashboard} />
@@ -135,7 +136,7 @@ function ViewSwitch({ timeline }: { timeline: boolean }) {
 /** Date, kind, photo check and a kept photo. Never a reading. */
 function CheckList({ dashboard, data, uid, selected }: { dashboard: Dashboard; data: DashboardData; uid: string; selected: string | null }) {
   return (
-    <section aria-labelledby="list-title" className="rounded-2xl border border-brand-line">
+    <section aria-labelledby="list-title" className="overflow-hidden rounded-2xl border border-brand-line">
       <div className="flex items-center justify-between gap-4 border-b border-brand-line px-5 py-4">
         <h2 id="list-title" className={eyebrow}>
           {C.history.title}
@@ -173,17 +174,8 @@ function CheckList({ dashboard, data, uid, selected }: { dashboard: Dashboard; d
 /** One opened check: its own readings, always with the fixed line. */
 function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: string; data: DashboardData; dashboard: Dashboard }) {
   const check = pastCheck(uid, scanId, data.checks, data.analyses);
-  if (!check)
-    return (
-      <EmptyState
-        body={C.history.notFound}
-        action={
-          <Link href="/checks" className={btnSecondary}>
-            {K.back}
-          </Link>
-        }
-      />
-    );
+  // The back link above (phone) and the list beside it (desktop) are the ways on.
+  if (!check) return <EmptyState title={C.history.notFound} body={K.notFoundBody} />;
   const date = formatDate(check.date);
   const newest = dashboard.echoScanId === check.scanId;
   return (
@@ -203,7 +195,7 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
       <p className="rounded-2xl bg-brand-mist px-5 py-4 text-brand-ink">{C.history.pastLine}</p>
       {check.view ? (
         <>
-          <CheckReadings view={{ ...check.view, photoCheck: null }} />
+          <CheckReadings view={{ ...check.view, photoCheck: null }} stack />
           {check.view.bands && (
             <div className="border-t border-brand-line pt-5">
               <KnownAndNotKnown />
@@ -234,7 +226,7 @@ function TimelineSection({ history }: { history: Dashboard["history"] }) {
   const items = mergeTimeline(history, routine.data?.events ?? [], routine.data?.today ?? dayOf(new Date()));
   const nameOf = (id: string) => routine.data?.products.find((p) => p.id === id)?.name ?? ROUTINE_COPY.otherProduct;
   return (
-    <section aria-label={K.timeline} className="max-w-3xl rounded-2xl border border-brand-line px-5">
+    <section aria-label={K.timeline} className="max-w-4xl rounded-2xl border border-brand-line px-5">
       {routine.failed && <p role="alert" className="py-3">{ROUTINE_COPY.error}</p>}
       {/* No photos here: a column of faces between routine entries would read as before and after (D-12). Photos stay on the list and the opened check. */}
       <TimelineList items={items} nameOf={nameOf} />

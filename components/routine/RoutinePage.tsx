@@ -49,7 +49,7 @@ export function RoutinePage() {
         </div>
       )}
 
-      <section aria-labelledby="products-title" className="flex flex-col gap-4 lg:col-span-7">
+      <section aria-labelledby="products-title" className="flex flex-col gap-4 sm:gap-6 lg:col-span-7">
         <h2 id="products-title" className={h2}>
           {C.yourProducts}
         </h2>

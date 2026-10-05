@@ -37,8 +37,10 @@ export function ReadingRows({ bands }: { bands: Bands | null }) {
 // One check's readings: whole face, or one face area, picked with the chips.
 // Band words only, all in the same neutral style, so no band reads as good or
 // bad news. No score, no overlay, no other check.
-export function CheckReadings({ view, face = true }: { view: CheckView; face?: boolean }) {
+export function CheckReadings({ view, face = true, stack = false }: { view: CheckView; face?: boolean; stack?: boolean }) {
   const [area, setArea] = useState<EchoRegion | null>(null);
+  // No drawing of areas when there are no readings to go with it.
+  const showFace = face && view.areas.length > 0 && view.bands !== null;
   const shown = area ? view.areas.find((a) => a.region === area)?.bands ?? null : view.bands;
   const chips: { key: EchoRegion | null; label: string }[] = [
     { key: null, label: C.current.wholeFace },
@@ -62,8 +64,8 @@ export function CheckReadings({ view, face = true }: { view: CheckView; face?: b
           ))}
         </div>
       )}
-      <div className={face && view.areas.length > 0 ? "grid items-center gap-6 md:grid-cols-[minmax(0,300px)_1fr]" : ""}>
-        {face && view.areas.length > 0 && (
+      <div className={showFace && !stack ? "grid items-center gap-6 md:grid-cols-[minmax(0,300px)_1fr]" : "flex flex-col gap-6"}>
+        {showFace && (
           <div className="rounded-2xl bg-brand-paper p-3">
             <FaceDrawing selected={area} labels={ECHO_REGION_LABELS} />
           </div>

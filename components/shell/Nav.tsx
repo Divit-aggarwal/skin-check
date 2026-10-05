@@ -37,7 +37,7 @@ export function Nav({ phoneLast4 }: { phoneLast4: string | null }) {
         <Link
           href={newCheck.href}
           aria-current={current(newCheck)}
-          className="mb-6 flex min-h-11 items-center justify-center gap-2 rounded-full bg-brand-action px-6 font-medium text-white hover:bg-brand-action-hover"
+          className="mb-6 flex min-h-11 items-center justify-center gap-2 rounded-full bg-brand-action px-6 font-medium text-white hover:bg-brand-action-hover aria-[current=page]:ring-2 aria-[current=page]:ring-brand-forest aria-[current=page]:ring-offset-2"
         >
           <Camera aria-hidden size={18} />
           {S.nav.newCheck}
@@ -98,7 +98,7 @@ export function Nav({ phoneLast4 }: { phoneLast4: string | null }) {
               >
                 {p.key === "newCheck" ? (
                   <>
-                    <span className="grid size-10 place-items-center rounded-full bg-brand-action text-white">
+                    <span className="grid size-10 place-items-center rounded-full bg-brand-action text-white group-aria-[current=page]:ring-2 group-aria-[current=page]:ring-brand-forest group-aria-[current=page]:ring-offset-2">
                       <p.icon aria-hidden size={20} />
                     </span>
                     <span className="sr-only">{S.nav[p.key]}</span>
@@ -130,7 +130,7 @@ function RailLink({ place: p, current, primary }: { place: Place; current: "page
       <span
         className={
           primary
-            ? "grid h-8 w-14 place-items-center rounded-full bg-brand-action text-white"
+            ? "grid h-8 w-14 place-items-center rounded-full bg-brand-action text-white group-aria-[current=page]:ring-2 group-aria-[current=page]:ring-brand-forest group-aria-[current=page]:ring-offset-2"
             : "grid h-8 w-14 place-items-center rounded-full group-hover:bg-brand-linen group-aria-[current=page]:bg-brand-mist"
         }
       >

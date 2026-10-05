@@ -72,7 +72,15 @@ export function DashboardPage() {
   if (loading || (user && load.kind === "loading")) {
     return (
       <Shell>
-        <LoadingState label={C.loading} blocks={["h-96", "h-40", "h-40"]} />
+        {/* Shaped like Home: the 8/4 split, so nothing jumps when it loads. */}
+        <div className="grid gap-6 lg:grid-cols-12">
+          <div className="lg:col-span-8">
+            <LoadingState label={C.loading} blocks={["h-[28rem]", "h-64"]} />
+          </div>
+          <div aria-hidden className="hidden lg:col-span-4 lg:block">
+            <LoadingState label="" blocks={["h-48", "h-40", "h-40"]} />
+          </div>
+        </div>
       </Shell>
     );
   }
@@ -136,6 +144,8 @@ export function DashboardPage() {
           <div className="order-4">
             <ChatSection uid={user.uid} dashboard={dashboard} data={load.data} />
           </div>
+          {/* Only when the lead card does not already offer a new check. */}
+          {dashboard.current.kind === "reading" && (
           <section aria-labelledby="new-title" className={`${card} order-6 flex flex-col items-start gap-3`}>
             <h2 id="new-title" className={h2}>
               {C.home.newCheckTitle}
@@ -145,6 +155,7 @@ export function DashboardPage() {
               {C.newCheck}
             </Link>
           </section>
+          )}
           <div className="order-7">
             <ConsentSection photo={dashboard.photo} deleteLink />
           </div>
@@ -172,7 +183,7 @@ function CurrentSection({ dashboard }: { dashboard: Dashboard }) {
         <div>
           <p className={`${eyebrow} mb-1`}>{C.current.eyebrow}</p>
           <h2 id="current-title" className={h2}>
-            {C.current.title}
+            {current.kind === "reading" ? C.current.title : C.current.noneTitle}
           </h2>
           {current.kind === "reading" && <p className="mt-1 text-sm text-brand-muted">{C.current.checkedOn(formatDate(current.view.date))}</p>}
         </div>
@@ -243,9 +254,6 @@ function RecentSection({ history, routine }: { history: Dashboard["history"]; ro
         </Link>
       </div>
       <TimelineList items={items} nameOf={nameOf} />
-      <Link href="/checks" className={textLink}>
-        {C.history.allChecks}
-      </Link>
     </section>
   );
 }

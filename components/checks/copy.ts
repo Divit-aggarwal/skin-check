@@ -17,4 +17,5 @@ export const CHECKS_COPY = {
   echoNewestOnly: "Echo talks about your newest check only.",
   noReadings: "This check has no photo reading.",
   pick: "Pick a check to open it here.",
+  notFoundBody: "It may have been deleted, or the address is mistyped. Your checks are in the list.",
 } as const;

@@ -1,13 +1,12 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { PhoneOtpForm } from "@/components/auth/PhoneOtpForm";
 import { ConsentSection } from "@/components/dashboard/ConsentSection";
 import { DashboardLink } from "@/components/dashboard/DashboardLink";
-import { card, h2, LoadingState, PageHeader, textLink } from "@/components/ui/page";
+import { card, h2, LoadingState, PageHeader } from "@/components/ui/page";
 import { DeleteAccount } from "./DeleteAccount";
 import { ACCOUNT_COPY as A } from "./copy";
 
@@ -47,12 +46,6 @@ export function AccountView() {
                     {A.signedIn}
                   </h2>
                   <PhoneOtpForm />
-                  <p className="text-brand-muted">
-                    {A.checksLink}{" "}
-                    <Link href="/checks" className={textLink}>
-                      {A.openChecks}
-                    </Link>
-                  </p>
                   {/* O-D3: the account page links to /dashboard. */}
                   <DashboardLink />
                 </section>

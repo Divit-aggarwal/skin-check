@@ -108,8 +108,9 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
 
   it("D-12: on Home the routine card is never beside the readings, and the timeline carries no photos", () => {
     const home = readFileSync("components/dashboard/DashboardPage.tsx", "utf8");
-    const left = home.slice(home.indexOf("lg:col-span-8"), home.indexOf("lg:col-span-4"));
-    const right = home.slice(home.indexOf("lg:col-span-4"));
+    const left = home.slice(home.indexOf("contents lg:col-span-8"), home.indexOf("contents lg:col-span-4"));
+    const right = home.slice(home.indexOf("contents lg:col-span-4"));
+    expect(left.length).toBeGreaterThan(100);
     expect(left).toMatch(/<TodayCard/);
     expect(left.indexOf("<TodayCard")).toBeGreaterThan(left.indexOf("<RecentSection"));
     expect(right).not.toMatch(/<TodayCard/);

@@ -125,33 +125,33 @@ export function SkinCheckFlow() {
 
   return (
     <div className="min-h-dvh bg-white">
-      <div ref={headerRef} className="mx-auto flex max-w-2xl items-center gap-3 px-4 pt-6 sm:px-6">
-        <button
-          type="button"
-          onClick={back}
-          disabled={isFirst}
-          aria-label="Go back"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-brand-muted hover:bg-brand-linen hover:text-brand-ink disabled:invisible"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
+      {/* Back and the Home link share a row above the progress bar, so the bar
+          and every question start on the same edge (design review G03). */}
+      <div ref={headerRef} className="mx-auto flex max-w-2xl flex-col gap-2 px-4 pt-4 sm:px-6 sm:pt-6">
+        <div className="flex min-h-11 items-center justify-between">
+          <button
+            type="button"
+            onClick={back}
+            disabled={isFirst}
+            aria-label="Go back"
+            className="-ml-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-brand-muted hover:bg-brand-linen hover:text-brand-ink disabled:invisible"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          {/* O-D3: the signed-in start page links to /dashboard. */}
+          {isFirst && !complete && (
+            <DashboardLink />
+          )}
+        </div>
         {!complete && (
-          <div className="flex-1">
-            <ProgressHeader
-              sectionLabels={ALL_SECTION_LABELS}
-              activeSectionIndex={sectionIndex}
-              activeSectionFill={sectionFill}
-              activeSectionLabel={section.label}
-            />
-          </div>
+          <ProgressHeader
+            sectionLabels={ALL_SECTION_LABELS}
+            activeSectionIndex={sectionIndex}
+            activeSectionFill={sectionFill}
+            activeSectionLabel={section.label}
+          />
         )}
       </div>
-      {/* O-D3: the signed-in start page links to /dashboard (its own row, so the progress bar keeps its width on a phone). */}
-      {isFirst && !complete && (
-        <div className="mx-auto flex max-w-2xl justify-end px-4 pt-2 sm:px-6">
-          <DashboardLink />
-        </div>
-      )}
 
       <AnimatePresence mode="wait" initial={false} custom={direction}>
         {confirmingUnder18 ? (
@@ -186,7 +186,12 @@ export function SkinCheckFlow() {
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
             className="mx-auto max-w-2xl px-4 pb-10 pt-10 sm:px-6"
           >
-            <EchoBubble message="This experience isn't available yet for users under 18. If that's not right, tap back to change your answer." />
+            <div role="status" className="flex flex-col items-start gap-4 rounded-2xl bg-brand-linen p-5 sm:p-6">
+              <p>This experience isn&apos;t available yet for users under 18. If that&apos;s not right, change your answer.</p>
+              <Button type="button" variant="ink" size="lg" onClick={back}>
+                Change my answer
+              </Button>
+            </div>
           </motion.div>
         ) : complete ? (
           <motion.div
@@ -197,7 +202,7 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6"
+            className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 lg:px-8"
           >
             <div className="flex flex-col gap-10">
               <div className="flex flex-col gap-3">

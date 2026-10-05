@@ -20,6 +20,7 @@ export const DASHBOARD_COPY = {
     none: "None of your checks has a photo reading yet.",
     checkedOn: (date: string) => `Checked on ${date}`,
     eyebrow: "Latest check",
+    noneTitle: "Your photo readings",
     openCheck: "Open this check",
     wholeFace: "Whole face",
     areaPicker: "Show readings for",
@@ -88,7 +89,7 @@ export const DASHBOARD_COPY = {
     title: "Ask Echo",
     body: "Ask Echo about your newest photo reading.",
     button: "Chat with Echo",
-    needsReading: "Echo needs a check with a photo reading.",
+    needsReading: "Echo talks about a photo reading from our server. Take a new check to chat with Echo.",
   },
 
   routine: {
@@ -101,7 +102,7 @@ export const DASHBOARD_COPY = {
     aiOn: "Sharing with the AI assistant: on.",
     aiOff: "Sharing with the AI assistant: off. Echo will ask you again the next time you chat.",
     aiNotAsked: "Sharing with the AI assistant: not asked yet. Echo asks the first time you chat.",
-    stop: "Stop sharing with the AI assistant",
+    stop: "Stop sharing",
     saving: "Saving…",
     loading: "Loading your sharing setting…",
     loadFailed: "Your sharing setting could not be loaded. Refresh the page to try again.",

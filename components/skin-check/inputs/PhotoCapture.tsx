@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState, type ChangeEvent } from "react";
-import { Camera, RotateCcw } from "lucide-react";
+import { AlertCircle, Camera, RotateCcw } from "lucide-react";
 import { useCameraStream } from "@/hooks/useCameraStream";
 import { useAuth } from "@/lib/auth-context";
 import { isAuthError, isUploadError, isUploadTooLarge, runSkinScan, UPLOAD_TOO_LARGE_MESSAGE } from "@/lib/api";
@@ -499,7 +499,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           {/* Required consent gate — the scan request below never fires
               until this is checked (PART 13). Unchecked by default, real
               <input type="checkbox">, keyboard- and screen-reader-visible. */}
-          <label className="flex max-w-md items-start gap-3 text-sm text-brand-ink">
+          <label className="flex max-w-md items-start gap-3 py-1 text-base text-brand-ink">
             <input
               type="checkbox"
               checked={hasConsented}
@@ -529,7 +529,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
               original is never uploaded (runSkinScan skips the S3 step). Never
               pre-checked, never inferred from the box above or from continuing
               the questionnaire. */}
-          <label className="flex max-w-md items-start gap-3 text-sm text-brand-ink">
+          <label className="flex max-w-md items-start gap-3 py-1 text-base text-brand-ink">
             <input
               type="checkbox"
               checked={hasRetentionConsent}
@@ -553,7 +553,10 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           <div aria-live="polite" className="max-w-sm text-sm">
             {flow.gate === "pending" && <p className="text-brand-muted">Checking your photo…</p>}
             {flow.gate === "done" && flow.quality && flow.quality.retakeReasons.length > 0 && (
-              <p className="rounded-xl border border-brand-line bg-brand-linen px-4 py-3 text-brand-ink">{RETAKE_COPY[flow.quality.retakeReasons[0]!]}</p>
+              <p role="alert" className="flex items-start gap-2 rounded-xl border border-brand-line bg-brand-linen px-4 py-3 text-brand-ink">
+                <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-brand-error" />
+                <span>{RETAKE_COPY[flow.quality.retakeReasons[0]!]}</span>
+              </p>
             )}
           </div>
           {canOverride(flow) && (

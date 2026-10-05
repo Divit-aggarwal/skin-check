@@ -230,8 +230,8 @@ export function EchoTwin({
           />
         )}
         {analyzed && (
-          <div className="absolute left-2 top-2 rounded-pill bg-canvas/80 px-2 py-1 text-label uppercase tracking-label text-muted-foreground backdrop-blur-sm">
-            Analysis complete
+          <div className="absolute left-2 top-2 rounded-full bg-brand-paper/90 px-3 py-1 text-xs font-semibold text-brand-ink">
+            Photo read
           </div>
         )}
         {categories.length > 1 && (
