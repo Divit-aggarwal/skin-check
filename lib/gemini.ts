@@ -1,4 +1,4 @@
-import { GoogleGenAI, type HarmBlockThreshold, type HarmCategory } from "@google/genai";
+import { GoogleGenAI, type HarmBlockThreshold, type HarmCategory, type ThinkingLevel } from "@google/genai";
 import { geminiApiKey } from "@/lib/gemini-key";
 import { summarizeSkinCheckAnswers, summarizeSkinScanScores } from "@/lib/skin-check-format";
 import type { SkinCheckAnswers } from "@/types/skin-check";
@@ -307,6 +307,18 @@ export async function getSkinCheckChatReply(
 // Explicit, because the platform default for these models is OFF
 // (GEMINI_BOUNDARY §8). String values, so a test that mocks @google/genai
 // with only GoogleGenAI still loads this module.
+/** F15. A string, like the safety settings, so a test that mocks @google/genai with only GoogleGenAI still loads this module. */
+export const CONTEXT_THINKING_LEVEL = "MINIMAL" as ThinkingLevel;
+
+/**
+ * F15: Gemini ran out of time. A server-side deadline is a 504; the client's
+ * own timeout aborts the request. Either way the user is asked to try again.
+ */
+export function isGeminiTimeout(err: unknown): boolean {
+  const e = err as { status?: unknown; name?: unknown } | null;
+  return !!e && (e.status === 504 || e.name === "TimeoutError" || e.name === "AbortError");
+}
+
 const CONTEXT_SAFETY_SETTINGS = [
   "HARM_CATEGORY_HARASSMENT",
   "HARM_CATEGORY_HATE_SPEECH",
@@ -337,6 +349,11 @@ export async function generateContextAnswer(
         responseMimeType: "application/json",
         responseJsonSchema,
         safetySettings: CONTEXT_SAFETY_SETTINGS,
+        // F15: the model's default thinking took 900-2,300 tokens and 5.5-12.7 s
+        // per answer (live probe, 2026-10-06), past the 10 s limit; MINIMAL
+        // answered the same requests in 1.9-2.9 s. The answer is a short JSON
+        // list checked by the validator, so it needs no long reasoning.
+        thinkingConfig: { thinkingLevel: CONTEXT_THINKING_LEVEL },
         httpOptions: { timeout: GEMINI_REQUEST_TIMEOUT_MS },
       },
     })

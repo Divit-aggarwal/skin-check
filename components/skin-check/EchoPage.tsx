@@ -29,7 +29,7 @@ const CATEGORY_LABELS: Record<keyof SkinScanScores, string> = {
 };
 const CATEGORY_KEYS = Object.keys(CATEGORY_LABELS) as (keyof SkinScanScores)[];
 
-const RETRYABLE_ERROR_MESSAGE = "Couldn't reach Echo just now.";
+const RETRYABLE_ERROR_MESSAGE = "Couldn't reach Echo just now. Please try again.";
 const CONFIG_ERROR_MESSAGE = "Echo isn't set up yet — this isn't something retrying will fix.";
 
 // Privacy gates on the chat route (H02a, H03c). Retrying can't fix these, so
@@ -37,6 +37,8 @@ const CONFIG_ERROR_MESSAGE = "Echo isn't set up yet — this isn't something ret
 const GATE_MESSAGES: Record<string, string> = {
   UNDER_18: "Echo is only available to people aged 18 or over.",
   ATTESTATION_REQUIRED: "Please confirm your age in Skin Check before using Echo.",
+  // F15: Gemini ran out of time; the Retry button stays (the code is retryable).
+  CHAT_TIMEOUT: "Echo took too long to answer. Please try again.",
   // F13: a newer check exists; Echo talks about that one (open it from the dashboard).
   CHAT_NOT_NEWEST: "Echo talks about your newest check only. Open it from your dashboard.",
 };

@@ -424,3 +424,38 @@ describe("only the newest measured check (F13)", () => {
     expect(h.consumeDailyQuota).not.toHaveBeenCalled();
   });
 });
+
+// F15: Gemini ran out of time (live probe 2026-10-06: default thinking took 5.5-12.7 s).
+describe("Gemini timeouts (F15)", () => {
+  it("the context call asks for MINIMAL thinking and keeps the 10 s limit", async () => {
+    await post();
+    const config = h.generateContent.mock.calls[0]![0].config;
+    expect(config.thinkingConfig).toEqual({ thinkingLevel: "MINIMAL" });
+    expect(config.httpOptions).toEqual({ timeout: 10_000 });
+  });
+
+  it.each([
+    ["a server deadline (504)", Object.assign(new Error("deadline"), { status: 504 })],
+    ["the client's own timeout", Object.assign(new Error("aborted"), { name: "TimeoutError" })],
+  ])("%s: 504 CHAT_TIMEOUT with a 'please try again' message", async (_n, err) => {
+    h.generateContent.mockRejectedValue(err);
+    const res = await post();
+    expect(res.status).toBe(504);
+    expect(await res.json()).toEqual({ error: "Echo took too long to answer. Please try again.", code: "CHAT_TIMEOUT" });
+  });
+
+  it("any other Gemini failure stays CHAT_SERVICE_ERROR, also asking to try again", async () => {
+    h.generateContent.mockRejectedValue(Object.assign(new Error("bad"), { status: 400 }));
+    const res = await post();
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: "Couldn't reach Echo. Please try again.", code: "CHAT_SERVICE_ERROR" });
+  });
+
+  it("the Echo page shows the timeout message with its Retry button", async () => {
+    const { readFileSync } = await import("node:fs");
+    const page = readFileSync("components/skin-check/EchoPage.tsx", "utf8");
+    expect(page).toContain('CHAT_TIMEOUT: "Echo took too long to answer. Please try again."');
+    expect(page).not.toMatch(/NOT_RETRYABLE = new Set\([^)]*CHAT_TIMEOUT/);
+    expect(page).toContain("Couldn't reach Echo just now. Please try again.");
+  });
+});

@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { checkRequestRate, consumeDailyQuota, GEMINI_ROUTE_LIMITS } from "@/lib/rate-limit";
 import { AdminNotConfiguredError, bearerToken, verifyFirebaseIdToken } from "@/lib/firebase/admin";
-import { getSkinCheckChatReply } from "@/lib/gemini";
+import { getSkinCheckChatReply, isGeminiTimeout } from "@/lib/gemini";
 import { geminiApiKey } from "@/lib/gemini-key";
 import { ECHO_REGIONS, ECHO_REGION_LABELS } from "@/lib/echo-regions";
 import { isValidScanId } from "@/lib/s3-key";
@@ -314,6 +314,10 @@ export async function POST(request: NextRequest) {
     // Name and code only: a Firestore failure in loadTrustedEchoContext
     // carries the doc path (users/<uid>/...) in its message.
     console.error("skin-check Echo chat failed:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
+    // F15: a Gemini timeout says so, and asks for another try.
+    if (isGeminiTimeout(err)) {
+      return NextResponse.json({ error: "Echo took too long to answer. Please try again.", code: "CHAT_TIMEOUT" }, { status: 504 });
+    }
     return NextResponse.json(
       { error: "Couldn't reach Echo. Please try again.", code: "CHAT_SERVICE_ERROR" },
       { status: 502 }
