@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
 import { ChevronRight } from "lucide-react";
-import { btnPrimary, btnSecondary, card, EmptyState, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";
+import { btnPrimary, btnSecondary, card, EmptyState, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, SignedOutCard, textLink } from "@/components/ui/page";
 import { TodayCard } from "@/components/routine/TodayCard";
 import { useRoutine } from "@/components/routine/useRoutine";
 import { TIMELINE_COPY } from "@/components/timeline/copy";
@@ -87,14 +87,7 @@ export function DashboardPage() {
   if (!user) {
     return (
       <Shell>
-        <EmptyState
-          body={C.signedOut}
-          action={
-            <Link href="/account" className={btnPrimary}>
-              {C.signIn}
-            </Link>
-          }
-        />
+        <SignedOutCard body={C.signedOut} />
       </Shell>
     );
   }

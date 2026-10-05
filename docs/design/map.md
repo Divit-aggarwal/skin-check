@@ -9,14 +9,14 @@ in-page ways forward in addition to the shell.
 
 | Place | Route | Reached from | Next (in page) |
 |---|---|---|---|
-| **Home** (dashboard) | `/dashboard` | After sign-in (TD-24 (3)); `/` when signed in; shell; results screen; every "Back" link | Latest check → that check; trend card; today's routine (used / skipped in place) → Routine; latest timeline items → Timeline; Ask Echo → Echo; New check |
-| **Checks** (history) | `/checks` | Shell; Home "All checks" | A check row → Check; Timeline tab; New check |
-| **Check** (one opened) | `/checks/[scanId]` | Checks list; Home latest check; Timeline check item | Back to Checks; Ask Echo (newest reading only); New check |
+| **Home** (dashboard) | `/dashboard` | After sign-in (TD-24 (3)); `/` when signed in; shell; results screen; every "Back" link | Latest check → that check; trend card; latest timeline items → each item, "See full timeline"; Ask Echo → Echo; New check (only when the latest-check card does not already offer one); today's routine (used / skipped in place, below Recently, never beside the readings) → Routine; Checks through the nav |
+| **Checks** (history) | `/checks` | Shell; Home "See full timeline" (Timeline tab) and the latest-check card | A check row → Check; Timeline tab; New check |
+| **Check** (one opened) | `/checks/[scanId]` | Checks list; Home latest check; Timeline check item | Phone: Back to all checks; desktop: the list and the List/Timeline tabs stay beside it; Ask Echo (newest reading only); New check |
 | **Timeline** | `/checks?view=timeline` (a tab on Checks) | Checks tab; Home "See full timeline" | A check item → Check; a routine item → Routine |
 | **New check** | `/skin-check` | Shell (centre button on phones); Home; Checks; empty states | Questions → photo → more questions → Results |
 | **Results** | `/skin-check` when finished | End of the check flow | Home; this check → Check; Echo; New check |
 | **Routine** | `/routine` | Shell; Home routine card; Timeline routine item | Add, swap, stop, mark used or skipped; Home |
-| **Echo** | `/echo` | Shell; Home; Check (newest); Results | Chat; back to Home. With no reading yet: an empty state that leads to New check |
+| **Echo** | `/echo` | Shell; Home; Check (newest); Results | Chat about one face area at a time (Forehead, Cheeks, Nose, Chin: each area is its own Echo thread, so there is no Whole face chip; the whole-face readings are in the side panel); Open this check; back to Home. With no reading yet: an empty state that leads to New check |
 | **Account** | `/account` | Shell (phone: header icon); sign-in links | Sign in → Home; consent status and withdraw; Delete account → confirm → signed-out start |
 
 ## Signed-out pages
@@ -25,7 +25,7 @@ in-page ways forward in addition to the shell.
 |---|---|---|
 | Start | `/` → `/skin-check` | Begin the check; "Sign in" (top bar) → Account |
 | Sign in | `/account` (signed out) | Phone and code → Home |
-| Any signed-in route while signed out | `/dashboard`, `/checks`, `/routine`, `/echo` | A designed "Sign in to see …" card with Sign in → Account, and Start a check → `/skin-check` |
+| Any signed-in route while signed out | `/dashboard`, `/checks`, `/checks/[id]`, `/routine`, `/echo` | A designed "Sign in to see …" card with Sign in → Account, and Start a check → `/skin-check` |
 | After account deletion | `/account` | "Your account and your data have been deleted." → Start a check |
 
 ## Dead ends found in the current app, and the fix
@@ -41,7 +41,9 @@ in-page ways forward in addition to the shell.
 
 ## Keyboard and screen reader paths
 
-- Skip link, then the main nav, then the page `<main>` with one `<h1>`.
+- Skip link, then the main nav, then the page `<main>` with one `<h1>` (in the check flow, the part of the check the user is in; on a phone's opened check, "Checks" is kept for screen readers).
+- The phone header's Account button comes before the page content in the tab order.
+- Buttons stay focusable while they save (aria-disabled, not disabled), so focus is never dropped.
 - Every list row is a single link with a full name, for example "Open the
   check from 3 Oct 2026".
 - Echo's message list is `role="log"` with `aria-live="polite"`.

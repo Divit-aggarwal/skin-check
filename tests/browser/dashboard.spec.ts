@@ -24,6 +24,8 @@ test("signed out: a sign-in link only", async ({ page }) => {
   await expect(page.getByText(C.signedOut)).toBeVisible();
   // The shell top bar has its own Sign in; this is the page's own link.
   await expect(page.getByRole("main").getByRole("link", { name: C.signIn })).toHaveAttribute("href", "/account");
+  // No dead end (map.md): signed out, a way into a check too.
+  await expect(page.getByRole("main").getByRole("link", { name: S.startCheck })).toHaveAttribute("href", "/skin-check");
   await shot(page, "signed-out");
 });
 
@@ -164,6 +166,8 @@ test("one opened check: its own readings with the fixed line; unknown id is not 
   // One check only: the newest reading's card is not on this page.
   await expect(page.getByRole("heading", { name: C.current.title })).toHaveCount(0);
   await shot(page, "past-check");
+  // One h1 on every page, on a phone too (flow review G03).
+  await expect(page.getByRole("heading", { level: 1 })).toHaveCount(1);
   await page.goto("/checks/not-a-check");
   await expect(page.getByText(C.history.notFound)).toBeVisible();
   await shot(page, "check-not-found");

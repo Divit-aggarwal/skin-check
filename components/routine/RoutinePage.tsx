@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { ROUTINE_COPY as C } from "@/lib/routine/copy";
 import { OTHER_PRODUCT_ID as OTHER, type Schedule } from "@/lib/routine/events";
-import { btnPrimary, btnSecondary, card, EmptyState, ErrorState, h2, LoadingState, ReloadButton } from "@/components/ui/page";
+import { btnPrimary, btnSecondary, card, ErrorState, h2, LoadingState, ReloadButton, SignedOutCard } from "@/components/ui/page";
 import { useRoutine } from "./useRoutine";
 
 // The user's own routine record (R-1 A). Product names, schedule and what the
@@ -15,7 +14,7 @@ import { useRoutine } from "./useRoutine";
 const weekdayOf = (date: string) => new Date(`${date}T00:00:00Z`).getUTCDay();
 const prettyDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
 const field = "h-12 w-full min-w-0 max-w-full rounded-lg border border-brand-line bg-brand-paper px-3 text-base text-brand-ink";
-const pill = "min-h-11 rounded-full border border-brand-ink px-4 font-medium hover:bg-brand-paper disabled:opacity-50";
+const pill = "min-h-11 rounded-full border border-brand-ink px-4 font-medium hover:bg-brand-paper aria-disabled:opacity-60";
 
 export function RoutinePage() {
   const { user, loading } = useAuth();
@@ -23,16 +22,7 @@ export function RoutinePage() {
 
   if (loading) return <LoadingState label={C.loading} blocks={["h-40", "h-40"]} />;
   if (!user)
-    return (
-      <EmptyState
-        body={C.signIn}
-        action={
-          <Link href="/account" className={btnPrimary}>
-            {C.signInButton}
-          </Link>
-        }
-      />
-    );
+    return <SignedOutCard body={C.signIn} />;
   if (!data) return failed ? <ErrorState body={C.error} action={<ReloadButton label={C.tryAgain} />} /> : <LoadingState label={C.loading} blocks={["h-40", "h-40"]} />;
 
   const nameOf = (id: string) => (id === OTHER ? C.otherProduct : data.products.find((p) => p.id === id)?.name ?? id);
@@ -80,10 +70,10 @@ export function RoutinePage() {
                             key={s}
                             type="button"
                             className={`${pill} aria-pressed:bg-brand-action aria-pressed:text-white`}
-                            disabled={busy}
+                            aria-disabled={busy}
                             aria-pressed={status === s}
                             aria-label={C.logAs(C.status[s], name, C.slot[slot].toLowerCase())}
-                            onClick={() => void send({ type: "usage", productId: item.productId, slot, status: s })}
+                            onClick={() => !busy && void send({ type: "usage", productId: item.productId, slot, status: s })}
                           >
                             {s === "used" ? C.used : C.skipped}
                           </button>
@@ -111,7 +101,7 @@ export function RoutinePage() {
                     ))}
                   </select>
                 </label>
-                <button type="button" className={btnSecondary} disabled={busy} aria-label={C.stopLabel(name)} onClick={() => void send({ type: "stop", productId: item.productId })}>
+                <button type="button" className={btnSecondary} aria-disabled={busy} aria-label={C.stopLabel(name)} onClick={() => !busy && void send({ type: "stop", productId: item.productId })}>
                   {C.stop}
                 </button>
               </div>
@@ -208,8 +198,10 @@ function AddProduct({
       <button
         type="button"
         className={btnPrimary}
-        disabled={busy || !ready}
+        // Never disabled: a disabled button drops keyboard focus (flow review G03).
+        aria-disabled={busy || !ready}
         onClick={() => {
+          if (busy || !ready) return;
           onAdd(productId, { slot, days });
           setProductId("");
         }}

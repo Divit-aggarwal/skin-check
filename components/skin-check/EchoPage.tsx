@@ -13,7 +13,7 @@ import { formatDate } from "@/components/dashboard/format";
 import { loadDashboard } from "@/components/dashboard/data";
 import { newestEchoSession } from "@/components/dashboard/echo-session";
 import { readingsOf, toDate } from "@/components/dashboard/state";
-import { AccountButton, btnPrimary, EmptyState, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
+import { AccountButton, btnPrimary, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getSkinCheckChatReply, ApiError } from "@/lib/api";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import { useAuth } from "@/lib/auth-context";
@@ -126,7 +126,7 @@ export function EchoPage() {
         {authLoading || (user && start === "loading") ? (
           <LoadingState label={E.loading} blocks={["h-24", "h-64"]} />
         ) : !user ? (
-          <EmptyState body={E.signedOut} action={<Link href="/account" className={btnPrimary}>{E.signIn}</Link>} />
+          <SignedOutCard body={E.signedOut} />
         ) : start === "error" ? (
           <ErrorState body={E.loadFailed} action={<ReloadButton label={E.tryAgain} />} />
         ) : (

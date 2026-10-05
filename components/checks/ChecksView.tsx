@@ -14,7 +14,7 @@ import { useRoutine } from "@/components/routine/useRoutine";
 import { mergeTimeline, dayOf } from "@/components/timeline/timeline";
 import { TimelineList } from "@/components/timeline/TimelineList";
 import { ROUTINE_COPY } from "@/lib/routine/copy";
-import { AccountButton, btnPrimary, btnSecondary, EmptyState, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";
+import { AccountButton, btnPrimary, btnSecondary, EmptyState, SignedOutCard, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";
 import { CHECKS_COPY as K } from "./copy";
 import { Thumb } from "./Thumb";
 
@@ -49,9 +49,14 @@ export function ChecksView({ openId }: { openId: string | null }) {
 
   const dashboard = useMemo(() => (user && load.kind === "ready" ? deriveDashboard(user.uid, load.data.checks, load.data.analyses) : null), [user, load]);
 
+  // An opened check on a phone has its own back row; the page title stays for
+  // screen readers, and the List/Timeline tabs stay on a wide screen, where
+  // the list is still on the left (flow review G03).
   const header = (
-    <PageHeader kicker={K.kicker} title={K.title}>
-      {!openId && <ViewSwitch timeline={timeline} />}
+    <PageHeader kicker={K.kicker} title={K.title} phoneCompact={Boolean(openId)}>
+      <div className={openId ? "hidden lg:block" : undefined}>
+        <ViewSwitch timeline={timeline} />
+      </div>
     </PageHeader>
   );
 
@@ -66,7 +71,7 @@ export function ChecksView({ openId }: { openId: string | null }) {
     return (
       <main className={page}>
         {header}
-        <EmptyState body={C.signedOut} action={<Link href="/account" className={btnPrimary}>{C.signIn}</Link>} />
+        <SignedOutCard body={C.signedOut} />
       </main>
     );
   if (load.kind !== "ready" || !dashboard)
@@ -106,7 +111,7 @@ export function ChecksView({ openId }: { openId: string | null }) {
           <AccountButton />
         </div>
       ) : null}
-      <div className={openId ? "hidden lg:block" : undefined}>{header}</div>
+      {header}
       <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-6">
         <div className={`lg:col-span-5 ${openId ? "hidden lg:block" : ""}`}>
           <CheckList dashboard={dashboard} data={load.data} uid={user.uid} selected={selected} />
@@ -191,10 +196,10 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
         {check.photoClaimed && <Thumb key={check.scanId} scanId={check.scanId} date={date} size={112} />}
       </div>
       {check.photoCheck && <PhotoCheckLine text={C.photoCheck[check.photoCheck]} />}
-      {/* TD-24 (1): always on an opened check, never behind a toggle. */}
-      <p className="rounded-2xl bg-brand-mist px-5 py-4 text-brand-ink">{C.history.pastLine}</p>
       {check.view ? (
         <>
+          {/* TD-24 (1): on every opened check with readings, never behind a toggle. */}
+          <p className="rounded-2xl bg-brand-mist px-5 py-4 text-brand-ink">{C.history.pastLine}</p>
           <CheckReadings view={{ ...check.view, photoCheck: null }} stack />
           {check.view.bands && (
             <div className="border-t border-brand-line pt-5">

@@ -13,12 +13,13 @@ export function ProgressHeader({
 }: ProgressHeaderProps) {
   return (
     <div>
-      <p className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs font-semibold uppercase tracking-[0.06em] text-brand-forest">
-        <span>{activeSectionLabel}</span>
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs font-semibold uppercase tracking-[0.06em] text-brand-forest">
+        {/* The page's one h1: the part of the check the user is in. */}
+        <h1 className="text-xs font-semibold">{activeSectionLabel}</h1>
         <span className="font-medium normal-case tracking-normal text-brand-muted">
           Part {activeSectionIndex + 1} of {sectionLabels.length}
         </span>
-      </p>
+      </div>
       <div className="mt-3 flex gap-1.5" aria-hidden>
         {sectionLabels.map((label, i) => {
           const fill = i < activeSectionIndex ? 1 : i === activeSectionIndex ? activeSectionFill : 0;

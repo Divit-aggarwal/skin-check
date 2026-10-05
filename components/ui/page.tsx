@@ -10,9 +10,9 @@ import { Skeleton } from "./skeleton";
 // Shared page pieces of the design system (docs/design/system.md §4-5).
 
 export const btnPrimary =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-brand-action px-6 font-medium text-white hover:bg-brand-action-hover disabled:pointer-events-none disabled:bg-brand-linen2 disabled:text-brand-muted sm:min-h-11";
+  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-brand-action px-6 font-medium text-white hover:bg-brand-action-hover disabled:pointer-events-none disabled:bg-brand-linen2 disabled:text-brand-muted aria-disabled:bg-brand-linen2 aria-disabled:text-brand-muted sm:min-h-11";
 export const btnSecondary =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-brand-ink bg-transparent px-6 font-medium text-brand-ink hover:bg-brand-linen disabled:pointer-events-none disabled:border-brand-line disabled:text-brand-muted sm:min-h-11";
+  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-brand-ink bg-transparent px-6 font-medium text-brand-ink hover:bg-brand-linen disabled:pointer-events-none disabled:border-brand-line disabled:text-brand-muted aria-disabled:border-brand-line aria-disabled:text-brand-muted sm:min-h-11";
 export const textLink =
   "inline-flex min-h-11 items-center gap-1 font-medium text-brand-forest underline-offset-4 hover:underline focus-visible:underline";
 export const card = "rounded-2xl bg-brand-linen p-5 sm:p-6";
@@ -22,17 +22,43 @@ export const h2 = "font-display text-xl font-semibold leading-tight sm:text-[22p
 export const page = "mx-auto w-full max-w-[1200px] px-4 pb-12 sm:px-6 lg:px-8";
 
 /** Page title. On phones the Account button sits top right (system.md §6). */
-export function PageHeader({ title, kicker, intro, children }: { title: string; kicker?: string; intro?: string; children?: React.ReactNode }) {
+export function PageHeader({ title, kicker, intro, children, phoneCompact = false }: { title: string; kicker?: string; intro?: string; children?: React.ReactNode; phoneCompact?: boolean }) {
+  // Account comes first in the DOM so the tab order reaches it before the page
+  // content; `order` keeps it top right (flow review G03). phoneCompact: a
+  // phone row above already has the title context and the Account button.
   return (
-    <header className="flex items-start justify-between gap-4 pb-6 pt-8 sm:pt-12">
-      <div className="min-w-0">
-        {kicker && <p className={`${eyebrow} mb-2`}>{kicker}</p>}
-        <h1 className="font-display text-[28px] font-semibold leading-[1.15] tracking-tight sm:text-4xl">{title}</h1>
+    <header className={`flex items-start justify-between gap-4 pb-6 ${phoneCompact ? "pt-2 lg:pt-12" : "pt-8 sm:pt-12"}`}>
+      <div className={`order-2 ${phoneCompact ? "hidden" : ""}`}>
+        <AccountButton />
+      </div>
+      <div className="order-1 min-w-0">
+        <div className={phoneCompact ? "sr-only lg:not-sr-only" : undefined}>
+          {kicker && <p className={`${eyebrow} mb-2`}>{kicker}</p>}
+          <h1 className="font-display text-[28px] font-semibold leading-[1.15] tracking-tight sm:text-4xl">{title}</h1>
+        </div>
         {intro && <p className="mt-3 max-w-prose text-brand-muted">{intro}</p>}
         {children}
       </div>
-      <AccountButton />
     </header>
+  );
+}
+
+/** Signed out on a signed-in page: Sign in, and a way into a check (docs/design/map.md). */
+export function SignedOutCard({ body }: { body: string }) {
+  return (
+    <EmptyState
+      body={body}
+      action={
+        <div className="flex flex-wrap gap-3">
+          <Link href="/account" className={btnPrimary}>
+            {SHELL_COPY.signIn}
+          </Link>
+          <Link href="/skin-check" className={btnSecondary}>
+            {SHELL_COPY.startCheck}
+          </Link>
+        </div>
+      }
+    />
   );
 }
 

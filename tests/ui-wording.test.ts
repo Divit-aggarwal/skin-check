@@ -123,7 +123,9 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
     const src = readFileSync("components/checks/ChecksView.tsx", "utf8");
     const detail = src.slice(src.indexOf("function CheckDetail("), src.indexOf("function TimelineSection("));
     expect(detail).toContain("{C.history.pastLine}");
-    // Not behind a condition: the line sits directly in the opened check's section.
-    expect(detail).not.toMatch(/&&\s*<p[^>]*>\{C\.history\.pastLine\}/);
+    // Shown whenever the opened check has readings, never behind a toggle; a
+    // check with no photo reading has no photos to compare, so no line.
+    expect(detail).toMatch(/\{check\.view \? \(\s*<>\s*\{\/\*[^*]*\*\/\}\s*<p[^>]*>\{C\.history\.pastLine\}/);
+    expect(detail).not.toMatch(/useState|<details|aria-expanded/);
   });
 });

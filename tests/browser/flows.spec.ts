@@ -33,6 +33,8 @@ async function darkPhoto(page: Page): Promise<Buffer> {
 /** Name, age and gender; a signed-in user then passes verify and lands on the photo step. */
 async function aboutYou(page: Page, age = "25–34") {
   await page.goto("/skin-check");
+  // The check flow's one h1 is the part of the check the user is in.
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText(/about you/i);
   const name = page.getByPlaceholder(/name/i).or(page.locator('input[type="text"]')).first();
   await name.fill("Tester");
   await name.press("Enter");
@@ -115,6 +117,7 @@ test("under 18 shows the confirm step; No goes back, Yes blocks", async ({ page 
   await page.getByRole("button", { name: "<18", exact: true }).click();
   await expect(page.getByText("You chose under 18. Is that right?")).toBeVisible();
   await page.getByRole("button", { name: /Yes, I.m under 18/ }).click();
+  await expect(page.getByRole("button", { name: "Change my answer" })).toBeVisible();
   await expect(page.getByText(/isn't available yet for users under 18/)).toBeVisible();
   await page.screenshot({ path: ".local-stack/browser-shots/dashboard-flow-under18.png", fullPage: true });
 });
@@ -168,6 +171,14 @@ test("routine: add a product, mark used, mark skipped, add other product, reload
   await card(R.otherProduct).getByRole("button", { name: R.logAs(R.status.skipped, R.otherProduct, R.slot.AM.toLowerCase()) }).click();
   await expect(card(R.otherProduct).getByText(`${R.today}, ${R.slot.AM}: ${R.status.skipped}`)).toBeVisible();
 
+  // Keyboard focus stays on the pressed button while it saves (flow review G03).
+  const skipped = card(first!).getByRole("button", { name: R.logAs(R.status.skipped, first!, R.slot.AM.toLowerCase()) });
+  await skipped.focus();
+  await page.keyboard.press("Enter");
+  await expect(card(first!).getByText(`${R.today}, ${R.slot.AM}: ${R.status.skipped}`)).toBeVisible();
+  await expect(skipped).toBeFocused();
+  await skipped.focus();
+  await card(first!).getByRole("button", { name: R.logAs(R.status.used, first!, R.slot.AM.toLowerCase()) }).click();
   await page.reload();
   await expect(card(first!).getByText(`${R.today}, ${R.slot.AM}: ${R.status.used}`)).toBeVisible();
   await expect(card(R.otherProduct).getByText(`${R.today}, ${R.slot.AM}: ${R.status.skipped}`)).toBeVisible();

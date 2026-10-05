@@ -48,11 +48,11 @@ export function TodayCard({ routine }: { routine: ReturnType<typeof useRoutine> 
                     <button
                       key={s}
                       type="button"
-                      disabled={busy}
+                      aria-disabled={busy}
                       aria-pressed={status === s}
                       aria-label={C.logAs(C.status[s], name, C.slot[slot].toLowerCase())}
-                      onClick={() => void send({ type: "usage", productId, slot, status: s })}
-                      className="min-h-11 rounded-full border border-brand-ink px-4 font-medium hover:bg-brand-paper disabled:opacity-50 aria-pressed:bg-brand-action aria-pressed:text-white"
+                      onClick={() => !busy && void send({ type: "usage", productId, slot, status: s })}
+                      className="min-h-11 rounded-full border border-brand-ink px-4 font-medium hover:bg-brand-paper aria-disabled:opacity-60 aria-pressed:bg-brand-action aria-pressed:text-white"
                     >
                       {s === "used" ? C.used : C.skipped}
                     </button>
