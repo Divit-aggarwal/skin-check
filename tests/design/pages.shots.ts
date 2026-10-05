@@ -72,15 +72,15 @@ test("routine empty and with products", async ({ page }) => {
   const product = page.getByLabel("Product").first();
   if (await product.count()) {
     await product.selectOption({ index: 1 });
-    await page.getByRole("button", { name: /^Add/ }).first().click();
+    await page.getByRole("button", { name: "Add", exact: true }).click({ timeout: 5_000 }).catch(() => undefined);
     await page.waitForTimeout(1500);
-    await page.getByRole("button", { name: "Used", exact: true }).first().click().catch(() => undefined);
+    await page.getByRole("button", { name: "Used", exact: true }).first().click({ timeout: 5_000 }).catch(() => undefined);
     await page.waitForTimeout(1500);
     await shots(page, "routine-with-product");
   }
 });
 
-test("echo: direct visit, before consent, with consent", async ({ page }) => {
+test("echo: direct visit and before consent", async ({ page }) => {
   await signIn(page, U.echo!.phoneNumber);
   await page.goto("/echo");
   await page.waitForTimeout(1500);
@@ -94,6 +94,9 @@ test("echo: direct visit, before consent, with consent", async ({ page }) => {
   await page.getByRole("button", { name: "Send" }).click();
   await page.waitForTimeout(1500);
   await shots(page, "echo-consent-prompt");
+});
+
+test("echo with sharing on", async ({ page }) => {
   await signIn(page, U.withdraw!.phoneNumber);
   await page.goto("/dashboard");
   await page.getByRole("button", { name: C.chat.button }).click();
@@ -121,11 +124,10 @@ test("check flow: questions, under 18, photo step, retake", async ({ page }) => 
   await shots(page, "flow-under18-confirm");
 });
 
-// The desktop path needs a webcam; a phone user agent keeps the photo-file
-// path at every width (layout follows the viewport, not the user agent).
+// Phone and tablet choose a photo file; the desktop takes a frame from the fake
+// webcam (playwright.config.ts) and, when the photo checks ask for a retake,
+// uses "Use this photo anyway" after the set number of retakes.
 const FLOW_USER = { "390": U.capture!, "768": U.scan!, "1280": U.empty! };
-test.describe(() => {
-  test.use({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148" });
 test("check flow to results", async ({ page }) => {
   test.setTimeout(600_000);
   await signIn(page, FLOW_USER[test.info().project.name as keyof typeof FLOW_USER].phoneNumber);
@@ -136,9 +138,27 @@ test("check flow to results", async ({ page }) => {
   await page.getByRole("button", { name: "25–34", exact: true }).click();
   await shots(page, "flow-questions");
   await page.getByRole("button", { name: "Female", exact: true }).click();
-  await expect(page.locator('input[type="file"]')).toBeAttached({ timeout: 30_000 });
+  const file = page.locator('input[type="file"]');
+  const capture = page.getByRole("button", { name: "Capture", exact: true });
+  await expect(file.or(capture)).toBeAttached({ timeout: 30_000 });
+  await page.waitForTimeout(2000);
   await shots(page, "flow-photo-step");
-  await page.locator('input[type="file"]').setInputFiles({ name: "face.png", mimeType: "image/png", buffer: readFileSync(FACE) });
+  if (await file.count()) {
+    await file.setInputFiles({ name: "face.png", mimeType: "image/png", buffer: readFileSync(FACE) });
+  } else {
+    await expect(capture).toBeEnabled({ timeout: 30_000 });
+    await capture.click();
+    const anyway = page.getByRole("button", { name: "Use this photo anyway" });
+    for (let i = 0; i < 6 && !(await anyway.isVisible()); i++) {
+      await page.waitForTimeout(1000);
+      if (await anyway.isVisible()) break;
+      const retake = page.getByRole("button", { name: "Retake", exact: true });
+      if (!(await retake.isVisible())) break;
+      await retake.click();
+      await capture.click();
+    }
+    if (await anyway.isVisible()) await anyway.click();
+  }
   await page.waitForTimeout(1500);
   await shots(page, "flow-photo-chosen");
   await page.getByRole("checkbox").first().check();
@@ -162,5 +182,4 @@ test("check flow to results", async ({ page }) => {
   await expect(results).toBeVisible({ timeout: 240_000 });
   await page.waitForTimeout(3000);
   await shots(page, "flow-results");
-});
 });

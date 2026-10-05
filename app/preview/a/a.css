@@ -1,0 +1,68 @@
+/* PREVIEW ONLY (direction A). Store tokens (docs/design/system.md §1-2), scoped to .a-root. */
+.a-root {
+  --a-paper: #ffffff;
+  --a-linen: #f5f3ee;
+  --a-linen-2: #eeeae5;
+  --a-border: #ddd8ce;
+  --a-ink: #2c2c2a;
+  --a-muted: #6b6862;
+  --a-action: #252724;
+  --a-action-hover: #111210;
+  --a-forest: #0f6e56;
+  --a-mist: #e1f5ee;
+  --a-accent: #b98783;
+  --a-accent-soft: #f3e9e7;
+  --a-taupe: #b7a58f;
+  --a-error: #b42318;
+  --a-shadow: 0 18px 50px rgba(20, 20, 15, 0.1);
+  --a-bar: calc(64px + env(safe-area-inset-bottom));
+
+  background: var(--a-paper);
+  color: var(--a-ink);
+  color-scheme: light;
+  font-family: var(--a-font-body), system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.55;
+}
+
+:where(.a-root *, .a-root *::before, .a-root *::after) {
+  border-color: var(--a-border);
+}
+
+/* Replaces the global sage focus ring (globals.css) with the store's forest outline. */
+.a-root :focus-visible {
+  outline: 2px solid var(--a-forest);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* main is only focused by the skip link; the Echo field's form draws its own ring. */
+.a-root main:focus-visible,
+.a-root form textarea:focus-visible {
+  outline: none;
+}
+
+.a-head {
+  font-family: var(--a-font-head), system-ui, sans-serif;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .a-fade {
+    animation: a-fade 220ms ease-out both;
+  }
+  .a-root a,
+  .a-root button {
+    transition: background-color 150ms ease-out, color 150ms ease-out, border-color 150ms ease-out;
+  }
+}
+
+@keyframes a-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
