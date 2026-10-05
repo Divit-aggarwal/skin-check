@@ -52,7 +52,10 @@ export async function answerFromPackage(
     // Either signal wins (GEMINI_BOUNDARY §6): the model asking for a referral is never overruled.
     // Red team pass 2 (I02 P2-1): a claim that reads as self-harm or another red flag is a referral too.
     const flagged = v.some((x) => x.redFlag);
-    if (flagged) return { reply: REFERRAL_COPY, referral: true, modelId, validator: { passed: false, failures: names(...v), regenerated, fallback: false } };
+    // F16: the model's own medical words in a refusal ("I cannot recommend any medicines") are no crisis
+    // when it also said "no distress"; the user's turns already passed the full pre-filter.
+    const doctorOnly = !v.some((x) => x.crisis) && v.every((x) => x.answer?.distress === false);
+    if (flagged) return { reply: doctorOnly ? DOCTOR_REFERRAL_COPY : REFERRAL_COPY, referral: true, modelId, validator: { passed: false, failures: names(...v), regenerated, fallback: false } };
     // F16: the crisis line goes with any distress, and with any referral that does not say "no distress" explicitly.
     if (last.answer?.needs_referral || last.answer?.distress === true) {
       const reply = last.answer.distress === false ? DOCTOR_REFERRAL_COPY : REFERRAL_COPY;

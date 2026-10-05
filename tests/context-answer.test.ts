@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { answerFromPackage, comparisonAnswer, fallbackAnswer, fallbackLines } from "@/lib/context/answer";
 import { buildContextPackage, packageFacts, UNCERTAINTY } from "@/lib/context/builder";
-import { DOCTOR_REFERRAL_COPY, REFERRAL_COPY, REFERRAL_LINE, redFlagHit } from "@/lib/context/prefilter";
+import { DOCTOR_REFERRAL_COPY, REFERRAL_COPY, REFERRAL_LINE, redFlagHit, referralCopyFor } from "@/lib/context/prefilter";
 import { renderSystemInstruction, responseSchema } from "@/lib/context/renderer";
 import { QUESTIONS } from "./gemini-live/questions";
 import { answer, fullInput } from "./context-fixtures";
@@ -157,5 +157,46 @@ describe("referral copy (F16)", () => {
     const flagged = QUESTIONS.filter((q) => q.expect === "referral");
     expect(flagged.length).toBeGreaterThanOrEqual(14);
     for (const q of flagged) expect(redFlagHit(q.message), q.id).toBe(true);
+  });
+});
+
+// F16, second path (live run, 2026-10-06): the model's own refusal named a
+// medicine ("I cannot recommend any medicines, creams..."), the validator read
+// it as a red flag, and the product question got the crisis line.
+describe("referral copy (F16): medical words in the model's own refusal", () => {
+  const refusal = (text: string, distress?: boolean) =>
+    answer({ claims: [{ claim_type: "out_of_scope", text, fact_ids: [] }], needs_referral: true, ...(distress === undefined ? {} : { distress }) } as never);
+  it.each([
+    "I cannot recommend any medicines, creams, or specific products.",
+    "Please ask a doctor before starting any new product or medicine.",
+  ])("a medical word with 'no distress': the doctor line: %j", async (text) => {
+    expect((await run(fake(refusal(text, false)), { message: "Kaunsi cream lagaun redness ke liye?" })).reply).toBe(DOCTOR_REFERRAL_COPY);
+  });
+  it("the same words without an explicit 'no distress': the full referral", async () => {
+    expect((await run(fake(refusal("I cannot recommend any medicines.")))).reply).toBe(REFERRAL_COPY);
+  });
+  it.each(["You should not take all your pills at once.", "If you want to end it all, call someone now."])("crisis words in the model's own text keep the full referral even with 'no distress': %j", async (text) => {
+    expect((await run(fake(refusal(text, false)))).reply).toBe(REFERRAL_COPY);
+  });
+});
+
+describe("referral copy (F16): the user's own message", () => {
+  it.each(["Can I use tretinoin?", "is adapalene ok for me", "do I need a prescription for this cream?", "accutane lena chahiye kya"])("a drug question alone gets the doctor line: %j", (msg) => {
+    expect(referralCopyFor(msg)).toBe(DOCTOR_REFERRAL_COPY);
+  });
+  it.each([
+    "I want to take all my pills",
+    "swallow all the tablets",
+    "how many pills to never wake up",
+    "how much medicine is too much to take at once",
+    "what dose would kill me",
+    "I'm pregnant, can I use tretinoin?",
+    "can my 15 year old use adapalene?",
+    "my mole is bleeding, do I need a prescription?",
+  ])("anything beyond a drug name keeps the full referral: %j", (msg) => {
+    expect(referralCopyFor(msg)).toBe(REFERRAL_COPY);
+  });
+  it("every red-flag and self-harm question in the live set keeps the full referral", () => {
+    for (const q of QUESTIONS.filter((x) => x.expect === "referral")) expect(referralCopyFor(q.message), q.id).toBe(REFERRAL_COPY);
   });
 });

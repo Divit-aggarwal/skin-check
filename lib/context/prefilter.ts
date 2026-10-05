@@ -6,7 +6,36 @@ import { normalizeForMatch } from "./lexicon";
 
 const re = (parts: string[]) => new RegExp(parts.join("|"), "iu");
 
-const RED_FLAG = re([
+// A request for a diagnosis, a prescription, a dose or a medicine. A red flag in the user's
+// message; in the model's own refusal ("I cannot recommend any medicines") it is no crisis (F16).
+// A prescription or a named drug: on its own, a question for a doctor or a
+// pharmacist (F16), not a crisis. Pills, tablets, medicine, a dose or mg stay
+// out of this list: "take all my pills" is caught only through them.
+const DRUG_PARTS: string[] = [
+  "\\bprescri\\w*",
+  "\\bantibiotic\\w*",
+  "\\b\\w*retinoin\\b",
+  "\\b(?:adapalene|accutane|isotretinoin|tretinoin|clindamycin|doxycycline|spironolactone)\\b",
+];
+const MEDICAL_REQUEST_PARTS: string[] = [
+  ...DRUG_PARTS,
+  "\\bdiagnos\\w*",
+  "\\bdos(?:e|age|ages)\\b",
+  "\\b(?:mg|milligrams?)\\b",
+  "\\bmedicines?\\b",
+  "\\bmedication\\w*",
+  "\\bdo i have (?:\\w+ ){0,2}(?:acne|rosacea|eczema|psoriasis|melasma|infection|cancer|melanoma|disease|condition|fungal|allerg\\w*|dermatitis|hives|pcos)\\b",
+  "\\b(?:tablets?|pills?)\\b",
+  "\\b(?:what|which) (?:disease|condition|infection)\\b",
+  "\\b(?:is|could|might|can|do|does|am|are)\\s+(?:it|this|that|these|those|they|i|my \\w+|this \\w+|the \\w+)\\s+(?:\\w+\\s+){0,2}(?:cancer\\w*|melanoma|rosacea|eczema|psoriasis|infect\\w*|fungal|melasma|dermatitis|hives|allerg\\w*|pcos)\\b",
+  "\\bit'?s (?:\\w+ ){0,2}(?:cancer\\w*|melanoma|rosacea|eczema|psoriasis|infect\\w*|fungal|melasma|dermatitis|hives|allerg\\w*|pcos)\\b",
+  "\\b(?:skin cancer|melanoma|infected)\\b",
+  "\\bbimaa?ri\\b",
+  "\\bdawa\\w*",
+  "दवा|बीमारी",
+];
+
+const RED_FLAG_PARTS: string[] = [
   // bleeding or changing moles, ABCDE terms
   "\\bmoles?\\b.{0,40}\\b(?:bleed\\w*|chang\\w*|grow\\w*|itch\\w*|darker|bigger|irregular|border|asymmetr\\w*)",
   "\\b(?:bleed\\w*|chang\\w*|grow\\w*|new)\\b.{0,30}\\bmoles?\\b",
@@ -112,25 +141,7 @@ const RED_FLAG = re([
   "\\bmer[aie] (?:bet[aie]|bachch?[ae]|bacch?[ae])\\b",
   "\\b(?:1[0-7]|[1-9]) ?saal\\b(?! se\\b)",
   "\\bumr?a?r? (?:1[0-7]|[1-9])\\b",
-  // requests for a diagnosis, prescription or dosage
-  "\\bdiagnos\\w*",
-  "\\bprescri\\w*",
-  "\\bdos(?:e|age|ages)\\b",
-  "\\b(?:mg|milligrams?)\\b",
-  "\\bantibiotic\\w*",
-  "\\b\\w*retinoin\\b",
-  "\\b(?:adapalene|accutane|isotretinoin|tretinoin|clindamycin|doxycycline|spironolactone)\\b",
-  "\\bmedicines?\\b",
-  "\\bmedication\\w*",
-  "\\bdo i have (?:\\w+ ){0,2}(?:acne|rosacea|eczema|psoriasis|melasma|infection|cancer|melanoma|disease|condition|fungal|allerg\\w*|dermatitis|hives|pcos)\\b",
-  "\\b(?:tablets?|pills?)\\b",
-  "\\b(?:what|which) (?:disease|condition|infection)\\b",
-  "\\b(?:is|could|might|can|do|does|am|are)\\s+(?:it|this|that|these|those|they|i|my \\w+|this \\w+|the \\w+)\\s+(?:\\w+\\s+){0,2}(?:cancer\\w*|melanoma|rosacea|eczema|psoriasis|infect\\w*|fungal|melasma|dermatitis|hives|allerg\\w*|pcos)\\b",
-  "\\bit'?s (?:\\w+ ){0,2}(?:cancer\\w*|melanoma|rosacea|eczema|psoriasis|infect\\w*|fungal|melasma|dermatitis|hives|allerg\\w*|pcos)\\b",
-  "\\b(?:skin cancer|melanoma|infected)\\b",
-  "\\bbimaa?ri\\b",
-  "\\bdawa\\w*",
-  "दवा|बीमारी",
+  ...MEDICAL_REQUEST_PARTS,
   // ── red team (2026-10-04, tracker I02): phrasings that reached Gemini ──
   // self-harm, English idioms
   "\\bkys\\b",
@@ -215,7 +226,15 @@ const RED_FLAG = re([
   "\\bdone\\W+(?:goodbye|bye)\\b",
   "\\bnahi? jee?na\\b",
   "\\bburn(?:ing|ed)? my (?:arms?|wrists?|thighs?|legs?)\\b",
-]);
+];
+const RED_FLAG = re(RED_FLAG_PARTS);
+// F16: the same list without the medical requests, for the model's own words
+// (Gemini is called only after the user's turns passed the full list), and
+// without the named drugs, for the user's own message.
+// Pills, tablets, a dose or mg stay crisis words even in the model's own text: they carry overdose phrasings.
+const OVERDOSE_PARTS = MEDICAL_REQUEST_PARTS.filter((p) => /tablets|dos\(\?:e|mg\|/.test(p));
+const RED_FLAG_NOT_MEDICAL = re(RED_FLAG_PARTS.filter((p) => !MEDICAL_REQUEST_PARTS.includes(p) || OVERDOSE_PARTS.includes(p)));
+const RED_FLAG_NOT_DRUG = re(RED_FLAG_PARTS.filter((p) => !DRUG_PARTS.includes(p)));
 
 
 // Lookalike letters from Cyrillic and Greek that read as Latin (security review, wave 2).
@@ -309,12 +328,12 @@ const GREEK_PREFIX = new RegExp(String.raw`(?<!\p{L})\p{Script=Greek}(?=-\p{L})`
 const LATIN_LOOKALIKE = new RegExp(String.raw`(?![a-z])\p{Script=Latin}`, "u");
 // Other Indian scripts (Tamil, Bengali, ...) are not referred: they are real users' languages (tracker row).
 
-export const redFlagHit = (message: string): boolean => {
+function hitWith(redFlag: RegExp, message: string): boolean {
   const folded = fold(message);
   return (
-    RED_FLAG.test(folded) ||
-    RED_FLAG.test(unleet(folded)) ||
-    RED_FLAG.test(devanagari(message)) ||
+    redFlag.test(folded) ||
+    redFlag.test(unleet(folded)) ||
+    redFlag.test(devanagari(message)) ||
     // A Devanagari word spaced out or split ("आ त्म ह त्या", "आत्म हत्या") (red team C).
     DEVANAGARI_SELF_HARM.test(devanagari(message).replace(/\s+/g, "")) ||
     SELF_HARM_WORD.test(squash(folded)) ||
@@ -323,7 +342,12 @@ export const redFlagHit = (message: string): boolean => {
     OTHER_SCRIPT_LOOKALIKE.test(folded.replace(GREEK_PREFIX, "")) ||
     LATIN_LOOKALIKE.test(folded)
   );
-};
+}
+export const redFlagHit = (message: string): boolean => hitWith(RED_FLAG, message);
+/** F16: the model's own words carry a red flag other than a medical request (a crisis, a symptom, a child, pregnancy). */
+export const nonMedicalRedFlagHit = (message: string): boolean => hitWith(RED_FLAG_NOT_MEDICAL, message);
+/** F16: the user's text is a red flag only because it names a prescription or a drug. */
+export const drugOnlyRedFlag = (text: string): boolean => redFlagHit(text) && !hitWith(RED_FLAG_NOT_DRUG, text);
 /**
  * Every user turn of `history` and the new message, as one text for the
  * pre-filter. Pass exactly the turns Gemini will receive, so the check and
@@ -424,6 +448,9 @@ export const REFERRAL_COPY =
  */
 export const DOCTOR_REFERRAL_COPY = "This is a question for a doctor, dermatologist or pharmacist, so Echo can't answer it here.";
 
+/** The fixed reply to a red flag in the user's text (F16): the doctor line for a drug question alone, else the full referral. */
+export const referralCopyFor = (text: string): string => (drugOnlyRedFlag(text) ? DOCTOR_REFERRAL_COPY : REFERRAL_COPY);
+
 /** TD-18 (1), tracker H22: the fixed reply to a message in a script Echo does not support. Never sent to Gemini. */
 export const UNSUPPORTED_SCRIPT_COPY = "Echo understands English and Hindi only. Please write your question in English or Hindi. " + REFERRAL_LINE;
 
@@ -441,6 +468,6 @@ export const unsupportedScript = (message: string): boolean =>
   (message.normalize("NFKC").replace(new RegExp(String.raw`[\p{Cf}${HANGUL_FILLERS}]`, "gu"), "").match(LETTER) ?? []).some((c) => !SUPPORTED_LETTER.test(c));
 
 /** Every fixed reply a pre-filter gives. An exchange answered with one is never sent to Gemini later. */
-export const PREFILTER_REPLIES: readonly string[] = [REFERRAL_COPY, UNSUPPORTED_SCRIPT_COPY];
+export const PREFILTER_REPLIES: readonly string[] = [REFERRAL_COPY, DOCTOR_REFERRAL_COPY, UNSUPPORTED_SCRIPT_COPY];
 
 export const COMPARISON_LEAD = "Each check reads one photo on its own, so we can't compare checks yet. Here is what this check showed:";

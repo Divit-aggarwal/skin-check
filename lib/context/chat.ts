@@ -12,7 +12,7 @@ import type { SkinState2Result } from "@/lib/skin-state-2";
 import { answerFromPackage, comparisonAnswer, fallbackAnswer } from "./answer";
 import { buildContextPackage, PACKAGE_VERSION, packageSha256 } from "./builder";
 import { loadChatHistory, loadSplitCheckTurns, recordChatTurns, type EchoTurnRecord } from "./chat-turns";
-import { comparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY, UNSUPPORTED_SCRIPT_COPY } from "./prefilter";
+import { comparisonHit, joinedUserTurns, redFlagHit, referralCopyFor, UNSUPPORTED_SCRIPT_COPY } from "./prefilter";
 import { PROMPT_VERSION } from "./renderer";
 
 // The chat route's context-package branch (docs/lanes/context-design.md §3.2).
@@ -72,7 +72,7 @@ async function longitudinalFor(uid: string, scanId: string): Promise<Longitudina
 
 /** A message caught before anything else ran (red flag, or an unsupported script): record it (best effort) as a pre-filter turn. */
 export async function recordReferral(uid: string, scanId: string, region: EchoRegion, message: string, kind: "red_flag" | "unsupported_script" = "red_flag"): Promise<void> {
-  const reply = kind === "red_flag" ? REFERRAL_COPY : UNSUPPORTED_SCRIPT_COPY;
+  const reply = kind === "red_flag" ? referralCopyFor(message) : UNSUPPORTED_SCRIPT_COPY;
   await recordBestEffort(uid, scanId, region, message, reply, { ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: kind, redFlag: kind === "red_flag", latencyMs: 0 });
 }
 
@@ -83,8 +83,9 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
 
   // §6: before anything is loaded or built, and never to Gemini.
   if (redFlagHit(message)) {
-    await recordBestEffort(uid, scanId, region, message, REFERRAL_COPY, meta({ ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: "red_flag", redFlag: true }));
-    return { ok: true, reply: REFERRAL_COPY };
+    const reply = referralCopyFor(message);
+    await recordBestEffort(uid, scanId, region, message, reply, meta({ ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: "red_flag", redFlag: true }));
+    return { ok: true, reply };
   }
 
   // A message split over turns ("i want to" then "die") is checked joined with
@@ -92,9 +93,11 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
   // review, wave 2). Stored turns hold no pre-filter or referral turns.
   const history = await loadChatHistory(uid, scanId, region);
   // Every stored user turn, including ones whose answer fell back (red team pass 2, I02 P2-3).
-  if (redFlagHit(joinedUserTurns(await loadSplitCheckTurns(uid, scanId, region), message))) {
-    await recordBestEffort(uid, scanId, region, message, REFERRAL_COPY, meta({ ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: "red_flag", redFlag: true }));
-    return { ok: true, reply: REFERRAL_COPY };
+  const joined = joinedUserTurns(await loadSplitCheckTurns(uid, scanId, region), message);
+  if (redFlagHit(joined)) {
+    const reply = referralCopyFor(joined);
+    await recordBestEffort(uid, scanId, region, message, reply, meta({ ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: "red_flag", redFlag: true }));
+    return { ok: true, reply };
   }
 
   const trusted = await loadTrustedEchoContext(uid, scanId);

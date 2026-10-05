@@ -15,7 +15,7 @@ import { ageStatus, latestGrant, withLedgerTimeout, type AgeStatus } from "@/app
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 import { contextChatEnabled } from "@/lib/context/switch";
 import { handleContextChat, recordReferral } from "@/lib/context/chat";
-import { checkComparisonHit, comparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY, UNSUPPORTED_SCRIPT_COPY, unsupportedScript, withoutReferrals } from "@/lib/context/prefilter";
+import { checkComparisonHit, comparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY, referralCopyFor, UNSUPPORTED_SCRIPT_COPY, unsupportedScript, withoutReferrals } from "@/lib/context/prefilter";
 import { buildContextPackage } from "@/lib/context/builder";
 import { comparisonAnswer, fallbackLines } from "@/lib/context/answer";
 import { ECHO_FALLBACK_LEAD, screenEchoReply } from "@/lib/echo-reply-screen";
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
   // reply (with the referral line) the same way: we cannot screen it.
   const fixedKind = redFlagHit(message) ? ("red_flag" as const) : unsupportedScript(message) ? ("unsupported_script" as const) : null;
   if (fixedKind) {
-    const fixedReply = fixedKind === "red_flag" ? REFERRAL_COPY : UNSUPPORTED_SCRIPT_COPY;
+    const fixedReply = fixedKind === "red_flag" ? referralCopyFor(message) : UNSUPPORTED_SCRIPT_COPY;
     // The context path keeps a record of the turn, but only for a user the
     // gates would admit: an under-18, unattested or unconsented user's message
     // is never stored. Any ledger error or timeout means no record; the
@@ -181,8 +181,9 @@ export async function POST(request: NextRequest) {
   // check runs over exactly those turns, before the ledger and the quota.
   const sentHistory = withoutReferrals(history).slice(-19);
   if (!contextChatEnabled() && redFlagHit(joinedUserTurns(sentHistory, message))) {
-    const turns = [...history, { role: "user" as const, text: message }, { role: "echo" as const, text: REFERRAL_COPY }];
-    return NextResponse.json({ ok: true, reply: REFERRAL_COPY, historyToken: signHistory(uid, scanId, region, turns) });
+    const reply = referralCopyFor(joinedUserTurns(sentHistory, message));
+    const turns = [...history, { role: "user" as const, text: message }, { role: "echo" as const, text: reply }];
+    return NextResponse.json({ ok: true, reply, historyToken: signHistory(uid, scanId, region, turns) });
   }
 
   // F13 (owner TD-20): only the newest measured check, after the referral
