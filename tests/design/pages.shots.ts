@@ -1,0 +1,166 @@
+import { readFileSync, mkdirSync } from "node:fs";
+import { expect, test, type Page } from "@playwright/test";
+import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
+import { DASHBOARD_SEED as U } from "../browser/seed-users";
+import { signIn } from "../browser/helpers";
+
+// One screenshot per page and state at each width, into docs/design/<SHOTS>/.
+const DIR = `docs/design/${process.env.SHOTS ?? "before"}`;
+mkdirSync(DIR, { recursive: true });
+const FACE = process.env.LOCAL_STACK_FACE ?? "../skin-scan/fixtures/input_face.png";
+const FS = process.env.PW_FIRESTORE_HOST!;
+
+async function shots(page: Page, name: string) {
+  await page.waitForTimeout(600); // entrance animations
+  await page.screenshot({ path: `${DIR}/${name}-${test.info().project.name}.png`, fullPage: true });
+}
+
+const NAME_PROMPT = "Hi! What's your name?";
+
+const signedOut = ["/skin-check", "/dashboard", "/routine", "/echo", "/account"];
+for (const path of signedOut) {
+  test(`signed out ${path}`, async ({ page }) => {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle");
+    if (path === "/skin-check") await expect(page.getByText(NAME_PROMPT)).toBeVisible({ timeout: 60_000 });
+    await shots(page, `signed-out${path.replace("/", "-")}`);
+  });
+}
+
+const dashStates = ["empty", "one", "building", "set", "boundary", "legacy", "noreading", "unreadable", "newer"] as const;
+for (const s of dashStates) {
+  test(`dashboard ${s}`, async ({ page }) => {
+    await signIn(page, U[s]!.phoneNumber);
+    await page.goto("/dashboard");
+    await expect(page.getByRole("heading", { name: C.title })).toBeVisible();
+    await page.waitForTimeout(1500);
+    await shots(page, `dashboard-${s}`);
+  });
+}
+
+test("dashboard loading and error", async ({ page }) => {
+  await signIn(page, U.one!.phoneNumber);
+  const fs = (url: URL) => url.host === FS;
+  let release!: () => void;
+  const held = new Promise<void>((r) => (release = r));
+  await page.route(fs, async (route) => { await held; await route.continue().catch(() => undefined); });
+  await page.goto("/dashboard");
+  await expect(page.getByText(C.loading)).toBeVisible();
+  await shots(page, "dashboard-loading");
+  release();
+  await page.unroute(fs);
+  await page.route(fs, (route) => route.abort());
+  await page.goto("/dashboard");
+  await expect(page.getByText(C.error)).toBeVisible({ timeout: 30_000 });
+  await shots(page, "dashboard-error");
+});
+
+test("past check opened", async ({ page }) => {
+  await signIn(page, U.set!.phoneNumber);
+  await page.goto("/dashboard");
+  await page.getByRole("link", { name: /Open the check from/ }).nth(1).click();
+  await expect(page.getByText(/Check from/).first()).toBeVisible();
+  await page.waitForTimeout(1500);
+  await shots(page, "check-opened");
+});
+
+test("routine empty and with products", async ({ page }) => {
+  await signIn(page, U.routine!.phoneNumber);
+  await page.goto("/routine");
+  await page.waitForTimeout(1500);
+  await shots(page, "routine-current");
+  const product = page.getByLabel("Product").first();
+  if (await product.count()) {
+    await product.selectOption({ index: 1 });
+    await page.getByRole("button", { name: /^Add/ }).first().click();
+    await page.waitForTimeout(1500);
+    await page.getByRole("button", { name: "Used", exact: true }).first().click().catch(() => undefined);
+    await page.waitForTimeout(1500);
+    await shots(page, "routine-with-product");
+  }
+});
+
+test("echo: direct visit, before consent, with consent", async ({ page }) => {
+  await signIn(page, U.echo!.phoneNumber);
+  await page.goto("/echo");
+  await page.waitForTimeout(1500);
+  await shots(page, "echo-direct-visit");
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: C.chat.button }).click();
+  await expect(page).toHaveURL(/\/echo/);
+  await page.waitForTimeout(1500);
+  await shots(page, "echo-not-asked");
+  await page.getByRole("textbox").fill("What does this photo reading show?");
+  await page.getByRole("button", { name: "Send" }).click();
+  await page.waitForTimeout(1500);
+  await shots(page, "echo-consent-prompt");
+  await signIn(page, U.withdraw!.phoneNumber);
+  await page.goto("/dashboard");
+  await page.getByRole("button", { name: C.chat.button }).click();
+  await expect(page).toHaveURL(/\/echo/);
+  await page.waitForTimeout(1500);
+  await shots(page, "echo-shared");
+});
+
+test("account signed in", async ({ page }) => {
+  await signIn(page, U.one!.phoneNumber);
+  await page.waitForTimeout(1500);
+  await shots(page, "account-signed-in");
+});
+
+test("check flow: questions, under 18, photo step, retake", async ({ page }) => {
+  await page.goto("/skin-check");
+  await expect(page.getByText(NAME_PROMPT)).toBeVisible({ timeout: 60_000 });
+  await shots(page, "flow-start");
+  const name = page.locator('input[type="text"]').first();
+  await name.fill("Tester");
+  await name.press("Enter");
+  await page.getByRole("button", { name: "<18", exact: true }).click();
+  await page.getByRole("button", { name: "Female", exact: true }).click();
+  await expect(page.getByText("You chose under 18. Is that right?")).toBeVisible();
+  await shots(page, "flow-under18-confirm");
+});
+
+// The desktop path needs a webcam; a phone user agent keeps the photo-file
+// path at every width (layout follows the viewport, not the user agent).
+const FLOW_USER = { "390": U.capture!, "768": U.scan!, "1280": U.empty! };
+test.describe(() => {
+  test.use({ userAgent: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148" });
+test("check flow to results", async ({ page }) => {
+  test.setTimeout(600_000);
+  await signIn(page, FLOW_USER[test.info().project.name as keyof typeof FLOW_USER].phoneNumber);
+  await page.goto("/skin-check");
+  const name = page.locator('input[type="text"]').first();
+  await name.fill("Tester");
+  await name.press("Enter");
+  await page.getByRole("button", { name: "25–34", exact: true }).click();
+  await shots(page, "flow-questions");
+  await page.getByRole("button", { name: "Female", exact: true }).click();
+  await expect(page.locator('input[type="file"]')).toBeAttached({ timeout: 30_000 });
+  await shots(page, "flow-photo-step");
+  await page.locator('input[type="file"]').setInputFiles({ name: "face.png", mimeType: "image/png", buffer: readFileSync(FACE) });
+  await page.waitForTimeout(1500);
+  await shots(page, "flow-photo-chosen");
+  await page.getByRole("checkbox").first().check();
+  await page.getByRole("button", { name: "Analyze my skin" }).click();
+  await expect(page.getByText("What are your main skin concerns?")).toBeVisible({ timeout: 60_000 });
+  await shots(page, "flow-after-photo");
+  // Answer every remaining question with its first option until the results show.
+  const results = page.getByText("Your skin, understood.");
+  for (let i = 0; i < 80 && !(await results.isVisible()); i++) {
+    const step = page.locator("div.flex.flex-col.gap-5").last();
+    const confirm = step.getByRole("button", { name: "Confirm selection" });
+    const options = step.locator("button:not([aria-label])");
+    if (await confirm.count()) {
+      if (await confirm.isDisabled()) await options.first().click();
+      await confirm.click();
+    } else if (await options.count()) {
+      await options.first().click();
+    }
+    await page.waitForTimeout(700);
+  }
+  await expect(results).toBeVisible({ timeout: 240_000 });
+  await page.waitForTimeout(3000);
+  await shots(page, "flow-results");
+});
+});

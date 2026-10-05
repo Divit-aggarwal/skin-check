@@ -1,0 +1,54 @@
+/* Copied 2026-10-05 from the inline <style> in https://theprojectskin.com/ (Shopify theme "Project Skin UX 2026-09-20", id 195299475827, assets /cdn/shop/t/25/; <html data-font-strategy="brand">). Reference only; not loaded by the app. */
+      :root {
+        --page-width: 1440px;
+        --page-pad: 30px;
+        --color-paper: #ffffff;
+        --color-linen: #f5f3ee;
+        --color-mist: #e1f5ee;
+        --color-forest: #0f6e56;
+        --color-canvas: var(--color-paper);
+        --color-surface: var(--color-linen);
+        --color-ink: #2c2c2a;
+        --color-muted: #6b6862;
+        --color-surface-alt: #eeeae5;
+        --color-border: #ddd8ce;
+        --color-action: #252724;
+        --color-action-hover: #111210;
+        --color-on-action: #ffffff;
+        --color-accent: #b98783;
+        --color-accent-secondary: #c58f65;
+        --color-accent-soft: #f3e9e7;
+        --color-sky: #0096d6;
+        --color-blush: #fb8cb3;
+        --color-mint: #0f9b8e;
+        --color-lilac: #6a479e;
+        --color-gold: #ffe300;
+        --color-taupe: #b7a58f;
+        --color-cyan: #00a3b1;
+        --text: var(--color-ink);
+        --muted: var(--color-muted);
+        --surface: var(--color-surface);
+        --surface-2: var(--color-surface-alt);
+        --accent: var(--color-action);
+        --accent-2: var(--color-accent-secondary);
+        --highlight: #e6b84a;
+        --radius: 8px;
+        --font-native-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+        --font-native-mono-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Roboto Mono", monospace;
+        --font-system-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        --font-body-family: "Plus Jakarta Sans", "Purity Sans", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        --font-heading-family: "Bai Jamjuree", "Purity Editorial", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        --font-mono-family: "IBM Plex Mono", ui-monospace, monospace;
+        --body-size: 15px;
+        --loader-bg: #f5f3ee;
+      }
+      :root[data-font-strategy="hybrid"] {
+        --font-body-family: var(--font-native-family);
+        --font-mono-family: var(--font-native-mono-family);
+      }
+      :root[data-font-strategy="system"] {
+        --font-body-family: var(--font-native-family);
+        --font-heading-family: var(--font-native-family);
+        --font-mono-family: var(--font-native-mono-family);
+      }
+    </style>
