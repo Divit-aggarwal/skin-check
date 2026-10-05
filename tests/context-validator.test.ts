@@ -402,3 +402,22 @@ describe("live run A fixes: real answers pass, the same words elsewhere still fa
     expect(checksOf(one("out_of_scope", `${MISSING.text} Your redness is fine.`, [MISSING.id]))).toContain("citation_rule");
   });
 });
+
+// Final live runs (2026-10-06): three more harmless phrasings.
+describe("final live-run fixes: real answers pass, the same words elsewhere still fail", () => {
+  const one = (claim_type: string, text: string) => ok([{ claim_type, text, fact_ids: [] } as never]);
+  it("small talk may name 'your skin check' (or 'skin-check') anywhere, and still no skin-state word", () => {
+    for (const t of ["Hello! How can I help you understand your skin check today?", "Hello! How can I help you with your skin-check analysis today?", "Hello! I can share the details from your skin check results with you."])
+      expect(checksOf(one("smalltalk", t)), t).toEqual([]);
+    for (const t of ["Your skin check looks good.", "Your skin check says your skin is clear.", "Your skin-check results are fine."])
+      expect(checksOf(one("smalltalk", t)), t).toContain("citation_rule");
+  });
+  it("'before taking a photo' is not a change word; 'before' about the skin still is", () => {
+    expect(checksOf(one("out_of_scope", "I do not have information about how long to wait after washing your face before taking a photo."))).toEqual([]);
+    expect(checksOf(one("out_of_scope", "Your redness was lower before taking the new cream."))).toContain("comparative_or_change");
+  });
+  it("'lighting conditions' is not a medical word; 'skin conditions' still is", () => {
+    expect(checksOf(one("out_of_scope", "I do not have facts about the best lighting conditions for taking your photo."))).toEqual([]);
+    expect(checksOf(one("out_of_scope", "I cannot discuss skin conditions."))).toContain("medical_or_efficacy_term");
+  });
+});

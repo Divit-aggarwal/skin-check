@@ -135,12 +135,15 @@ const UNCITED_PHISH = new RegExp(String.raw`https?:|www\.|\b\w+\.(?:com|in|org|n
 // "your results/readings", and "skin check" (the product's name) only in small talk.
 const SAFE_PHRASES = [
   new RegExp(String.raw`(?<=\b(?:doctor|dermatologist|pharmacist)\b[^.;:!?]{0,40}\s)before (?:starting|using|trying|adding|changing|switching)\b`, "giu"),
+  // photo-taking words, not a change or a condition (final live runs)
+  new RegExp(String.raw`\bbefore (?:taking|you take) (?:a|the|your) (?:photo|picture|selfie|scan|check)\b`, "giu"),
+  new RegExp(String.raw`\blighting conditions?\b`, "giu"),
   // a refusal: "I cannot explain general definitions" (still fails on "causes" or "because")
   new RegExp(String.raw`(?<=\b(?:cannot|can't|can not|unable to|not able to)\s)explain\b`, "giu"),
   new RegExp(String.raw`\b(?:help(?:s)?|to) explain (?:your|the|these) (?:skin check )?(?:results?|readings?)\b`, "giu"),
 ];
 const neutral = (text: string) => SAFE_PHRASES.reduce((t, re) => t.replace(re, " "), text);
-const SKIN_CHECK_NAME = new RegExp(String.raw`\b(?:with|about|on) your skin checks?(?: results?| readings?)?\b`, "giu");
+const SKIN_CHECK_NAME = new RegExp(String.raw`\byour skin[- ]checks?(?: results?| readings?| analysis| data)?\b`, "giu");
 // F17: an uncited claim (small talk, clarify, out of scope) carries no fact,
 // so it may assert nothing about the world: "the heat is the issue" and "this
 // is from the sun" name no cause word but still say why. By sentence form, not
