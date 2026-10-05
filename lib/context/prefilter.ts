@@ -404,6 +404,15 @@ export const REFERRAL_LINE =
 export const REFERRAL_COPY =
   "This is something a doctor or dermatologist should look at in person, so Echo can't answer it here. " + REFERRAL_LINE;
 
+/**
+ * F16: the model asked for a doctor (a medicine, a product's safety, a
+ * diagnosis) and said explicitly that the user shows no distress. No crisis
+ * line: a product question never gets the self-harm reply. Every red flag,
+ * every self-harm signal and any answer without that explicit "no distress"
+ * still gets REFERRAL_COPY.
+ */
+export const DOCTOR_REFERRAL_COPY = "This is a question for a doctor, dermatologist or pharmacist, so Echo can't answer it here.";
+
 /** TD-18 (1), tracker H22: the fixed reply to a message in a script Echo does not support. Never sent to Gemini. */
 export const UNSUPPORTED_SCRIPT_COPY = "Echo understands English and Hindi only. Please write your question in English or Hindi. " + REFERRAL_LINE;
 

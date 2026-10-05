@@ -179,7 +179,7 @@ describe("switch on: the new path", () => {
     expect(h.getSkinCheckChatReply).not.toHaveBeenCalled();
     expect(h.generateContent).toHaveBeenCalledTimes(1);
     const meta = h.recordChatTurns.mock.calls[0]![5];
-    expect(meta).toMatchObject({ packageVersion: "ctx-2", promptVersion: "ctx-prompt-2", modelId: expect.any(String), prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
+    expect(meta).toMatchObject({ packageVersion: "ctx-2", promptVersion: "ctx-prompt-3", modelId: expect.any(String), prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
     expect(meta.packageSha256).toMatch(/^[0-9a-f]{64}$/);
   });
 

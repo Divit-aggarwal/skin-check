@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { answerFromPackage, comparisonAnswer, fallbackAnswer, fallbackLines } from "@/lib/context/answer";
 import { buildContextPackage, packageFacts, UNCERTAINTY } from "@/lib/context/builder";
-import { REFERRAL_COPY } from "@/lib/context/prefilter";
+import { DOCTOR_REFERRAL_COPY, REFERRAL_COPY, REFERRAL_LINE, redFlagHit } from "@/lib/context/prefilter";
+import { renderSystemInstruction, responseSchema } from "@/lib/context/renderer";
+import { QUESTIONS } from "./gemini-live/questions";
 import { answer, fullInput } from "./context-fixtures";
 
 // Reject, retry and fallback (docs/lanes/context-design.md §3.7): one test per row.
@@ -113,5 +115,46 @@ describe("answer path: a self-harm claim", () => {
     const out = await answerFromPackage(p, "tell me", [], { generate: fake(ok), redFlag: false });
     expect(out.referral).toBe(false);
     expect(out.reply).toBe(self.text);
+  });
+});
+
+// F16: a product question never gets the self-harm reply; every distress or
+// self-harm signal still does.
+describe("referral copy (F16)", () => {
+  const referral = (needs: boolean, distress?: boolean, text = "Please ask a doctor or pharmacist.") =>
+    answer({ claims: [{ claim_type: "out_of_scope", text, fact_ids: [] }], needs_referral: needs, ...(distress === undefined ? {} : { distress }) } as never);
+
+  it("the model asks for a doctor and says 'no distress': the doctor line, no crisis line", async () => {
+    const out = await run(fake(referral(true, false)), { message: "Is niacinamide good for me?" });
+    expect(out).toMatchObject({ reply: DOCTOR_REFERRAL_COPY, referral: true });
+    expect(out.reply).not.toContain(REFERRAL_LINE);
+    expect(DOCTOR_REFERRAL_COPY).not.toMatch(/\b(?:hurt|unsafe|emergency|harm|crisis)\b/i);
+  });
+
+  it.each([
+    ["distress", referral(true, true)],
+    ["distress without needs_referral", referral(false, true)],
+    ["no distress field (an older or partial answer)", referral(true)],
+  ])("%s: the full referral with the crisis line", async (_n, raw) => {
+    const out = await run(fake(raw));
+    expect(out).toMatchObject({ reply: REFERRAL_COPY, referral: true });
+  });
+
+  it("a claim that reads as self-harm wins over 'no distress'", async () => {
+    const out = await run(fake(referral(true, false, "You may want to end it all.")));
+    expect(out.reply).toBe(REFERRAL_COPY);
+  });
+
+  it("the model is told distress is its own field, and a product question alone is not distress", () => {
+    const sys = renderSystemInstruction(pkg);
+    expect(sys).toMatch(/Set distress to true if the user says or hints that they feel hopeless/);
+    expect(sys).toMatch(/A question about a product or a medicine alone is not distress/);
+    expect(responseSchema(pkg)).toMatchObject({ required: ["claims", "needs_referral", "distress"] });
+  });
+
+  it("every red-flag and self-harm question in the live set is caught before Gemini", () => {
+    const flagged = QUESTIONS.filter((q) => q.expect === "referral");
+    expect(flagged.length).toBeGreaterThanOrEqual(14);
+    for (const q of flagged) expect(redFlagHit(q.message), q.id).toBe(true);
   });
 });

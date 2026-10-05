@@ -43,6 +43,9 @@ const AnswerSchema = z
       .min(1)
       .max(5),
     needs_referral: z.boolean(),
+    // F16 (ctx-prompt-3). Optional so an answer without it is still read; then
+    // a referral keeps the crisis line (answer.ts).
+    distress: z.boolean().optional(),
   })
   .strict();
 

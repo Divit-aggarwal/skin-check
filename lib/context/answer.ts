@@ -2,7 +2,7 @@ import type { ContextPackage } from "@/lib/contracts/context-package";
 import type { EchoChatMessage } from "@/lib/gemini";
 import { renderSystemInstruction, responseSchema } from "./renderer";
 import { validateAnswer, type Validation } from "./validator";
-import { COMPARISON_LEAD, REFERRAL_COPY } from "./prefilter";
+import { COMPARISON_LEAD, DOCTOR_REFERRAL_COPY, REFERRAL_COPY } from "./prefilter";
 
 // Reject, retry and fallback (docs/lanes/context-design.md §3.7).
 
@@ -53,12 +53,16 @@ export async function answerFromPackage(
     // Red team pass 2 (I02 P2-1): a claim that reads as self-harm or another red flag is a referral too.
     const flagged = v.some((x) => x.redFlag);
     if (flagged) return { reply: REFERRAL_COPY, referral: true, modelId, validator: { passed: false, failures: names(...v), regenerated, fallback: false } };
-    if (last.answer?.needs_referral) return { reply: REFERRAL_COPY, referral: true, modelId, validator: { passed: last.passed, failures: names(...v), regenerated, fallback: false } };
+    // F16: the crisis line goes with any distress, and with any referral that does not say "no distress" explicitly.
+    if (last.answer?.needs_referral || last.answer?.distress === true) {
+      const reply = last.answer.distress === false ? DOCTOR_REFERRAL_COPY : REFERRAL_COPY;
+      return { reply, referral: true, modelId, validator: { passed: last.passed, failures: names(...v), regenerated, fallback: false } };
+    }
     if (last.passed) return { reply: last.answer!.claims.map((c) => c.text.trim()).join(" "), referral: false, modelId, validator: { passed: true, failures: names(...v), regenerated, fallback: false } };
     return { reply: fallbackAnswer(pkg), referral: false, modelId, validator: { passed: false, failures: names(...v), regenerated, fallback: true } };
   };
 
-  if (v1.passed || v1.answer?.needs_referral) return done([v1], false, first.modelId);
+  if (v1.passed || v1.answer?.needs_referral || v1.answer?.distress === true) return done([v1], false, first.modelId);
   const unsafeToRetry = opts.redFlag || v1.userPremise || v1.failures.some((f) => NO_RETRY_CHECKS.has(f.check));
   if (unsafeToRetry) return done([v1], false, first.modelId);
 
