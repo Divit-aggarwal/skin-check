@@ -45,12 +45,14 @@ What is wrong for the user, page by page, in plain words.
 
 - The back control is a bare chevron with no label. The top bar has no logo and no way to leave the flow.
 - Questions build up down the page and auto-advance after a tap. On a desktop each answer card sits in the 576px column with large gaps.
+- Retake (flow-retake-390.png, flow-retake-use-anyway-390.png): the reason is grey body text under a black box; "Use this photo anyway" appears after the set number of retakes with the same weight as Retake.
+- Under 18 blocked (flow-under18-blocked-*.png): one grey sentence inside an Echo bubble on an empty page, no way out except the unlabeled back chevron.
 - Under 18 confirm: the two choices are plain buttons with no visual difference between "change my answer" and "yes".
 - Photo step:
   - On a phone the preview is a 280px black box with a faint camera icon.
   - The consent checkbox and "Analyze my skin" sit under it. The relation between them is hard to see.
   - The retake reasons are plain grey text.
-- Desktop photo step: a live camera box and a Capture button, no file upload. When the photo checks fail ("We couldn't find a face"), the results screen still opens with the headline "Your skin, understood." above the error (flow-results-1280.png).
+- Desktop photo step: a live camera box and a Capture button, no file upload. When the photo has no face ("We couldn't find a face"), the results screen still opens with the headline "Your skin, understood." above the error (seen with a camera showing no face; the saved flow-results-1280.png is the normal case, with a face).
 - Results:
   - **It shows numbers the rest of the app hides.** Every reading has a score "/100", there is a large "12 /100" headline number, and a "Dryness" row.
     - The dashboard shows band words only and has no Dryness row ("a photo cannot measure it", components/dashboard/state.ts; tests/dashboard-copy.test.ts allows no digits except counts and dates).
@@ -126,6 +128,7 @@ What is wrong for the user, page by page, in plain words.
   - delete.
 
   The page mixes "account" with "history".
+- Delete (account-delete-confirm-*.png): the typed confirmation opens inline under the history list; the destructive button is not set apart from the rest of the page.
 - The +91 prefix box and the field have different corner radii and fills. The disabled "Send verification code" button is mid-grey with white text, which has low contrast.
 
 ## Wording that is unclear

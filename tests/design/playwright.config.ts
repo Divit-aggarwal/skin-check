@@ -16,14 +16,17 @@ const config = {
   projects: [
     { name: "390", use: { ...phone, browserName: "chromium", viewport: { width: 390, height: 844 } } },
     { name: "768", use: { ...devices["iPad Mini"], browserName: "chromium", viewport: { width: 768, height: 1024 } } },
-    // A fake webcam: the desktop photo step uses getUserMedia, not a file input.
+    // A fake webcam showing the fixture face: the desktop photo step uses
+// getUserMedia, not a file input. Make the video once (gitignored):
+//   ffmpeg -loop 1 -i ../skin-scan/fixtures/input_face.png -t 1 -r 10 \
+//     -vf "scale=720:960:force_original_aspect_ratio=increase,crop=720:960" -pix_fmt yuv420p .local-stack/fake-face.y4m
     {
       name: "1280",
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1280, height: 800 },
         permissions: ["camera"],
-        launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
+        launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", "--use-file-for-fake-video-capture=.local-stack/fake-face.y4m"] },
       },
     },
   ],

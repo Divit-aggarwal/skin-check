@@ -122,6 +122,43 @@ test("check flow: questions, under 18, photo step, retake", async ({ page }) => 
   await page.getByRole("button", { name: "Female", exact: true }).click();
   await expect(page.getByText("You chose under 18. Is that right?")).toBeVisible();
   await shots(page, "flow-under18-confirm");
+  await page.getByRole("button", { name: /Yes, I.m under 18/ }).click();
+  await expect(page.getByText(/isn't available yet for users under 18/)).toBeVisible();
+  await shots(page, "flow-under18-blocked");
+});
+
+test("check flow: a dark photo asks for a retake", async ({ page }) => {
+  test.skip(test.info().project.name === "1280", "the desktop takes photos from the camera, not a file");
+  await signIn(page, U.returning!.phoneNumber);
+  await page.goto("/skin-check");
+  const file = page.locator('input[type="file"]');
+  await expect(file).toBeAttached({ timeout: 30_000 });
+  const dataUrl = await page.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = 800;
+    c.height = 1000;
+    const g = c.getContext("2d")!;
+    g.fillStyle = "rgb(4,4,4)";
+    g.fillRect(0, 0, c.width, c.height);
+    return c.toDataURL("image/png");
+  });
+  const dark = { name: "dark.png", mimeType: "image/png", buffer: Buffer.from(dataUrl.split(",")[1]!, "base64") };
+  await file.setInputFiles(dark);
+  await expect(page.getByRole("button", { name: "Retake" })).toBeVisible();
+  await shots(page, "flow-retake");
+  for (let i = 0; i < 5 && !(await page.getByRole("button", { name: "Use this photo anyway" }).isVisible()); i++) {
+    await page.getByRole("button", { name: "Retake" }).click();
+    await file.setInputFiles(dark);
+    await page.waitForTimeout(800);
+  }
+  await shots(page, "flow-retake-use-anyway");
+});
+
+test("account: delete confirmation open (not submitted)", async ({ page }) => {
+  await signIn(page, U.withdraw!.phoneNumber);
+  await page.getByRole("button", { name: "Delete my account and data" }).click();
+  await expect(page.getByLabel(/to confirm/)).toBeVisible();
+  await shots(page, "account-delete-confirm");
 });
 
 // Phone and tablet choose a photo file; the desktop takes a frame from the fake
@@ -130,7 +167,9 @@ test("check flow: questions, under 18, photo step, retake", async ({ page }) => 
 const FLOW_USER = { "390": U.capture!, "768": U.scan!, "1280": U.empty! };
 test("check flow to results", async ({ page }) => {
   test.setTimeout(600_000);
-  await signIn(page, FLOW_USER[test.info().project.name as keyof typeof FLOW_USER].phoneNumber);
+  // FLOW_USER=<seed key> picks another user with no checks for a rerun on the same stack.
+  const user = process.env.FLOW_USER ? U[process.env.FLOW_USER]! : FLOW_USER[test.info().project.name as keyof typeof FLOW_USER];
+  await signIn(page, user.phoneNumber);
   await page.goto("/skin-check");
   const name = page.locator('input[type="text"]').first();
   await name.fill("Tester");
