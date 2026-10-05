@@ -201,7 +201,7 @@ test("check flow to results", async ({ page }) => {
   await page.getByRole("button", { name: "Female", exact: true }).click();
   const file = page.locator('input[type="file"]');
   const capture = page.getByRole("button", { name: "Capture", exact: true });
-  await expect(file.or(capture)).toBeAttached({ timeout: 30_000 });
+  await expect(file.or(capture).first()).toBeAttached({ timeout: 30_000 });
   await page.waitForTimeout(2000);
   await shots(page, "flow-photo-step");
   if (await file.count()) {
