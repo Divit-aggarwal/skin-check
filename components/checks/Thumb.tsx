@@ -15,6 +15,8 @@ export function Thumb({ scanId, date, size = 48 }: { scanId: string; date: strin
   const [state, setState] = useState<State>({ kind: "loading" });
 
   useEffect(() => {
+    // Never keep a photo across a change of check or user (security review G03, L1).
+    setState(user ? { kind: "loading" } : { kind: "none" });
     if (!user) return;
     let active = true;
     (async () => {

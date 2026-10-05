@@ -30,7 +30,11 @@ export const dynamic = "force-dynamic";
 //   exists for anyone else.
 // - Nothing is cacheable: this answer and the S3 response are private, no-store.
 
-const LIMITS: PublicRouteLimits = { scope: "checks-photo", perMinute: 60, perDay: 2000 };
+// Per-IP burst only (checkRequestRate): one row per kept photo, and many
+// phones share one carrier IP in India, so the minute limit is generous.
+// perDay is required by the type but not enforced here: there is no upstream
+// quota to protect (security review G03, L2).
+const LIMITS: PublicRouteLimits = { scope: "checks-photo", perMinute: 120, perDay: 0 };
 const NO_STORE = { "Cache-Control": "private, no-store, max-age=0", Vary: "Authorization" };
 
 const answer = (status: number, body: Record<string, unknown>) => NextResponse.json(body, { status, headers: NO_STORE });

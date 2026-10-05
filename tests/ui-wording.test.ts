@@ -9,7 +9,7 @@ import { CAUSE, CHANGE, DIAGNOSIS, FORECAST, MEDICAL } from "@/lib/context/lexic
 // tests/dashboard-copy.test.ts covers) pass the same D-12 checks, and TD-25 (6):
 // the word "check" on screen, never "scan".
 
-const DIRS = ["components/checks", "components/timeline", "components/shell", "components/ui/page.tsx", "app/(marketing)/checks", "components/skin-check/echoCopy.ts", "app/(marketing)/account/AccountView.tsx", "app/(marketing)/account/copy.ts", "app/not-found.tsx", "app/(marketing)/error.tsx", "app/(marketing)/page.tsx", "app/(marketing)/echo/page.tsx"];
+const DIRS = ["components/checks", "components/timeline", "components/shell", "components/ui/page.tsx", "app/(marketing)/checks", "components/skin-check/echoCopy.ts", "app/(marketing)/account/AccountView.tsx", "app/(marketing)/account/copy.ts", "app/not-found.tsx", "app/(marketing)/error.tsx", "app/(marketing)/page.tsx", "app/(marketing)/echo/page.tsx", "components/skin-check/SkinCheckDashboard.tsx", "components/skin-check/EchoTwin.tsx", "components/routine", "components/dashboard/FaceDrawing.tsx"];
 
 function sourceText(src: string): string[] {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
@@ -25,7 +25,10 @@ export function uiFiles(dirs: string[]): string[] {
     .filter((f) => /\.(ts|tsx)$/.test(f));
 }
 
-const problems = (text: string) => [
+/** A Tailwind class list, not words a user reads ("animate-in fade-in" is not the banned "fade"). */
+const isClassList = (s: string) => /(^|\s)(flex|grid|rounded|text-|bg-|border|px-|py-|inset-|object-|animate-|absolute|relative|h-|w-)/.test(s);
+
+const problems = (text: string) => isClassList(text) ? [] : [
   ...bannedWordsIn(text),
   ...Object.entries({ CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST }).filter(([, re]) => re.test(text)).map(([n]) => n),
 ];
@@ -36,6 +39,8 @@ export const saysScan = (s: string) => !/^[@./]/.test(s.trim()) && !/[={}()]/.te
 describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
   it("self-check: the checks catch planted words", () => {
     expect(problems("your redness improved")).not.toEqual([]);
+    expect(problems("absolute inset-0 animate-in fade-in")).toEqual([]);
+    expect(problems("Dark marks fade over time")).not.toEqual([]);
     expect(saysScan("Take a new scan")).toBe(true);
     expect(saysScan("Your previous scans")).toBe(true);
     expect(saysScan("/api/skin-scan/upload")).toBe(false);
@@ -99,6 +104,18 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
       expect(src, f).toMatch(/href="\/dashboard"/);
     }
     expect(readFileSync("app/(marketing)/error.tsx", "utf8")).toMatch(/role="alert"[\s\S]*onClick=\{reset\}/);
+  });
+
+  it("D-12: on Home the routine card is never beside the readings, and the timeline carries no photos", () => {
+    const home = readFileSync("components/dashboard/DashboardPage.tsx", "utf8");
+    const left = home.slice(home.indexOf("lg:col-span-8"), home.indexOf("lg:col-span-4"));
+    const right = home.slice(home.indexOf("lg:col-span-4"));
+    expect(left).toMatch(/<TodayCard/);
+    expect(left.indexOf("<TodayCard")).toBeGreaterThan(left.indexOf("<RecentSection"));
+    expect(right).not.toMatch(/<TodayCard/);
+    const checks = readFileSync("components/checks/ChecksView.tsx", "utf8");
+    const timeline = checks.slice(checks.indexOf("function TimelineSection("));
+    expect(timeline).not.toMatch(/<Thumb|thumb=/);
   });
 
   it("TD-24 (1): the opened check always shows the fixed line", () => {

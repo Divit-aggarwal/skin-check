@@ -159,7 +159,7 @@ function CheckList({ dashboard, data, uid, selected }: { dashboard: Dashboard; d
                   <span className="text-sm text-brand-muted">{C.history.kind[row.kind]}</span>
                   {check?.photoCheck && <span className="text-sm text-brand-muted">{C.photoCheck[check.photoCheck]}</span>}
                 </span>
-                {row.photoClaimed && <Thumb scanId={row.scanId} date={date} />}
+                {row.photoClaimed && <Thumb key={row.scanId} scanId={row.scanId} date={date} />}
                 <ChevronRight aria-hidden size={18} className="shrink-0 text-brand-muted group-hover:text-brand-ink" />
               </Link>
             </li>
@@ -196,7 +196,7 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
           </h2>
           <p className="mt-1 text-brand-muted">{C.history.kind[check.kind]}</p>
         </div>
-        {check.photoClaimed && <Thumb scanId={check.scanId} date={date} size={112} />}
+        {check.photoClaimed && <Thumb key={check.scanId} scanId={check.scanId} date={date} size={112} />}
       </div>
       {check.photoCheck && <PhotoCheckLine text={C.photoCheck[check.photoCheck]} />}
       {/* TD-24 (1): always on an opened check, never behind a toggle. */}
@@ -233,12 +233,11 @@ function TimelineSection({ history }: { history: Dashboard["history"] }) {
   const routine = useRoutine();
   const items = mergeTimeline(history, routine.data?.events ?? [], routine.data?.today ?? dayOf(new Date()));
   const nameOf = (id: string) => routine.data?.products.find((p) => p.id === id)?.name ?? ROUTINE_COPY.otherProduct;
-  const claimed = new Set(history.filter((h) => h.photoClaimed).map((h) => h.scanId));
-  const dateOf = new Map(history.map((h) => [h.scanId, formatDate(h.date)]));
   return (
     <section aria-label={K.timeline} className="max-w-3xl rounded-2xl border border-brand-line px-5">
       {routine.failed && <p role="alert" className="py-3">{ROUTINE_COPY.error}</p>}
-      <TimelineList items={items} nameOf={nameOf} thumb={(id) => (claimed.has(id) ? <Thumb scanId={id} date={dateOf.get(id)!} /> : null)} />
+      {/* No photos here: a column of faces between routine entries would read as before and after (D-12). Photos stay on the list and the opened check. */}
+      <TimelineList items={items} nameOf={nameOf} />
     </section>
   );
 }

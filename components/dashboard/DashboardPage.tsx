@@ -20,10 +20,11 @@ import { loadDashboard, type DashboardData } from "./data";
 import { deriveDashboard, isEmpty, type Dashboard } from "./state";
 import { newestEchoSession } from "./echo-session";
 
-// G01 dashboard (docs/lanes/dashboard-design.md). Phone first, one column.
-// Six sections. Readings are shown for the newest photo reading only; a past
-// check opens on its own page with its date, kind and photo check, never its
-// readings (LONGITUDINAL_METHOD §1), so no two checks' readings meet.
+// Home (G03, docs/design/map.md). The newest reading by face area, the
+// starting point, recent timeline, Echo, a new check, today's routine and
+// privacy. A past check opens on /checks/[id] with its own readings and the
+// fixed line (TD-24 (1)), so no two checks' readings meet on one screen, and
+// the routine card never sits beside the readings (D-12).
 
 
 type Load = { kind: "loading" } | { kind: "error" } | { kind: "ready"; data: DashboardData };
@@ -120,18 +121,19 @@ export function DashboardPage() {
               <CurrentSection dashboard={dashboard} />
             )}
           </div>
-          <div className="order-4">
+          <div className="order-3">
             <RecentSection history={dashboard.history} routine={routine} />
+          </div>
+          {/* Never beside the readings (D-12): below Recently, in the main column. */}
+          <div className="order-5">
+            <TodayCard routine={routine} />
           </div>
         </div>
         <div className="contents lg:col-span-4 lg:flex lg:flex-col lg:gap-6">
           <div className="order-2">
             <TrendSection trend={dashboard.trend} />
           </div>
-          <div className="order-3">
-            <TodayCard routine={routine} />
-          </div>
-          <div className="order-5">
+          <div className="order-4">
             <ChatSection uid={user.uid} dashboard={dashboard} data={load.data} />
           </div>
           <section aria-labelledby="new-title" className={`${card} order-6 flex flex-col items-start gap-3`}>

@@ -58,7 +58,7 @@ function interpretationFor(band: Band, noun: string): string {
     case "Moderate":
       return `Some ${noun} showed up — moderate relative to the rest of this photo.`;
     case "Elevated":
-      return `${cap(noun)} stood out more than other areas in this photo.`;
+      return `${cap(noun)} stood out in this photo, relative to the rest of your face.`;
   }
 }
 

@@ -182,6 +182,12 @@ function s3Read(): S3Client {
  * True when the object exists. `key` must come from scanImageKey() with a
  * server-VERIFIED uid. A missing object (never kept, or erased) is false; any
  * other error throws.
+ *
+ * The read principal has s3:GetObject only, never s3:ListBucket (one key
+ * serves every user, and listing would expose every user's scan keys). Without
+ * ListBucket, S3 answers a HEAD on a missing key with 403, so 403 also means
+ * "not there" (security review G03, M1). The cost: a read policy that lacks
+ * GetObject entirely also reads as "no photo" rather than an error.
  */
 export async function originalExists(key: string): Promise<boolean> {
   try {
@@ -189,7 +195,8 @@ export async function originalExists(key: string): Promise<boolean> {
     return true;
   } catch (err) {
     const status = (err as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
-    if (status === 404 || (err as Error)?.name === "NotFound" || (err as Error)?.name === "NoSuchKey") return false;
+    const name = (err as Error)?.name;
+    if (status === 404 || status === 403 || name === "NotFound" || name === "NoSuchKey" || name === "Forbidden") return false;
     throw err;
   }
 }
