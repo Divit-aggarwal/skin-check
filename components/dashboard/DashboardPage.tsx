@@ -5,8 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
-import { bandScores } from "@/lib/skin-check-rules";
-import { summarizeConcerns } from "@/lib/skin-check-score";
 import { ChevronRight } from "lucide-react";
 import { btnPrimary, btnSecondary, card, EmptyState, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";
 import { TodayCard } from "@/components/routine/TodayCard";
@@ -15,13 +13,12 @@ import { TIMELINE_COPY } from "@/components/timeline/copy";
 import { dayOf, mergeTimeline } from "@/components/timeline/timeline";
 import { TimelineList } from "@/components/timeline/TimelineList";
 import { ROUTINE_COPY } from "@/lib/routine/copy";
-import type { SkinCheckAnswers } from "@/types/skin-check";
-import type { CaptureMethod, SkinScanResult } from "@/types/skin-scan";
 import { CheckReadings, formatDate, KnownAndNotKnown } from "./CheckReadings";
 import { ConsentSection } from "./ConsentSection";
 import { DASHBOARD_COPY as C } from "./copy";
 import { loadDashboard, type DashboardData } from "./data";
-import { deriveDashboard, echoRecord, isEmpty, type Dashboard } from "./state";
+import { deriveDashboard, isEmpty, type Dashboard } from "./state";
+import { newestEchoSession } from "./echo-session";
 
 // G01 dashboard (docs/lanes/dashboard-design.md). Phone first, one column.
 // Six sections. Readings are shown for the newest photo reading only; a past
@@ -256,24 +253,10 @@ function ChatSection({ uid, dashboard, data }: { uid: string; dashboard: Dashboa
   const router = useRouter();
   const scanId = dashboard.echoScanId;
 
-  // Echo reads only scanId and region_scores from the session; the chat
-  // server loads the facts for that scanId itself.
   function openEcho() {
-    if (!scanId) return;
-    const record = echoRecord(uid, scanId, data.analyses);
-    if (!record) return;
-    const result = record as unknown as SkinScanResult;
-    const { bands } = bandScores(result.scores);
-    setSession({
-      scanId,
-      answers: (data.checks.find((c) => c.id === scanId)?.data.answers ?? {}) as SkinCheckAnswers,
-      result,
-      composite: summarizeConcerns(result.scores, bands),
-      // ponytail: no photo is held here; Echo never reads it. Load the stored original if Echo ever shows it.
-      photo: new Blob(),
-      captureMethod: (record.captureMethod as CaptureMethod | undefined) ?? "native",
-      fromDashboard: true,
-    });
+    const session = newestEchoSession(uid, data);
+    if (!session) return;
+    setSession(session);
     router.push("/echo");
   }
 

@@ -9,7 +9,7 @@ import { CAUSE, CHANGE, DIAGNOSIS, FORECAST, MEDICAL } from "@/lib/context/lexic
 // tests/dashboard-copy.test.ts covers) pass the same D-12 checks, and TD-25 (6):
 // the word "check" on screen, never "scan".
 
-const DIRS = ["components/checks", "components/timeline", "components/shell", "components/ui/page.tsx", "app/(marketing)/checks"];
+const DIRS = ["components/checks", "components/timeline", "components/shell", "components/ui/page.tsx", "app/(marketing)/checks", "components/skin-check/echoCopy.ts"];
 
 function sourceText(src: string): string[] {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
@@ -59,6 +59,12 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
         expect(problems(s), `${f}: ${s}`).toEqual([]);
         expect(saysScan(s), `${f}: ${s}`).toBe(false);
       }
+    }
+  });
+
+  it("TD-25 (6): the restyled Echo and check-flow screens never say scan (their lane wording keeps its own tests)", () => {
+    for (const f of ["components/skin-check/EchoPage.tsx"]) {
+      for (const s of sourceText(readFileSync(f, "utf8"))) expect(saysScan(s), `${f}: ${s}`).toBe(false);
     }
   });
 

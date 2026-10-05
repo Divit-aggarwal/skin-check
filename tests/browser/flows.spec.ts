@@ -6,6 +6,7 @@ import { RETAKE_COPY } from "@/lib/capture-quality/retake";
 import { AI_SHARE_CONSENT_COPY, ERASE_CONFIRMATION } from "@/lib/consent";
 import { ROUTINE_COPY as R } from "@/lib/routine/copy";
 import { TIMELINE_COPY as T } from "@/components/timeline/copy";
+import { ECHO_COPY as E } from "@/components/skin-check/echoCopy";
 import { DASHBOARD_SEED as U } from "./seed-users";
 import { shot, signIn } from "./helpers";
 
@@ -209,6 +210,27 @@ test("Ask Echo, back to the dashboard, a new check starts at the questions", asy
   await page.getByRole("link", { name: C.newCheck }).first().click();
   await expect(page.getByText(NAME_PROMPT)).toBeVisible();
   await expect(page.getByText("Your skin, understood.")).toHaveCount(0);
+});
+
+test("Echo opened from the nav or after a refresh talks about the newest check; no reading leads to a new check", async ({ page }) => {
+  await signIn(page, U.echo!.phoneNumber);
+  await page.goto("/echo");
+  await expect(page.getByRole("textbox")).toBeEnabled();
+  // The readings of the check being discussed, with the fixed line, in the fold-away panel on a phone.
+  await page.getByText(E.readingsSummary).click();
+  await expect(page.getByText(C.history.pastLine).first()).toBeVisible();
+  await expect(page.locator("main")).not.toContainText(/\/100|Dryness|Pores/);
+  await page.reload();
+  await expect(page.getByRole("textbox")).toBeEnabled();
+  await expect(page.getByText(/We lost your check-in/)).toHaveCount(0);
+  await shot(page, "echo-direct");
+});
+
+test("Echo with no photo reading: a designed empty state with a way to a new check", async ({ page }) => {
+  await signIn(page, U.noreading!.phoneNumber);
+  await page.goto("/echo");
+  await expect(page.getByText(C.chat.needsReading)).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: E.newCheck })).toHaveAttribute("href", "/skin-check");
 });
 
 test("K-1 fixed: Echo's back link after a dashboard hand-off returns to the dashboard", async ({ page }) => {
