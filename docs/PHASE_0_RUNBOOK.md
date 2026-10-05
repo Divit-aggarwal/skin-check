@@ -11,7 +11,7 @@ Stage 1 puts everything on `longitudinal-platform` into production and checks it
 
 | # | Step (section) | Who | Time | Stop line after it |
 |---|---|---|---|---|
-| 0 | Log in: `aws login`, `npx -y firebase-tools@latest login --reauth`, `vercel login` if needed; re-read production (C0, the A0 checks, B1 check) and compare with "Production state checked 2026-10-06" below | Owner | 10 min | Stop if anything differs from what this runbook assumes |
+| 0 | Log in: `aws login`, `npx -y firebase-tools@latest login --reauth`, `vercel login` if needed; if days have passed since 2026-10-06, re-read production (C0, the A0 checks, B1 check) and compare with "Production state checked 2026-10-06" below | Owner | 10 min | Stop if anything differs from what this runbook assumes |
 | 1 | P1: done (the engine branch is on GitHub, checked 2026-10-06); re-check only | Owner | 1 min | |
 | 2 | P2 / B01: remove the Admin and S3 keys from the laptop; rotate the Firebase Admin key and put the new one in Vercel Production | Owner | 20 min | Stop until `.env.local` holds no production key |
 | 3 | **Job C** from C2: task definition `skin-scan:2`, baseline, update service, watch 30 min, smoke scan, replay | Owner | 75 min | **STOP: JOB C DONE** |
@@ -32,7 +32,7 @@ Total: about 4.5 hours of owner time, plus waiting for the next daily sweep (ste
 
 **Must be done before Stage 2 (real users):** F06 helpline number, H06 final consent copy, G1 Gemini key and tier, F14 daily limit, E01 real catalogue (or hide the routine page), decision 5 and S5 photo expiry, and a review of everything the Stage 1 test accounts saw.
 
-## Production state checked 2026-10-06 (read-only)
+## Production state checked 2026-10-06 (read-only; AWS and Firestore re-read the same day after the logins were refreshed)
 
 | Item | Found | Runbook assumes | Same? |
 |---|---|---|---|
@@ -40,8 +40,13 @@ Total: about 4.5 hours of owner time, plus waiting for the next daily sweep (ste
 | `origin/master` | 1b39f88 (the local `master` branch is an unrelated 55b6f74; use `origin/master`) | 1b39f88 | Yes |
 | Engine health | `scan-0.1.5-provisional`, cv2 4.11.0 | 0.1.5 live until C3 | Yes |
 | Engine branch on GitHub (P1) | `engine-build-identity` at 8dc37dc on the remote | P1 not run | **No: P1 is already done** |
-| ECS task definition, live image digest, 0.1.6 and rollback images in ECR | Not re-read: the AWS session was expired | `skin-scan:1` only, digest `668b1f56…`, 0.1.6 `9a8f96c0…` in ECR | **Cannot check**: re-read in step 0 |
-| Firestore `(default)` region | Not re-read: the Firebase session was expired | nam5 until A1 | **Cannot check**: re-read in step 0 (A0) |
+| ECS service | `skin-scan-service` on `skin-scan:1`, one deployment PRIMARY / COMPLETED, 2 of 2 running, both tasks HEALTHY | `skin-scan:1`, 2 running | Matches |
+| Task definitions | `skin-scan:1` is the only revision | only `:1`, so C2 registers `:2` | Matches |
+| Live image | `skin-scan:sha-7f3695ef…`, running digest `sha256:668b1f56c4405b4aacad3b77076ac12c7d8e59a09bacc95693952a2e09455005` on both tasks | the same | Matches |
+| ECR rollback image | tag `sha-7f3695ef2bfbda37273411766531848774bd098e`, digest `668b1f56…` (pushed 2026-09-04) | present | Matches |
+| ECR 0.1.6 image | tag `sha-8dc37dc501ea974825427c665acd7019120c20ec`, digest `sha256:9a8f96c0a54025c4137b89dee181ba7fb140db1431fa95156cc20d8880e1fc2c` (pushed 2026-10-03) | present, `9a8f96c0…` | Matches |
+| ECR untagged entries | 4, the per-platform children of the two tagged images (2 pushed 2026-09-04, 2 on 2026-10-03) | protected by their tagged index (A18) | Matches |
+| Firestore `(default)` | the only database: location nam5, Standard, FIRESTORE_NATIVE, created 2026-09-08, delete protection and point-in-time recovery disabled | nam5 until A1 | Matches |
 | Vercel Production settings | 20 names present; `CRON_SECRET`, `S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID`, `S3_SKIN_IMAGES_ERASE_SECRET_ACCESS_KEY` missing | same | Yes |
 | `GEMINI_MODEL_SYNTHESIS` value | Stored as a secret, not readable | the model G1 approves | **Cannot check**: S6 sets it |
 | Merge dry runs | `infra/india-region` into this branch: conflicts in `DECISION_LOG.md` and `vercel.json`; this branch into `origin/master`: clean | D0 | Yes (D0 now also covers `vercel.json`) |
