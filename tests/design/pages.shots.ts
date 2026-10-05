@@ -89,12 +89,12 @@ test("routine empty and with products", async ({ page }) => {
   await page.goto("/routine");
   await page.waitForTimeout(1500);
   await shots(page, "routine-current");
-  const product = page.getByLabel("Product").first();
-  if (await product.count()) {
-    await product.selectOption({ index: 1 });
-    await page.getByRole("button", { name: "Add", exact: true }).click({ timeout: 5_000 }).catch(() => undefined);
+  const add = page.locator("section", { has: page.getByRole("heading", { name: "Add a product" }) });
+  if (await add.count()) {
+    await add.locator("select").first().selectOption({ index: 1 });
+    await add.getByRole("button", { name: "Add", exact: true }).click({ timeout: 5_000 }).catch(() => undefined);
     await page.waitForTimeout(1500);
-    await page.getByRole("button", { name: "Used", exact: true }).first().click({ timeout: 5_000 }).catch(() => undefined);
+    await page.getByRole("button", { name: /^Used: / }).first().click({ timeout: 5_000 }).catch(() => undefined);
     await page.waitForTimeout(1500);
     await shots(page, "routine-with-product");
   }

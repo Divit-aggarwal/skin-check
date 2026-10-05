@@ -155,16 +155,16 @@ test("routine: add a product, mark used, mark skipped, add other product, reload
   const first = await product.locator("option").nth(1).textContent();
   await product.selectOption({ index: 1 });
   await addSection.getByRole("button", { name: R.addButton, exact: true }).click();
-  // By the product name line only: every card's "Swap for" list also names the other products.
-  const card = (name: string) => page.locator("div.rounded-lg").filter({ has: page.locator("div.font-medium").getByText(name, { exact: true }) });
+  // By the product name heading only: every card's "Swap for" list also names the other products.
+  const card = (name: string) => page.locator("article[data-routine-card]").filter({ has: page.locator("h3").getByText(name, { exact: true }) });
   await expect(card(first!)).toBeVisible();
-  await card(first!).getByRole("button", { name: R.used, exact: true }).click();
+  await card(first!).getByRole("button", { name: R.logAs(R.status.used, first!, R.slot.AM.toLowerCase()) }).click();
   await expect(card(first!).getByText(`${R.today}, ${R.slot.AM}: ${R.status.used}`)).toBeVisible();
 
   await addSection.getByLabel(R.product).selectOption({ label: R.otherProduct });
   await addSection.getByRole("button", { name: R.addButton, exact: true }).click();
   await expect(card(R.otherProduct)).toBeVisible();
-  await card(R.otherProduct).getByRole("button", { name: R.skipped, exact: true }).click();
+  await card(R.otherProduct).getByRole("button", { name: R.logAs(R.status.skipped, R.otherProduct, R.slot.AM.toLowerCase()) }).click();
   await expect(card(R.otherProduct).getByText(`${R.today}, ${R.slot.AM}: ${R.status.skipped}`)).toBeVisible();
 
   await page.reload();
@@ -172,7 +172,7 @@ test("routine: add a product, mark used, mark skipped, add other product, reload
   await expect(card(R.otherProduct).getByText(`${R.today}, ${R.slot.AM}: ${R.status.skipped}`)).toBeVisible();
   // R-6: the page fits a 390 px phone screen, with long product names in every list.
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-  for (const el of await page.locator("select, div.rounded-lg").all()) {
+  for (const el of await page.locator("select, article[data-routine-card]").all()) {
     const box = await el.boundingBox();
     expect(box!.x + box!.width, await el.evaluate((n) => n.outerHTML.slice(0, 80))).toBeLessThanOrEqual(390);
   }
