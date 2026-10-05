@@ -9,7 +9,7 @@ import { CAUSE, CHANGE, DIAGNOSIS, FORECAST, MEDICAL } from "@/lib/context/lexic
 // tests/dashboard-copy.test.ts covers) pass the same D-12 checks, and TD-25 (6):
 // the word "check" on screen, never "scan".
 
-const DIRS = ["components/checks", "components/timeline", "components/shell", "components/ui/page.tsx", "app/(marketing)/checks", "components/skin-check/echoCopy.ts", "app/(marketing)/account/AccountView.tsx", "app/(marketing)/account/copy.ts"];
+const DIRS = ["components/checks", "components/timeline", "components/shell", "components/ui/page.tsx", "app/(marketing)/checks", "components/skin-check/echoCopy.ts", "app/(marketing)/account/AccountView.tsx", "app/(marketing)/account/copy.ts", "app/not-found.tsx", "app/(marketing)/error.tsx", "app/(marketing)/page.tsx", "app/(marketing)/echo/page.tsx"];
 
 function sourceText(src: string): string[] {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
@@ -88,6 +88,17 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
     expect(results).toMatch(/\.filter\(\(key\) => key !== "hydration"\)/);
     expect(results).toMatch(/readingsOf\(/);
     expect(results).toMatch(/<CheckReadings view=\{view\}/);
+  });
+
+  it("G03 3.9: every page has a designed loading state, an unknown address and a failed page get a designed screen with ways on", () => {
+    for (const f of ["app/(marketing)/dashboard/page.tsx", "app/(marketing)/checks/page.tsx", "app/(marketing)/checks/[scanId]/page.tsx", "app/(marketing)/echo/page.tsx"]) {
+      expect(readFileSync(f, "utf8"), f).toMatch(/fallback=\{\s*<main[\s\S]*<LoadingState/);
+    }
+    for (const f of ["app/not-found.tsx", "app/(marketing)/error.tsx"]) {
+      const src = readFileSync(f, "utf8");
+      expect(src, f).toMatch(/href="\/dashboard"/);
+    }
+    expect(readFileSync("app/(marketing)/error.tsx", "utf8")).toMatch(/role="alert"[\s\S]*onClick=\{reset\}/);
   });
 
   it("TD-24 (1): the opened check always shows the fixed line", () => {

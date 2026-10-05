@@ -14,4 +14,12 @@ export const SHELL_COPY = {
   },
   phoneEnding: (last4: string) => `Phone ending ${last4}`,
   signIn: "Sign in",
+  loading: "Loading…",
+  notFoundTitle: "This page could not be found",
+  notFoundBody: "The address may be mistyped, or the page has moved.",
+  errorTitle: "Something went wrong",
+  errorBody: "This page could not be shown just now. Nothing you saved is lost.",
+  tryAgain: "Try again",
+  goHome: "Go to Home",
+  startCheck: "Start a check",
 } as const;

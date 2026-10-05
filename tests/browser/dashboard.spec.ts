@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
 import { TIMELINE_COPY as T } from "@/components/timeline/copy";
 import { CHECKS_COPY as K } from "@/components/checks/copy";
+import { SHELL_COPY as S } from "@/components/shell/copy";
 import { ROUTINE_COPY as R } from "@/lib/routine/copy";
 import { DASHBOARD_SEED as U } from "./seed-users";
 import { shot, signIn } from "./helpers";
@@ -32,6 +33,14 @@ test("'/' opens the check flow when signed out and Home when signed in (TD-24 (3
   await signIn(page, U.one!.phoneNumber);
   await page.goto("/");
   await expect(page).toHaveURL(/\/dashboard$/);
+});
+
+test("an unknown address shows a designed page with ways on, inside the app shell", async ({ page }) => {
+  await signIn(page, U.one!.phoneNumber);
+  await page.goto("/no-such-page");
+  await expect(page.getByRole("heading", { name: S.notFoundTitle })).toBeVisible();
+  await expect(page.getByRole("main").getByRole("link", { name: S.goHome })).toHaveAttribute("href", "/dashboard");
+  await expect(page.getByRole("navigation", { name: S.navLabel }).first()).toBeAttached();
 });
 
 test("sign in as a seeded user and see the dashboard", async ({ page }) => {
