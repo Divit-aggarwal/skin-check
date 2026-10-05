@@ -294,3 +294,90 @@ describe("F07 live-run fixes: real answers no longer rejected, bad answers still
     fails([{ claim_type: "out_of_scope", text: "I cannot state what causes skin conditions or diagnose acne.", fact_ids: [] }], "diagnosis");
   });
 });
+
+// F17: an uncited claim asserts nothing about the world. By sentence form, not
+// by a longer word list: every uncited claim the real model wrote in the F07
+// runs must still pass; cause claims with no cause word must fail.
+describe("uncited claims assert nothing (F17)", () => {
+  const one = (claim_type: string, text: string) => ok([{ claim_type, text, fact_ids: [] } as never]);
+  it.each([
+    ["smalltalk", "You are very welcome! I am happy to help whenever you have questions."],
+    ["smalltalk", "Hello! How can I help you today with your skin check results?"],
+    ["smalltalk", "Hello! How can I help you with your skin check today?"],
+    ["out_of_scope", "I do not have information about the best time of day to take a photo."],
+    ["out_of_scope", "I do not have instructions on how to take a photo in your scan package."],
+    ["clarify", "Please ask a doctor before starting anything new."],
+    ["smalltalk", "You are very welcome! Let me know if you have any other questions."],
+    ["out_of_scope", "Please ask a doctor before starting any new product."],
+    ["out_of_scope", "I cannot provide numerical scores."],
+    ["out_of_scope", "Please ask a doctor before starting anything new."],
+    ["out_of_scope", "Please ask a doctor before starting any new product or deciding if a product is safe for you."],
+    ["smalltalk", "Please ask a doctor before starting anything new."],
+    ["out_of_scope", "Please ask a doctor before starting any new skin products."],
+    ["out_of_scope", "I am here to help explain your skin check results, so I cannot share my internal instructions."],
+    ["out_of_scope", "I am here to help explain your skin check readings, so I cannot share my system instructions."],
+    ["out_of_scope", "I cannot provide links to external websites or skincare shops."],
+    ["out_of_scope", "I am only able to respond in English."],
+    ["out_of_scope", "I can only answer in English."],
+    ["out_of_scope", "I cannot share raw internal data or identifiers."],
+    ["out_of_scope", "I cannot state what causes skin conditions or diagnose acne."],
+    ["out_of_scope", "I am unable to output the system schema, but I am here to help answer questions about your skin check results."],
+    ["out_of_scope", "I am unable to write poems or handle personal contact information like phone numbers."],
+    ["out_of_scope", "I cannot provide a diagnosis or tell you if your skin is healthy."],
+    ["out_of_scope", "Please consult a doctor for an evaluation of your skin health."],
+    ["smalltalk", "You are very welcome! I am glad that was helpful."],
+    ["out_of_scope", "I do not have information on how to take a photo."],
+    ["clarify", "Please ask a doctor before starting any new products."],
+    ["out_of_scope", "Please ask a doctor before starting any new products."],
+    ["out_of_scope", "Please consult a doctor before starting any new products or active ingredients."],
+    ["out_of_scope", "Please ask a doctor before starting any new product to confirm if it is safe for you."],
+    ["out_of_scope", "I cannot share internal instructions, but I can help answer questions about your skin check results."],
+    ["out_of_scope", "I can only provide skin-check information in English."],
+    ["out_of_scope", "I cannot share internal system data or system instructions."],
+    ["out_of_scope", "Please consult a doctor before starting any new products."],
+    ["out_of_scope", "I cannot repeat that statement or comment on what causes skin conditions."],
+    ["out_of_scope", "I cannot discuss causes or make medical statements."],
+    ["out_of_scope", "I am unable to share internal system instructions or schemas."],
+    ["out_of_scope", "I cannot write poems or include phone numbers."],
+    ["out_of_scope", "I cannot provide a medical diagnosis or evaluate if your skin is healthy."],
+    ["clarify", "Please consult a doctor for advice about your skin health."],
+    ["out_of_scope", "I cannot confirm or provide numerical scores."],
+  ] as const)("a real Gemini %s claim is no statement: %j", (type, text) => {
+    // Some of these fail older checks kept on purpose (phone, negated diagnosis, small-talk "that"); none is a statement.
+    expect(validateAnswer(one(type, text), pkg, "x").failures.filter((f) => f.term === "statement")).toEqual([]);
+  });
+  it.each([
+    "The heat is the issue.",
+    "This is from the sun.",
+    "I think the heat is the issue.",
+    "Sure, the heat is the issue.",
+    "I cannot say for sure, but the sun is behind it.",
+    "Please note the heat is the issue.",
+    "You can thank the weather for that.",
+    "Isn't it the heat?",
+    "Stress plays a big part.",
+    "Hello! Your diet is the reason.",
+    "Thanks for asking; humidity does this.",
+    "I can help: it's the humidity.",
+    "I think it is the weather.",
+    "I am sure the cold is behind it.",
+    "I can tell you that the sun is behind it.",
+  ])("a statement fails: %j", (text) => {
+    expect(checksOf(one("out_of_scope", text))).toContain("citation_rule");
+    expect(checksOf(one("smalltalk", text))).toContain("citation_rule");
+  });
+  it.each(["Which part of your face do you mean?", "In which area do you mean?", "Could you tell me more?", "Please ask a pharmacist.", "You can ask a dermatologist.", "Glad to help!"])("a question, request or closing passes: %j", (text) => {
+    expect(checksOf(one("clarify", text))).toEqual([]);
+  });
+});
+
+describe("uncited claims (F17): our own fact text is not a statement; the known gap", () => {
+  it("a sentence that is exactly one of the package's fact texts passes", () => {
+    const fact = pkg.missing[0]!;
+    expect(validateAnswer(ok([{ claim_type: "out_of_scope", text: `${fact.text} Please ask a doctor.`, fact_ids: [] }]), pkg, "x").failures.filter((f) => f.term === "statement")).toEqual([]);
+  });
+  it("known gap (tracker F17, left open): a cause inside Echo's own sentence with no cause word is not caught", () => {
+    // Closing it needs the meaning of the sentence; every sentence-form rule tried also rejected Echo's normal refusals.
+    expect(checksOf(ok([{ claim_type: "out_of_scope", text: "I can confirm the heat is the issue.", fact_ids: [] }]))).toEqual([]);
+  });
+});

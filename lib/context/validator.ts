@@ -137,6 +137,40 @@ const SAFE_PHRASES = [
 ];
 const neutral = (text: string) => SAFE_PHRASES.reduce((t, re) => t.replace(re, " "), text);
 const SKIN_CHECK_NAME = new RegExp(String.raw`\b(?:with|about|on) your skin checks?(?: results?| readings?)?\b`, "giu");
+// F17: an uncited claim (small talk, clarify, out of scope) carries no fact,
+// so it may assert nothing about the world: "the heat is the issue" and "this
+// is from the sun" name no cause word but still say why. By sentence form, not
+// by word list: after an optional greeting, every clause is Echo saying what it
+// can or cannot do, a question to the user, a request to see a doctor or
+// pharmacist, or a closing. Anything else fails citation_rule ("statement").
+const OPENER = new RegExp(String.raw`^(?:(?:hello|hi|hey|hiya|namaste|thanks|thank you|sure|of course|okay|ok|absolutely|got it|no problem|good question|great question)\b[\s,!.:-]*)+`, "iu");
+const CLAUSE_SPLIT = new RegExp(String.raw`\s*(?:[;:]|,\s*(?:but|so|and|though|although|while|because|since|as|which)\b|\s(?:but|so that|because|since|as)\s)\s*`, "iu");
+const CLAUSE_FORMS = [
+  // Echo on what it can or cannot do. Any verb, but not an opinion ("I think the
+  // heat is ...", "I am sure ...") and not a reported clause ("I can tell you that ...").
+  new RegExp(String.raw`^(?:i|echo)(?:'m| am| can(?:not|'t)?| could(?: not|n't)?| do(?: not|n't)| does(?: not|n't)| will| would| may not| won't| have no| only)\b(?!.*\b(?:think|believe|feel|guess|suspect|reckon|bet|sure|certain|confident|convinced)\b)(?!.*\b(?:that|:)\s+(?:the|this|it|your|my|stress|heat|sun|weather|diet|hormones?)\b)`, "iu"),
+  // a request to ask a professional, or to tell Echo more
+  new RegExp(String.raw`^(?:please\s+)?(?:ask|consult|talk to|speak (?:to|with)|see|check with|contact|reach out to)\s+(?:a|an|your)\s+(?:doctor|dermatologist|pharmacist|gp|physician|skin specialist)\b`, "iu"),
+  new RegExp(String.raw`^(?:please\s+)?(?:let me know|feel free|tell me|share)\b`, "iu"),
+  new RegExp(String.raw`^you (?:can|could|may)(?: also| always)? (?:ask|consult|talk|speak|see|check with|contact|tell me|share|try asking|rephrase)\b`, "iu"),
+  // a closing
+  new RegExp(String.raw`^(?:you(?:'re| are) (?:very |most |always )?welcome|anytime|happy to help|glad to help|glad (?:that|it|i could) help\w*)\b`, "iu"),
+];
+// A real question to the user; a negative question ("isn't it the heat?") asserts, so it is not one.
+const QUESTION = new RegExp(String.raw`^(?:(?:in|on|for|about|at|from|with|to) (?:which|what|where|whom)|how|what|which|where|when|who|could|can|would|will|do|does|did|is|are|may|should|shall|have|has)\b(?!n't)[^?]*\?$`, "iu");
+const sentenceKey = (t: string) => normalizeForMatch(t).toLowerCase().replace(/[.!?\s]+$/, "").trim();
+/** `own`: this package's fact texts, which are our words, not a statement by Gemini. */
+function uncitedStatement(text: string, own: Set<string>): string | null {
+  for (const raw of text.split(/(?<=[.!?])\s+/)) {
+    const sentence = raw.trim().replace(OPENER, "").trim();
+    if (!sentence || QUESTION.test(sentence) || own.has(sentenceKey(sentence))) continue;
+    for (const part of sentence.replace(/[.!]+$/, "").split(CLAUSE_SPLIT)) {
+      const clause = part.trim().replace(OPENER, "").trim();
+      if (clause && !CLAUSE_FORMS.some((f) => f.test(clause))) return clause;
+    }
+  }
+  return null;
+}
 const GOOD_QUESTION = new RegExp(String.raw`\b(?:good|great) question\b`, "giu");
 // An uncertainty or comparability claim cites the facts it is about (H20, finding 4).
 const NEEDS_KIND: Partial<Record<AllowedClaim, FactKind[]>> = { uncertainty: ["uncert", "missing", "long"], comparability: ["long", "missing", "confounder"] };
@@ -176,6 +210,7 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
   let redFlag = false;
 
   const facts = new Map(packageFacts(pkg).map((f) => [f.id, f]));
+  const ownTexts = new Set(packageFacts(pkg).flatMap((f) => f.text.split(/(?<=[.!?])\s+/).map(sentenceKey)));
   const readings = pkg.skin?.readings ?? [];
   const failures: Failure[] = [];
   const fail = (check: Check, claimIndex: number, term?: string) => failures.push({ check, claimIndex, ...(term ? { term } : {}) });
@@ -229,6 +264,7 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
       const phish = firstMatch(UNCITED_PHISH, text);
       if (phish) fail("citation_rule", i, phish);
     }
+    if (!MUST_CITE.has(claim.claim_type) && uncitedStatement(claim.text, ownTexts) !== null) fail("citation_rule", i, "statement");
     if (claim.claim_type === "clarify" || claim.claim_type === "out_of_scope") {
       const plain = text.replace(GOOD_QUESTION, " ");
       const state = UNCITED_SKIN_NOUN.test(plain) ? firstMatch(UNCITED_SKIN_STATE, plain) : null;

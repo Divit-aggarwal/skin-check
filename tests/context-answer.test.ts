@@ -38,9 +38,10 @@ describe("answer path", () => {
     const out = await run(g);
     expect(g).toHaveBeenCalledTimes(2);
     const note = g.mock.calls[1]![0] as string;
-    expect(note).toContain("rejected by these checks: cause");
+    // F17: an uncited statement fails citation_rule too.
+    expect(note).toContain("rejected by these checks: citation_rule, cause");
     expect(note).not.toContain("caused by stress");
-    expect(out.validator).toEqual({ passed: true, failures: ["cause"], regenerated: true, fallback: false });
+    expect(out.validator).toEqual({ passed: true, failures: ["citation_rule", "cause"], regenerated: true, fallback: false });
   });
 
   it("retry fails too: fallback, never a third call", async () => {
@@ -71,7 +72,7 @@ describe("answer path", () => {
     const g = fake(premise, GOOD);
     const out = await run(g, { message: "is it better now?" });
     expect(g).toHaveBeenCalledTimes(1);
-    expect(out.validator).toMatchObject({ fallback: true, failures: ["comparative_or_change"] });
+    expect(out.validator).toMatchObject({ fallback: true, failures: ["citation_rule", "comparative_or_change"] });
   });
 
   it.each([
