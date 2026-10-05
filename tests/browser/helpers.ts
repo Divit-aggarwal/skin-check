@@ -36,7 +36,8 @@ export async function completePhoneForm(page: Page, phoneNumber: string) {
 export async function signIn(page: Page, phoneNumber: string) {
   await page.goto("/account");
   await completePhoneForm(page, phoneNumber);
-  await expect(page.getByText(/Signed in as/)).toBeVisible();
+  // TD-24 (3): a sign-in on /account goes to Home.
+  await expect(page).toHaveURL(/\/dashboard$/);
 }
 
 /** Saves a full-page screenshot under .local-stack/ (gitignored); the lane report keeps its own copies in docs/lanes/. */

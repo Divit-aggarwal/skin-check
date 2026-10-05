@@ -4,7 +4,9 @@ import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
 import { clearDraft } from "@/lib/skin-check-draft";
 import { clearUnder18Chosen, ERASE_CONFIRMATION, ERASE_COPY, ERASE_MAX_AUTH_AGE_SECONDS } from "@/lib/consent";
-import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { btnPrimary, btnSecondary, h2 } from "@/components/ui/page";
+import { ACCOUNT_COPY as A } from "./copy";
 
 // H01b: a signed-in user deletes their account and every copy of their data
 // we hold (S3 photos, Firestore, the sign-in account). The server does the
@@ -25,9 +27,12 @@ export function DeleteAccount() {
 
   if (state.kind === "done") {
     return (
-      <div className="flex flex-col gap-1">
-        <p className="text-body text-text/70">{ERASE_COPY.done}</p>
-        <p className="text-body text-text/70">{ERASE_COPY.doneLate}</p>
+      <div role="status" className="flex flex-col items-start gap-3 rounded-2xl bg-brand-linen p-5 sm:p-6">
+        <p className="font-semibold">{ERASE_COPY.done}</p>
+        <p className="text-brand-muted">{ERASE_COPY.doneLate}</p>
+        <Link href="/skin-check" className={btnPrimary}>
+          {A.startCheck}
+        </Link>
       </div>
     );
   }
@@ -65,41 +70,48 @@ export function DeleteAccount() {
   }
 
   return (
-    <section className="flex flex-col gap-3 border-t border-text/10 pt-6">
-      <h2 className="font-display text-lg text-text">Delete your account</h2>
-      <p className="text-body text-text/60">{ERASE_COPY.explain}</p>
-      <p className="text-body text-text/60">{ERASE_COPY.gemini}</p>
-      <p className="text-body text-text/60">{ERASE_COPY.otherBrowsers}</p>
+    <section aria-labelledby="delete-title" className="flex flex-col items-start gap-3 rounded-2xl border border-brand-error/40 p-5 sm:p-6">
+      <h2 id="delete-title" className={h2}>
+        {A.deleteTitle}
+      </h2>
+      <p>{ERASE_COPY.explain}</p>
+      <p className="text-brand-muted">{ERASE_COPY.gemini}</p>
+      <p className="text-brand-muted">{ERASE_COPY.otherBrowsers}</p>
       {state.kind === "idle" && (
-        <Button variant="outline" onClick={() => setState({ kind: "confirming", typed: "" })}>
-          Delete my account and data
-        </Button>
+        <button type="button" className={`${btnSecondary} border-brand-error text-brand-error hover:bg-brand-accent-soft`} onClick={() => setState({ kind: "confirming", typed: "" })}>
+          {A.deleteButton}
+        </button>
       )}
       {state.kind === "confirming" && (
-        <div className="flex flex-col gap-2">
-          <label htmlFor="erase-confirm" className="text-body text-text/70">
-            Type <span className="font-medium text-text">{ERASE_CONFIRMATION}</span> to confirm.
+        <div className="flex w-full flex-col gap-2">
+          <label htmlFor="erase-confirm" className="text-sm font-medium">
+            Type <span className="font-semibold">{ERASE_CONFIRMATION}</span> to confirm.
           </label>
           <input
             id="erase-confirm"
-            className="h-11 rounded-lg border border-text/20 bg-transparent px-3 text-text"
+            className="h-12 w-full rounded-lg border border-brand-line bg-brand-paper px-3 text-base text-brand-ink"
             value={state.typed}
             autoComplete="off"
             onChange={(e) => setState({ kind: "confirming", typed: e.target.value })}
           />
-          <div className="flex gap-2">
-            <Button variant="destructive" disabled={state.typed !== ERASE_CONFIRMATION} onClick={() => void erase()}>
-              Delete permanently
-            </Button>
-            <Button variant="ghost" onClick={() => setState({ kind: "idle" })}>
-              Cancel
-            </Button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="inline-flex min-h-12 items-center justify-center rounded-full bg-brand-error px-6 font-medium text-white hover:opacity-90 disabled:opacity-40 sm:min-h-11"
+              disabled={state.typed !== ERASE_CONFIRMATION}
+              onClick={() => void erase()}
+            >
+              {A.deletePermanently}
+            </button>
+            <button type="button" className={btnSecondary} onClick={() => setState({ kind: "idle" })}>
+              {A.cancel}
+            </button>
           </div>
         </div>
       )}
-      {state.kind === "working" && <p className="text-body text-text/70">Deleting…</p>}
+      {state.kind === "working" && <p role="status">{A.deleting}</p>}
       {state.kind === "error" && (
-        <p role="alert" className="text-body text-text">
+        <p role="alert" className="text-brand-error">
           {state.message}
         </p>
       )}

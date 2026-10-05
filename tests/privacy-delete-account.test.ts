@@ -5,11 +5,13 @@ import { describe, expect, it } from "vitest";
 // component's request and its success path are pinned at the source. The
 // route behind it is covered by privacy-erase and privacy.e2e.
 const src = readFileSync("app/(marketing)/account/DeleteAccount.tsx", "utf8");
-const page = readFileSync("app/(marketing)/account/page.tsx", "utf8");
+// G03 3.7: /account renders AccountView, which renders DeleteAccount.
+const page = readFileSync("app/(marketing)/account/page.tsx", "utf8") + readFileSync("app/(marketing)/account/AccountView.tsx", "utf8");
 
 describe("DeleteAccount", () => {
   it("is a client component rendered on /account", () => {
     expect(src.startsWith('"use client";')).toBe(true);
+    expect(page).toContain("<AccountView />");
     expect(page).toContain("<DeleteAccount />");
   });
 

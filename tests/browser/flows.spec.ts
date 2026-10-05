@@ -243,6 +243,17 @@ test("K-1 fixed: Echo's back link after a dashboard hand-off returns to the dash
   await expect(page.getByRole("heading", { name: C.title })).toBeVisible();
 });
 
+test("account: sign-in lands on Home; the account page has the sign-in, privacy and delete, and no second history list", async ({ page }) => {
+  await signIn(page, U.withdraw!.phoneNumber); // the helper asserts the sign-in went to /dashboard (TD-24 (3))
+  await page.goto("/account");
+  await expect(page.getByText(/Signed in as/)).toBeVisible();
+  await expect(page.getByRole("heading", { name: C.privacy.title })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Delete your account" })).toBeVisible();
+  await expect(page.getByText(C.history.kind.reading)).toHaveCount(0);
+  await expect(page.getByRole("main")).not.toContainText(/\bscans?\b/i);
+  await shot(page, "account");
+});
+
 test("delete the account, sign in again, no history", async ({ page }) => {
   await signIn(page, U.erase!.phoneNumber);
   await page.goto("/dashboard");
@@ -278,20 +289,20 @@ test("O-D3: the signed-in start page and the account page link to the dashboard;
   await expect(page).toHaveURL(/\/dashboard$/);
 });
 
-// R-5: the same checks, the same labels, on /account and /dashboard.
+// TD-25 (6) replaces R-5: one history list. Every check is on /checks with
+// the dashboard's own labels; /account lists none.
 for (const key of ["noreading", "legacy", "building"] as const) {
-  test(`R-5: /account and /dashboard label each check the same way (${key})`, async ({ page }) => {
+  test(`one history list: /checks labels every check the dashboard way, /account lists none (${key})`, async ({ page }) => {
     const user = U[key]!;
     const kinds = Object.values(C.history.kind);
     const label = new RegExp(`^(${kinds.join("|")})$`);
     await signIn(page, user.phoneNumber);
-    await page.goto("/dashboard");
-    await expect(page.getByText(label).first()).toBeVisible();
-    const onDashboard = (await page.getByText(label).allTextContents()).sort();
+    await page.goto("/checks");
+    const list = page.locator("section", { has: page.getByRole("heading", { name: C.history.title }) });
+    await expect(list.getByText(label).first()).toBeVisible();
+    expect(await list.getByText(label).allTextContents()).toHaveLength(user.checks.length);
     await page.goto("/account");
-    await expect(page.getByText(label).first()).toBeVisible();
-    const onAccount = (await page.getByText(label).allTextContents()).sort();
-    expect(onAccount).toEqual(onDashboard);
-    expect(onAccount).toHaveLength(user.checks.length);
+    await expect(page.getByRole("heading", { name: C.privacy.title })).toBeVisible();
+    await expect(page.getByRole("main").getByText(label)).toHaveCount(0);
   });
 }

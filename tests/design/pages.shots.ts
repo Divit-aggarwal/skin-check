@@ -127,6 +127,7 @@ test("echo with sharing on", async ({ page }) => {
 
 test("account signed in", async ({ page }) => {
   await signIn(page, U.one!.phoneNumber);
+  await page.goto("/account");
   await page.waitForTimeout(1500);
   await shots(page, "account-signed-in");
 });
@@ -176,6 +177,7 @@ test("check flow: a dark photo asks for a retake", async ({ page }) => {
 
 test("account: delete confirmation open (not submitted)", async ({ page }) => {
   await signIn(page, U.withdraw!.phoneNumber);
+  await page.goto("/account");
   await page.getByRole("button", { name: "Delete my account and data" }).click();
   await expect(page.getByLabel(/to confirm/)).toBeVisible();
   await shots(page, "account-delete-confirm");

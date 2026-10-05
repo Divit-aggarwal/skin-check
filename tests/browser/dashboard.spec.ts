@@ -26,6 +26,14 @@ test("signed out: a sign-in link only", async ({ page }) => {
   await shot(page, "signed-out");
 });
 
+test("'/' opens the check flow when signed out and Home when signed in (TD-24 (3))", async ({ page }) => {
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/skin-check$/);
+  await signIn(page, U.one!.phoneNumber);
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/dashboard$/);
+});
+
 test("sign in as a seeded user and see the dashboard", async ({ page }) => {
   await dashboardAs(page, U.building!.phoneNumber);
   // G03 Home: latest check, starting point, today's routine, recent timeline, Echo, a new check, privacy.

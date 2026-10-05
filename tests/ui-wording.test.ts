@@ -9,7 +9,7 @@ import { CAUSE, CHANGE, DIAGNOSIS, FORECAST, MEDICAL } from "@/lib/context/lexic
 // tests/dashboard-copy.test.ts covers) pass the same D-12 checks, and TD-25 (6):
 // the word "check" on screen, never "scan".
 
-const DIRS = ["components/checks", "components/timeline", "components/shell", "components/ui/page.tsx", "app/(marketing)/checks", "components/skin-check/echoCopy.ts"];
+const DIRS = ["components/checks", "components/timeline", "components/shell", "components/ui/page.tsx", "app/(marketing)/checks", "components/skin-check/echoCopy.ts", "app/(marketing)/account/AccountView.tsx", "app/(marketing)/account/copy.ts"];
 
 function sourceText(src: string): string[] {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");

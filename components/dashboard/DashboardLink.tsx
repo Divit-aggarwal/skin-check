@@ -13,7 +13,7 @@ export function DashboardLink({ className = "" }: { className?: string }) {
   const { user, loading } = useAuth();
   if (loading || !user) return null;
   return (
-    <Link href="/dashboard" className={`text-sm font-medium text-text underline underline-offset-4 ${className}`}>
+    <Link href="/dashboard" className={`inline-flex min-h-11 items-center font-medium text-brand-forest underline-offset-4 hover:underline ${className}`}>
       {DASHBOARD_COPY.entryLink}
     </Link>
   );

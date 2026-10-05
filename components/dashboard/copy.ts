@@ -6,7 +6,7 @@
 export const DASHBOARD_COPY = {
   title: "Your skin checks",
   // O-D3: the link to /dashboard from the results screen, /account and the signed-in start page.
-  entryLink: "See all your skin checks",
+  entryLink: "Go to Home",
   signedOut: "Sign in to see your skin checks.",
   signIn: "Sign in",
   loading: "Loading your checks…",

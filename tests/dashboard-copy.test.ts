@@ -115,7 +115,7 @@ describe("dashboard owner decisions (TD-18)", () => {
     // Once on the results screen (complete) and once on the first section (start page).
     expect(flow.match(/<DashboardLink\b/g)).toHaveLength(2);
     expect(flow).toMatch(/isFirst && !complete && \(/);
-    expect(readFileSync("app/(marketing)/account/page.tsx", "utf8")).toMatch(/<DashboardLink \/>/);
+    expect(readFileSync("app/(marketing)/account/AccountView.tsx", "utf8")).toMatch(/<DashboardLink \/>/);
   });
 
   it("O-D6: no trend text says 'yet'", () => {
@@ -142,13 +142,17 @@ describe("K-1", () => {
   });
 });
 
-// R-5: /account and /dashboard give the same check the same label.
-describe("R-5", () => {
-  it("PreviousScans classifies with deriveDashboard and labels with the dashboard's own copy and date format", () => {
-    const src = readFileSync("components/skin-check/PreviousScans.tsx", "utf8");
-    expect(src).toMatch(/deriveDashboard\(user\.uid, checks, analyses\)\.history/);
-    expect(src).toMatch(/DASHBOARD_COPY\.history\.kind\[scan\.kind\]/);
-    expect(src).toMatch(/formatDate\(scan\.date\)/);
-    expect(src).not.toMatch(/Photo analyzed|Questionnaire only|STATUS_LABEL|toLocaleDateString/);
+// TD-25 (6): one history list only. The account page's "previous scans" list
+// (and its R-5 label test) is gone; every check is listed on /checks, with
+// the dashboard's own labels and dates.
+describe("one history list (TD-25 (6))", () => {
+  it("no account file renders a list of checks, and the old list component is removed", () => {
+    expect(existsSync("components/skin-check/PreviousScans.tsx")).toBe(false);
+    for (const f of ["app/(marketing)/account/page.tsx", "app/(marketing)/account/AccountView.tsx"]) {
+      expect(readFileSync(f, "utf8"), f).not.toMatch(/PreviousScans|deriveDashboard|history\.kind/);
+    }
+    const checks = readFileSync("components/checks/ChecksView.tsx", "utf8");
+    expect(checks).toMatch(/C\.history\.kind\[row\.kind\]/);
+    expect(checks).toMatch(/formatDate\(row\.date\)/);
   });
 });

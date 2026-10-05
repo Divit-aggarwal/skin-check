@@ -12,15 +12,8 @@ const nextConfig = {
 
   compress: true,
 
-  // There is no "/" route — the app's only entry points are /skin-check,
-  // /echo and /account — so the root returned a 404 in production. That is
-  // the first thing anyone arriving from the Shopify storefront would hit,
-  // so send them to the funnel instead. Not permanent (307, not 308): if a
-  // real landing page is ever added at "/", a permanent redirect cached in
-  // users' browsers would keep redirecting past it.
-  async redirects() {
-    return [{ source: "/", destination: "/skin-check", permanent: false }];
-  },
+  // "/" is app/(marketing)/page.tsx (G03, TD-24 (3)): Home when signed in,
+  // the check flow when not. It replaced a fixed redirect to /skin-check.
 
   logging: {
     fetches: {
