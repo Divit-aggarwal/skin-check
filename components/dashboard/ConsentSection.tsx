@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
-import { Button } from "@/components/ui/button";
+import { btnSecondary, card, h2 } from "@/components/ui/page";
 import { DASHBOARD_COPY } from "./copy";
 import { loadLedger } from "./data";
 import { aiShareStatus, photoKeptFrom, withdrawalOutcome, type AiShareStatus, type Dashboard } from "./state";
@@ -62,29 +62,29 @@ export function ConsentSection({ photo = null, deleteLink = false }: { photo?: D
   }
 
   return (
-    <section aria-labelledby="privacy-title" className="flex flex-col gap-3">
-      <h2 id="privacy-title" className="font-display text-lg text-text">
+    <section aria-labelledby="privacy-title" className={`${card} flex flex-col items-start gap-3`}>
+      <h2 id="privacy-title" className={h2}>
         {C.title}
       </h2>
       {status === "on" && (
         <>
-          <p className="text-body text-text/70">{C.aiOn}</p>
-          <Button variant="outline" className="self-start" disabled={saving} onClick={() => void withdraw()}>
+          <p>{C.aiOn}</p>
+          <button type="button" className={btnSecondary} disabled={saving} onClick={() => void withdraw()}>
             {saving ? C.saving : C.stop}
-          </Button>
+          </button>
         </>
       )}
-      {status === null && !failed && <p className="text-body text-text/60">{C.loading}</p>}
-      {status === "off" && <p className="text-body text-text/70">{C.aiOff}</p>}
-      {status === "not_asked" && <p className="text-body text-text/70">{C.aiNotAsked}</p>}
+      {status === null && !failed && <p role="status" className="text-brand-muted">{C.loading}</p>}
+      {status === "off" && <p>{C.aiOff}</p>}
+      {status === "not_asked" && <p>{C.aiNotAsked}</p>}
       {failed && (
-        <p role="alert" className="text-body text-text">
+        <p role="alert">
           {failed === "stale" ? C.stale : failed === "load" ? C.loadFailed : C.failed}
         </p>
       )}
-      {photoKept !== null && <p className="text-body text-text/70">{photoKept ? C.photoKept : C.photoNotKept}</p>}
+      {photoKept !== null && <p className="text-brand-muted">{photoKept ? C.photoKept : C.photoNotKept}</p>}
       {deleteLink && (
-        <Link href="/account#delete-account" className="w-fit text-sm text-text underline underline-offset-4">
+        <Link href="/account#delete-account" className="inline-flex min-h-11 items-center font-medium text-brand-forest underline-offset-4 hover:underline">
           {C.delete}
         </Link>
       )}

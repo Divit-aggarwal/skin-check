@@ -13,6 +13,7 @@ import { bandScores, type Band, type BandableMetric } from "@/lib/skin-check-rul
 import { METRIC_LABELS } from "@/lib/skin-check-skus";
 import { toSkinState2, type SkinState2 } from "@/lib/skin-state-2";
 import { SkinScanScoresSchema } from "@/types/skin-scan";
+import { ECHO_REGIONS, ECHO_REGION_LABELS, type EchoRegion } from "@/lib/echo-regions";
 
 /** One Firestore document: its id and its data, as read. */
 export interface Doc {
@@ -23,12 +24,23 @@ export interface Doc {
 export type PhotoCheck = "pass" | "override" | "unchecked" | "not_recorded";
 export type HistoryKind = "reading" | "legacy" | "failed" | "questions";
 
+export type Bands = { metric: BandableMetric; label: string; band: Band }[];
+
+/** One face area's readings from the same photo; bands null when that area's scores could not be read. */
+export interface AreaReadings {
+  region: EchoRegion;
+  label: string;
+  bands: Bands | null;
+}
+
 export interface CheckView {
   scanId: string;
   date: Date | null;
   source: "measured" | "legacy";
   /** null when the stored scores could not be read. */
-  bands: { metric: BandableMetric; label: string; band: Band }[] | null;
+  bands: Bands | null;
+  /** Readings by face area (G03 Home and opened check); empty when the record has none. */
+  areas: AreaReadings[];
   hardToRead: string[];
   /** null for a legacy check: it predates the photo checks. */
   photoCheck: PhotoCheck | null;
@@ -38,6 +50,12 @@ export interface HistoryRow {
   scanId: string;
   date: Date | null;
   kind: HistoryKind;
+  /**
+   * The client-written record says the photo was kept. Not shown as "kept" on
+   * its own (H27): the thumbnail comes from /api/checks/photo, which checks
+   * the stored object itself and shows nothing when there is none.
+   */
+  photoClaimed: boolean;
 }
 
 export type Current = { kind: "reading"; view: CheckView } | { kind: "none" };
@@ -82,7 +100,7 @@ export function toDate(v: unknown): Date | null {
 /** Newest first; a pending timestamp is the newest of all. */
 const newestFirst = (a: Date | null, b: Date | null) => (b?.getTime() ?? Infinity) - (a?.getTime() ?? Infinity);
 
-function bandsOf(scores: unknown): CheckView["bands"] {
+function bandsOf(scores: unknown): Bands | null {
   const parsed = SkinScanScoresSchema.safeParse(scores);
   if (!parsed.success) return null;
   const { bands } = bandScores(parsed.data);
@@ -90,6 +108,24 @@ function bandsOf(scores: unknown): CheckView["bands"] {
   return (Object.keys(METRIC_LABELS) as BandableMetric[])
     .filter((metric) => metric !== "hydration")
     .map((metric) => ({ metric, label: METRIC_LABELS[metric], band: bands[metric] }));
+}
+
+/** Readings by face area, in the fixed Echo order; only areas the record has. */
+function areasOf(regionScores: unknown): AreaReadings[] {
+  if (!isObj(regionScores)) return [];
+  return ECHO_REGIONS.filter((r) => isObj(regionScores[r])).map((region) => ({
+    region,
+    label: ECHO_REGION_LABELS[region],
+    bands: bandsOf(regionScores[region]),
+  }));
+}
+
+/**
+ * The readings of one result, as every screen shows them (dashboard, opened
+ * check, results screen, Echo's panel): band words only, no Dryness, no score.
+ */
+export function readingsOf(result: { scores?: unknown; region_scores?: unknown; region_low_confidence?: unknown }) {
+  return { bands: bandsOf(result.scores), areas: areasOf(result.region_scores), hardToRead: hardToRead(result.region_low_confidence) };
 }
 
 function hardToRead(flags: unknown): string[] {
@@ -129,6 +165,7 @@ function measuredView(m: Measured): CheckView {
     date: m.date,
     source: "measured",
     bands: bandsOf(m.record.scores),
+    areas: areasOf(m.record.region_scores),
     hardToRead: hardToRead(m.record.region_low_confidence),
     photoCheck: photoCheckOf(m.record),
   };
@@ -140,6 +177,7 @@ function legacyView(check: Doc, result: Obj): CheckView {
     date: toDate(check.data.createdAt),
     source: "legacy",
     bands: bandsOf(result.scores),
+    areas: areasOf(result.region_scores),
     hardToRead: hardToRead(result.region_low_confidence),
     photoCheck: null,
   };
@@ -195,6 +233,7 @@ export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: r
     scanId: c.id,
     date: toDate(c.data.createdAt),
     kind: byScan.has(c.id) ? "reading" : legacyResultOf(c) ? "legacy" : c.data.status === "analysis_failed" ? "failed" : "questions",
+    photoClaimed: isObj(c.data.image) && c.data.image.stored === true,
   }));
 
   const newestMeasured = Array.from(byScan.values()).sort((a, b) => newestFirst(a.date, b.date))[0];
@@ -243,24 +282,27 @@ export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: r
   };
 }
 
-export interface PastCheck {
-  scanId: string;
-  date: Date | null;
-  kind: HistoryKind;
+export interface PastCheck extends HistoryRow {
   /** The phone's photo-check result; null when the check had no measured reading. */
   photoCheck: PhotoCheck | null;
+  /** This check's own readings; null when it has none (questions only, failed). */
+  view: CheckView | null;
 }
 
 /**
- * One past check: date, kind and photo check only. No readings: each band is
- * relative to its own photo, and the previous-scans list may show dates and
- * photos only (LONGITUDINAL_METHOD §1). null when the id is not one of this user's checks.
+ * One opened check with its own readings (TD-24 (1), replacing O-D4). Each band
+ * is relative to its own photo, so the screen always carries the fixed line
+ * (PAST_CHECK_LINE) and never sets two checks' readings side by side.
+ * null when the id is not one of this user's checks.
  */
 export function pastCheck(uid: string, scanId: string, checks: readonly Doc[], analyses: readonly Doc[]): PastCheck | null {
   const row = deriveDashboard(uid, checks, analyses).history.find((h) => h.scanId === scanId);
   if (!row) return null;
   const m = primaryPerScan(uid, analyses).get(scanId);
-  return { ...row, photoCheck: m ? photoCheckOf(m.record) : null };
+  const check = checks.find((c) => c.id === scanId);
+  const legacy = !m && check ? legacyResultOf(check) : null;
+  const view = m ? measuredView(m) : check && legacy ? legacyView(check, legacy) : null;
+  return { ...row, photoCheck: m ? photoCheckOf(m.record) : null, view };
 }
 
 /** The analysis record Echo will load's session: the server loads the facts from its scanId. */

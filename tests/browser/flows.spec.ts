@@ -5,6 +5,7 @@ import { CAPTURE_QUALITY_SETTINGS } from "@/lib/capture-quality/settings";
 import { RETAKE_COPY } from "@/lib/capture-quality/retake";
 import { AI_SHARE_CONSENT_COPY, ERASE_CONFIRMATION } from "@/lib/consent";
 import { ROUTINE_COPY as R } from "@/lib/routine/copy";
+import { TIMELINE_COPY as T } from "@/components/timeline/copy";
 import { DASHBOARD_SEED as U } from "./seed-users";
 import { shot, signIn } from "./helpers";
 
@@ -176,6 +177,27 @@ test("routine: add a product, mark used, mark skipped, add other product, reload
     expect(box!.x + box!.width, await el.evaluate((n) => n.outerHTML.slice(0, 80))).toBeLessThanOrEqual(390);
   }
   await page.screenshot({ path: ".local-stack/browser-shots/dashboard-flow-routine.png", fullPage: true });
+});
+
+test("Home: today's routine logs used or skipped in one tap, and the entry shows in Recently", async ({ page }) => {
+  await signIn(page, U.routine!.phoneNumber);
+  await page.goto("/routine");
+  const addSection = page.locator("section", { has: page.getByRole("heading", { name: R.add }) });
+  await addSection.getByLabel(R.product).selectOption({ index: 1 });
+  const name = (await addSection.getByLabel(R.product).locator("option:checked").textContent())!;
+  const saved = page.waitForResponse((r) => r.url().includes("/api/routine/events") && r.request().method() === "POST" && r.ok());
+  await addSection.getByRole("button", { name: R.addButton, exact: true }).click();
+  await saved;
+
+  await page.goto("/dashboard");
+  const today = page.locator("section", { has: page.getByRole("heading", { name: R.todayTitle }) });
+  const used = today.getByRole("button", { name: R.logAs(R.status.used, name, R.slot.AM.toLowerCase()) });
+  await used.click();
+  await expect(used).toHaveAttribute("aria-pressed", "true");
+  await expect(today.getByText(`${R.slot.AM} · ${R.status.used}`)).toBeVisible();
+  const recent = page.locator("section", { has: page.getByRole("heading", { name: T.recent }) });
+  await expect(recent.getByText(T.routine.usage(name, R.slot.AM.toLowerCase(), R.status.used))).toBeVisible();
+  await shot(page, "home-routine");
 });
 
 test("Ask Echo, back to the dashboard, a new check starts at the questions", async ({ page }) => {

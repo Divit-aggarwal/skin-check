@@ -74,6 +74,13 @@ async function main() {
         ...syntheticNative(),
         // Varied per check so bands differ between checks; still synthetic.
         scores: { redness: 0.3 + 0.1 * (i % 3), oiliness: 0.5, texture: 0.4, pores: 0, blemishes: 0.2, hydration: 0.6, pigment: 0.5 },
+        // Readings by face area, as the engine returns them (G03 Home and opened check). Synthetic.
+        region_scores: Object.fromEntries(
+          (["forehead", "cheeks", "nose", "chin"] as const).map((r, k) => [
+            r,
+            { redness: 0.25 + 0.15 * ((i + k) % 3), oiliness: 0.5, texture: 0.35 + 0.1 * k, pores: 0, blemishes: 0.2 + 0.1 * (k % 2), hydration: 0.6, pigment: 0.5 },
+          ])
+        ),
         region_low_confidence: { forehead: c.lowForehead === true, nose: false, chin: false, cheeks: false },
         pipeline_version: "scan-0.1.6-provisional",
         engine_build: c.build ?? BUILD,

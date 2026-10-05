@@ -7,8 +7,14 @@ import { useAuth } from "@/lib/auth-context";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
 import { bandScores } from "@/lib/skin-check-rules";
 import { summarizeConcerns } from "@/lib/skin-check-score";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { ChevronRight } from "lucide-react";
+import { btnPrimary, btnSecondary, card, EmptyState, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";
+import { TodayCard } from "@/components/routine/TodayCard";
+import { useRoutine } from "@/components/routine/useRoutine";
+import { TIMELINE_COPY } from "@/components/timeline/copy";
+import { dayOf, mergeTimeline } from "@/components/timeline/timeline";
+import { TimelineList } from "@/components/timeline/TimelineList";
+import { ROUTINE_COPY } from "@/lib/routine/copy";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanResult } from "@/types/skin-scan";
 import { CheckReadings, formatDate, KnownAndNotKnown } from "./CheckReadings";
@@ -22,8 +28,6 @@ import { deriveDashboard, echoRecord, isEmpty, pastCheck, type Dashboard } from 
 // check opens on its own page with its date, kind and photo check, never its
 // readings (LONGITUDINAL_METHOD §1), so no two checks' readings meet.
 
-const section = "flex flex-col gap-3";
-const h2 = "font-display text-lg text-text";
 const link = "w-fit text-sm font-medium text-text underline underline-offset-4";
 
 type Load = { kind: "loading" } | { kind: "error" } | { kind: "ready"; data: DashboardData };
@@ -33,6 +37,7 @@ export function DashboardPage() {
   const [load, setLoad] = useState<Load>({ kind: "loading" });
   const openId = useSearchParams().get("check");
   const { setSession } = useSkinCheckSession();
+  const routine = useRoutine();
 
   // A session in the shared provider makes /skin-check reopen that scan's
   // results screen (lib/useSkinCheckFlow.ts). Clear it here, so the dashboard's
@@ -64,31 +69,28 @@ export function DashboardPage() {
   if (loading || (user && load.kind === "loading")) {
     return (
       <Shell>
-        <p className="text-body text-text/60">{C.loading}</p>
-        <div className="flex flex-col gap-3" aria-hidden>
-          <Skeleton className="h-40 w-full rounded-lg" />
-          <Skeleton className="h-24 w-full rounded-lg" />
-          <Skeleton className="h-24 w-full rounded-lg" />
-        </div>
+        <LoadingState label={C.loading} blocks={["h-96", "h-40", "h-40"]} />
       </Shell>
     );
   }
   if (!user) {
     return (
       <Shell>
-        <p className="text-body text-text/70">{C.signedOut}</p>
-        <Link href="/account" className={link}>
-          {C.signIn}
-        </Link>
+        <EmptyState
+          body={C.signedOut}
+          action={
+            <Link href="/account" className={btnPrimary}>
+              {C.signIn}
+            </Link>
+          }
+        />
       </Shell>
     );
   }
   if (load.kind === "error" || !dashboard || load.kind !== "ready") {
     return (
       <Shell>
-        <p role="alert" className="text-body text-text/70">
-          {C.error}
-        </p>
+        <ErrorState body={C.error} action={<ReloadButton label={C.home.tryAgain} />} />
       </Shell>
     );
   }
@@ -97,38 +99,63 @@ export function DashboardPage() {
 
   return (
     <Shell>
-      {/* Empty only when there is neither a check nor a reading: an analysis
-          lands before the questionnaire is saved (design §3, orphan record). */}
-      {isEmpty(dashboard) ? (
-        <section className={section}>
-          <p className="text-body text-text/70">{C.empty}</p>
-          <Link href="/skin-check" className={link}>
-            {C.firstCheck}
-          </Link>
-        </section>
-      ) : (
-        <CurrentSection dashboard={dashboard} />
-      )}
-      <TrendSection trend={dashboard.trend} />
-      {dashboard.history.length > 0 && <HistorySection dashboard={dashboard} />}
-      <ChatSection uid={user.uid} dashboard={dashboard} data={load.data} />
-      <section aria-labelledby="routine-title" className={section}>
-        <h2 id="routine-title" className={h2}>
-          {C.routine.title}
-        </h2>
-        <Link href="/routine" className={link}>
-          {C.routine.link}
-        </Link>
-      </section>
-      <ConsentSection photo={dashboard.photo} deleteLink />
+      {/* Phone: one column in reading order. Desktop: two columns (8/4); the
+          columns are `contents` on phones so `order` sets one sequence. */}
+      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start">
+        <div className="contents lg:col-span-8 lg:flex lg:flex-col lg:gap-6">
+          <div className="order-1">
+            {/* Empty only when there is neither a check nor a reading: an analysis
+                lands before the questionnaire is saved (design §3, orphan record). */}
+            {isEmpty(dashboard) ? (
+              <EmptyState
+                body={C.empty}
+                action={
+                  <Link href="/skin-check" className={btnPrimary}>
+                    {C.firstCheck}
+                  </Link>
+                }
+              />
+            ) : (
+              <CurrentSection dashboard={dashboard} />
+            )}
+          </div>
+          <div className="order-4">
+            <RecentSection history={dashboard.history} routine={routine} />
+          </div>
+        </div>
+        <div className="contents lg:col-span-4 lg:flex lg:flex-col lg:gap-6">
+          <div className="order-2">
+            <TrendSection trend={dashboard.trend} />
+          </div>
+          <div className="order-3">
+            <TodayCard routine={routine} />
+          </div>
+          <div className="order-5">
+            <ChatSection uid={user.uid} dashboard={dashboard} data={load.data} />
+          </div>
+          <section aria-labelledby="new-title" className={`${card} order-6 flex flex-col items-start gap-3`}>
+            <h2 id="new-title" className={h2}>
+              {C.home.newCheckTitle}
+            </h2>
+            <p className="text-brand-muted">{C.home.newCheckBody}</p>
+            <Link href="/skin-check" className={btnSecondary}>
+              {C.newCheck}
+            </Link>
+          </section>
+          <div className="order-7">
+            <ConsentSection photo={dashboard.photo} deleteLink />
+          </div>
+        </div>
+      </div>
     </Shell>
   );
 }
 
 function Shell({ children }: { children: React.ReactNode }) {
+  const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
   return (
-    <main className="mx-auto flex min-h-dvh w-full max-w-md flex-col gap-10 px-4 py-10">
-      <h1 className="font-display text-2xl text-text">{C.title}</h1>
+    <main className={page}>
+      <PageHeader kicker={today} title={C.title} />
       {children}
     </main>
   );
@@ -137,24 +164,39 @@ function Shell({ children }: { children: React.ReactNode }) {
 function CurrentSection({ dashboard }: { dashboard: Dashboard }) {
   const { current } = dashboard;
   return (
-    <section aria-labelledby="current-title" className={section}>
-      <h2 id="current-title" className={h2}>
-        {C.current.title}
-      </h2>
+    <section aria-labelledby="current-title" className={`${card} flex flex-col gap-5`}>
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
+        <div>
+          <p className={`${eyebrow} mb-1`}>{C.current.eyebrow}</p>
+          <h2 id="current-title" className={h2}>
+            {C.current.title}
+          </h2>
+          {current.kind === "reading" && <p className="mt-1 text-sm text-brand-muted">{C.current.checkedOn(formatDate(current.view.date))}</p>}
+        </div>
+        {current.kind === "reading" && (
+          <Link href={`/checks/${encodeURIComponent(current.view.scanId)}`} className={textLink}>
+            {C.current.openCheck}
+            <ChevronRight aria-hidden size={16} />
+          </Link>
+        )}
+      </div>
       {current.kind === "none" ? (
-        <>
-          <p className="text-body text-text/70">{C.current.none}</p>
-          <Link href="/skin-check" className={link}>
+        <div className="flex flex-col items-start gap-4">
+          <p>{C.current.none}</p>
+          <Link href="/skin-check" className={btnPrimary}>
             {C.newCheck}
           </Link>
-        </>
+        </div>
       ) : (
         <>
-          <p className="text-sm text-text/60">{C.current.checkedOn(formatDate(current.view.date))}</p>
-          {dashboard.newerCheckNotShown && <p className="text-sm text-text/70">{C.current.newerNotShown}</p>}
+          {dashboard.newerCheckNotShown && <p className="rounded-xl bg-brand-paper px-4 py-3 text-sm">{C.current.newerNotShown}</p>}
           <CheckReadings view={current.view} />
           {/* Only next to readings that are on screen. */}
-          {current.view.bands && <KnownAndNotKnown />}
+          {current.view.bands && (
+            <div className="border-t border-brand-line pt-5">
+              <KnownAndNotKnown />
+            </div>
+          )}
         </>
       )}
     </section>
@@ -163,47 +205,43 @@ function CurrentSection({ dashboard }: { dashboard: Dashboard }) {
 
 function TrendSection({ trend }: { trend: Dashboard["trend"] }) {
   return (
-    <section aria-labelledby="trend-title" className={section}>
+    <section aria-labelledby="trend-title" className={`${card} flex flex-col gap-2`}>
       <h2 id="trend-title" className={h2}>
         {C.trend.title}
       </h2>
       {trend.kind === "empty" ? (
-        <p className="text-body text-text/70">{C.trend.empty}</p>
+        <p>{C.trend.empty}</p>
       ) : (
         <>
-          <p className="text-body text-text">{C.trend.notEnough}</p>
-          <p className="text-body text-text/70">{C.trend.count(trend.count, trend.needed)}</p>
+          <p className="font-semibold">{C.trend.notEnough}</p>
+          <p>{C.trend.count(trend.count, trend.needed)}</p>
         </>
       )}
-      <p className="text-sm text-text/60">{trend.kind === "set" ? C.trend.set : C.trend.howItForms(trend.needed)}</p>
-      {trend.engineBoundary && <p className="text-sm text-text/60">{C.trend.boundary}</p>}
-      {trend.legacyPresent && <p className="text-sm text-text/60">{C.trend.legacy}</p>}
+      <p className="text-sm text-brand-muted">{trend.kind === "set" ? C.trend.set : C.trend.howItForms(trend.needed)}</p>
+      {trend.engineBoundary && <p className="text-sm text-brand-muted">{C.trend.boundary}</p>}
+      {trend.legacyPresent && <p className="text-sm text-brand-muted">{C.trend.legacy}</p>}
     </section>
   );
 }
 
-function HistorySection({ dashboard }: { dashboard: Dashboard }) {
+/** The latest items of the timeline: checks and routine entries by date, never a reading. */
+function RecentSection({ history, routine }: { history: Dashboard["history"]; routine: ReturnType<typeof useRoutine> }) {
+  const items = mergeTimeline(history, routine.data?.events ?? [], routine.data?.today ?? dayOf(new Date())).slice(0, 4);
+  const nameOf = (id: string) => routine.data?.products.find((p) => p.id === id)?.name ?? ROUTINE_COPY.otherProduct;
   return (
-    <section aria-labelledby="history-title" className={section}>
-      <h2 id="history-title" className={h2}>
-        {C.history.title}
-      </h2>
-      <ul className="flex flex-col gap-2">
-        {dashboard.history.map((row) => (
-          <li key={row.scanId}>
-            <Link
-              href={`/dashboard?check=${encodeURIComponent(row.scanId)}`}
-              aria-label={C.history.openLabel(formatDate(row.date))}
-              className="flex min-h-11 flex-col gap-0.5 rounded-lg bg-canvas px-4 py-3"
-            >
-              <span className="text-body text-text">{formatDate(row.date)}</span>
-              <span className="text-sm text-text/60">{C.history.kind[row.kind]}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <Link href="/skin-check" className={link}>
-        {C.newCheck}
+    <section aria-labelledby="recent-title" className="flex flex-col gap-2 rounded-2xl border border-brand-line p-5 sm:p-6">
+      <div className="flex flex-wrap items-center justify-between gap-x-4">
+        <h2 id="recent-title" className={h2}>
+          {TIMELINE_COPY.recent}
+        </h2>
+        <Link href="/checks?view=timeline" className={textLink}>
+          {TIMELINE_COPY.seeAll}
+          <ChevronRight aria-hidden size={16} />
+        </Link>
+      </div>
+      <TimelineList items={items} nameOf={nameOf} />
+      <Link href="/checks" className={textLink}>
+        {C.history.allChecks}
       </Link>
     </section>
   );
@@ -236,19 +274,19 @@ function ChatSection({ uid, dashboard, data }: { uid: string; dashboard: Dashboa
   }
 
   return (
-    <section aria-labelledby="chat-title" className={section}>
+    <section aria-labelledby="chat-title" className={`${card} flex flex-col items-start gap-3`}>
       <h2 id="chat-title" className={h2}>
         {C.chat.title}
       </h2>
       {scanId ? (
         <>
-          <p className="text-body text-text/70">{C.chat.body}</p>
-          <Button variant="ink" size="lg" className="self-start" onClick={openEcho}>
+          <p className="text-brand-muted">{C.chat.body}</p>
+          <button type="button" className={btnPrimary} onClick={openEcho}>
             {C.chat.button}
-          </Button>
+          </button>
         </>
       ) : (
-        <p className="text-body text-text/70">{C.chat.needsReading}</p>
+        <p className="text-brand-muted">{C.chat.needsReading}</p>
       )}
     </section>
   );
@@ -258,12 +296,12 @@ function OneCheck({ uid, scanId, data }: { uid: string; scanId: string; data: Da
   const check = pastCheck(uid, scanId, data.checks, data.analyses);
   return (
     <Shell>
-      <section aria-labelledby="check-title" className={section}>
+      <section aria-labelledby="check-title" className="flex flex-col gap-3">
         {check === null ? (
           <p className="text-body text-text/70">{C.history.notFound}</p>
         ) : (
           <>
-            <h2 id="check-title" className={h2}>
+            <h2 id="check-title" className="font-display text-lg text-text">
               {C.history.checkFrom(formatDate(check.date))}
             </h2>
             <p className="text-body text-text/70">{C.history.kind[check.kind]}</p>

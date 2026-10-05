@@ -19,6 +19,11 @@ export const DASHBOARD_COPY = {
     title: "Your newest photo reading",
     none: "None of your checks has a photo reading yet.",
     checkedOn: (date: string) => `Checked on ${date}`,
+    eyebrow: "Latest check",
+    openCheck: "Open this check",
+    wholeFace: "Whole face",
+    areaPicker: "Show readings for",
+    areaNote: "Every area is read from this one photo. Each reading belongs to this photo only.",
     newerNotShown: "Your newest check has no photo reading from our server. The reading below is from an earlier check.",
     unreadable: "The readings of this check could not be shown.",
     hardToRead: (areas: string) => `Hard to read in this photo: ${areas}. Those readings are uncertain.`,
@@ -67,8 +72,17 @@ export const DASHBOARD_COPY = {
     openLabel: (date: string) => `Open the check from ${date}`,
     checkFrom: (date: string) => `Check from ${date}`,
     back: "Back to your dashboard",
+    // TD-24 (1): on every opened check, always visible. Fixed owner wording.
+    pastLine: "Photos differ in light and angle. Differences between checks are not yet a measured change.",
+    allChecks: "All checks",
     notFound: "This check could not be found.",
     onlyNewest: "Readings are shown for your newest photo reading only. Each reading is relative to its own photo, so past checks are listed by date.",
+  },
+
+  home: {
+    newCheckTitle: "A new check",
+    newCheckBody: "Take a photo check in good, even light, facing the camera.",
+    tryAgain: "Try again",
   },
 
   chat: {

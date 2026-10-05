@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
+import { TIMELINE_COPY as T } from "@/components/timeline/copy";
+import { ROUTINE_COPY as R } from "@/lib/routine/copy";
 import { DASHBOARD_SEED as U } from "./seed-users";
 import { shot, signIn } from "./helpers";
 
@@ -25,17 +27,37 @@ test("signed out: a sign-in link only", async ({ page }) => {
 
 test("sign in as a seeded user and see the dashboard", async ({ page }) => {
   await dashboardAs(page, U.building!.phoneNumber);
-  for (const title of [C.current.title, C.trend.title, C.history.title, C.chat.title, C.routine.title, C.privacy.title]) {
+  // G03 Home: latest check, starting point, today's routine, recent timeline, Echo, a new check, privacy.
+  for (const title of [C.current.title, C.trend.title, R.todayTitle, T.recent, C.chat.title, C.home.newCheckTitle, C.privacy.title]) {
     await expect(page.getByRole("heading", { name: title })).toBeVisible();
   }
   await expect(page.getByText(C.trend.notEnough)).toBeVisible();
   await expect(page.getByText(C.trend.count(2, 3))).toBeVisible();
   await expect(page.getByText(C.photoCheck.pass)).toBeVisible();
-  await expect(page.getByRole("link", { name: C.routine.link })).toHaveAttribute("href", "/routine");
+  await expect(page.getByRole("link", { name: R.open })).toHaveAttribute("href", "/routine");
   await expect(page.getByRole("link", { name: C.privacy.delete })).toHaveAttribute("href", "/account#delete-account");
   // No score, arrow or percentage anywhere on the page.
   await expect(page.locator("body")).not.toContainText(/\/100|%|↑|↓|▲|▼/);
   await shot(page, "building");
+});
+
+test("readings by face area: the chips switch the area, every band in the same style, no score", async ({ page }) => {
+  await dashboardAs(page, U.set!.phoneNumber);
+  const current = page.locator("section", { has: page.getByRole("heading", { name: C.current.title }) });
+  await expect(current.getByRole("button", { name: C.current.wholeFace })).toHaveAttribute("aria-pressed", "true");
+  await current.getByRole("button", { name: "Forehead" }).click();
+  await expect(current.getByRole("heading", { name: "Forehead" })).toBeVisible();
+  await expect(current.getByRole("button", { name: "Forehead" })).toHaveAttribute("aria-pressed", "true");
+  await expect(current.getByText(C.current.areaNote)).toBeVisible();
+  // Every reading row has one style, whatever its band; no Dryness row.
+  const classes = await current.locator("dd").evaluateAll((els) => Array.from(new Set(els.map((e) => e.className))));
+  expect(classes).toHaveLength(1);
+  await expect(current.getByText("Dryness")).toHaveCount(0);
+  await expect(current).not.toContainText(/\/100|%/);
+  // The Recently list shows dates and kinds only: no reading next to it.
+  const recent = page.locator("section", { has: page.getByRole("heading", { name: T.recent }) });
+  await expect(recent).not.toContainText(/\b(Low|Moderate|Elevated)\b/);
+  await shot(page, "home-areas");
 });
 
 test("loading", async ({ page }) => {

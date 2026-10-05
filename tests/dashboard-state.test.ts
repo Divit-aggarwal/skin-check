@@ -187,13 +187,31 @@ describe("one check at a time", () => {
   passed.data.captureQuality = { verdict: "pass" };
   const analyses = [passed];
 
-  it("a past check carries its date, kind and photo check only: no readings (LONGITUDINAL_METHOD §1)", () => {
+  // TD-24 (1) replaces O-D4: an opened check shows its OWN readings (the screen
+  // adds the fixed line). Never another check's readings, never two at once.
+  it("a past check carries its date, kind, photo check and its own readings only", () => {
     const a = pastCheck(UID, "a", checks, analyses);
-    expect(a).toEqual({ scanId: "a", date: day(1), kind: "reading", photoCheck: "pass" });
-    expect(Object.keys(a!).sort()).toEqual(["date", "kind", "photoCheck", "scanId"]);
-    expect(pastCheck(UID, "b", checks, analyses)).toMatchObject({ kind: "legacy", photoCheck: null });
-    expect(pastCheck(UID, "q", checks, analyses)).toMatchObject({ kind: "questions", photoCheck: null });
-    expect(pastCheck(UID, "f", checks, analyses)).toMatchObject({ kind: "failed", photoCheck: null });
+    expect(a).toMatchObject({ scanId: "a", date: day(1), kind: "reading", photoCheck: "pass" });
+    expect(Object.keys(a!).sort()).toEqual(["date", "kind", "photoCheck", "photoClaimed", "scanId", "view"]);
+    expect(a!.view!.scanId).toBe("a");
+    expect(a!.view!.bands!.map((b) => b.metric)).not.toContain("hydration");
+    // A legacy check shows what its own record saved, marked as legacy.
+    expect(pastCheck(UID, "b", checks, analyses)).toMatchObject({ kind: "legacy", photoCheck: null, view: { scanId: "b", source: "legacy" } });
+    expect(pastCheck(UID, "q", checks, analyses)).toMatchObject({ kind: "questions", photoCheck: null, view: null });
+    expect(pastCheck(UID, "f", checks, analyses)).toMatchObject({ kind: "failed", photoCheck: null, view: null });
+  });
+
+  it("an opened check's readings come from that check's record, not the newest one", () => {
+    const older = analysis("a", 1);
+    const newer = analysis("n", 0);
+    newer.data.scores = { ...(newer.data.scores as object), redness: 0.95 };
+    older.data.scores = { ...(older.data.scores as object), redness: 0.05 };
+    const both = [check("a", 1), check("n", 0)];
+    const opened = pastCheck(UID, "a", both, [older, newer])!;
+    const band = (v: typeof opened.view) => v!.bands!.find((b) => b.metric === "redness")!.band;
+    expect(opened.view!.scanId).toBe("a");
+    expect(band(opened.view)).toBe(band(pastCheck(UID, "a", [check("a", 1)], [older])!.view));
+    expect(band(opened.view)).not.toBe(band(pastCheck(UID, "n", both, [older, newer])!.view));
   });
 
   it("an unknown id, or an analysis with no check of this user, is not openable", () => {
