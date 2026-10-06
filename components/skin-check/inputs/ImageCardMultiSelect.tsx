@@ -51,12 +51,20 @@ export function ImageCardMultiSelect({ step, value, onChange, onCommit }: ImageC
                     : "border-brand-line bg-white hover:border-brand-ink/40"
               )}
             >
-              {opt.imagePlaceholder && (
-                <span className="flex h-16 w-full items-center justify-center rounded-md border border-dashed border-blush/30 bg-canvas px-2 text-center text-[0.625rem] font-medium leading-tight text-blush/70">
-                  ⟨{opt.imagePlaceholder}⟩
-                </span>
-              )}
+              {/* The label comes first in the DOM, so a screen reader says the
+                  option before the picture; `order-first` shows the picture on top. */}
               <span className="text-sm font-medium leading-snug text-text">{opt.label}</span>
+              {opt.image && (
+                // eslint-disable-next-line @next/next/no-img-element -- a 1 KB SVG; next/image adds nothing here
+                <img
+                  src={opt.image.src}
+                  alt={opt.image.alt}
+                  width={160}
+                  height={64}
+                  decoding="async"
+                  className="order-first h-16 w-full rounded-md border border-brand-card-line object-cover"
+                />
+              )}
               {opt.description && (
                 <span className="text-xs leading-snug text-brand-muted">{opt.description}</span>
               )}

@@ -3,6 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
 import { DASHBOARD_SEED as U } from "../browser/seed-users";
 import { signIn } from "../browser/helpers";
+import { SECTIONS } from "@/lib/skin-check-steps";
 
 // One screenshot per page and state at each width, into docs/design/<SHOTS>/.
 const DIR = `docs/design/${process.env.SHOTS ?? "before"}`;
@@ -16,6 +17,18 @@ async function shots(page: Page, name: string) {
 }
 
 const NAME_PROMPT = "Hi! What's your name?";
+
+// One screenshot per check question (G03 quiz brief), named by the step id.
+const STEPS = SECTIONS.flatMap((s) => s.steps);
+const shotQuestions = new Set<string>();
+async function question(page: Page) {
+  const text = ((await page.locator("p.font-display").last().textContent({ timeout: 5_000 }).catch(() => "")) ?? "").trim();
+  const step = STEPS.find((s) => s.prompt.replace(/\{name\}/g, "Tester") === text);
+  const key = `${test.info().project.name}-${step?.id}`;
+  if (!step || shotQuestions.has(key)) return;
+  shotQuestions.add(key);
+  await shots(page, `question-${step.id}`);
+}
 
 const signedOut = ["/skin-check", "/dashboard", "/routine", "/echo", "/account"];
 for (const path of signedOut) {
@@ -195,16 +208,22 @@ test("check flow to results", async ({ page }) => {
   await signIn(page, user.phoneNumber);
   await page.goto("/skin-check");
   const name = page.locator('input[type="text"]').first();
+  await expect(name).toBeVisible({ timeout: 60_000 });
+  await question(page);
   await name.fill("Tester");
   await name.press("Enter");
+  await page.waitForTimeout(700);
+  await question(page);
   await page.getByRole("button", { name: "25–34", exact: true }).click();
   await shots(page, "flow-questions");
+  await question(page);
   await page.getByRole("button", { name: "Female", exact: true }).click();
   const file = page.locator('input[type="file"]');
   const capture = page.getByRole("button", { name: "Capture", exact: true });
   await expect(file.or(capture).first()).toBeAttached({ timeout: 30_000 });
   await page.waitForTimeout(2000);
   await shots(page, "flow-photo-step");
+  await question(page);
   if (await file.count()) {
     await file.setInputFiles({ name: "face.png", mimeType: "image/png", buffer: readFileSync(FACE) });
   } else {
@@ -230,6 +249,7 @@ test("check flow to results", async ({ page }) => {
   // Answer every remaining question with its first option until the results show.
   const results = page.getByRole("heading", { name: "Your photo reading" });
   for (let i = 0; i < 80 && !(await results.isVisible()); i++) {
+    await question(page);
     const step = page.locator("div.flex.flex-col.gap-5").last();
     const confirm = step.getByRole("button", { name: "Confirm selection" });
     const options = step.locator("button:not([aria-label])");
@@ -244,6 +264,69 @@ test("check flow to results", async ({ page }) => {
   await expect(results).toBeVisible({ timeout: 240_000 });
   await page.waitForTimeout(3000);
   await shots(page, "flow-results");
+});
+
+// The two questions the flow above never reaches: the phone check (signed out
+// only) and the male-only question. The scan request is blocked, so nothing
+// is saved: the check is written only at the end of the flow.
+test("check flow: the phone question, signed out", async ({ page }) => {
+  await page.goto("/skin-check");
+  const name = page.locator('input[type="text"]').first();
+  await expect(name).toBeVisible({ timeout: 60_000 });
+  await name.fill("Tester");
+  await name.press("Enter");
+  await page.getByRole("button", { name: "25–34", exact: true }).click();
+  await page.getByRole("button", { name: "Male", exact: true }).click();
+  await expect(page.getByText(/let's confirm it's you/)).toBeVisible();
+  await question(page);
+});
+
+test("check flow: the male-only question (nothing saved)", async ({ page }) => {
+  test.setTimeout(300_000);
+  await page.route((url) => url.pathname === "/api/skin-scan", (route) => route.abort());
+  await signIn(page, U.routine!.phoneNumber); // no checks, so the full flow; nothing is saved
+  await page.goto("/skin-check");
+  const name = page.locator('input[type="text"]').first();
+  await expect(name).toBeVisible({ timeout: 60_000 });
+  await name.fill("Tester");
+  await name.press("Enter");
+  await page.getByRole("button", { name: "25–34", exact: true }).click();
+  await page.getByRole("button", { name: "Male", exact: true }).click();
+  const file = page.locator('input[type="file"]');
+  const capture = page.getByRole("button", { name: "Capture", exact: true });
+  await expect(file.or(capture).first()).toBeAttached({ timeout: 30_000 });
+  await page.waitForTimeout(2000); // the file input replaces the camera button once the page knows the device
+  if (await file.count()) await file.setInputFiles({ name: "face.png", mimeType: "image/png", buffer: readFileSync(FACE) });
+  else {
+    await expect(capture).toBeEnabled({ timeout: 30_000 });
+    await capture.click();
+    const anyway = page.getByRole("button", { name: "Use this photo anyway" });
+    for (let i = 0; i < 6 && !(await anyway.isVisible()); i++) {
+      await page.waitForTimeout(1000);
+      const retake = page.getByRole("button", { name: "Retake", exact: true });
+      if ((await anyway.isVisible()) || !(await retake.isVisible())) break;
+      await retake.click();
+      await capture.click();
+    }
+    if (await anyway.isVisible()) await anyway.click();
+  }
+  await page.waitForTimeout(1500);
+  await page.getByRole("checkbox").first().check();
+  await page.getByRole("button", { name: "Analyze my skin" }).click();
+  await expect(page.getByText("What are your main skin concerns?")).toBeVisible({ timeout: 60_000 });
+  const male = page.getByText((STEPS.find((s) => s.id === "male_skin_context")!).prompt);
+  for (let i = 0; i < 40 && !(await male.isVisible()); i++) {
+    const step = page.locator("div.flex.flex-col.gap-5").last();
+    const confirm = step.getByRole("button", { name: "Confirm selection" });
+    const options = step.locator("button:not([aria-label])");
+    if (await confirm.count()) {
+      if (await confirm.isDisabled()) await options.first().click();
+      await confirm.click();
+    } else if (await options.count()) await options.first().click();
+    await page.waitForTimeout(700);
+  }
+  await expect(male).toBeVisible();
+  await question(page);
 });
 
 // G03 part 4: the local-only recommendation preview (not in production builds).
