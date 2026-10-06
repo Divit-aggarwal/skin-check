@@ -1,7 +1,9 @@
 // Where lib/rules and the public store's products do not fit (G03 part 4).
 // Questions for the clinical reviewer; the rules are not changed here.
 // tests/dev-recommendations.test.ts runs recommend() on the store catalogue and
-// checks the "rules" sentence of every entry that can be checked.
+// checks the "rules" sentence of every entry that can be checked. The two
+// owner questions (the "Treat" step name and the "Calming Moisturiser" name)
+// were decided on 2026-10-06 (tracker TD-26) and are no longer listed.
 
 export interface Mismatch {
   id: string;
@@ -69,24 +71,10 @@ export const MISMATCHES: Mismatch[] = [
     question: "Should the rules show 'start once daily' or a patch test line for any answer, and from which quiz answers?",
   },
   {
-    id: "names-with-banned-words",
-    products: ["Calming Moisturiser", "Clear Seal"],
-    store: "Product names as sold: 'Calming Moisturiser', 'Clear Seal'.",
-    rules: "The D-12 word check bans calm* and clear*. Only 'Clear Seal' has an owner name exception, and only for owner data. 'Calming Moisturiser' has none, so it fails the routine word check once it is owner data.",
-    question: "For the owner and D-12 rather than the clinical reviewer: may 'Calming Moisturiser' get the same registered-name exception as 'Clear Seal'?",
-  },
-  {
     id: "kit-not-modelled",
     products: ["Project Skin Complete 4-Step Skincare Routine Kit"],
     store: "The store sells the cleanser, serum, moisturiser and sunscreen as one kit for Rs. 1,699.00.",
     rules: "The rules have no bundle. The kit is left out of this catalogue.",
     question: "For the owner: should a recommendation ever point to the kit instead of the single products?",
-  },
-  {
-    id: "treat-word",
-    products: [],
-    store: "The store names the second step 'Treat'.",
-    rules: "D-12 bans treat* in routine wording, so the app labels the step 'Serum', the store kit's own word for it.",
-    question: "For the owner: may 'Treat' be used as a step name (a D-12 exception), or does 'Serum' stay?",
   },
 ];

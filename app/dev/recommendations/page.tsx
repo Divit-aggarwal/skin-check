@@ -35,7 +35,7 @@ const SAMPLE: Record<string, unknown> = {
   female_skin_context: ["none_not_sure"],
 };
 
-const CATEGORY_STEP: Record<string, string> = { cleanser: "Cleanse", serum: "Serum (store: Treat)", moisturiser: "Moisturise", sunscreen: "Protect", other: "No step in the rules" };
+const CATEGORY_STEP: Record<string, string> = { cleanser: "Cleanse", serum: "Treat", moisturiser: "Moisturise", sunscreen: "Protect", other: "No step in the rules" };
 
 type Seeded = { uid: string; answers: Record<string, unknown> | null };
 

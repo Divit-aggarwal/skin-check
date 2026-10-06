@@ -26,6 +26,17 @@ export function bannedWordsIn(text: string): string[] {
   return PATTERNS.filter((p) => p.re.test(text)).map((p) => p.word);
 }
 
+/**
+ * Owner decision TD-26 (1), 2026-10-06: the routine step label "Treat", the
+ * store's own step name. Exact match on the whole label only; any other text
+ * containing "treat" is still banned.
+ */
+export const STEP_LABEL_EXCEPTIONS: readonly string[] = ["Treat"];
+
+export function stepLabelIsExcepted(text: string): boolean {
+  return STEP_LABEL_EXCEPTIONS.includes(text);
+}
+
 export type NameException = { name: string; approvedBy: "owner"; date: string; reason: string };
 
 /** True only for an owner product whose whole name is listed exactly. */

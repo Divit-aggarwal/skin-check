@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { ROUTINE_COPY } from "@/lib/routine/copy";
 import { ROUTINE_PURPOSE_COPY } from "@/lib/consent";
 import { CATALOGUE, PRODUCT_NAME_EXCEPTIONS } from "@/lib/catalog/catalogue";
-import { bannedWordsIn, nameIsExcepted } from "@/lib/catalog/wording";
+import { bannedWordsIn, nameIsExcepted, stepLabelIsExcepted } from "@/lib/catalog/wording";
 
 // D-12: no routine wording links a product to a skin change (R-4 A).
 
@@ -57,7 +57,15 @@ describe("routine copy (D-12)", () => {
   it("no string in lib/routine/copy.ts has a banned word", () => {
     const all = strings(ROUTINE_COPY);
     expect(all.length).toBeGreaterThan(10);
-    for (const s of all) expect(bannedWordsIn(s), s).toEqual([]);
+    for (const s of all) if (!stepLabelIsExcepted(s)) expect(bannedWordsIn(s), s).toEqual([]);
+  });
+
+  it("TD-26 (1): 'Treat' is allowed as the exact step label only", () => {
+    expect(ROUTINE_COPY.steps.serum).toBe("Treat");
+    expect(stepLabelIsExcepted("Treat")).toBe(true);
+    for (const s of ["treat", "Treat your skin", "Treatment", "Treat "]) expect(stepLabelIsExcepted(s), s).toBe(false);
+    // The exception is used for the step label and nothing else in the copy.
+    expect(strings(ROUTINE_COPY).filter(stepLabelIsExcepted)).toEqual(["Treat"]);
   });
 
   it("no string or JSX text in the routine UI has a banned word", () => {

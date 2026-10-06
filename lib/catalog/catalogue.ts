@@ -17,6 +17,7 @@ export const CATALOG_VERSION = "catalog-0-synthetic";
  */
 export const PRODUCT_NAME_EXCEPTIONS: readonly NameException[] = [
   { name: "Clear Seal", approvedBy: "owner", date: "2026-10-03", reason: "Registered own-brand product name" },
+  { name: "Calming Moisturiser", approvedBy: "owner", date: "2026-10-06", reason: "Own-brand product name, same exact-name rule as Clear Seal (TD-26 (2))" },
 ];
 
 const synthetic = {

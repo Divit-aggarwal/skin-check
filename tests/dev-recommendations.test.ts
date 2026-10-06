@@ -69,7 +69,7 @@ describe("the store catalogue", () => {
 
 describe("mismatches between lib/rules and the store's products (questions for the clinical reviewer)", () => {
   it("every entry has a question", () => {
-    expect(MISMATCHES.length).toBeGreaterThanOrEqual(10);
+    expect(MISMATCHES.length).toBeGreaterThanOrEqual(9);
     for (const m of MISMATCHES) expect(m.question.endsWith("?"), m.id).toBe(true);
   });
 
@@ -121,13 +121,12 @@ describe("mismatches between lib/rules and the store's products (questions for t
     expect(pregnant.notices.map((n) => n.text).join(" ")).not.toMatch(/salicylic/i);
   });
 
-  it("names-with-banned-words: 'Calming Moisturiser' fails the D-12 check with no exception; 'Clear Seal' has one", () => {
+  it("TD-26: the two owner questions are decided: 'Calming Moisturiser' and 'Clear Seal' are excepted names", () => {
+    expect(MISMATCHES.map((m) => m.id)).not.toContain("names-with-banned-words");
+    expect(MISMATCHES.map((m) => m.id)).not.toContain("treat-word");
     expect(bannedWordsIn("Calming Moisturiser")).toContain("calm*");
-    expect(nameIsExcepted({ name: "Calming Moisturiser", dataSource: "owner" }, PRODUCT_NAME_EXCEPTIONS)).toBe(false);
+    expect(nameIsExcepted({ name: "Calming Moisturiser", dataSource: "owner" }, PRODUCT_NAME_EXCEPTIONS)).toBe(true);
     expect(nameIsExcepted({ name: "Clear Seal", dataSource: "owner" }, PRODUCT_NAME_EXCEPTIONS)).toBe(true);
-  });
-
-  it("treat-word: the store's step name 'Treat' is banned by D-12", () => {
-    expect(bannedWordsIn("Treat")).toContain("treat*");
+    expect(nameIsExcepted({ name: "Calming Moisturiser", dataSource: "synthetic" }, PRODUCT_NAME_EXCEPTIONS)).toBe(false);
   });
 });

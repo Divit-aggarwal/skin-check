@@ -36,11 +36,10 @@ export const ROUTINE_COPY = {
   skipped: "Skipped",
   status: { used: "Used", skipped: "Skipped", unknown: "Not logged" },
   todayTitle: "Today's routine",
-  // The store's four steps (theprojectskin.com). The store calls the second
-  // step "Treat", but D-12 (LOCKED) bans that word in routine copy; "Serum" is
-  // the store's own name for it in the kit's how-to-use. One-line swap if the
-  // owner approves "Treat" (tracker G08).
-  steps: { cleanse: "Cleanse", serum: "Serum", moisturise: "Moisturise", protect: "Protect" },
+  // The store's four steps (theprojectskin.com). "Treat" is allowed as this
+  // exact label only (owner decision TD-26 (1), lib/catalog/wording.ts
+  // STEP_LABEL_EXCEPTIONS); the key stays "serum", the catalogue category.
+  steps: { cleanse: "Cleanse", serum: "Treat", moisturise: "Moisturise", protect: "Protect" },
   stepNumber: (n: number) => `Step ${n}`,
   emptyStep: "Nothing in this step yet.",
   emptySlot: "No products yet.",
