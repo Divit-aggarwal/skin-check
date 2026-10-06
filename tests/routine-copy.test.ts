@@ -68,6 +68,20 @@ describe("routine copy (D-12)", () => {
     expect(strings(ROUTINE_COPY).filter(stepLabelIsExcepted)).toEqual(["Treat"]);
   });
 
+  it("TD-26 (1): strings built with the step label have no other banned word", () => {
+    const label = ROUTINE_COPY.steps.serum;
+    const built = [
+      ROUTINE_COPY.addToStepLabel(label, "morning"),
+      ROUTINE_COPY.addFor(label),
+      ROUTINE_COPY.stepOf(label),
+      `${label} · ${ROUTINE_COPY.slot.AM} · Mon, Tue · ${ROUTINE_COPY.since("6 Oct 2026")}`,
+    ];
+    for (const s of built) {
+      expect(s, s).toContain(label);
+      expect(bannedWordsIn(s.replaceAll(label, "")), s).toEqual([]);
+    }
+  });
+
   it("no string or JSX text in the routine UI has a banned word", () => {
     const files = filesUnder(...UI_DIRS);
     expect(files.length).toBeGreaterThanOrEqual(2);

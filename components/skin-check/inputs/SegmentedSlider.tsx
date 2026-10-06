@@ -24,7 +24,7 @@ export function SegmentedSlider({ step, value, onChange, onCommit }: SegmentedSl
               onCommit();
             }}
             className={cn(
-              "flex flex-1 flex-col items-center gap-0.5 px-2 py-3 text-center transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blush/50",
+              "flex flex-1 flex-col items-center gap-0.5 px-2 py-3 text-center transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-forest",
               i > 0 && "border-l border-brand-line",
               selected ? "bg-brand-action text-white" : "bg-white text-text hover:bg-brand-linen"
             )}

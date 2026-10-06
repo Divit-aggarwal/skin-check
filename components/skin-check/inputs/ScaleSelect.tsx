@@ -28,7 +28,7 @@ export function ScaleSelect({ step, value, onChange, onCommit }: ScaleSelectProp
                   onCommit();
                 }}
                 className={cn(
-                  "flex h-11 w-11 items-center justify-center rounded-full border text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
+                  "flex h-11 w-11 items-center justify-center rounded-full border text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-forest focus-visible:ring-offset-2",
                   selected
                     ? "border-brand-action bg-brand-action text-white"
                     : "border-brand-line bg-white text-text hover:border-brand-ink/40"

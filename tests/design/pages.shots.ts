@@ -316,6 +316,8 @@ test("check flow: the male-only question (nothing saved)", async ({ page }) => {
   await expect(page.getByText("What are your main skin concerns?")).toBeVisible({ timeout: 60_000 });
   const male = page.getByText((STEPS.find((s) => s.id === "male_skin_context")!).prompt);
   for (let i = 0; i < 40 && !(await male.isVisible()); i++) {
+    // Never reach the last step: an error-state check could be saved there (safety review G11).
+    await expect(page.getByRole("button", { name: /Get my results/ })).toHaveCount(0);
     const step = page.locator("div.flex.flex-col.gap-5").last();
     const confirm = step.getByRole("button", { name: "Confirm selection" });
     const options = step.locator("button:not([aria-label])");

@@ -25,9 +25,9 @@ export function ChipSelect({ step, value, onChange, onCommit }: ChipSelectProps)
                 onCommit();
               }}
               className={cn(
-                "min-h-11 rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
+                "min-h-11 rounded-full px-4 py-2.5 text-sm font-medium transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-forest focus-visible:ring-offset-2",
                 selected
-                  ? "bg-brand-action text-white"
+                  ? "border border-brand-forest bg-brand-mist text-brand-forest"
                   : "border border-brand-line bg-white text-text hover:border-brand-ink/40"
               )}
             >
