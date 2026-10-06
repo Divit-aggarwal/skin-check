@@ -91,11 +91,12 @@ test("routine empty and with products", async ({ page }) => {
   await shots(page, "routine-current");
   const add = page.locator("section", { has: page.getByRole("heading", { name: "Add a product" }) });
   if (await add.count()) {
-    await add.locator("select").first().selectOption({ index: 1 });
-    await add.getByRole("button", { name: "Add", exact: true }).click({ timeout: 5_000 }).catch(() => undefined);
-    await page.waitForTimeout(1500);
-    await page.getByRole("button", { name: /^Used: / }).first().click({ timeout: 5_000 }).catch(() => undefined);
-    await page.waitForTimeout(1500);
+    await add.getByLabel("Product").selectOption({ index: 1 });
+    await add.getByRole("button", { name: "Add", exact: true }).click();
+    const used = page.getByRole("button", { name: /^Used: / }).first();
+    await used.click();
+    await expect(used).toHaveAttribute("aria-pressed", "true");
+    await page.waitForTimeout(1000);
     await shots(page, "routine-with-product");
   }
 });

@@ -5,12 +5,12 @@ import { ECHO_REGIONS, type EchoRegion } from "@/lib/echo-regions";
 // their areas, so there are no pointer lines.
 const AREAS: Record<EchoRegion, { shapes: JSX.Element[]; text: [number, number][] }> = {
   forehead: { shapes: [<rect key="f" x="76" y="52" width="128" height="52" rx="24" />], text: [[140, 83]] },
-  nose: { shapes: [<rect key="n" x="120" y="116" width="40" height="82" rx="20" />], text: [[140, 161]] },
+  nose: { shapes: [<rect key="n" x="118" y="116" width="44" height="82" rx="22" />], text: [[140, 161]] },
   cheeks: {
-    shapes: [<ellipse key="l" cx="87" cy="196" rx="31" ry="27" />, <ellipse key="r" cx="193" cy="196" rx="31" ry="27" />],
+    shapes: [<ellipse key="l" cx="85" cy="196" rx="29" ry="27" />, <ellipse key="r" cx="195" cy="196" rx="29" ry="27" />],
     text: [
-      [87, 200],
-      [193, 200],
+      [85, 200],
+      [195, 200],
     ],
   },
   chin: { shapes: [<ellipse key="c" cx="140" cy="276" rx="44" ry="22" />], text: [[140, 280]] },
@@ -44,7 +44,7 @@ export function FaceDrawing({
   };
 
   return (
-    <svg viewBox="0 0 280 330" className="mx-auto block h-auto w-full max-w-[300px] select-none font-body">
+    <svg viewBox="0 0 280 330" className="mx-auto block h-auto w-full max-w-[240px] select-none font-body sm:max-w-[300px]">
       <g aria-hidden fill="none" stroke="#B0AAA2" strokeLinecap="round" strokeWidth="1.5">
         <path d="M140 16C78 16 40 62 40 130c0 88 46 186 100 186s100-98 100-186C240 62 202 16 140 16Z" fill="#FFFFFF" stroke="#2C2C2A" />
         <path d="M58 88c16-34 46-52 82-52s66 18 82 52" />

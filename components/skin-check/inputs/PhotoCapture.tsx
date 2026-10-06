@@ -390,11 +390,11 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   // the verify section, a signOut in another tab, an expired session.
   if (!user) {
     return (
-      <div className="flex flex-col gap-2 rounded-lg border border-text/10 bg-white p-4">
-        <p className="text-sm text-text/70">
+      <div className="flex flex-col gap-2 rounded-2xl border border-brand-card-line bg-brand-paper p-4">
+        <p className="text-sm text-brand-muted">
           Verify your phone number before taking your photo.
         </p>
-        <p className="text-xs text-text/45">
+        <p className="text-xs text-brand-muted">
           Tap back to the Verify step to continue.
         </p>
       </div>
@@ -410,7 +410,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
             // eslint-disable-next-line @next/next/no-img-element -- transient object URL, not a static asset
             <img src={thumbSrc} alt="Captured photo" className="h-14 w-14 rounded-md object-cover" />
           )}
-          <p className="text-sm text-text/70">
+          <p className="text-sm text-brand-muted">
             {scan.status === "loading"
               ? "Analyzing your photo…"
               : scan.status === "error" && scan.retakeReason
@@ -431,8 +431,8 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
 
   if (status === "denied" || status === "unavailable") {
     return (
-      <div className="flex flex-col gap-3 rounded-lg border border-text/10 bg-white p-4">
-        <p className="text-sm text-text/70">{error ?? "Camera access is needed for this step."}</p>
+      <div className="flex flex-col gap-3 rounded-2xl border border-brand-card-line bg-brand-paper p-4">
+        <p className="text-sm text-brand-muted">{error ?? "Camera access is needed for this step."}</p>
         <Button type="button" variant="outlineLight" size="sm" onClick={requestCamera}>
           Try again
         </Button>

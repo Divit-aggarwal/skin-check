@@ -43,6 +43,8 @@ export const ROUTINE_COPY = {
   steps: { cleanse: "Cleanse", serum: "Serum", moisturise: "Moisturise", protect: "Protect" },
   stepNumber: (n: number) => `Step ${n}`,
   emptyStep: "Nothing in this step yet.",
+  emptySlot: "No products yet.",
+  addToSlotLabel: (slot: string) => `Add a product, ${slot}`,
   addToStep: "Add a product",
   addToStepLabel: (step: string, slot: string) => `Add a product to ${step}, ${slot}`,
   eveningProtect: "Sunscreen is a morning step.",

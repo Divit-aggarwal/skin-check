@@ -79,6 +79,27 @@ export function SlotSteps({ data, slot, busy, send, compact = false }: { data: R
     );
   };
 
+  // Home, nothing in this slot: one line, not four empty steps (design review G03 part 5).
+  if (compact && inSlot.length === 0)
+    return (
+      <section aria-labelledby={titleId} className="flex min-w-0 flex-col gap-3">
+        <h3 id={titleId} className="text-lg font-semibold">
+          {C.slot[slot]}
+        </h3>
+        <div className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 rounded-lg border border-dashed border-brand-line py-1 pl-4 pr-1">
+          <p className="text-sm text-brand-muted">{C.emptySlot}</p>
+          <Link
+            href={addHref(STEPS[0], slot)}
+            aria-label={C.addToSlotLabel(C.slot[slot].toLowerCase())}
+            className="inline-flex min-h-11 items-center gap-1 rounded-full px-3 text-sm font-semibold text-brand-forest hover:bg-brand-mist"
+          >
+            <Plus aria-hidden size={16} />
+            {C.addToStep}
+          </Link>
+        </div>
+      </section>
+    );
+
   return (
     <section aria-labelledby={titleId} className="flex min-w-0 flex-col gap-3">
       <h3 id={titleId} className="text-lg font-semibold">
@@ -93,8 +114,8 @@ export function SlotSteps({ data, slot, busy, send, compact = false }: { data: R
               key={step}
               className={
                 items.length > 0
-                  ? "flex flex-col gap-3 rounded-xl border border-brand-card-line bg-brand-paper p-4"
-                  : "flex min-h-14 flex-wrap items-center justify-between gap-x-3 rounded-xl border border-dashed border-brand-line py-1 pl-4 pr-1"
+                  ? "flex flex-col gap-3 rounded-lg border border-brand-card-line bg-brand-paper p-4"
+                  : "flex min-h-14 flex-wrap items-center justify-between gap-x-3 rounded-lg border border-dashed border-brand-line py-1 pl-4 pr-1"
               }
             >
               <p className="flex items-baseline gap-2 text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">
@@ -131,7 +152,7 @@ export function SlotSteps({ data, slot, busy, send, compact = false }: { data: R
         })}
       </ol>
       {other.length > 0 && (
-        <div className="flex flex-col gap-3 rounded-xl border border-brand-card-line bg-brand-paper p-4">
+        <div className="flex flex-col gap-3 rounded-lg border border-brand-card-line bg-brand-paper p-4">
           <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">{C.otherGroup}</p>
           {other.map((it) => entry(it.productId, it.schedule.days.includes(today)))}
           {!compact && <p className="text-sm text-brand-muted">{C.otherNote}</p>}

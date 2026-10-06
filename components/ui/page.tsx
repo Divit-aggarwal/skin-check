@@ -110,7 +110,7 @@ export function EmptyState({ title, body, action }: { title?: string; body: stri
 /** Error: a plain sentence, no code, and one way on. */
 export function ErrorState({ body, action }: { body: string; action?: React.ReactNode }) {
   return (
-    <div role="alert" className="flex max-w-2xl flex-col items-start gap-4 rounded-2xl border border-brand-line p-5 sm:p-6">
+    <div role="alert" className="flex max-w-2xl flex-col items-start gap-4 rounded-2xl border border-brand-line bg-brand-paper p-5 sm:p-6">
       <p className="flex items-start gap-2">
         <AlertCircle aria-hidden size={20} className="mt-0.5 shrink-0 text-brand-error" />
         <span>{body}</span>

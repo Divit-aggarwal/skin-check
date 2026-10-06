@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { h2 } from "@/components/ui/page";
 import { ROUTINE_COPY as C } from "@/lib/routine/copy";
 import { SlotSteps } from "./RoutineSteps";
 import type { useRoutine } from "./useRoutine";
@@ -15,7 +16,7 @@ export function TodayCard({ routine }: { routine: ReturnType<typeof useRoutine> 
   return (
     <section aria-labelledby="today-title" className="flex flex-col gap-5 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="today-title" className="font-display text-xl font-semibold uppercase leading-tight tracking-[0.04em] text-brand-title sm:text-[22px]">
+        <h2 id="today-title" className={h2}>
           {C.todayTitle}
         </h2>
         <Link href="/routine" className="inline-flex min-h-11 items-center font-semibold text-brand-forest underline-offset-4 hover:underline">

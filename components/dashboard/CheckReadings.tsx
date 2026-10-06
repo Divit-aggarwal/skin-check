@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ShieldCheck } from "lucide-react";
-import { ECHO_REGION_LABELS, type EchoRegion } from "@/lib/echo-regions";
+import { ECHO_REGION_LABELS, ECHO_REGIONS, type EchoRegion } from "@/lib/echo-regions";
 import { DASHBOARD_COPY as C } from "./copy";
 import { FaceDrawing } from "./FaceDrawing";
 import type { Bands, CheckView } from "./state";
@@ -59,10 +59,15 @@ export function CheckReadings({ view, stack = false }: { view: CheckView; stack?
               {C.current.wholeFace}
             </button>
             <p className="text-center text-sm text-brand-muted">{C.current.areaHint}</p>
+            {ECHO_REGIONS.filter((r) => !view.areas.some((a) => a.region === r)).map((r) => (
+              <p key={r} className="text-center text-sm text-brand-muted">
+                {C.current.noAreaReading(ECHO_REGION_LABELS[r])}
+              </p>
+            ))}
           </div>
         )}
-        <div className="min-w-0" aria-live="polite">
-          <h3 className="mb-1 text-base font-semibold">{area ? ECHO_REGION_LABELS[area] : C.current.wholeFace}</h3>
+        <div className="min-w-0">
+          <h3 aria-live="polite" className="mb-1 text-base font-semibold">{area ? ECHO_REGION_LABELS[area] : C.current.wholeFace}</h3>
           <ReadingRows bands={shown} />
         </div>
       </div>

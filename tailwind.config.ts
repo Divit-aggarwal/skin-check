@@ -2,6 +2,8 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   darkMode: ["class"],
+  // A hover tint must not stick after a tap on touch screens (design review G03 part 5).
+  future: { hoverOnlyWhenSupported: true },
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -121,7 +123,7 @@ const config: Config = {
         // SkinCheckFlow.tsx, the inputs/* components), not a new palette.
         // G03 (docs/design/system.md): mapped to the Shopify store theme, so
         // every screen that already uses these names takes the store's look.
-        canvas:  "#F5F3EE",  // store --color-linen (cards, panels)
+        canvas:  "#F5F3EE",  // store --color-linen (the page; cards are white, system.md §0)
         surface: "#FFFFFF",  // store --color-paper
         text:    "#2C2C2A",  // store --color-ink
 
