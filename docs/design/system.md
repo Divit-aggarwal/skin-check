@@ -198,7 +198,9 @@ Hard rules (D-12, TD-24 (4), LONGITUDINAL_METHOD §1):
 | Reading row | Metric on the left, band word on the right, both in ink, divided by a 1px border. Never a bar or a colour. |
 | List row (checks, timeline) | Min height 56px. Date first, then kind, then the photo check. The whole row is the link. A thumbnail (48px, 8px corners) appears only when the user chose to keep the photo. |
 | Form field | 48px tall, 8px corners, 1px border, 16px text, label above. Focus ring 2px forest. Errors below the field in the error colour, with `aria-describedby`. |
-| Choice chip | 44px tall, pill shape. Selected: ink fill, white text. |
+| Choice chip | 44px tall, pill shape. Selected: tint `#e4e9e8` fill, 1px `#1f473e` border, `#1f473e` text (G11, the same selected style as the option cards). Focus: a solid 2px `#1f473e` ring. |
+| Quiz option picture | A side view of the skin on one shared line, in the face drawing's style: linen above, white skin below, a dashed `#6b6862` deeper layer, meaningful marks in `#1f473e` or `#6b6862` at full strength (3:1 or more), the tint for swelling. 160 × 64 canvas, shown at 5:2 with nothing cropped. One SVG file per option in public/quiz/ (under 1 KB, no text inside); the option's `image.alt` is the only description. The owner can replace a file by putting their own under the same name. No photos of people, no red, nothing graphic. |
+| Multi-select question | A muted line under the question: "Choose all that apply." or "Choose up to N." Selected card: tint fill, green border, a check badge beside the label (never on the picture). |
 | Status line | Muted 14px text with an icon (lucide, 16px), for example "Photo checks on your phone: passed." |
 | Fixed line (TD-24 (1)) | On every opened past check, in a mist panel with ink text, not hidden behind a toggle: "Photos differ in light and angle. Differences between checks are not yet a measured change." |
 | Skeleton | Surface-2 blocks shaped like the content. The loading text stays for screen readers (`role="status"`). |
