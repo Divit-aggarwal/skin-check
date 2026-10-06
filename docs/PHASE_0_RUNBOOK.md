@@ -17,20 +17,22 @@ Stage 1 puts everything on `longitudinal-platform` into production and checks it
 | 3 | **Job C** from C2: task definition `skin-scan:2`, baseline, update service, watch 30 min, smoke scan, replay | Owner | 75 min | **STOP: JOB C DONE** |
 | 4 | **Job A**: Firestore `(default)` to asia-south1 (A1 cannot be undone; 5-10 min outage) | Owner | 30 min | **STOP: JOB A DONE** |
 | 5 | **Job B**: Vercel functions to bom1 | Owner | 15 min | **STOP: JOB B DONE** |
-| 6 | **Job S**: S1 erase user, S2 erase keys, S3 `CRON_SECRET`, S4 no dev settings, **S6 `GEMINI_MODEL_SYNTHESIS`** (Stage 1 needs it). Skip S5 (photo expiry) until decision 5 | Owner | 25 min | **STOP: JOB S DONE** |
+| 6 | **Job S**: S1 erase user, S2 erase keys, S3 `CRON_SECRET`, S4 no dev settings, **S6 `GEMINI_MODEL_SYNTHESIS`**, **S7 read-only photo user, S8 its keys** (Stage 1 needs S6-S8). Skip S5 (photo expiry) until decision 5 | Owner | 35 min | **STOP: JOB S DONE** |
 | 7 | **Job D**: D0 A14 merge (resolve `DECISION_LOG.md` and `vercel.json`), D1 push and PR, D2 merge = production deploy, D3 rules and chat-turn expiry right after Ready | Owner | 45 min | **STOP before D2**: tests green on the merged branch. **STOP before D3**: D2 Ready |
-| 8 | **D4** checks with two made-up test accounts: login, photo upload, engine, Gemini (English and Hinglish), rate limit, trust boundary, delete and the next daily sweep | Owner | 60 min + next sweep (03:00-03:59 IST) | **STOP: JOB D DONE**. Stage 1 is live |
+| 8 | **D4** checks with two made-up test accounts: login, photo upload, engine, Gemini (English and Hinglish), rate limit, trust boundary, delete and the next daily sweep; then the redesign checks (items 9-14): sign in lands on Home, navigation on a phone and a desktop, a past check with its photo, the face drawing, the routine steps, `/dev/recommendations` returns 404 | Owner | 80 min + next sweep (03:00-03:59 IST) | **STOP: JOB D DONE**. Stage 1 is live |
 
-Total: about 4.5 hours of owner time, plus waiting for the next daily sweep (step 8).
+Total: about 5 hours of owner time, plus waiting for the next daily sweep (step 8).
 
 **What a Stage 1 test user sees, and why it is accepted for Stage 1 only:**
 - Echo's AI-share consent starts with "DRAFT:" (H06 not final).
-- The routine page lists three products named "Sample … (SYNTHETIC - replace)" (E01 not supplied).
+- The routine page lists three products named "Sample … (SYNTHETIC - replace)" (E01 not supplied), so the Treat step has no product of ours to add.
+- The routine purpose sentence starts with "DRAFT:" (G05 not final).
+- The logo is the words "The Project SKIN" (no `public/brand/logo.png` yet, TD-26 (3)).
 - A red-flag or self-harm message gets the referral with no helpline number (F06).
 - The Gemini key is whatever key is in production now (G1 undecided): use made-up answers only. Echo allows 18 chat requests a day across all users (F14).
 - Product recommendations are off; the safety check is on and marked provisional.
 
-**Must be done before Stage 2 (real users):** F06 helpline number, H06 final consent copy, G1 Gemini key and tier, F14 daily limit, E01 real catalogue (or hide the routine page), decision 5 and S5 photo expiry, and a review of everything the Stage 1 test accounts saw.
+**Must be done before Stage 2 (real users):** F06 helpline number, H06 final consent copy, G05 final routine purpose copy, G1 Gemini key and tier, F14 daily limit, E01 real catalogue (or hide the routine page), the G09 clinical-reviewer questions (before recommendations are ever turned on), decision 5 and S5 photo expiry, and a review of everything the Stage 1 test accounts saw.
 
 ## Production state checked 2026-10-06 (read-only; AWS and Firestore re-read the same day after the logins were refreshed)
 
@@ -49,11 +51,12 @@ Total: about 4.5 hours of owner time, plus waiting for the next daily sweep (ste
 | Firestore `(default)` | the only database: location nam5, Standard, FIRESTORE_NATIVE, created 2026-09-08, delete protection and point-in-time recovery disabled | nam5 until A1 | Matches |
 | Vercel Production settings | 20 names present; `CRON_SECRET`, `S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID`, `S3_SKIN_IMAGES_ERASE_SECRET_ACCESS_KEY` missing | same | Yes |
 | `GEMINI_MODEL_SYNTHESIS` value | Stored as a secret, not readable | the model G1 approves | **Cannot check**: S6 sets it |
-| Merge dry runs | `infra/india-region` into this branch: conflicts in `DECISION_LOG.md` and `vercel.json`; this branch into `origin/master`: clean | D0 | Yes (D0 now also covers `vercel.json`) |
+| Merge dry runs (re-run 2026-10-06 after the redesign with `git merge-tree`, on `redesign/ui` = what `longitudinal-platform` becomes) | `infra/india-region` (ff08107) into this branch: conflicts in `DECISION_LOG.md` (D-22 against D-23/D-25/D-26, the block A14 plans for) and `vercel.json` (add/add: `regions` against `crons`); this branch into `origin/master` (1b39f88): clean; `infra/india-region` into `origin/master` alone: clean | D0 | Yes, unchanged: the redesign added no conflict |
+| Read-only photo settings in Vercel Production | not re-read; `S3_SKIN_IMAGES_READ_ACCESS_KEY_ID` and `_SECRET_ACCESS_KEY` are new (G03, TD-25 (2)), so expected **missing** | S7 and S8 create and set them | Re-check in step 0 (see S8's check) |
 
 ---
 
-Engine 0.1.6, India Firestore, Vercel bom1, website gates 01-04, and every feature built on the branch since (longitudinal engine, rules safety check, context-path Echo, dashboard, privacy: consent ledger, 18+ gate, erase and sweep).
+Engine 0.1.6, India Firestore, Vercel bom1, website gates 01-04, and every feature built on the branch since (longitudinal engine, rules safety check, context-path Echo, dashboard, privacy: consent ledger, 18+ gate, erase and sweep), and the UI redesign (G03, G10, G11: store brand, app shell, Home, Checks with kept-photo thumbnails, Routine steps, quiz pictures; added to this runbook 2026-10-06).
 
 First prepared 2026-10-03; rewritten 2026-10-05 for the whole branch. **Nothing in this file has been executed except C0 and C1 (2026-10-03, TD-04).**
 
@@ -89,12 +92,22 @@ Names only. Set with `vercel env add <NAME> production` (the value is read from 
 | `S3_SKIN_IMAGES_REGION`, `S3_SKIN_IMAGES_BUCKET` | Photo bucket | Owner | `ap-south-1`, `projectskin-skin-originals-prod` | Present |
 | `S3_SKIN_IMAGES_ACCESS_KEY_ID`, `S3_SKIN_IMAGES_SECRET_ACCESS_KEY` | Upload-only principal `skin-check-uploader` (presigned PUT) | Owner | existing keys | Present |
 | `S3_SKIN_IMAGES_ERASE_ACCESS_KEY_ID`, `S3_SKIN_IMAGES_ERASE_SECRET_ACCESS_KEY` | **Erase credentials**: a separate principal that may list and delete under `users/*` only (account erase and the sweep) | Owner (S1, S2) | keys of the new `skin-check-eraser` user | **Missing** |
+| `S3_SKIN_IMAGES_READ_ACCESS_KEY_ID`, `S3_SKIN_IMAGES_READ_SECRET_ACCESS_KEY` | **Read-only photo credentials** (G03, TD-25 (2)): a third user that may only `s3:GetObject` the kept originals, with no listing. `GET /api/checks/photo` uses it to give a signed-in user a 60-second link to their **own** kept photo (the thumbnail on Checks and on the opened check). Unset: the route answers 500 and no thumbnail shows; nothing else breaks | Owner (S7, S8) | keys of the new `skin-check-photo-reader` user | **Missing** (new) |
 | `CRON_SECRET` | The erase sweep refuses without it; Vercel sends it as `Authorization: Bearer …` on every cron call | Owner (S3) | 32 random bytes, hex | **Missing** |
 | `GEMINI_API_KEY` | Echo (context path) | Owner, after G1 (paid tier, region) | the key G1 approves | Present (key ownership/tier unresolved, G1) |
 | `GEMINI_MODEL_SYNTHESIS` | Model id for Echo; unset means `gemini-3.6-flash`. The call always sends `thinkingLevel: MINIMAL`; the model must accept it. Older ids (`gemini-2.5-flash`, `gemini-2.0-flash`) now return 404 "no longer available" (checked 2026-10-06), and every answer would fail | Owner (S6) | `gemini-3.6-flash` for Stage 1; the model G1 approves for Stage 2 | Present, value not readable (stored as a secret) |
 | `GEMINI_MODEL_VISION` | Not read by the code any more | Owner | may be removed | Present (unused) |
 | `NEXT_PUBLIC_APP_ENV` | Only turns on full fetch-URL logging when `development` | Owner | `production` | Present |
 | `NEXT_PUBLIC_TERMS_URL` | Terms link on the photo step | Owner | the terms page URL | Present |
+
+**New since the runbook was last checked (2026-10-06, the redesign):**
+
+| Setting (name only) | What it is for | Who sets it | Stage 1 needs it? |
+|---|---|---|---|
+| `S3_SKIN_IMAGES_READ_ACCESS_KEY_ID` | Access key id of the read-only photo user `skin-check-photo-reader` (S7, S8) | Owner, in S8 (piped from `aws iam create-access-key`, never typed) | **Yes**: D4 item 11 checks a past check's thumbnail. Without it the thumbnail is simply missing |
+| `S3_SKIN_IMAGES_READ_SECRET_ACCESS_KEY` | Its secret | Owner, in S8 | **Yes**, with the id above |
+
+No other setting was added: `git diff 050af54..HEAD` adds no other `process.env` name. The redesign removed one config item: `next.config.js` no longer redirects `/` to `/skin-check`. `/` is now a page: Home when signed in, the check flow when not. The local recommendation preview `/dev/recommendations` needs no setting: it is "not found" in every production build.
 
 **Feature switches (no setting changes them in production):**
 
@@ -103,11 +116,14 @@ Names only. Set with `vercel env add <NAME> production` (the value is read from 
 | Echo path (`ECHO_CONTEXT_PATH`) | `lib/context/switch.ts` | Context path always (F12, TD-20). A production build ignores the variable; leave it **unset**. Going back to today's Echo is a code change and a redeploy. |
 | Rules safety check | `lib/rules/settings.ts` (`REVIEW_STATUS`) | **On**, marked `provisional` (TD-20): the red-flag and extra-caution check runs. |
 | Product recommendations | same | **Off** until clinical sign-off (E05). No setting turns them on. |
+| Recommendation preview (`/dev/recommendations`) | `app/dev/recommendations/page.tsx` | **Not found** unless `NODE_ENV` is `development` (`next dev`): a production build answers 404 before reading anything. D4 item 14 checks it. |
 | 18+ attestation required for scan/upload | `app/api/account/_ledger.ts` (`REQUIRE_AGE_ATTESTATION`) | `false` (decision 3a): logged, not refused. Under-18 is always refused; chat always requires 18+. |
 
 **Must be unset in Production** (development and test only; most are ignored in production builds anyway): `ECHO_CONTEXT_PATH`, `ERASE_SWEEP_DELAY_SECONDS`, `GEMINI_DEV_API_KEY`, `GEMINI_LOCAL_BASE_URL`, `FAKE_GEMINI_PORT`, `S3_SKIN_IMAGES_ENDPOINT`, `FIREBASE_AUTH_EMULATOR_HOST`, `FIRESTORE_EMULATOR_HOST`, `NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST`, `NEXT_PUBLIC_FIRESTORE_EMULATOR_HOST`. S4 checks this.
 
 ## Database rules and indexes (as on the branch)
+
+**No change since the runbook was last checked (re-checked 2026-10-06 after the redesign):** `git diff 050af54..HEAD -- firestore.rules firestore.indexes.json vercel.json` is empty. The redesign's new reads are server-side only, or emulator-only. The photo route reads `erasedAccounts/{uid}` and `users/{uid}/skinChecks/{scanId}` with the Admin SDK, which rules do not apply to. `/dev/recommendations` reads only from the emulator. No client query was added, so no rule and no composite index is needed.
 
 `firestore.rules` (deployed in D3). Deny by default; every path a client touches is matched explicitly.
 
@@ -132,6 +148,8 @@ Names only. Set with `vercel env add <NAME> production` (the value is read from 
 - **Expiry policy for stored chat turns (H17, D-15):** every `users/{uid}/chatTurns` document carries `expireAt` = written time + 90 days (`CHAT_TURN_TTL_DAYS`). The override above turns on Firestore TTL for that field and leaves it unindexed (nothing queries it). Firestore deletes expired documents some time after `expireAt`, not on the second. Erase deletes them at once with the account.
 
 ## Scheduled job: the erase sweep (TD-19)
+
+Unchanged by the redesign: still the one cron in `vercel.json`.
 
 - `vercel.json` (on the branch) declares one Vercel cron: `GET /api/account/erase/sweep`, schedule `30 21 * * *` (UTC), i.e. once a day between 03:00 and 03:59 India time. The Hobby plan allows one run a day at any minute of the scheduled hour.
 - Vercel sends `Authorization: Bearer $CRON_SECRET`. The route refuses (500) when `CRON_SECRET` is unset and (401) on any other header.
@@ -164,7 +182,8 @@ Each is a commit on `longitudinal-platform` by an engineer once the owner suppli
 1. **F06**: a verified India helpline number and its hours for the referral message (deploy blocker for the context path).
 2. **H06**: the final AI-share and processing consent sentences (both versions still say DRAFT; tests pin them).
 3. **G1**: Gemini key ownership, paid tier and processing region (decision 6). The context path sends Gemini the user's message and the reading facts.
-4. **Decision 5** (optional before deploy): the photo retention period. Needed for S5 and for `IMAGE_RETENTION_PERIOD_DAYS` and its copy.
+4. **G05**: the final routine purpose sentence. `ROUTINE_PURPOSE_COPY` in `lib/consent.ts` still starts with "DRAFT:". Stage 1 may ship with DRAFT; Stage 2 may not.
+5. **Decision 5** (optional before deploy): the photo retention period. Needed for S5 and for `IMAGE_RETENTION_PERIOD_DAYS` and its copy.
 
 ```
 ==================== STOP: P DONE ====================
@@ -639,6 +658,56 @@ printf 'gemini-3.6-flash' | vercel env add GEMINI_MODEL_SYNTHESIS production --n
 - Check (read-only): `vercel env ls production | grep GEMINI_MODEL_SYNTHESIS` shows it as a plain (non-secret) value; D4 item 4 shows `modelId: "gemini-3.6-flash"` on the echo turn.
 - Undo: `vercel env rm GEMINI_MODEL_SYNTHESIS production --yes` (the code then uses its default, `gemini-3.6-flash`). The old value cannot be restored, because it was never readable.
 
+### S7. Create the read-only photo user (kept photos only, no listing)
+
+For `GET /api/checks/photo` (G03, TD-25 (2)): a signed-in user sees their own kept photo. This is a **separate** user from the uploader and the eraser, so each key can do one thing only.
+
+Re-check first (read-only): the bucket must use S3-managed encryption. Otherwise the read user also needs `kms:Decrypt` on the bucket's key.
+
+```bash
+aws s3api get-bucket-encryption --bucket $BUCKET --query 'ServerSideEncryptionConfiguration.Rules[].ApplyServerSideEncryptionByDefault.SSEAlgorithm' --output text   # AES256
+```
+- If it prints `aws:kms` or `aws:kms:dsse`: **stop.** The policy below then needs `kms:Decrypt` on that key (tracker row).
+
+**STOP (owner runs this).**
+
+```bash
+umask 077; POL=$(mktemp)
+cat > "$POL" <<EOF
+{ "Version": "2012-10-17", "Statement": [
+  { "Effect": "Allow", "Action": "s3:GetObject", "Resource": "arn:aws:s3:::$BUCKET/users/*/scans/*/original.jpg" } ] }
+EOF
+aws iam create-user --user-name skin-check-photo-reader --query 'User.Arn' --output text
+aws iam put-user-policy --user-name skin-check-photo-reader --policy-name skin-check-read-kept-originals --policy-document "file://$POL"
+rm -f "$POL"
+```
+- Who: owner.
+- The user gets exactly one permission: `s3:GetObject` on the original photos.
+- There is **no `s3:ListBucket`**. The key cannot list the bucket or find anyone's photos; it can only fetch a key it is given. The route builds that key from the signed-in user's own uid, and checks the user's check record first.
+- Without `ListBucket`, S3 answers a missing photo with 403 instead of 404. `originalExists` in `lib/s3.ts` treats both as "no photo".
+- Good output: the new user's ARN, then nothing.
+- Check (read-only):
+  - `aws iam get-user-policy --user-name skin-check-photo-reader --policy-name skin-check-read-kept-originals --query PolicyDocument` shows exactly the one statement above.
+  - `aws iam list-attached-user-policies --user-name skin-check-photo-reader` and `aws iam list-groups-for-user --user-name skin-check-photo-reader` show none.
+- A leaked read key can fetch any kept photo whose key it is given, until it is rotated. Rotate it like the other keys.
+- Undo: `aws iam delete-user-policy --user-name skin-check-photo-reader --policy-name skin-check-read-kept-originals && aws iam delete-user --user-name skin-check-photo-reader` (after S8's undo).
+
+### S8. Give the read keys to Vercel without showing them
+
+**STOP (owner runs this).**
+
+```bash
+umask 077; K=$(mktemp)
+aws iam create-access-key --user-name skin-check-photo-reader --output json > "$K"
+jq -r .AccessKey.AccessKeyId "$K"     | vercel env add S3_SKIN_IMAGES_READ_ACCESS_KEY_ID production --sensitive
+jq -r .AccessKey.SecretAccessKey "$K" | vercel env add S3_SKIN_IMAGES_READ_SECRET_ACCESS_KEY production --sensitive
+rm -f "$K"
+```
+- Who: owner. Nothing is printed, and the temp file is deleted at once.
+- Good output: two `Added Environment Variable … to Project skin-check` lines.
+- Check (read-only): `vercel env ls production | grep S3_SKIN_IMAGES_READ` shows both names; `aws iam list-access-keys --user-name skin-check-photo-reader --query 'AccessKeyMetadata[].Status'` shows one `Active`.
+- Undo: `vercel env rm S3_SKIN_IMAGES_READ_ACCESS_KEY_ID production --yes; vercel env rm S3_SKIN_IMAGES_READ_SECRET_ACCESS_KEY production --yes`, then `aws iam delete-access-key --user-name skin-check-photo-reader --access-key-id <id from list-access-keys>`.
+
 ### S5. Photo retention rule on the bucket (decision 5; period chosen by the owner)
 
 Fill in `RETENTION_DAYS` with the decided number. **Do not run this until decision 5 is made and `IMAGE_RETENTION_PERIOD_DAYS` in `lib/consent.ts` and its copy are set to the same number** (otherwise photos disappear on a schedule no copy tells users about).
@@ -662,8 +731,8 @@ aws s3api put-bucket-lifecycle-configuration --bucket $BUCKET --lifecycle-config
 
 ```
 ==================== STOP: JOB S DONE ====================
-Owner confirms S1-S4 checks pass (S5 done or recorded as waiting on
-decision 5), tracker H01/TD-19 updated. Do not start job D before this.
+Owner confirms S1-S4 and S6-S8 checks pass (S5 done or recorded as
+waiting on decision 5), tracker H01/TD-19/G04 updated. Do not start job D before this.
 ==========================================================
 ```
 
@@ -797,6 +866,35 @@ The local stack uses emulators, S3Mock, a fake Gemini and the engine image by ID
 7. **Erase and the sweep.** With a second made-up account that has one check with a photo: delete the account on `/account`. Right away (read-only): the S3 prefix `users/<uid2>/` lists nothing, the console has no `users/<uid2>` tree, Firebase Auth has no such user, and `erasedAccounts/<uid2>` exists. After the next cron run (03:00-03:59 India time, at least 70 minutes after the delete), `erasedAccounts/<uid2>` is gone. Vercel dashboard → project → Settings → Cron Jobs shows the run with status 200. To run it at once, use **Run** on that page (a STOP step; it only re-erases already erased accounts).
 8. **Region.** `curl -s -o /dev/null -D - -X POST https://skin-check-sigma.vercel.app/api/skin-scan | grep -i x-vercel-id` shows `bom1::bom1::`.
 
+9. **Sign in lands on Home.** Signed out, open `https://skin-check-sigma.vercel.app/`: the check flow starts. There is no redirect to `/skin-check` any more; `/` is a page. Sign in on `/account` with the test phone: you land on `/dashboard` ("Your skin checks"). Open `/` again while signed in: Home.
+10. **Navigation on a phone and a desktop.**
+    - Phone (a real phone, or a desktop browser under 640 px wide): a bottom bar with Home, Checks, New check (the round button in the middle), Routine and Echo. Account is the round button at the top right of each page. Each item opens its page and is shown as current.
+    - Desktop (1024 px or wider): a white side bar with the name, New check, Home, Checks, Routine, Echo, and Account with the phone's last 4 digits at the bottom.
+    - On either, press Tab at the top of a page: the first stop is "Skip to content".
+11. **A past check with its photo** (needs S7 and S8). Use the account from item 2, which kept its photo.
+    - Open Checks. The check shows a small photo. The opened check shows it too, with its readings and the fixed line "Photos differ in light and angle…".
+    - In devtools → Network, `GET /api/checks/photo?scanId=…` answers `200` with `Cache-Control: private, no-store, max-age=0`. A check with no kept photo shows no photo, and its request answers `404`.
+    - Without a login it answers `401`:
+      ```bash
+      curl -s -o /dev/null -w '%{http_code}\n' 'https://skin-check-sigma.vercel.app/api/checks/photo?scanId=<scanId>'
+      ```
+    - Signed in as the **second** test account, resend the photo request with the first account's `scanId` ("Copy as fetch" in devtools): `404 NO_PHOTO`, never the photo.
+    - The link in a `200` answer stops working after 60 seconds (S3 then answers 403).
+12. **The face drawing.** Check it on Home, on the opened check, and on the results screen after a new check.
+    - Tap Forehead, Nose, Cheeks and Chin. Each fills with the green tint, and its readings show under the area name.
+    - Tapping the chosen area again, or "Whole face", shows the whole face.
+    - Readings are band words only (Low, Moderate, Elevated), all in the same style.
+13. **The routine steps.** On `/routine`:
+    - Morning and Evening each show Step 1 Cleanse, Step 2 Treat, Step 3 Moisturise and Step 4 Protect.
+    - "Add a product" on an empty step opens the form with that step chosen.
+    - Add the sample cleanser. Tap Used, then Skipped: "Today: …" changes each time and stays after a reload. Home's "Today's routine" shows the same.
+    - No reading or photo appears next to any routine entry.
+14. **The recommendation preview is not in production.**
+    ```bash
+    curl -s -o /dev/null -w '%{http_code}\n' https://skin-check-sigma.vercel.app/dev/recommendations   # 404
+    curl -s https://skin-check-sigma.vercel.app/dev/recommendations | grep -c 'Recommendation preview'   # 0
+    ```
+
 - Who: owner.
 - Undo: as D2.
 
@@ -818,7 +916,8 @@ env -u FIRESTORE_EMULATOR_HOST -u FIREBASE_AUTH_EMULATOR_HOST \
 
 ```
 ==================== STOP: JOB D DONE ====================
-Owner confirms: D2, D3 and D4 pass, tracker A13 and I01 updated.
+Owner confirms: D2, D3 and D4 (items 1-14) pass, tracker A13, I01 and
+G04 updated.
 ==========================================================
 ```
 
