@@ -61,14 +61,30 @@ test("sign in as a seeded user and see the dashboard", async ({ page }) => {
   await shot(page, "building");
 });
 
-test("readings by face area: the chips switch the area, every band in the same style, no score", async ({ page }) => {
+test("readings by face area: the face drawing switches the area, every band in the same style, no score", async ({ page }) => {
   await dashboardAs(page, U.set!.phoneNumber);
   const current = page.locator("section", { has: page.getByRole("heading", { name: C.current.title }) });
   await expect(current.getByRole("button", { name: C.current.wholeFace })).toHaveAttribute("aria-pressed", "true");
   await current.getByRole("button", { name: "Forehead" }).click();
   await expect(current.getByRole("heading", { name: "Forehead" })).toBeVisible();
   await expect(current.getByRole("button", { name: "Forehead" })).toHaveAttribute("aria-pressed", "true");
+  await expect(current.getByRole("button", { name: C.current.wholeFace })).toHaveAttribute("aria-pressed", "false");
   await expect(current.getByText(C.current.areaNote)).toBeVisible();
+  await shot(page, "home-area-chosen");
+  // Choosing the chosen area again goes back to the whole face.
+  await current.getByRole("button", { name: "Forehead" }).click();
+  await expect(current.getByRole("button", { name: C.current.wholeFace })).toHaveAttribute("aria-pressed", "true");
+  await expect(current.getByRole("heading", { name: C.current.wholeFace })).toBeVisible();
+  // Keyboard: Enter and Space choose an area; "Whole face" goes back.
+  await current.getByRole("button", { name: "Nose" }).focus();
+  await page.keyboard.press("Enter");
+  await expect(current.getByRole("heading", { name: "Nose" })).toBeVisible();
+  await current.getByRole("button", { name: "Cheeks" }).focus();
+  await page.keyboard.press(" ");
+  await expect(current.getByRole("button", { name: "Cheeks" })).toHaveAttribute("aria-pressed", "true");
+  await current.getByRole("button", { name: C.current.wholeFace }).click();
+  await expect(current.getByRole("heading", { name: C.current.wholeFace })).toBeVisible();
+  await current.getByRole("button", { name: "Forehead" }).click();
   // Every reading row has one style, whatever its band; no Dryness row.
   const classes = await current.locator("dd").evaluateAll((els) => Array.from(new Set(els.map((e) => e.className))));
   expect(classes).toHaveLength(1);

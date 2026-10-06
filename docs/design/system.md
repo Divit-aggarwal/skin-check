@@ -149,6 +149,9 @@ Hard rules (D-12, TD-24 (4), LONGITUDINAL_METHOD §1):
   no green, amber or red, no fill length, no gauge. The repo's `confidence`
   and `subscore` palettes are never used on readings.
 - No arrows, deltas, sparklines or side-by-side numbers between checks.
+- The face drawing's chosen area gets the brand tint `#e4e9e8` and a solid
+  2.5px `#1f473e` outline (10:1 on the tint). The tint follows the user's
+  choice only, never a band or a reading.
 - Decorative colours are allowed only on things that carry no meaning about
   skin, such as an illustration, the Echo mark or a routine product dot.
 
@@ -190,6 +193,7 @@ Hard rules (D-12, TD-24 (4), LONGITUDINAL_METHOD §1):
 | Secondary button | Pill shape with a 1px `#ddd8ce` border, transparent fill and ink text, 15px weight 600, 48px tall (§0). |
 | Text link | Forest colour, underlined on hover and focus. Tap area at least 44px tall in lists. |
 | Card | White on the linen page, 1px `#ece8e1` border, 16px corners, 16–24px padding (§0). A card's h3 is the card's name. |
+| Face drawing | One drawing on Home, an opened check and the results screen (components/dashboard/FaceDrawing.tsx). Each area with a reading (forehead, nose, cheeks, chin) is a button: `role="button"`, `aria-pressed`, the area's name, Enter and Space. Choosing the chosen area again, or the "Whole face" button, shows the whole face. Labels sit inside the areas: no pointer lines. Unchosen areas: dashed ink outline. Chosen: tint fill and a solid green outline. Keyboard focus: a solid 3px green outline. An area without a reading is faint and cannot be chosen. Fits 390px: the drawing scales to the card, up to 300px wide. |
 | Reading row | Metric on the left, band word on the right, both in ink, divided by a 1px border. Never a bar or a colour. |
 | List row (checks, timeline) | Min height 56px. Date first, then kind, then the photo check. The whole row is the link. A thumbnail (48px, 8px corners) appears only when the user chose to keep the photo. |
 | Form field | 48px tall, 8px corners, 1px border, 16px text, label above. Focus ring 2px forest. Errors below the field in the error colour, with `aria-describedby`. |

@@ -167,7 +167,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
           <h2 id="readings-title" className="font-display text-xl font-semibold uppercase leading-tight tracking-[0.04em] text-brand-title sm:text-[22px]">
             What this photo shows
           </h2>
-          {view.bands ? <CheckReadings view={view} face={false} /> : <p>The readings of this check could not be shown.</p>}
+          {view.bands ? <CheckReadings view={view} stack /> : <p>The readings of this check could not be shown.</p>}
           <p className="text-sm text-brand-muted">
             Each reading is relative to this one photo. It is not a medical opinion and does not set you against other people or other checks.
           </p>

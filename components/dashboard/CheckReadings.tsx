@@ -34,48 +34,39 @@ export function ReadingRows({ bands }: { bands: Bands | null }) {
   );
 }
 
-// One check's readings: whole face, or one face area, picked with the chips.
+// One check's readings: whole face, or one face area, chosen on the face
+// drawing (the same drawing on Home, an opened check and the results screen).
 // Band words only, all in the same neutral style, so no band reads as good or
 // bad news. No score, no overlay, no other check.
-export function CheckReadings({ view, face = true, stack = false }: { view: CheckView; face?: boolean; stack?: boolean }) {
+export function CheckReadings({ view, stack = false }: { view: CheckView; stack?: boolean }) {
   const [area, setArea] = useState<EchoRegion | null>(null);
   // No drawing of areas when there are no readings to go with it.
-  const showFace = face && view.areas.length > 0 && view.bands !== null;
+  const showFace = view.areas.length > 0 && view.bands !== null;
   const shown = area ? view.areas.find((a) => a.region === area)?.bands ?? null : view.bands;
-  const chips: { key: EchoRegion | null; label: string }[] = [
-    { key: null, label: C.current.wholeFace },
-    ...view.areas.map((a) => ({ key: a.region, label: a.label })),
-  ];
 
   return (
     <div className="flex flex-col gap-5">
-      {view.bands && view.areas.length > 0 && (
-        <div role="group" aria-label={C.current.areaPicker} className="flex flex-wrap gap-2">
-          {chips.map((c) => (
-            <button
-              key={c.label}
-              type="button"
-              aria-pressed={area === c.key}
-              onClick={() => setArea(c.key)}
-              className="min-h-11 rounded-full border border-brand-line bg-brand-linen px-4 text-sm font-medium aria-pressed:border-brand-action aria-pressed:bg-brand-action aria-pressed:text-white"
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className={showFace && !stack ? "grid items-center gap-6 md:grid-cols-[minmax(0,300px)_1fr]" : "flex flex-col gap-6"}>
+      <div className={showFace && !stack ? "grid items-start gap-6 md:grid-cols-[minmax(0,300px)_1fr]" : "flex flex-col gap-6"}>
         {showFace && (
-          <div className="rounded-2xl bg-brand-linen p-3">
-            <FaceDrawing selected={area} labels={ECHO_REGION_LABELS} />
+          <div role="group" aria-label={C.current.areaPicker} className="flex flex-col items-center gap-3 rounded-2xl bg-brand-linen p-4">
+            <FaceDrawing selected={area} labels={ECHO_REGION_LABELS} available={view.areas.map((a) => a.region)} onSelect={setArea} />
+            <button
+              type="button"
+              aria-pressed={area === null}
+              onClick={() => setArea(null)}
+              className="min-h-11 rounded-full border border-brand-line bg-brand-paper px-5 text-sm font-semibold aria-pressed:border-brand-forest aria-pressed:bg-brand-mist aria-pressed:text-brand-forest"
+            >
+              {C.current.wholeFace}
+            </button>
+            <p className="text-center text-sm text-brand-muted">{C.current.areaHint}</p>
           </div>
         )}
-        <div className="min-w-0">
-          <h3 className="mb-1 font-semibold">{area ? ECHO_REGION_LABELS[area] : C.current.wholeFace}</h3>
+        <div className="min-w-0" aria-live="polite">
+          <h3 className="mb-1 text-base font-semibold">{area ? ECHO_REGION_LABELS[area] : C.current.wholeFace}</h3>
           <ReadingRows bands={shown} />
         </div>
       </div>
-      {view.areas.length > 0 && view.bands && <p className="text-sm text-brand-muted">{C.current.areaNote}</p>}
+      {showFace && <p className="text-sm text-brand-muted">{C.current.areaNote}</p>}
       {view.hardToRead.length > 0 && <p className="text-sm">{C.current.hardToRead(view.hardToRead.join(", "))}</p>}
       {view.photoCheck && <PhotoCheckLine text={C.photoCheck[view.photoCheck]} />}
       {view.source === "legacy" && view.bands && <p className="text-sm text-brand-muted">{C.legacyNote}</p>}

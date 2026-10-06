@@ -1,44 +1,103 @@
-import type { EchoRegion } from "@/lib/echo-regions";
+import type { KeyboardEvent } from "react";
+import { ECHO_REGIONS, type EchoRegion } from "@/lib/echo-regions";
+
+// Shapes and label positions in the 280 x 330 drawing. Labels sit inside
+// their areas, so there are no pointer lines.
+const AREAS: Record<EchoRegion, { shapes: JSX.Element[]; text: [number, number][] }> = {
+  forehead: { shapes: [<rect key="f" x="76" y="52" width="128" height="52" rx="24" />], text: [[140, 83]] },
+  nose: { shapes: [<rect key="n" x="120" y="116" width="40" height="82" rx="20" />], text: [[140, 161]] },
+  cheeks: {
+    shapes: [<ellipse key="l" cx="87" cy="196" rx="31" ry="27" />, <ellipse key="r" cx="193" cy="196" rx="31" ry="27" />],
+    text: [
+      [87, 200],
+      [193, 200],
+    ],
+  },
+  chin: { shapes: [<ellipse key="c" cx="140" cy="276" rx="44" ry="22" />], text: [[140, 280]] },
+};
 
 /**
- * An abstract face in neutral ink with the four areas marked. The selected
- * area gets a solid outline; nothing is filled or coloured to mean anything
- * (docs/design/system.md §2). Decorative: the readings are in text beside it.
+ * An abstract face with the four areas the pipeline reads. Each area that has
+ * a reading is a button (tap, click, Enter or Space); choosing the chosen area
+ * again goes back to the whole face. The chosen area gets the brand tint and a
+ * solid green outline; keyboard focus gets a thicker solid outline. Only the
+ * choice changes the look: nothing is coloured by band (system.md §2).
  */
-export function FaceDrawing({ selected, labels }: { selected: EchoRegion | null; labels: Record<EchoRegion, string> }) {
-  const ink = "#2C2C2A";
-  const zone = (r: EchoRegion) => ({
-    fill: "none",
-    stroke: ink,
-    strokeWidth: selected === r ? 2 : 1,
-    strokeDasharray: selected === r ? undefined : "4 4",
-    opacity: selected && selected !== r ? 0.45 : 1,
-  });
-  const text = (r: EchoRegion) => ({ fontSize: 13, fontWeight: selected === r ? 700 : 500, fill: ink, textAnchor: "middle" as const });
-  const lead = (r: EchoRegion) => ({ stroke: ink, strokeWidth: 1, opacity: selected && selected !== r ? 0.45 : 1 });
+export function FaceDrawing({
+  selected,
+  labels,
+  available,
+  onSelect,
+}: {
+  selected: EchoRegion | null;
+  labels: Record<EchoRegion, string>;
+  /** Areas with a reading. Any other area is drawn faint and cannot be chosen. */
+  available: readonly EchoRegion[];
+  onSelect: (region: EchoRegion | null) => void;
+}) {
+  const choose = (r: EchoRegion) => onSelect(selected === r ? null : r);
+  const keys = (r: EchoRegion) => (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      choose(r);
+    }
+  };
+
   return (
-    <svg width="300" height="292" viewBox="0 0 300 292" aria-hidden className="mx-auto block h-auto max-w-full shrink-0 font-body">
-      <g transform="translate(30 0)">
-        <path d="M120 22c-50 0-80 38-80 92 0 72 36 144 80 144s80-72 80-144c0-54-30-92-80-92Z" fill="#FFFFFF" stroke={ink} strokeWidth="1.5" />
-        <path d="M48 92c14-30 40-44 72-44s58 14 72 44" fill="none" stroke="#B7A58F" strokeWidth="1.5" />
-        <path d="M40 132c-10-2-12 26 2 30M200 132c10-2 12 26-2 30" fill="none" stroke={ink} strokeWidth="1.2" />
-        <path d="M82 134q12-8 24 0M134 134q12-8 24 0" fill="none" stroke={ink} strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M120 140v30q-8 6 0 10" fill="none" stroke={ink} strokeWidth="1.2" strokeLinecap="round" />
-        <path d="M100 212q20 12 40 0" fill="none" stroke={ink} strokeWidth="1.5" strokeLinecap="round" />
-        <rect x="70" y="60" width="100" height="50" rx="18" {...zone("forehead")} />
-        <ellipse cx="74" cy="180" rx="22" ry="24" {...zone("cheeks")} />
-        <ellipse cx="166" cy="180" rx="22" ry="24" {...zone("cheeks")} />
-        <rect x="106" y="122" width="28" height="64" rx="14" {...zone("nose")} />
-        <ellipse cx="120" cy="238" rx="28" ry="13" {...zone("chin")} />
+    <svg viewBox="0 0 280 330" className="mx-auto block h-auto w-full max-w-[300px] select-none font-body">
+      <g aria-hidden fill="none" stroke="#B0AAA2" strokeLinecap="round" strokeWidth="1.5">
+        <path d="M140 16C78 16 40 62 40 130c0 88 46 186 100 186s100-98 100-186C240 62 202 16 140 16Z" fill="#FFFFFF" stroke="#2C2C2A" />
+        <path d="M58 88c16-34 46-52 82-52s66 18 82 52" />
+        <path d="M80 128q14-7 28 0M172 128q14-7 28 0" />
+        <path d="M124 236q16 9 32 0" />
       </g>
-      <text x="150" y="90" {...text("forehead")}>{labels.forehead}</text>
-      <line x1="164" y1="140" x2="252" y2="112" {...lead("nose")} />
-      <text x="256" y="117" {...text("nose")} textAnchor="start">{labels.nose}</text>
-      <line x1="90" y1="198" x2="36" y2="236" {...lead("cheeks")} />
-      <text x="2" y="252" {...text("cheeks")} textAnchor="start">{labels.cheeks}</text>
-      <line x1="210" y1="198" x2="264" y2="236" {...lead("cheeks")} />
-      <text x="298" y="252" {...text("cheeks")} textAnchor="end">{labels.cheeks}</text>
-      <text x="150" y="284" {...text("chin")}>{labels.chin}</text>
+      {ECHO_REGIONS.map((r) => {
+        const { shapes, text } = AREAS[r];
+        if (!available.includes(r)) {
+          return (
+            <g key={r} aria-hidden fill="none" stroke="#B0AAA2" strokeDasharray="3 5">
+              {shapes}
+            </g>
+          );
+        }
+        const on = selected === r;
+        return (
+          <g
+            key={r}
+            role="button"
+            tabIndex={0}
+            aria-pressed={on}
+            aria-label={labels[r]}
+            onClick={() => choose(r)}
+            onKeyDown={keys(r)}
+            className="group cursor-pointer outline-none"
+          >
+            <g
+              className={
+                on
+                  ? "fill-brand-mist stroke-brand-forest [stroke-width:2.5] group-focus-visible:[stroke-width:4]"
+                  : "fill-white stroke-brand-ink [stroke-dasharray:5_4] [stroke-width:1.25] group-hover:fill-brand-mist group-focus-visible:stroke-brand-forest group-focus-visible:[stroke-dasharray:none] group-focus-visible:[stroke-width:3]"
+              }
+            >
+              {shapes}
+            </g>
+            {text.map(([x, y]) => (
+              <text
+                key={`${x}-${y}`}
+                aria-hidden
+                x={x}
+                y={y}
+                textAnchor="middle"
+                fontSize="12.5"
+                fontWeight={on ? 700 : 600}
+                className={on ? "fill-brand-forest" : "fill-brand-ink"}
+              >
+                {labels[r]}
+              </text>
+            ))}
+          </g>
+        );
+      })}
     </svg>
   );
 }

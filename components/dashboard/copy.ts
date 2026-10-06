@@ -24,6 +24,7 @@ export const DASHBOARD_COPY = {
     openCheck: "Open this check",
     wholeFace: "Whole face",
     areaPicker: "Show readings for",
+    areaHint: "Choose an area to see its readings. Choose it again for the whole face.",
     areaNote: "Every area is read from this one photo. Each reading belongs to this photo only.",
     newerNotShown: "Your newest check has no photo reading from our server. The reading below is from an earlier check.",
     unreadable: "The readings of this check could not be shown.",
