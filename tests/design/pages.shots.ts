@@ -244,3 +244,10 @@ test("check flow to results", async ({ page }) => {
   await page.waitForTimeout(3000);
   await shots(page, "flow-results");
 });
+
+// G03 part 4: the local-only recommendation preview (not in production builds).
+test("dev: recommendation preview", async ({ page }) => {
+  await page.goto("/dev/recommendations");
+  await expect(page.getByRole("heading", { name: "Recommendation preview" })).toBeVisible();
+  await shots(page, "dev-recommendations");
+});
