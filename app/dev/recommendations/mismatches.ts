@@ -51,14 +51,14 @@ export const MISMATCHES: Mismatch[] = [
     id: "serum-concentration-and-extras",
     products: ["5% Niacinamide Serum"],
     store: "5% encapsulated Niacinamide with Zinc PCA, SEPICONCONTROL A5 and PDRN.",
-    rules: "The serum fits the rules' one active and is chosen when a trigger fires (blemishes or pigment, or a dark mark that fades or lingers). The rules do not check the concentration, and Zinc PCA, SEPICONCONTROL A5 and PDRN have no ingredient class.",
+    rules: "The serum fits the rules' one active. It is chosen when a trigger fires (blemishes, pigment, or a dark mark that fades) and no gate applies: no red flag (a lingering dark mark is one), no prescription, no extra caution, answers confirmed and none unknown. The rules do not check the concentration, and Zinc PCA, SEPICONCONTROL A5 and PDRN have no ingredient class.",
     question: "Is 5% niacinamide with these supporting actives what the rules mean by 'the niacinamide serum'? Should any of the supporting actives be a class of their own?",
   },
   {
     id: "salicylic-pregnancy",
     products: ["Refreshing Cleanser", "Clear Seal", "Active Boba"],
     store: "Three products contain salicylic acid. The product pages list no warnings or contraindications.",
-    rules: "The only pregnancy notice is about retinoids. The catalogue's contraindications are empty for every store product, so nothing is left out for a pregnant or breastfeeding user.",
+    rules: "The only pregnancy notice is about retinoids. Every store product's contraindication list is empty, so no product is left out as contraindicated. Pregnancy turns on extra caution, which leaves out only the niacinamide serum, through the general extra-caution gate.",
     question: "Should salicylic acid (and glycolic acid) products carry a pregnancy or breastfeeding contraindication or notice? Which products, at which strengths?",
   },
   {

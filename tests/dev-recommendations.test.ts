@@ -44,6 +44,16 @@ const chosen = (answers: Record<string, unknown>, catalogue = STORE_CATALOGUE) =
 const outBecause = (answers: Record<string, unknown>, id: string) => run(answers).excluded.find((e) => e.productId === id)?.ruleId;
 
 describe("the store catalogue", () => {
+  it("is used only by the preview and the tests: nothing else imports app/dev", () => {
+    const { readdirSync, readFileSync } = require("node:fs") as typeof import("node:fs");
+    const { join } = require("node:path") as typeof import("node:path");
+    const files = ["app", "components", "lib", "hooks"].flatMap((d) =>
+      readdirSync(d, { recursive: true, encoding: "utf8" }).map((f) => join(d, f)).filter((f) => /\.(ts|tsx)$/.test(f) && !f.startsWith("app/dev/"))
+    );
+    expect(files.length).toBeGreaterThan(50);
+    for (const f of files) expect(readFileSync(f, "utf8"), f).not.toMatch(/app\/dev|store-catalogue|\/dev\/recommendations/);
+  });
+
   it("is the six store products, valid against the catalogue schema, marked as unverified", () => {
     expect(Object.keys(STORE_PRODUCTS)).toHaveLength(6);
     expect(() => CatalogueSchema.parse(STORE_CATALOGUE)).not.toThrow();
@@ -94,14 +104,18 @@ describe("mismatches between lib/rules and the store's products (questions for t
     expect(run(ANSWERS, asSerum).excluded.find((e) => e.productId === "store-active-boba")?.ruleId).toBe("catalogue.not_in_ruleset");
   });
 
-  it("serum-concentration-and-extras: the serum is chosen on a trigger and left out without one", () => {
+  it("serum-concentration-and-extras: the serum is chosen on a trigger and left out without one, or under a gate", () => {
     expect(chosen(ANSWERS)).toContain("store-niacinamide-serum");
+    // A lingering dark mark is a trigger and a red flag: the red flag wins.
+    expect(outBecause({ ...ANSWERS, pih_scar_tendency: "dark_mark_lingers" }, "store-niacinamide-serum")).toBe("red_flag.lingering_dark_mark");
     expect(outBecause({ ...ANSWERS, primary_concerns: ["redness"], pih_scar_tendency: "fades_no_trace" }, "store-niacinamide-serum")).toBe("active.not_triggered");
   });
 
   it("salicylic-pregnancy: nothing is left out for a pregnant user; the only notice is about retinoids", () => {
     const pregnant = run({ ...ANSWERS, female_skin_context: ["pregnant_or_breastfeeding"], current_products: ["actives"] });
     expect(pregnant.excluded.filter((e) => e.ruleId === "catalogue.contraindicated")).toEqual([]);
+    expect(pregnant.items.map((i) => i.productId)).not.toContain("store-niacinamide-serum");
+    expect(pregnant.excluded.find((e) => e.productId === "store-niacinamide-serum")?.ruleId).toBe("extra_caution");
     expect(STORE_CATALOGUE.products.every((p) => p.contraindications.length === 0)).toBe(true);
     expect(pregnant.notices.map((n) => n.text).join(" ")).toMatch(/retinoid/);
     expect(pregnant.notices.map((n) => n.text).join(" ")).not.toMatch(/salicylic/i);
