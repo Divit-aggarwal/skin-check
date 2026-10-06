@@ -70,7 +70,7 @@ export const MISMATCHES: Mismatch[] = [
   },
   {
     id: "names-with-banned-words",
-    products: ["Calming Moisturiser", "Clear Seal", "Refreshing Cleanser"],
+    products: ["Calming Moisturiser", "Clear Seal"],
     store: "Product names as sold: 'Calming Moisturiser', 'Clear Seal'.",
     rules: "The D-12 word check bans calm* and clear*. Only 'Clear Seal' has an owner name exception, and only for owner data. 'Calming Moisturiser' has none, so it fails the routine word check once it is owner data.",
     question: "For the owner and D-12 rather than the clinical reviewer: may 'Calming Moisturiser' get the same registered-name exception as 'Clear Seal'?",
