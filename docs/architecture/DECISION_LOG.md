@@ -135,18 +135,6 @@ None of these decisions has been implemented. "PROPOSED" means the investigation
 **D-20 Remove "digital twin" from the persona and from app metadata. (PROPOSED)**
 - **Evidence:** research doc §8; the FTC net-impression standard; the system is not a twin by NASEM criteria.
 
-**D-21 Move Firestore to a named database in `asia-south1` before C2 ships, and move the Vercel function region to `bom1` in the same window. (PROPOSED)**
-- Resolves PREFLIGHT_AUDIT G4.2. Full analysis, runbook and risks are in [DATA_LOCALITY_DECISION.md](DATA_LOCALITY_DECISION.md).
-- **Evidence:**
-  - Production holds 21 docs (7 users, 14 skinChecks, 0 scanAnalyses) and no composite indexes.
-  - A Firestore location is immutable.
-  - Longitudinal records are append-only, so they are cheapest to place correctly at birth.
-  - ECS and S3 are already in ap-south-1.
-- **Rejected:**
-  - Recreating `(default)` in place: destructive, no fallback database, and its viability is unverified.
-  - A new Firebase project: requires an Auth migration.
-  - Staying on nam5 and disclosing it: the cost of moving grows with every scan.
-
 **D-21 Gate 01 stores raw analysis in `users/{uid}/scanAnalyses/{scanId}_{sha16}`, not in `skinStates`. (IMPLEMENTED in 6e9081d; not deployed)**
 - This gate was scoped to preservation only; SkinState semantics (comparability keys, engineBuild, requestedScanId join) are deferred to a later gate.
 - `scanAnalyses` is the immutable raw substrate. A later SkinState may be derived from it or replace it, but it is never mutated.
@@ -154,6 +142,23 @@ None of these decisions has been implemented. "PROPOSED" means the investigation
 - Retries of the same bytes are idempotent. A retake gets its own document, keyed by hash. A failed write never fails the scan (D-03 honoured).
 - **Also in gate 01:** the scan save now blocks until it succeeds or times out after 15 s, with a retry. This replaces the old "non-fatal by design" save, so a failed save can no longer silently lose the scan.
 - Details: IMPLEMENTATION_GATE_01.md.
+
+**D-22 Recreate Firestore `(default)` in `asia-south1` (no data copy) and move Vercel functions to `bom1`. (APPROVED by owner 2026-10-03; preparation committed, reset not yet executed)**
+- Resolves PREFLIGHT_AUDIT G4.2.
+  - Analysis: [DATA_LOCALITY_DECISION.md](DATA_LOCALITY_DECISION.md), "Owner input" section.
+  - Runbook: [FIRESTORE_RESET_RUNBOOK.md](FIRESTORE_RESET_RUNBOOK.md).
+- **Evidence:**
+  - The owner confirmed all 21 production docs (7 users) are disposable test data.
+  - Direction: India-first, and cost matters.
+  - A Firestore location is immutable.
+  - Recreating `(default)` keeps the free tier and needs no code change. `asia-south1` is offered for this project (`firebase firestore:locations`). There is no location pin: the project was created after 2024-10-30, the Storage bucket was never provisioned, and App Engine integration is disabled.
+- **Vercel:** `vercel.json` `regions: ["bom1"]` replaces the dashboard default `iad1`. It takes effect on the next production deploy from `master`.
+- **Rejected:**
+  - A named database: loses the free tier and adds config everywhere.
+  - A new project: requires an Auth migration.
+  - Staying on nam5.
+- **Not covered:** Firebase Auth (global) and Gemini (any country) remain outside India.
+- Supersedes an earlier draft of this decision, committed in 311c700 under the duplicate number D-21, which proposed a named database with a data copy.
 
 **D-23 SkinState is a computed, versioned view over `scanAnalyses`, not a stored collection. Contract `skinstate-1` is frozen. (PROPOSED → FROZEN contract; no code)**
 - **Identity:** `(analysisRef, contractVersion)`. The mapping per version is frozen and kept in code forever. Any change requires a new version.
@@ -166,6 +171,22 @@ None of these decisions has been implemented. "PROPOSED" means the investigation
 - **Comparability key:** includes `engine.build` and `captureMethod`. Both are null today, so no two SkinStates are comparable.
 - **Supersedes:** SKIN_STATE_CONTRACT.md, and the `skinStates` collection in DATA_MODEL, SYSTEM_MODEL and IMPLEMENTATION_MAP C2.
 - **Details:** SKIN_STATE_CONTRACT_FINAL.md.
+
+**D-24 Longitudinal change claims are gated on the measurement-validation protocol. It supersedes EVALUATION_PLAN Track 1. (PROPOSED; research design, no code)**
+- **Two claims, kept separate:**
+  - **(a) "Beyond measurement noise":** needs a between-day SEM/MDC95 under production capture, per field × region × tone band, plus held-out-user transfer.
+  - **(b) Anything about the skin itself:** additionally needs colorimeter criterion validity and responsiveness.
+- **Primary fields:** native-path L*, b* and a*, ITA, `lbpEntropy` and `specular.fraction`.
+  - The corrected path is a control only (gray-world removes about 93% of a synthetic a* shift).
+  - Scores are analysed only to document their failure.
+- **Design:**
+  - D0/D7/D28 with re-positioned captures. A naturalistic own-phone arm sets the production MDC.
+  - Tone bands MST 1–4 / 5–6 / 7–10, recruited to quota.
+  - About 30 calibration + 15 validation completers per band (≈ 160 enrolled), split by user.
+  - A field failing in any band fails overall.
+- **Rejected:** n = 30 pooled (about ±0.2–0.25 ICC precision per band); same-day repeats as the noise floor; offline-script scoring (the EXIF/ICC decode differs from production HTTP).
+- **Details:** MEASUREMENT_VALIDATION_STATUS.md and `docs/research/measurement-validation/`.
+- Primary fields narrowed by D-25 (MD-1); D-24 governs the protocol, D-25 the endpoints.
 
 **D-25 Phase 0 metric decision MD-1: native `lStarMean` and `aStarMean` are the only primary endpoints for the human validation study. (ACCEPTED for study design; no production change)**
 - Corrected-path colour, `gradientMean` and `specular.fraction` are dropped for this engine. b\*, ITA and `lbpEntropy` are inconclusive. The owner may reverse the primary-endpoint cut before Phase 1 pre-registration.
