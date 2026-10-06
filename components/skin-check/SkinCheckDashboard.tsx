@@ -121,7 +121,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
           onSelect={() => {}}
           analyzed={false}
         />
-        <div role="alert" className="flex flex-col items-start gap-3 rounded-2xl border border-brand-line bg-brand-linen p-5">
+        <div role="alert" className="flex flex-col items-start gap-3 rounded-2xl border border-brand-line bg-brand-paper p-5">
           <p>{message}</p>
           {canRetrySamePhoto(scan) ? (
             // Resends the same photo, so it must not promise a new one.
@@ -163,8 +163,8 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
       <div className="grid items-start gap-8 lg:grid-cols-2">
         <EchoTwin photo={scan.photo} categories={categories} overlays={overlays} selected={shown} onSelect={setSelectedCategory} analyzed />
 
-        <section aria-labelledby="readings-title" className="flex flex-col gap-5 rounded-2xl bg-brand-linen p-5 sm:p-6">
-          <h2 id="readings-title" className="font-display text-xl font-semibold sm:text-[22px]">
+        <section aria-labelledby="readings-title" className="flex flex-col gap-5 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
+          <h2 id="readings-title" className="font-display text-xl font-semibold uppercase leading-tight tracking-[0.04em] text-brand-title sm:text-[22px]">
             What this photo shows
           </h2>
           {view.bands ? <CheckReadings view={view} face={false} /> : <p>The readings of this check could not be shown.</p>}
@@ -187,7 +187,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
           of a long page and was easy to never see. Sticky rather than fixed,
           because the results container animates with a transform, which
           breaks `position: fixed`. */}
-      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-raised -mx-4 -mt-6 border-t border-brand-line bg-brand-paper/95 px-4 py-3 backdrop-blur sm:bottom-0 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:mt-0 lg:rounded-2xl lg:border lg:px-6">
+      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-raised -mx-4 -mt-6 border-t border-brand-line bg-brand-linen/95 px-4 py-3 backdrop-blur sm:bottom-0 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:mt-0 lg:rounded-2xl lg:border lg:px-6">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 lg:max-w-none">
           <p className="text-sm text-brand-muted">Questions about this check?</p>
           <Button asChild variant="ink" size="lg" className="shrink-0 px-5">

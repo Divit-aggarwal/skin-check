@@ -404,7 +404,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   if (value === "done") {
     const thumbSrc = previewUrl ?? donePreviewUrl;
     return (
-      <div className="flex flex-col gap-3 rounded-2xl border border-brand-line bg-brand-linen p-4 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 rounded-2xl border border-brand-line bg-brand-paper p-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           {thumbSrc && (
             // eslint-disable-next-line @next/next/no-img-element -- transient object URL, not a static asset
@@ -553,7 +553,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           <div aria-live="polite" className="max-w-sm text-sm">
             {flow.gate === "pending" && <p className="text-brand-muted">Checking your photo…</p>}
             {flow.gate === "done" && flow.quality && flow.quality.retakeReasons.length > 0 && (
-              <p role="alert" className="flex items-start gap-2 rounded-xl border border-brand-line bg-brand-linen px-4 py-3 text-brand-ink">
+              <p role="alert" className="flex items-start gap-2 rounded-xl border border-brand-line bg-brand-paper px-4 py-3 text-brand-ink">
                 <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-brand-error" />
                 <span>{RETAKE_COPY[flow.quality.retakeReasons[0]!]}</span>
               </p>

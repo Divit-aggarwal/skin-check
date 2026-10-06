@@ -39,7 +39,7 @@ export function ScaleSelect({ step, value, onChange, onCommit }: ScaleSelectProp
             );
           })}
         </div>
-        <div className="flex justify-between text-[0.6875rem] font-medium uppercase tracking-wide text-brand-muted">
+        <div className="flex justify-between text-xs font-bold uppercase tracking-[0.08em] text-brand-muted">
           <span>{step.minLabel}</span>
           <span>{step.maxLabel}</span>
         </div>

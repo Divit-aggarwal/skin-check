@@ -275,7 +275,7 @@ export function EchoPage() {
             <ChevronLeft aria-hidden className="h-5 w-5" />
           </Link>
           <div className="min-w-0 flex-1">
-            <h1 className="flex items-center gap-2 font-display text-[28px] font-semibold leading-tight sm:text-4xl">
+            <h1 className="flex items-center gap-2 font-display text-[30px] font-semibold leading-[1.15] tracking-[-0.025em] text-brand-title sm:text-[40px]">
               <span aria-hidden className="grid size-9 place-items-center rounded-full bg-brand-mist text-brand-forest">
                 <MessageCircle size={18} />
               </span>
@@ -293,7 +293,7 @@ export function EchoPage() {
               type="button"
               aria-pressed={region === activeRegion}
               onClick={() => setActiveRegion(region)}
-              className="min-h-11 shrink-0 rounded-full border border-brand-line bg-brand-paper px-4 text-sm font-medium aria-pressed:border-brand-action aria-pressed:bg-brand-action aria-pressed:text-white"
+              className="min-h-11 shrink-0 rounded-full border border-brand-line bg-brand-linen px-4 text-sm font-medium aria-pressed:border-brand-action aria-pressed:bg-brand-action aria-pressed:text-white"
             >
               {ECHO_REGION_LABELS[region]}
             </button>
@@ -301,7 +301,7 @@ export function EchoPage() {
         </div>
 
         {/* Phone and tablet: the same readings, folded away until asked for. */}
-        <details className="group mt-3 shrink-0 rounded-2xl bg-brand-linen px-4 py-2 lg:hidden">
+        <details className="group mt-3 shrink-0 rounded-2xl border border-brand-card-line bg-brand-paper px-4 py-2 lg:hidden">
           <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between font-medium [&::-webkit-details-marker]:hidden">
             {E.readingsSummary}
             <ChevronDown aria-hidden size={18} className="transition-transform group-open:rotate-180" />
@@ -311,11 +311,11 @@ export function EchoPage() {
 
         <div ref={scrollRef} role="log" aria-live="polite" className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pb-4">
         {messages.length === 0 && (
-          <p className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-linen px-4 py-3 leading-relaxed text-brand-ink">{greetingFor(activeRegion)}</p>
+          <p className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">{greetingFor(activeRegion)}</p>
         )}
         {messages.map((m) =>
           m.role === "echo" ? (
-<p key={m.id} className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-linen px-4 py-3 leading-relaxed text-brand-ink">
+<p key={m.id} className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">
               {m.text}
             </p>
           ) : (
@@ -328,11 +328,11 @@ export function EchoPage() {
         )}
         <AnimatePresence initial={false}>
           {isThinking && (
-            <TypingIndicator key="thinking" className="rounded-tl-sm bg-brand-linen text-brand-muted" />
+            <TypingIndicator key="thinking" className="rounded-tl-sm bg-brand-paper text-brand-muted" />
           )}
         </AnimatePresence>
         {activeError?.code === "AI_CONSENT_REQUIRED" && (
-          <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl border border-brand-line bg-brand-linen px-4 py-3">
+          <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl border border-brand-line bg-brand-paper px-4 py-3">
             <p className="text-body text-text">{AI_SHARE_CONSENT_COPY}</p>
             <button
               type="button"
@@ -348,7 +348,7 @@ export function EchoPage() {
           </div>
         )}
         {activeError && activeError.code !== "AI_CONSENT_REQUIRED" && (
-          <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl border border-brand-line bg-brand-linen px-4 py-3">
+          <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl border border-brand-line bg-brand-paper px-4 py-3">
             <p className="text-body text-text">
               {GATE_MESSAGES[activeError.code ?? ""] ?? (activeError.retryable ? RETRYABLE_ERROR_MESSAGE : CONFIG_ERROR_MESSAGE)}
             </p>

@@ -46,7 +46,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#ffffff",
+  themeColor: "#1f473e", // the live site's theme-color
 };
 
 export default function RootLayout({
@@ -60,7 +60,7 @@ export default function RootLayout({
       className={`${display.variable} ${jakarta.variable}`}
       suppressHydrationWarning
     >
-      <body className="bg-surface font-body text-text antialiased">
+      <body className="bg-brand-linen font-body text-text antialiased">
         {/* The store theme is light only (system.md); no dark variant is designed. */}
         <ThemeProvider attribute="class" forcedTheme="light">
           <AuthProvider>{children}</AuthProvider>

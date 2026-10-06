@@ -40,7 +40,7 @@ export function BodyZoneChecklist({ step, value, onChange, onCommit }: BodyZoneC
               className={cn(
                 "flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
                 selected
-                  ? "border-brand-action bg-brand-linen"
+                  ? "border-brand-action bg-brand-mist"
                   : disabled
                     ? "cursor-not-allowed border-brand-line bg-white opacity-40"
                     : "border-brand-line bg-white hover:border-brand-ink/40"

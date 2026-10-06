@@ -132,13 +132,15 @@ const config: Config = {
         // marketing-home palette this feature no longer draws from.
         // G03: the old mauve accent now maps to the store's forest/mist, the
         // one accent that passes contrast for text (system.md §2).
+        // G03 part 1 (2026-10-06): the live site's theme green #1f473e.
         blush: {
-          DEFAULT: "#0F6E56",
-          soft: "#E1F5EE",
+          DEFAULT: "#1F473E",
+          soft: "#E4E9E8",
         },
-        // The store theme by role (docs/design/system.md §1-2; source:
-        // docs/design/brand-source-root.css). `error` is the one value not
-        // from the store.
+        // The store theme by role (docs/design/system.md §0-2; sources:
+        // docs/design/brand-source-root.css and the computed styles read from
+        // the live site, docs/design/live-styles-2026-10-06.json). `error` is
+        // the one value not from the store.
         brand: {
           paper: "#FFFFFF",
           linen: "#F5F3EE",
@@ -146,10 +148,17 @@ const config: Config = {
           line: "#DDD8CE",
           ink: "#2C2C2A",
           muted: "#6B6862",
-          action: "#252724",
-          "action-hover": "#111210",
-          forest: "#0F6E56",
-          mist: "#E1F5EE",
+          // Live site: theme-color and the main pill button (.ps-button) are #1f473e.
+          action: "#1F473E",
+          "action-hover": "#17362F",
+          forest: "#1F473E",
+          // #1f473e at 12% on white: the live site's rgba(31,71,62,.12) lines.
+          mist: "#E4E9E8",
+          // Live small uppercase labels (eyebrows, actives) keep the older green.
+          eyebrow: "#0F6E56",
+          // Live section titles and product card borders.
+          title: "#111111",
+          "card-line": "#ECE8E1",
           accent: "#B98783",
           "accent-soft": "#F3E9E7",
           taupe: "#B7A58F",

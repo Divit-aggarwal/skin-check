@@ -196,7 +196,7 @@ function CurrentSection({ dashboard }: { dashboard: Dashboard }) {
         </div>
       ) : (
         <>
-          {dashboard.newerCheckNotShown && <p className="rounded-xl bg-brand-paper px-4 py-3 text-sm">{C.current.newerNotShown}</p>}
+          {dashboard.newerCheckNotShown && <p className="rounded-xl bg-brand-linen px-4 py-3 text-sm">{C.current.newerNotShown}</p>}
           <CheckReadings view={current.view} />
           {/* Only next to readings that are on screen. */}
           {current.view.bands && (

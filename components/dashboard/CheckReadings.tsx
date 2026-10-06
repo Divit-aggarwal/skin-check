@@ -57,7 +57,7 @@ export function CheckReadings({ view, face = true, stack = false }: { view: Chec
               type="button"
               aria-pressed={area === c.key}
               onClick={() => setArea(c.key)}
-              className="min-h-11 rounded-full border border-brand-line bg-brand-paper px-4 text-sm font-medium aria-pressed:border-brand-action aria-pressed:bg-brand-action aria-pressed:text-white"
+              className="min-h-11 rounded-full border border-brand-line bg-brand-linen px-4 text-sm font-medium aria-pressed:border-brand-action aria-pressed:bg-brand-action aria-pressed:text-white"
             >
               {c.label}
             </button>
@@ -66,7 +66,7 @@ export function CheckReadings({ view, face = true, stack = false }: { view: Chec
       )}
       <div className={showFace && !stack ? "grid items-center gap-6 md:grid-cols-[minmax(0,300px)_1fr]" : "flex flex-col gap-6"}>
         {showFace && (
-          <div className="rounded-2xl bg-brand-paper p-3">
+          <div className="rounded-2xl bg-brand-linen p-3">
             <FaceDrawing selected={area} labels={ECHO_REGION_LABELS} />
           </div>
         )}

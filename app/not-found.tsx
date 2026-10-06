@@ -9,7 +9,7 @@ export default function NotFound() {
     <AppShell>
       <main className={page}>
         <div className="flex flex-col items-start gap-4 pt-12 sm:pt-16">
-          <h1 className="font-display text-[28px] font-semibold leading-tight sm:text-4xl">{S.notFoundTitle}</h1>
+          <h1 className="font-display text-[30px] font-semibold leading-[1.15] tracking-[-0.025em] text-brand-title sm:text-[40px]">{S.notFoundTitle}</h1>
           <p className="max-w-prose text-brand-muted">{S.notFoundBody}</p>
           <div className="flex flex-wrap gap-3">
             <Link href="/dashboard" className={btnPrimary}>

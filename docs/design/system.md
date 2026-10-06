@@ -1,8 +1,75 @@
 # Design system: The Project SKIN app
 
-Status: draft for the owner's choice of direction (G03 step 2). One system, two
-layout directions (see options/). Applies to every signed-in page, the check
-flow and the signed-out pages.
+Status: built (G03). Section 0 (2026-10-06) replaces the colour, type and
+button values of sections 1–5 wherever they differ. Applies to every signed-in
+page, the check flow and the signed-out pages.
+
+## 0. Match the live site (2026-10-06)
+
+The values in sections 1–5 came from the store theme's `:root` variables
+(brand-source-root.css). The live pages do not use all of them. On 2026-10-06
+the computed styles of https://theprojectskin.com/ (home, at 390 and 1280px)
+and of one product page (Refreshing Cleanser) were read in Chromium with
+Playwright `getComputedStyle`. The raw readings are saved in
+[live-styles-2026-10-06.json](live-styles-2026-10-06.json), because the store
+can change.
+
+**The greens.** The live site uses three:
+
+- `#1f473e`. This is the `<meta name="theme-color">`. It is also on the main
+  pill button (`.ps-button`), the active tab and the callout text. It is the
+  most-used green as a text colour on the home page (73 elements).
+- `#0f6e56`. This is used on small uppercase labels (eyebrows, active
+  ingredients), the Checkout button and some home CTAs. The `:root`
+  `--color-forest` still says `#0f6e56`.
+- `#0f9b8e`. This is the Add to Cart button on product pages. White text on it
+  is only 3.4:1, which fails for text.
+
+The app takes `#1f473e` as its one brand green. The only exception is
+eyebrows, which keep the live `#0f6e56`.
+
+| Value | App before | Live site | App now |
+|---|---|---|---|
+| Browser theme colour | `#ffffff` | `#1f473e` (`meta theme-color`) | `#1f473e` |
+| Brand green: links, focus ring, selected nav text | forest `#0f6e56` | `#1f473e` (theme colour, `.ps-button`, active tab) | `#1f473e` |
+| Primary button | Pill, `#252724` fill, white text, 16px weight 500, min height 48px (44px from tablet), padding 0 24px | `.ps-button`: pill, `#1f473e` fill and 1px border, white text, Plus Jakarta Sans 16px weight 500, 52px tall, padding 0 24px, no letter case change | As live: pill, `#1f473e`, 16px weight 500, 52px tall, padding 0 24px. Hover `#17362f` (assumed: the store has no hover value for it) |
+| Secondary button | Pill, 1px ink border, transparent, ink text, 16px weight 500 | `.button--secondary`: pill, 1px `#ddd8ce` border, transparent, ink text, 15px weight 600, 48px tall, padding 0 22px | As live. Hover: the border turns ink |
+| Shop buttons | Not used | ADD TO BAG: `#111` fill, square, 12px weight 700, uppercase, +0.1em. Checkout: `#0f6e56` pill. Product page Add to Cart: `#0f9b8e` pill | Not used. The app sells nothing, and white on `#0f9b8e` fails contrast |
+| Page background | White `#ffffff` | Linen `#f5f3ee` (`body`) | Linen `#f5f3ee` |
+| Cards | Linen fill, no border, 16px corners | Product card: white, 1px `#ece8e1` border, 12px corners. Menu and learn cards: 16px corners | White, 1px `#ece8e1` border, 16px corners |
+| Selected tint (nav item, chosen face area, selected chip) | Mist `#e1f5ee` | `:root --color-mist` `#e1f5ee` (barely used). Lines and borders are `rgba(31,71,62,.12)` | `#e4e9e8`, which is `#1f473e` at 12% on white |
+| Ink (body text) | `#2c2c2a` | `#2c2c2a` | `#2c2c2a` |
+| Title colour (h1, h2) | `#2c2c2a` | `#111111` (section titles), `#252422` (product h1) | `#111111` |
+| Muted text | `#6b6862` | `#6b6862` | `#6b6862` |
+| Body text | Plus Jakarta Sans 16px, weight 400, line height 1.55 | Plus Jakarta Sans 15px, weight 500, line height 1.5 | 15px, weight 500, 1.5. Form fields stay 16px, because iOS zooms into smaller fields |
+| Page title (h1) | Bai Jamjuree 28px → 36px, weight 600, tight tracking | Bai Jamjuree 30px (390) → 43.5px (1280), weight 600, −0.025em | Bai Jamjuree 30px → 40px, weight 600, −0.025em, `#111` |
+| Section title (h2) | Bai Jamjuree 20px → 22px, weight 600, as written | Bai Jamjuree 22px (390) → 34px (1280), weight 600, UPPERCASE, +0.04em, `#111` | Bai Jamjuree 20px → 22px, weight 600, UPPERCASE, +0.04em, `#111`. Kept smaller, because app cards are smaller than store sections |
+| Card title (h3) | Plus Jakarta Sans 16px weight 600 | Bai Jamjuree 14px (390) → 18px (1280), weight 600, −0.01em | Bai Jamjuree, weight 600, −0.01em, at the size each card sets (mostly 16px) |
+| Small label (eyebrow) | Plus Jakarta Sans 12px, weight 600, uppercase, +0.06em, muted | Plus Jakarta Sans 10–11px, weight 700, uppercase, +0.06 to +0.08em, `#0f6e56` | 12px, weight 700, uppercase, +0.08em, `#0f6e56`. 12px is the app's smallest size |
+| Navigation | Plus Jakarta Sans 16px weight 500, ink. Selected: mist, `#0f6e56` | Header links: Plus Jakarta Sans 16px weight 500, `#1d1d1f`. Menu links: 14px weight 500, `#4f4c49` | 16px weight 500, ink. Selected: tint `#e4e9e8`, `#1f473e` |
+| Focus ring | 2px `#0f6e56`, 2px offset | Browser default | 2px `#1f473e`, 2px offset |
+| Form field | 48px tall, 8px corners, 1px `#ddd8ce`, white, 16px text | Select: 4px corners, 1px `#dcd7ce`, 13px | Kept: 48px, 8px, 16px (tap size and iOS zoom) |
+| Logo | The words "The Project SKIN" in Bai Jamjuree | Image wordmark "project SKIN" | Kept as words. The wordmark image is not in the repository |
+
+**Fonts.** Both live fonts are on Google Fonts and already load through
+`next/font`: Bai Jamjuree for headings and Plus Jakarta Sans for text. The
+store's own fallbacks, "Purity Editorial" and "Purity Sans", are not public
+fonts and are not needed. No font had to be substituted.
+
+**Contrast.** `tests/brand-contrast.test.ts` checks every text pair at 4.5:1
+or more and every UI part at 3:1 or more, using the token values in
+tailwind.config.ts:
+
+| Pair | Ratio |
+|---|---|
+| White on `#1f473e` (primary button) | 10.4 |
+| `#1f473e` on linen / on white | 9.3 / 10.4 |
+| `#1f473e` on the tint `#e4e9e8` | 8.4 |
+| Ink on the tint | 11.4 |
+| Muted on linen / on white | 5.0 / 5.5 |
+| `#0f6e56` eyebrow on linen / on white | 5.6 / 6.2 |
+| `#111` titles on linen | 17.0 |
+| Error `#b42318` on linen | 5.9 |
 
 ## 1. Brand source (what was found, and where)
 
@@ -64,9 +131,10 @@ Contrast was measured against WCAG 2.1. Text needs 4.5:1, or 3:1 for large text 
 |---|---|---|---|
 | Body text, headings, band words | ink `#2c2c2a` | 14.0 | 12.6 |
 | Secondary text | muted `#6b6862` | 5.6 | 5.0 |
-| Primary button | action `#252724` with white text | 15.1 | – |
-| Links, focus ring, selected nav item | forest `#0f6e56` | 6.2 | 5.6 |
-| Selected nav background, info panel | mist `#e1f5ee` (with ink or forest text) | – | – |
+| Primary button | action `#1f473e` with white text (§0) | 10.4 | – |
+| Links, focus ring, selected nav item | green `#1f473e` (§0) | 10.4 | 9.3 |
+| Eyebrows (small uppercase labels) | `#0f6e56` (§0) | 6.2 | 5.6 |
+| Selected nav background, chosen face area, info panel | tint `#e4e9e8` (with ink or green text) (§0) | – | – |
 | Decorative only, never text | accent, blush, gold, taupe, sky, mint, cyan | 1.3–3.4 | – |
 | Error text and border | `#b42318` (assumed; the store has no error colour) | 6.5 | 5.9 |
 
@@ -88,15 +156,15 @@ Hard rules (D-12, TD-24 (4), LONGITUDINAL_METHOD §1):
 
 | Role | Font | Size (phone → desktop) | Weight | Line height |
 |---|---|---|---|---|
-| Page title (h1) | Bai Jamjuree | 28 → 36px | 600 | 1.15 |
-| Section title (h2) | Bai Jamjuree | 20 → 22px | 600 | 1.25 |
-| Card title (h3) | Plus Jakarta Sans | 16px | 600 | 1.4 |
-| Body | Plus Jakarta Sans | 16px | 400 | 1.55 |
+| Page title (h1) | Bai Jamjuree, −0.025em, `#111` (§0) | 30 → 40px | 600 | 1.15 |
+| Section title (h2) | Bai Jamjuree, UPPERCASE, +0.04em, `#111` (§0) | 20 → 22px | 600 | 1.25 |
+| Card title (h3) | Bai Jamjuree (§0) | 16px | 600 | 1.4 |
+| Body | Plus Jakarta Sans | 15px (§0) | 500 | 1.5 |
 | Secondary / meta | Plus Jakarta Sans | 14px | 400 | 1.45 |
-| Label / eyebrow | Plus Jakarta Sans | 12px, +0.06em, uppercase | 600 | 1.3 |
+| Label / eyebrow | Plus Jakarta Sans, `#0f6e56` (§0) | 12px, +0.08em, uppercase | 700 | 1.3 |
 
-- Body text is 16px, not the store's 15px. Phone readability is better, and
-  iOS zooms into any input under 16px.
+- Body text is 15px weight 500, as on the live site (§0). Form fields stay
+  16px, because iOS zooms into any field under 16px.
 - Nothing on screen is smaller than 12px.
 - Line length is at most 70 characters, about `max-w-prose`.
 
@@ -118,10 +186,10 @@ Hard rules (D-12, TD-24 (4), LONGITUDINAL_METHOD §1):
 
 | Component | Rules |
 |---|---|
-| Primary button | Pill shape, action fill, white text. 16px, weight 500. Min height 48px on phones and 44px from tablet up. Padding 0 24px. One per view. |
-| Secondary button | Pill shape with a 1px ink border, transparent fill and ink text. Same size as the primary. |
+| Primary button | Pill shape, `#1f473e` fill, white text. 16px, weight 500. 52px tall. Padding 0 24px. One per view (§0). |
+| Secondary button | Pill shape with a 1px `#ddd8ce` border, transparent fill and ink text, 15px weight 600, 48px tall (§0). |
 | Text link | Forest colour, underlined on hover and focus. Tap area at least 44px tall in lists. |
-| Card | Surface `#f5f3ee` or white with a 1px border, 16px corners, 16–24px padding. A card's h3 is the card's name. |
+| Card | White on the linen page, 1px `#ece8e1` border, 16px corners, 16–24px padding (§0). A card's h3 is the card's name. |
 | Reading row | Metric on the left, band word on the right, both in ink, divided by a 1px border. Never a bar or a colour. |
 | List row (checks, timeline) | Min height 56px. Date first, then kind, then the photo check. The whole row is the link. A thumbnail (48px, 8px corners) appears only when the user chose to keep the photo. |
 | Form field | 48px tall, 8px corners, 1px border, 16px text, label above. Focus ring 2px forest. Errors below the field in the error colour, with `aria-describedby`. |

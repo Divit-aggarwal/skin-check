@@ -127,7 +127,7 @@ export function ChecksView({ openId }: { openId: string | null }) {
 function ViewSwitch({ timeline }: { timeline: boolean }) {
   const tab = "flex min-h-11 items-center rounded-full px-5 font-medium aria-[current=page]:bg-brand-action aria-[current=page]:text-white";
   return (
-    <nav aria-label={K.views} className="mt-5 inline-flex rounded-full border border-brand-line bg-brand-linen p-1">
+    <nav aria-label={K.views} className="mt-5 inline-flex rounded-full border border-brand-line bg-brand-paper p-1">
       <Link href="/checks" aria-current={timeline ? undefined : "page"} className={tab}>
         {K.list}
       </Link>
@@ -184,7 +184,7 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
   const date = formatDate(check.date);
   const newest = dashboard.echoScanId === check.scanId;
   return (
-    <section aria-labelledby="check-title" className="flex flex-col gap-5 rounded-2xl bg-brand-linen p-5 sm:p-6">
+    <section aria-labelledby="check-title" className="flex flex-col gap-5 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className={`${eyebrow} mb-1`}>{K.opened}</p>

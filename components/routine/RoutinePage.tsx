@@ -60,7 +60,7 @@ export function RoutinePage() {
                 slots.map((slot) => {
                   const status = statusOf(item.productId, slot);
                   return (
-                    <div key={slot} className="flex flex-col gap-2 rounded-xl bg-brand-paper p-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div key={slot} className="flex flex-col gap-2 rounded-xl bg-brand-linen p-3 sm:flex-row sm:items-center sm:justify-between">
                       <p className="text-sm">
                         {C.today}, {C.slot[slot]}: {C.status[status ?? "unknown"]}
                       </p>
@@ -187,7 +187,7 @@ function AddProduct({
                 checked={days.includes(d)}
                 onChange={(e) => setDays(e.target.checked ? [...days, d].sort() : days.filter((x) => x !== d))}
               />
-              <span className="flex min-h-11 min-w-12 items-center justify-center rounded-full border border-brand-line bg-brand-paper px-3 text-sm font-medium peer-checked:border-brand-action peer-checked:bg-brand-action peer-checked:text-white peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-forest">
+              <span className="flex min-h-11 min-w-12 items-center justify-center rounded-full border border-brand-line bg-brand-linen px-3 text-sm font-medium peer-checked:border-brand-action peer-checked:bg-brand-action peer-checked:text-white peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-brand-forest">
                 {label}
               </span>
             </label>

@@ -13,7 +13,7 @@ export function ProgressHeader({
 }: ProgressHeaderProps) {
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs font-semibold uppercase tracking-[0.06em] text-brand-forest">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">
         {/* The page's one h1: the part of the check the user is in. */}
         <h1 className="text-xs font-semibold">{activeSectionLabel}</h1>
         <span className="font-medium normal-case tracking-normal text-brand-muted">

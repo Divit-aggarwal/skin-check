@@ -23,8 +23,8 @@ export function TodayCard({ routine }: { routine: ReturnType<typeof useRoutine> 
     data?.adherence.days.find((d) => d.date === data.today && d.productId === productId && d.slot === slot)?.status ?? "unknown";
 
   return (
-    <section aria-labelledby="today-title" className="flex flex-col gap-4 rounded-2xl bg-brand-linen p-5 sm:p-6">
-      <h2 id="today-title" className="font-display text-xl font-semibold sm:text-[22px]">
+    <section aria-labelledby="today-title" className="flex flex-col gap-4 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
+      <h2 id="today-title" className="font-display text-xl font-semibold uppercase leading-tight tracking-[0.04em] text-brand-title sm:text-[22px]">
         {C.todayTitle}
       </h2>
       {!data && !failed && <p className="text-brand-muted" role="status">{C.loading}</p>}

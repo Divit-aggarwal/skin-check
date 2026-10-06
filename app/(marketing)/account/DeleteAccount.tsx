@@ -27,7 +27,7 @@ export function DeleteAccount() {
 
   if (state.kind === "done") {
     return (
-      <div role="status" className="flex flex-col items-start gap-3 rounded-2xl bg-brand-linen p-5 sm:p-6">
+      <div role="status" className="flex flex-col items-start gap-3 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
         <p className="font-semibold">{ERASE_COPY.done}</p>
         <p className="text-brand-muted">{ERASE_COPY.doneLate}</p>
         <Link href="/skin-check" className={btnPrimary}>

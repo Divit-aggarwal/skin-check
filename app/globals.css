@@ -11,7 +11,7 @@
     --card-foreground: 60 2% 17%;
     --popover: 0 0% 100%;
     --popover-foreground: 60 2% 17%;
-    --primary: 100 3% 15%;              /* store action #252724 */
+    --primary: 166 39% 20%;             /* live theme green #1f473e */
     --primary-foreground: 0 0% 100%;
     --secondary: 43 27% 95%;
     --secondary-foreground: 60 2% 17%;
@@ -23,7 +23,7 @@
     --destructive-foreground: 0 0% 100%;
     --border: 40 18% 84%;               /* store border #ddd8ce */
     --input: 40 18% 84%;
-    --ring: 165 76% 25%;                /* store forest #0f6e56 */
+    --ring: 166 39% 20%;                /* live theme green #1f473e */
     --radius: 0.5rem;
 
     /* Glassmorphism recipe — the redesigned screens' shared surface.
@@ -49,6 +49,12 @@
     @apply border-border;
   }
 
+  /* Live site card titles: Bai Jamjuree 600, -0.01em (system.md §0). */
+  h3 {
+    font-family: var(--font-display), system-ui, sans-serif;
+    letter-spacing: -0.01em;
+  }
+
   html {
     /* Prevent text size adjustment on orientation change */
     -webkit-text-size-adjust: 100%;
@@ -56,7 +62,11 @@
   }
 
   body {
-    @apply bg-surface text-text;
+    /* Live site body: linen page, Plus Jakarta Sans 15px weight 500, 1.5 (system.md §0). */
+    @apply bg-brand-linen text-text;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.5;
     /* Smooth scrolling for the whole app */
     scroll-behavior: smooth;
     /* Prevent overscroll bounce on iOS for the app shell */
@@ -78,8 +88,8 @@
     outline: none;
   }
   :focus-visible {
-    /* G03: the store's forest, 2px outline with a 2px offset (system.md §5). */
-    outline: 2px solid #0f6e56;
+    /* The live theme green, 2px outline with a 2px offset (system.md §5). */
+    outline: 2px solid #1f473e;
     outline-offset: 2px;
   }
 }

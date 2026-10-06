@@ -45,7 +45,7 @@ export function ImageCardMultiSelect({ step, value, onChange, onCommit }: ImageC
               className={cn(
                 "relative flex flex-col gap-2 rounded-lg border p-3 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
                 selected
-                  ? "border-brand-action bg-brand-linen"
+                  ? "border-brand-action bg-brand-mist"
                   : disabled
                     ? "cursor-not-allowed border-brand-line bg-white opacity-40"
                     : "border-brand-line bg-white hover:border-brand-ink/40"

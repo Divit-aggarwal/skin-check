@@ -287,7 +287,7 @@ export function EchoTwin({
                 tabIndex={active ? 0 : -1}
                 onClick={() => onSelect(cat.key)}
                 onKeyDown={handleTabKeyDown}
-                className="min-h-11 shrink-0 rounded-full border border-brand-line bg-brand-paper px-4 text-sm font-medium aria-selected:border-brand-action aria-selected:bg-brand-action aria-selected:text-white"
+                className="min-h-11 shrink-0 rounded-full border border-brand-line bg-brand-linen px-4 text-sm font-medium aria-selected:border-brand-action aria-selected:bg-brand-action aria-selected:text-white"
               >
                 {cat.label}
               </button>
@@ -309,7 +309,7 @@ export function EchoTwin({
               transition={{ duration: 0.2, ease: [0.19, 1, 0.22, 1] }}
               className="flex flex-col items-center gap-1 text-center"
             >
-              <h2 className="text-xs font-semibold uppercase tracking-[0.06em] text-brand-muted">{selectedCategory.label}</h2>
+              <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">{selectedCategory.label}</h2>
               <p className="font-display text-2xl font-semibold text-brand-ink">{selectedCategory.band}</p>
               <p className="max-w-[85%] text-brand-muted">
                 {interpretationFor(selectedCategory.band, METRIC_LABELS[selectedCategory.key].toLowerCase())}

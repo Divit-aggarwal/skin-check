@@ -120,11 +120,11 @@ export function SkinCheckFlow() {
   // restored position a tick later would be a visible flash, so hold the
   // frame — this resolves synchronously off localStorage in practice.
   if (!restored) {
-    return <div className="min-h-dvh bg-white" />;
+    return <div className="min-h-dvh bg-brand-linen" />;
   }
 
   return (
-    <div className="min-h-dvh bg-white">
+    <div className="min-h-dvh bg-brand-linen">
       {/* Back and the Home link share a row above the progress bar, so the bar
           and every question start on the same edge (design review G03). */}
       <div ref={headerRef} className={`mx-auto flex flex-col gap-2 px-4 pt-4 sm:px-6 sm:pt-6 ${complete ? "max-w-6xl lg:px-8" : "max-w-2xl"}`}>
@@ -186,7 +186,7 @@ export function SkinCheckFlow() {
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
             className="mx-auto max-w-2xl px-4 pb-10 pt-10 sm:px-6"
           >
-            <div role="status" className="flex flex-col items-start gap-4 rounded-2xl bg-brand-linen p-5 sm:p-6">
+            <div role="status" className="flex flex-col items-start gap-4 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
               <p>This experience isn&apos;t available yet for users under 18. If that&apos;s not right, change your answer.</p>
               <Button type="button" variant="ink" size="lg" onClick={back}>
                 Change my answer
@@ -206,8 +206,8 @@ export function SkinCheckFlow() {
           >
             <div className="flex flex-col gap-10">
               <div className="flex flex-col gap-3">
-                <p className="text-xs font-semibold uppercase tracking-[0.06em] text-brand-muted">Your check</p>
-                <h1 className="font-display text-[28px] font-semibold leading-tight text-brand-ink sm:text-4xl">Your photo reading</h1>
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">Your check</p>
+                <h1 className="font-display text-[30px] font-semibold leading-[1.15] tracking-[-0.025em] text-brand-title sm:text-[40px]">Your photo reading</h1>
                 <p className="max-w-prose text-brand-muted">
                   {formatPrompt("Thanks, {name}. Here is how each area of your face showed up in this one photo.", answers)}
                 </p>
