@@ -2,8 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 import { checkRequestRate, SKIN_SCAN_ROUTE_LIMITS } from "@/lib/rate-limit";
 import { AdminNotConfiguredError, bearerToken, verifyFirebaseIdToken } from "@/lib/firebase/admin";
 import { isValidScanId, ORIGINAL_CONTENT_TYPE, scanImageKey } from "@/lib/s3-key";
-import { IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
-import { presignOriginalUpload, S3NotConfiguredError, UPLOAD_URL_TTL_SECONDS } from "@/lib/s3";
+import { IMAGE_RETENTION_CONSENT_COPY, IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
+import { appendConsent, scanAgeGate, withLedgerTimeout } from "@/app/api/account/_ledger";
+import { MAX_ORIGINAL_BYTES, presignOriginalUpload, S3NotConfiguredError, UPLOAD_URL_TTL_SECONDS } from "@/lib/s3";
 
 // firebase-admin and the AWS SDK both need Node APIs.
 export const runtime = "nodejs";
@@ -57,7 +58,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body.", code: "BAD_REQUEST" }, { status: 400 });
   }
 
-  // scanId and the consent fields are the ONLY things read from the body.
+  // scanId, the size and the consent fields are the ONLY things read from the body.
   // Anything else it carries — a uid, a key, a bucket — is ignored by
   // construction, not by filtering.
   const scanId = (body as { scanId?: unknown } | null)?.scanId;
@@ -72,9 +73,11 @@ export async function POST(request: NextRequest) {
   //
   // Honest about what this is: the flag is client-asserted, so it stops the
   // application's own flow from uploading without consent, not a client that
-  // deliberately lies. The check that actually holds is in firestore.rules,
-  // where a record claiming image.stored == true is rejected unless it also
-  // carries this exact consent version.
+  // deliberately lies. firestore.rules also rejects a record claiming
+  // image.stored == true unless it also
+  // carries this exact consent version. That rule reads the same client-written
+  // record, so it stops the app's own flow, not a tampered client (red team
+  // I02); the ledger entry written below is the authoritative record.
   const consent = (body as { imageRetentionConsent?: unknown } | null)?.imageRetentionConsent;
   const consentVersion = (body as { imageRetentionConsentVersion?: unknown } | null)?.imageRetentionConsentVersion;
   if (consent !== true || consentVersion !== IMAGE_RETENTION_CONSENT_VERSION) {
@@ -85,11 +88,34 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // The exact size the browser will PUT, signed into the URL (H20): a URL can
+  // only write that many bytes, and never more than MAX_ORIGINAL_BYTES.
+  const contentLength = (body as { contentLength?: unknown } | null)?.contentLength;
+  if (typeof contentLength !== "number" || !Number.isInteger(contentLength) || contentLength < 1) {
+    return NextResponse.json({ error: "Invalid image size.", code: "INVALID_CONTENT_LENGTH" }, { status: 400 });
+  }
+  if (contentLength > MAX_ORIGINAL_BYTES) {
+    return NextResponse.json({ error: "Image too large.", code: "IMAGE_TOO_LARGE" }, { status: 413 });
+  }
+
+  // H02a (D-19): an under-18 record is refused before anything is recorded or
+  // presigned. Everything else goes ahead (decision 3a, D-03).
+  const ageRefusal = await scanAgeGate(uid, "skin-scan/upload");
+  if (ageRefusal) return ageRefusal;
+
+  // D-16: the server's own record of this consent, written before the URL is
+  // handed out, so an abandoned flow still leaves one (audit D11). Best-effort:
+  // one retry, then the URL is issued anyway. The client uploads before it
+  // scans and aborts the scan when the upload fails, so refusing here would
+  // break the live scan (D-03). The client-written skinChecks.consent block
+  // stays as the fallback record.
+  await recordRetentionConsent(uid, scanId);
+
   const key = scanImageKey(uid, scanId);
 
   let uploadUrl: string;
   try {
-    uploadUrl = await presignOriginalUpload(key);
+    uploadUrl = await presignOriginalUpload(key, contentLength);
   } catch (err) {
     if (err instanceof S3NotConfiguredError) {
       console.error("skin-scan/upload:", err.message);
@@ -116,4 +142,27 @@ export async function POST(request: NextRequest) {
     expiresIn: UPLOAD_URL_TTL_SECONDS,
     contentType: ORIGINAL_CONTENT_TYPE,
   });
+}
+
+async function recordRetentionConsent(uid: string, scanId: string): Promise<void> {
+  const event = {
+    purpose: "image_retention" as const,
+    granted: true,
+    version: IMAGE_RETENTION_CONSENT_VERSION,
+    copy: IMAGE_RETENTION_CONSENT_COPY,
+    scanId,
+    source: "presign" as const,
+  };
+  for (let attempt = 1; attempt <= 2; attempt++) {
+    try {
+      await withLedgerTimeout(appendConsent(uid, event));
+      return;
+    } catch (err) {
+      // No uid in the log line: the failure is what matters, not whose.
+      if (attempt === 2) {
+        // Name and code only: Firestore messages embed the doc path (the uid).
+        console.error("skin-scan/upload: consent ledger write failed; URL issued anyway:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
+      }
+    }
+  }
 }

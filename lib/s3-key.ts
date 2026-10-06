@@ -30,3 +30,27 @@ export function scanImageKey(uid: string, scanId: string): string {
 }
 
 export const ORIGINAL_CONTENT_TYPE = "image/jpeg";
+
+/**
+ * Largest original the presigned PUT accepts (H20; TD-18 (3): stays 25 MB).
+ * PROVISIONAL. Shared so the browser can say so before asking for a URL.
+ */
+export const MAX_ORIGINAL_BYTES = 25 * 1024 * 1024;
+
+/**
+ * Everything one user has in the bucket (H01b erasure). The trailing slash is
+ * load-bearing: without it, erasing "abc" would also match "abcd/…".
+ */
+export function userPrefix(uid: string): string {
+  // A uid with "/" or ".." would point the prefix into another user's tree.
+  // Phone-auth uids are alphanumeric; anything else is refused outright.
+  if (!isPlainUid(uid)) throw new Error("Refusing to build a user prefix from an unexpected uid shape.");
+  return `users/${uid}/`;
+}
+
+const PLAIN_UID = /^[A-Za-z0-9_-]{1,128}$/;
+
+/** True for a uid that is safe as one path segment (no "/", no "."). */
+export function isPlainUid(uid: unknown): uid is string {
+  return typeof uid === "string" && PLAIN_UID.test(uid);
+}

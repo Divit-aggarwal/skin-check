@@ -1,17 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
-import { Camera, RotateCcw } from "lucide-react";
+import { useCallback, useEffect, useReducer, useRef, useState, type ChangeEvent } from "react";
+import { AlertCircle, Camera, RotateCcw } from "lucide-react";
 import { useCameraStream } from "@/hooks/useCameraStream";
 import { useAuth } from "@/lib/auth-context";
-import { isAuthError, isUploadError, runSkinScan } from "@/lib/api";
+import { isAuthError, isUploadError, isUploadTooLarge, runSkinScan, UPLOAD_TOO_LARGE_MESSAGE } from "@/lib/api";
 import { OVERLAY_CATEGORIES } from "@/lib/skin-check-skus";
 import {
   IMAGE_RETENTION_CONSENT_COPY,
   IMAGE_RETENTION_CONSENT_VERSION,
+  PROCESSING_CONSENT_COPY,
+  PROCESSING_CONSENT_TERMS_LABEL,
+  PROCESSING_CONSENT_VERSION,
   PRIVACY_POLICY_LINK_TEXT,
   PRIVACY_POLICY_URL,
 } from "@/lib/consent";
+import { saveDraftScan } from "@/lib/skin-check-draft";
+import { frameFromBlob } from "@/lib/capture-quality/frame";
+import { canAnalyze, canOverride, captureFlowReducer, initialCaptureFlow, runCaptureGate } from "@/lib/capture-quality/gate";
+import { isRetakeError, RETAKE_COPY, retakeReasonFromServerCode } from "@/lib/capture-quality/retake";
 import { Button } from "@/components/ui/button";
 import type { PhotoCaptureStep } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanState } from "@/types/skin-scan";
@@ -31,7 +38,8 @@ interface PhotoCaptureProps {
   onChange: (value: string) => void;
   onCommit: () => void;
   scan: SkinScanState;
-  onScanChange: (scan: SkinScanState) => void;
+  /** `forScanId` lets the flow drop a response from a superseded attempt. */
+  onScanChange: (scan: SkinScanState, forScanId?: string) => void;
 }
 
 // capture="user" on a file input only actually opens the device camera on
@@ -48,6 +56,9 @@ function isMobileCaptureDevice(): boolean {
   return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 }
 
+// R3: the checkbox shows PROCESSING_CONSENT_COPY exactly, with the terms label as a link.
+const [PROCESSING_TERMS_BEFORE, PROCESSING_TERMS_AFTER] = PROCESSING_CONSENT_COPY.split(PROCESSING_CONSENT_TERMS_LABEL);
+
 // Downscales a full-res camera File to ~maxDimension on its long edge, for
 // the CV call only — the original File's bytes are stored untouched
 // elsewhere (see originalBlobRef below). Never upscales.
@@ -60,6 +71,7 @@ function isMobileCaptureDevice(): boolean {
 // or, worse, succeeds against the wrong pixels and silently mislabels which
 // region is which. The stored original (originalBlobRef) is the untouched
 // File itself, not this bitmap, so its EXIF tag is never altered.
+
 async function downscaleToJpeg(file: Blob, maxDimension: number, quality: number): Promise<Blob> {
   const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
   try {
@@ -111,19 +123,26 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   const originalBlobRef = useRef<Blob | null>(null);
   const hasCaptured = previewUrl !== null;
 
+  // The retake loop (C01) and both consent booleans, in one pure reducer
+  // (lib/capture-quality/gate.ts) so a retake clears the photo's gate result
+  // and both consents in the same transition.
+  //
   // Required data-collection consent (PART 11-15 of the redesign brief) —
-  // gates the scan request itself, not just the button's disabled look.
-  // Local, session-scoped state: re-mounting this step (e.g. navigating
-  // away and back) resets it, and retaking a photo resets it explicitly
-  // below, so consent never silently carries over to a different image.
-  const [hasConsented, setHasConsented] = useState(false);
-  // SEPARATE permission, separate boolean, deliberately never merged with the
-  // one above: that one allows this photo to be analyzed, this one allows the
-  // original to be RETAINED in private S3. Optional — declining it still gives
-  // the user their analysis, it just means nothing is stored. Local state
-  // only: never written to the draft, so a new scan (or a retake) has to ask
-  // again rather than inheriting an answer given for a different image.
-  const [hasRetentionConsent, setHasRetentionConsent] = useState(false);
+  // `hasConsented` gates the scan request itself, not just the button's
+  // disabled look. Local, session-scoped state: re-mounting this step (e.g.
+  // navigating away and back) resets it, and every retake resets it, so
+  // consent never silently carries over to a different image.
+  // `hasRetentionConsent` is a SEPARATE permission, separate boolean,
+  // deliberately never merged with the one above: that one allows this photo
+  // to be analyzed, this one allows the original to be RETAINED in private
+  // S3. Optional — declining it still gives the user their analysis, it just
+  // means nothing is stored. Never written to the draft, so a new scan (or a
+  // retake) has to ask again rather than inheriting an answer given for a
+  // different image.
+  const [flow, dispatch] = useReducer(captureFlowReducer, initialCaptureFlow);
+  const { hasConsented, hasRetentionConsent } = flow;
+  // Tags each capture so a gate result that arrives after a retake is dropped.
+  const photoSeqRef = useRef(0);
   // "Analyze my skin" is only disabled once `scan.status` flips to "loading",
   // which is a re-render away — two taps inside the same tick would both get
   // through and bill two upstream CV jobs for one photo. Reset on retake, so
@@ -163,6 +182,16 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     return () => URL.revokeObjectURL(url);
   }, [scan]);
 
+  // Checks the exact bytes the engine will receive (capturedBlobRef), so the
+  // result describes the image whose hash becomes inputSha256.
+  const startGate = useCallback((blob: Blob, captureMethod: CaptureMethod) => {
+    const photoId = ++photoSeqRef.current;
+    dispatch({ type: "captured", photoId });
+    void frameFromBlob(blob).then((frame) =>
+      dispatch({ type: "gateResult", photoId, quality: runCaptureGate(frame, { captureMethod, retakeCount: 0 }) })
+    );
+  }, []);
+
   const handleCapture = useCallback(() => {
     const video = videoRef.current;
     const canvas = canvasRef.current;
@@ -181,13 +210,14 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
         // the CV blob and the stored "original" are the same bytes.
         capturedBlobRef.current = blob;
         originalBlobRef.current = blob;
+        startGate(blob, "canvas");
         setPreviewUrl(URL.createObjectURL(blob));
         stopCamera();
       },
       "image/jpeg",
       0.92
     );
-  }, [videoRef, stopCamera]);
+  }, [videoRef, stopCamera, startGate]);
 
   const handleNativeFileChange = useCallback(async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -201,8 +231,9 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     originalBlobRef.current = file;
     const cvBlob = await downscaleToJpeg(file, 1280, 0.92);
     capturedBlobRef.current = cvBlob;
+    startGate(cvBlob, "native");
     setPreviewUrl(URL.createObjectURL(file));
-  }, []);
+  }, [startGate]);
 
   const handleRetake = useCallback(() => {
     setPreviewUrl((prev) => {
@@ -212,8 +243,8 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     capturedBlobRef.current = null;
     originalBlobRef.current = null;
     scanRequestedRef.current = false;
-    setHasConsented(false);
-    setHasRetentionConsent(false);
+    // Clears both consents and the gate result; a late result for the old photo is ignored.
+    dispatch({ type: "retake" });
     if (isMobile) {
       fileInputRef.current?.click();
     } else {
@@ -233,7 +264,9 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   }, [handleRetake, onChange, onScanChange]);
 
   const handleConfirm = useCallback(() => {
-    if (!hasConsented || scanRequestedRef.current) return;
+    // Consent AND the gate (O-4 soft block): pending or an un-overridden
+    // retake verdict never reaches the request.
+    if (!canAnalyze(flow) || scanRequestedRef.current) return;
     // Belt to getSkinScanResult's braces (lib/api.ts throws on the same
     // condition). Here so an unauthenticated tap is a silent no-op rather
     // than a rejected promise rendered as "analysis failed".
@@ -243,6 +276,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     if (!blob || !original) return;
     scanRequestedRef.current = true;
     const captureMethod: CaptureMethod = isMobile ? "native" : "canvas";
+    const quality = flow.quality ?? undefined;
 
     // Unlock the next section immediately. The scan runs in the background
     // while the user answers the remaining sections; by the time they reach
@@ -253,6 +287,20 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     onCommit();
 
     onScanChange({ status: "loading" });
+    // Into the draft before the analysis starts, so a refresh mid-scan
+    // restores this photo as a retryable scan instead of losing it. Written
+    // under-claiming: the upload hasn't happened yet, so originalStored is
+    // false until the outcome below rewrites it.
+    const retentionConsentVersion = hasRetentionConsent ? IMAGE_RETENTION_CONSENT_VERSION : undefined;
+    void saveDraftScan({
+      scanId,
+      photo: blob,
+      result: null,
+      captureMethod,
+      originalStored: false,
+      retentionConsentVersion,
+      quality,
+    });
     // Request every traversable category's overlay in this one call — the
     // skin-scan service accepts a comma-separated `overlays` list and
     // generates all of them in one pipeline run (measured well under its own
@@ -264,28 +312,38 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     // PHASE 3 ordering: the original image is PUT to private S3 first and the
     // CV analysis only starts once that succeeded (runSkinScan owns both
     // halves, so the dashboard's retry runs the same sequence).
-    const retentionConsentVersion = hasRetentionConsent ? IMAGE_RETENTION_CONSENT_VERSION : undefined;
 
     void runSkinScan({
       scanId,
       photo: blob,
+      captureMethod,
       original,
       retentionConsent: hasRetentionConsent,
       overlays: OVERLAY_CATEGORIES,
+      captureQuality: quality,
+      // canAnalyze() above requires the processing checkbox.
+      processingConsentVersion: PROCESSING_CONSENT_VERSION,
     })
       .then(({ result, originalStored }) =>
-        onScanChange({
-          status: "success",
-          result,
-          photo: blob,
-          original,
-          captureMethod,
-          originalStored,
-          retentionConsentVersion,
-        })
+        onScanChange(
+          {
+            status: "success",
+            result,
+            photo: blob,
+            original,
+            captureMethod,
+            originalStored,
+            retentionConsentVersion,
+            quality,
+            processingConsentVersion: PROCESSING_CONSENT_VERSION,
+          },
+          scanId
+        )
       )
       .catch((err) => {
         console.error("Skin scan failed:", err);
+        // The engine refused the photo for a reason a retake fixes (O-5).
+        const retakeReason = isRetakeError(err) ? retakeReasonFromServerCode(err.code) ?? undefined : undefined;
         onScanChange({
           status: "error",
           // An expired/refused session is not a photo problem, and telling
@@ -294,8 +352,12 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           // before the scan resolves), and the results view has no verify
           // step to send them to — so it points at the one action that does
           // work there: a refresh, which re-runs Firebase auth restoration.
-          message: isAuthError(err)
+          message: retakeReason
+            ? RETAKE_COPY[retakeReason]
+            : isAuthError(err)
             ? "Your session expired before we could read your photo. Refresh the page to sign in again, then retry."
+            : isUploadTooLarge(err)
+            ? UPLOAD_TOO_LARGE_MESSAGE
             : isUploadError(err)
               // Upload failed, so the analysis never ran — retrying is the
               // fix, and the retry starts from the upload again.
@@ -309,9 +371,12 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           // failed (case B), so the record must not claim otherwise.
           originalStored: !isUploadError(err) && Boolean(original) && hasRetentionConsent,
           retentionConsentVersion,
-        });
+          quality,
+          retakeReason,
+          processingConsentVersion: PROCESSING_CONSENT_VERSION,
+        }, scanId);
       });
-  }, [hasConsented, hasRetentionConsent, onChange, onCommit, onScanChange, isMobile, user, scanId]);
+  }, [flow, hasRetentionConsent, onChange, onCommit, onScanChange, isMobile, user, scanId]);
 
   // Firebase hasn't reported yet — holding the frame is the difference
   // between "we don't know" and "you're signed out" (failure case 6).
@@ -325,11 +390,11 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   // the verify section, a signOut in another tab, an expired session.
   if (!user) {
     return (
-      <div className="flex flex-col gap-2 rounded-lg border border-text/10 bg-white p-4">
-        <p className="text-sm text-text/70">
+      <div className="flex flex-col gap-2 rounded-2xl border border-brand-card-line bg-brand-paper p-4">
+        <p className="text-sm text-brand-muted">
           Verify your phone number before taking your photo.
         </p>
-        <p className="text-xs text-text/45">
+        <p className="text-xs text-brand-muted">
           Tap back to the Verify step to continue.
         </p>
       </div>
@@ -339,20 +404,24 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   if (value === "done") {
     const thumbSrc = previewUrl ?? donePreviewUrl;
     return (
-      <div className="flex flex-col gap-3 rounded-lg border border-text/10 bg-white p-4 sm:flex-row sm:items-center">
+      <div className="flex flex-col gap-3 rounded-2xl border border-brand-line bg-brand-paper p-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           {thumbSrc && (
             // eslint-disable-next-line @next/next/no-img-element -- transient object URL, not a static asset
             <img src={thumbSrc} alt="Captured photo" className="h-14 w-14 rounded-md object-cover" />
           )}
-          <p className="text-sm text-text/70">
-            {scan.status === "loading" ? "Analyzing your photo…" : "Photo saved for this scan."}
+          <p className="text-sm text-brand-muted">
+            {scan.status === "loading"
+              ? "Analyzing your photo…"
+              : scan.status === "error" && scan.retakeReason
+                ? RETAKE_COPY[scan.retakeReason]
+                : "Photo saved for this check."}
           </p>
         </div>
         <button
           type="button"
           onClick={handleRetakeFromDone}
-          className="text-sm font-medium text-text underline underline-offset-4 hover:text-blush sm:ml-auto"
+          className="inline-flex min-h-11 items-center text-sm font-medium text-brand-forest underline-offset-4 hover:underline sm:ml-auto"
         >
           Retake photo
         </button>
@@ -362,8 +431,8 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
 
   if (status === "denied" || status === "unavailable") {
     return (
-      <div className="flex flex-col gap-3 rounded-lg border border-text/10 bg-white p-4">
-        <p className="text-sm text-text/70">{error ?? "Camera access is needed for this step."}</p>
+      <div className="flex flex-col gap-3 rounded-2xl border border-brand-card-line bg-brand-paper p-4">
+        <p className="text-sm text-brand-muted">{error ?? "Camera access is needed for this step."}</p>
         <Button type="button" variant="outlineLight" size="sm" onClick={requestCamera}>
           Try again
         </Button>
@@ -373,7 +442,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="relative aspect-[3/4] w-full max-w-[280px] overflow-hidden rounded-lg bg-black">
+      <div className="relative aspect-[3/4] w-full max-w-[320px] overflow-hidden rounded-2xl bg-brand-ink">
         {!isMobile && !hasCaptured && (
           <video
             ref={videoRef}
@@ -411,13 +480,13 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
         />
       )}
 
-      <p className="max-w-sm text-xs text-text/45">{step.note}</p>
+      <p className="max-w-sm text-sm text-brand-muted">{step.note}</p>
 
       {!hasCaptured ? (
         <Button
           type="button"
           variant="ink"
-          size="sm"
+          size="lg"
           disabled={!isMobile && status !== "active"}
           onClick={isMobile ? () => fileInputRef.current?.click() : handleCapture}
           className="w-fit gap-2"
@@ -430,15 +499,15 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           {/* Required consent gate — the scan request below never fires
               until this is checked (PART 13). Unchecked by default, real
               <input type="checkbox">, keyboard- and screen-reader-visible. */}
-          <label className="flex max-w-sm items-start gap-2.5 text-sm text-text/70">
+          <label className="flex max-w-md items-start gap-3 py-1 text-base text-brand-ink">
             <input
               type="checkbox"
               checked={hasConsented}
-              onChange={(e) => setHasConsented(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-text/30 text-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+              onChange={(e) => dispatch({ type: "consent", analysis: e.target.checked })}
+              className="mt-0.5 h-5 w-5 shrink-0 rounded border-brand-line accent-brand-action"
             />
             <span>
-              I agree to the{" "}
+              {PROCESSING_TERMS_BEFORE}
               {TERMS_URL ? (
                 <a
                   href={TERMS_URL}
@@ -446,12 +515,12 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
                   rel="noopener noreferrer"
                   className="underline underline-offset-2 hover:text-text"
                 >
-                  Terms &amp; Conditions
+                  {PROCESSING_CONSENT_TERMS_LABEL}
                 </a>
               ) : (
-                <span className="underline underline-offset-2">Terms &amp; Conditions</span>
-              )}{" "}
-              and consent to my photo being collected and processed for this skin analysis.
+                <span className="underline underline-offset-2">{PROCESSING_CONSENT_TERMS_LABEL}</span>
+              )}
+              {PROCESSING_TERMS_AFTER}
             </span>
           </label>
 
@@ -460,12 +529,12 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
               original is never uploaded (runSkinScan skips the S3 step). Never
               pre-checked, never inferred from the box above or from continuing
               the questionnaire. */}
-          <label className="flex max-w-sm items-start gap-2.5 text-sm text-text/70">
+          <label className="flex max-w-md items-start gap-3 py-1 text-base text-brand-ink">
             <input
               type="checkbox"
               checked={hasRetentionConsent}
-              onChange={(e) => setHasRetentionConsent(e.target.checked)}
-              className="mt-0.5 h-4 w-4 shrink-0 rounded border-text/30 text-blush focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+              onChange={(e) => dispatch({ type: "consent", retention: e.target.checked })}
+              className="mt-0.5 h-5 w-5 shrink-0 rounded border-brand-line accent-brand-action"
             />
             <span>
               {IMAGE_RETENTION_CONSENT_COPY}{" "}
@@ -480,11 +549,31 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
             </span>
           </label>
 
-          <div className="flex gap-2">
+          {/* Gate status (C01). Instruction only: no score or number. */}
+          <div aria-live="polite" className="max-w-sm text-sm">
+            {flow.gate === "pending" && <p className="text-brand-muted">Checking your photo…</p>}
+            {flow.gate === "done" && flow.quality && flow.quality.retakeReasons.length > 0 && (
+              <p role="alert" className="flex items-start gap-2 rounded-xl border border-brand-line bg-brand-paper px-4 py-3 text-brand-ink">
+                <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-brand-error" />
+                <span>{RETAKE_COPY[flow.quality.retakeReasons[0]!]}</span>
+              </p>
+            )}
+          </div>
+          {canOverride(flow) && (
+            <button
+              type="button"
+              onClick={() => dispatch({ type: "override" })}
+              className="inline-flex min-h-11 w-fit items-center text-sm font-medium text-brand-forest underline-offset-4 hover:underline"
+            >
+              Use this photo anyway
+            </button>
+          )}
+
+          <div className="flex flex-wrap gap-2">
             <Button
               type="button"
               variant="outlineLight"
-              size="sm"
+              size="lg"
               disabled={scan.status === "loading"}
               onClick={handleRetake}
               className="gap-2"
@@ -495,8 +584,8 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
             <Button
               type="button"
               variant="ink"
-              size="sm"
-              disabled={scan.status === "loading" || !hasConsented}
+              size="lg"
+              disabled={scan.status === "loading" || !canAnalyze(flow)}
               onClick={handleConfirm}
             >
               {scan.status === "loading" ? "Analyzing…" : "Analyze my skin"}

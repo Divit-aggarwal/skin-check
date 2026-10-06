@@ -56,8 +56,12 @@ export interface ImageCardOption {
   value: string;
   label: string;
   description?: string;
-  /** Placeholder label for the swap-me image/icon box — not a real asset. */
-  imagePlaceholder?: string;
+  /**
+   * A small picture of what the option means (public/quiz/). The owner can
+   * swap a file by putting their own under the same name. `alt` is what a
+   * screen reader says.
+   */
+  image?: { src: string; alt: string };
 }
 
 export interface MultiSelectCardsStep extends BaseStep {

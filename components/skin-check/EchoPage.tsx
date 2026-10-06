@@ -4,31 +4,35 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence } from "framer-motion";
-import { ChevronLeft } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, MessageCircle, SendHorizontal } from "lucide-react";
 import { TypingIndicator } from "@/components/primitives/TypingIndicator";
-import { EchoBubble } from "./EchoBubble";
-import { EchoMark } from "./EchoMark";
-import { useSkinCheckSession, type EchoThreadMessage } from "@/lib/skin-check-session-context";
+import { ECHO_COPY as E } from "./echoCopy";
+import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
+import { PhotoCheckLine, ReadingRows } from "@/components/dashboard/CheckReadings";
+import { formatDate } from "@/components/dashboard/format";
+import { loadDashboard } from "@/components/dashboard/data";
+import { newestEchoSession } from "@/components/dashboard/echo-session";
+import { readingsOf, toDate } from "@/components/dashboard/state";
+import { AccountButton, btnPrimary, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getSkinCheckChatReply, ApiError } from "@/lib/api";
-import { bandScores } from "@/lib/skin-check-rules";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
-import type { SkinScanScores } from "@/types/skin-scan";
+import { useAuth } from "@/lib/auth-context";
+import { AI_SHARE_CONSENT_COPY, AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 
-// hydration is labeled "Dryness" - see lib/skin-check-skus.ts's METRIC_LABELS
-// comment. Same reasoning, same relabel, kept in sync across both sites.
-const CATEGORY_LABELS: Record<keyof SkinScanScores, string> = {
-  redness: "Redness",
-  oiliness: "Oiliness",
-  texture: "Texture",
-  pores: "Pores",
-  blemishes: "Blemishes",
-  hydration: "Dryness",
-  pigment: "Pigment",
-};
-const CATEGORY_KEYS = Object.keys(CATEGORY_LABELS) as (keyof SkinScanScores)[];
-
-const RETRYABLE_ERROR_MESSAGE = "Couldn't reach Echo just now.";
+const RETRYABLE_ERROR_MESSAGE = "Couldn't reach Echo just now. Please try again.";
 const CONFIG_ERROR_MESSAGE = "Echo isn't set up yet — this isn't something retrying will fix.";
+
+// Privacy gates on the chat route (H02a, H03c). Retrying can't fix these, so
+// they get their own message and no Retry button.
+const GATE_MESSAGES: Record<string, string> = {
+  UNDER_18: "Echo is only available to people aged 18 or over.",
+  ATTESTATION_REQUIRED: "Please confirm your age in Skin Check before using Echo.",
+  // F15: Gemini ran out of time; the Retry button stays (the code is retryable).
+  CHAT_TIMEOUT: "Echo took too long to answer. Please try again.",
+  // F13: a newer check exists; Echo talks about that one (open it from the dashboard).
+  CHAT_NOT_NEWEST: "Echo talks about your newest check only. Open it from your dashboard.",
+};
+const NOT_RETRYABLE = new Set(["CHAT_MISCONFIGURED", "UNDER_18", "ATTESTATION_REQUIRED", "AI_CONSENT_REQUIRED", "CHAT_NOT_NEWEST"]);
 
 function greetingFor(region: EchoRegion): string {
   return `Hey — let's talk about your ${ECHO_REGION_LABELS[region].toLowerCase()}. What would you like to know?`;
@@ -46,7 +50,7 @@ let messageSeq = 0;
 // Echo in, so this shows a way back to /skin-check instead of a blind chat.
 export function EchoPage() {
   const searchParams = useSearchParams();
-  const { session, threads, setThreadMessages } = useSkinCheckSession();
+  const { session, threads, setThread } = useSkinCheckSession();
 
   const regionParam = searchParams.get("region");
   const [activeRegion, setActiveRegion] = useState<EchoRegion>(isEchoRegion(regionParam) ? regionParam : "forehead");
@@ -56,20 +60,50 @@ export function EchoPage() {
   // request, not a message Echo said. The old version pushed a role:"echo"
   // error string into thread history, which meant it got replayed back to
   // Gemini as a model turn on the next send (context pollution) and gave the
-  // user no way to retry without retyping. `retryMessages` is the exact
-  // history that failed to send, so Retry resends it verbatim instead of
-  // reconstructing it (which could silently drop or reorder the failed turn).
+  // user no way to retry without retyping. `retryBefore` (the thread and its
+  // historyToken from BEFORE the failed turn) plus `retryMessage` are exactly
+  // what failed to send, so Retry resends them verbatim instead of
+  // reconstructing them (which could silently drop or reorder the failed turn).
   const [sendError, setSendError] = useState<{
     region: EchoRegion;
-    retryMessages: EchoThreadMessage[];
+    retryBefore: EchoThread;
+    retryMessage: EchoThreadMessage;
     retryable: boolean;
+    code: string | undefined;
   } | null>(null);
+  const { user, loading: authLoading } = useAuth();
+  const [consentSaving, setConsentSaving] = useState(false);
+  const [consentFailed, setConsentFailed] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // G03: /echo opened from the nav, or after a refresh, builds the session for
+  // the newest reading itself (the same helper as Home's Chat with Echo).
+  const [start, setStart] = useState<"loading" | "none" | "error">("loading");
+  const { setSession } = useSkinCheckSession();
+  useEffect(() => {
+    if (session || !user) return;
+    let active = true;
+    setStart("loading");
+    loadDashboard(user.uid).then(
+      (data) => {
+        if (!active) return;
+        const next = newestEchoSession(user.uid, data);
+        if (next) setSession(next);
+        else setStart("none");
+      },
+      (error) => {
+        console.error("[echo] newest check not loaded", error instanceof Error ? error.name : error);
+        if (active) setStart("error");
+      }
+    );
+    return () => {
+      active = false;
+    };
+  }, [session, user, setSession]);
 
   // Aborts any in-flight /api/skin-check/chat request when this page
   // unmounts (user taps "Back to Skin Check", or navigates away entirely,
   // while Echo is still thinking) — without this, the fetch resolves after
-  // unmount and calls setThreadMessages/setSendError on a component that's
+  // unmount and calls setThread/setSendError on a component that's
   // gone. One controller at a time matches sendingRegion's own one-in-flight
   // invariant (sendToEcho refuses to start a second request).
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -77,7 +111,7 @@ export function EchoPage() {
     return () => abortControllerRef.current?.abort();
   }, []);
 
-  const messages = threads[activeRegion];
+  const messages = threads[activeRegion].messages;
   const isThinking = sendingRegion === activeRegion;
   const activeError = sendError?.region === activeRegion ? sendError : null;
 
@@ -87,33 +121,61 @@ export function EchoPage() {
 
   if (!session) {
     return (
-      <div className="mx-auto flex min-h-dvh max-w-lg flex-col items-center justify-center gap-4 bg-surface px-6 text-center">
-        <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blush-soft">
-          <EchoMark className="h-5 w-5" />
-        </span>
-        <p className="text-sm text-text/70">
-          We lost your check-in — Echo needs your Skin Check results to talk this through, and that session
-          doesn&apos;t survive a refresh yet.
-        </p>
-        <Link
-          href="/skin-check"
-          className="h-12 rounded-full bg-text px-6 text-sm font-medium leading-[3rem] text-white transition-colors hover:bg-text/85"
-        >
-          Back to Skin Check
-        </Link>
-      </div>
+      <main className={page}>
+        <PageHeader title={E.title} />
+        {authLoading || (user && start === "loading") ? (
+          <LoadingState label={E.loading} blocks={["h-24", "h-64"]} />
+        ) : !user ? (
+          <SignedOutCard body={E.signedOut} />
+        ) : start === "error" ? (
+          <ErrorState body={E.loadFailed} action={<ReloadButton label={E.tryAgain} />} />
+        ) : (
+          <EmptyState body={C.chat.needsReading} action={<Link href="/skin-check" className={btnPrimary}>{E.newCheck}</Link>} />
+        )}
+      </main>
     );
   }
 
-  const regionScores = session.result.region_scores[activeRegion];
-  const regionBands = regionScores ? bandScores(regionScores).bands : null;
+  const readings = readingsOf(session.result as unknown as Record<string, unknown>);
+  const record = session.result as unknown as Record<string, unknown>;
+  const date = formatDate(toDate(record.createdAt));
+  const verdict = (record.captureQuality as { verdict?: unknown } | undefined)?.verdict;
+  const photoCheck = verdict === "pass" || verdict === "override" || verdict === "unchecked" ? verdict : null;
+  const area = readings.areas.find((a) => a.region === activeRegion);
+  const areaLabel = ECHO_REGION_LABELS[activeRegion].toLowerCase();
   const activeSession = session; // fresh const so the closure below keeps the non-null narrowing
 
-  // Shared by a fresh send and a Retry — `nextMessages` already has the
-  // user's turn appended (or, on retry, is exactly what failed last time),
+  // The readings of the check being discussed, with the fixed line (TD-25 (4), TD-24 (1)).
+  const panel = (
+    <div className="flex flex-col gap-4">
+      <div>
+        <p className={`${eyebrow} mb-1`}>{E.talkingAbout}</p>
+        <p className="font-display text-xl font-semibold">{E.checkFrom(date)}</p>
+      </div>
+      {photoCheck && <PhotoCheckLine text={C.photoCheck[photoCheck]} />}
+      <p className="rounded-2xl bg-brand-mist px-4 py-3 text-sm text-brand-ink">{C.history.pastLine}</p>
+      <div>
+        <h3 className="mb-1 font-semibold">{E.wholeFace}</h3>
+        <ReadingRows bands={readings.bands} />
+      </div>
+      {area && (
+        <div>
+          <h3 className="mb-1 font-semibold">{area.label}</h3>
+          <ReadingRows bands={area.bands} />
+        </div>
+      )}
+      <Link href={`/checks/${encodeURIComponent(session.scanId)}`} className="inline-flex min-h-11 items-center gap-1 font-medium text-brand-forest underline-offset-4 hover:underline">
+        {E.openCheck}
+        <ChevronRight aria-hidden size={16} />
+      </Link>
+    </div>
+  );
+
+  // Shared by a fresh send and a Retry — `before` is the thread (and its
+  // historyToken) prior to `userMessage`, which the caller has already shown,
   // so this never re-adds a user message and never duplicates a request:
   // sendingRegion gates both entry points the same way.
-  async function sendToEcho(region: EchoRegion, nextMessages: EchoThreadMessage[]) {
+  async function sendToEcho(region: EchoRegion, before: EchoThread, userMessage: EchoThreadMessage) {
     if (sendingRegion) return;
     setSendError(null);
     setSendingRegion(region);
@@ -122,22 +184,32 @@ export function EchoPage() {
     abortControllerRef.current = controller;
 
     try {
-      const history = nextMessages.map((m) => ({ role: m.role, text: m.text }));
-      const focusScores = activeSession.result.region_scores[region];
-      const reply = await getSkinCheckChatReply(
+      // Only the scan's id and the thread go up — the server loads this
+      // scan's scores and answers itself.
+      const history = before.messages.map((m) => ({ role: m.role, text: m.text }));
+      const { reply, historyToken } = await getSkinCheckChatReply(
+        activeSession.scanId,
+        region,
         history,
-        activeSession.answers,
-        activeSession.result.scores,
-        focusScores ? { region: ECHO_REGION_LABELS[region], scores: focusScores } : null,
+        before.historyToken,
+        userMessage.text,
         controller.signal
       );
       if (controller.signal.aborted) return; // unmounted mid-request — nothing left to update
-      setThreadMessages(region, [...nextMessages, { id: messageSeq++, role: "echo", text: reply }]);
+      setThread(region, {
+        messages: [...before.messages, userMessage, { id: messageSeq++, role: "echo", text: reply }],
+        historyToken,
+      });
     } catch (err) {
       if (controller.signal.aborted) return;
       console.error("Echo region chat failed:", err instanceof Error ? err.message : err);
-      const misconfigured = err instanceof ApiError && err.code === "CHAT_MISCONFIGURED";
-      setSendError({ region, retryMessages: nextMessages, retryable: !misconfigured });
+      const code = err instanceof ApiError ? err.code : undefined;
+      // The server no longer vouches for this thread's history (e.g. a key
+      // rotation) — start the thread over from the failed turn so Retry can
+      // succeed instead of failing the same way forever.
+      const retryBefore = code === "CHAT_HISTORY_INVALID" ? { messages: [], historyToken: null } : before;
+      if (retryBefore !== before) setThread(region, { messages: [userMessage], historyToken: null });
+      setSendError({ region, retryBefore, retryMessage: userMessage, retryable: !NOT_RETRYABLE.has(code ?? ""), code });
     } finally {
       if (!controller.signal.aborted) setSendingRegion(null);
       if (abortControllerRef.current === controller) abortControllerRef.current = null;
@@ -149,158 +221,184 @@ export function EchoPage() {
     if (!text || sendingRegion) return;
 
     const region = activeRegion;
-    const nextMessages: EchoThreadMessage[] = [...threads[region], { id: messageSeq++, role: "user", text }];
-    setThreadMessages(region, nextMessages);
+    const before = threads[region];
+    const userMessage: EchoThreadMessage = { id: messageSeq++, role: "user", text };
+    setThread(region, { ...before, messages: [...before.messages, userMessage] });
     setDraft("");
-    void sendToEcho(region, nextMessages);
+    void sendToEcho(region, before, userMessage);
   }
 
   function handleRetry() {
     if (!activeError || sendingRegion) return;
-    void sendToEcho(activeError.region, activeError.retryMessages);
+    void sendToEcho(activeError.region, activeError.retryBefore, activeError.retryMessage);
+  }
+
+  // H03c: the server refused because there is no AI-share consent. Record the
+  // user's yes, then resend the turn that was refused. LOCAL ONLY for now:
+  // DRAFT copy (decision 7b), Gemini key pending (decision 6).
+  async function grantAiShare() {
+    if (!activeError || consentSaving) return;
+    if (!user) {
+      setConsentFailed(true);
+      return;
+    }
+    setConsentSaving(true);
+    setConsentFailed(false);
+    try {
+      const res = await fetch("/api/account/consent", {
+        method: "POST",
+        headers: { "content-type": "application/json", authorization: `Bearer ${await user.getIdToken()}` },
+        body: JSON.stringify({ purpose: "ai_share", granted: true, version: AI_SHARE_CONSENT_VERSION }),
+      });
+      if (res.ok) void sendToEcho(activeError.region, activeError.retryBefore, activeError.retryMessage);
+      else setConsentFailed(true);
+    } catch (err) {
+      console.error("AI-share consent not recorded:", err instanceof Error ? err.message : err);
+      setConsentFailed(true);
+    } finally {
+      setConsentSaving(false);
+    }
   }
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-lg flex-col bg-surface px-6 pb-6 pt-6">
-      <div className="flex shrink-0 items-center gap-3">
-        <Link
-          href="/skin-check"
-          aria-label="Back to Skin Check"
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text/60 transition-opacity hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </Link>
-        <p className="text-sm font-semibold text-text">Echo</p>
-      </div>
+    // The chat fills the screen above the phone's bottom bar; on a wide screen
+    // the readings sit beside it (TD-25 (1), from direction B).
+    <main className="mx-auto flex h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] w-full max-w-[1200px] flex-col sm:h-dvh lg:grid lg:grid-cols-[minmax(0,1fr)_360px]">
+      <div className="flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:border-r lg:border-brand-line lg:px-8">
+        <header className="flex shrink-0 items-start gap-2 pt-4 sm:pt-8">
+          <Link
+            // K-1: a hand-off from the dashboard goes back there, not to an old results screen.
+            href={session.fromDashboard ? "/dashboard" : "/skin-check"}
+            aria-label={session.fromDashboard ? "Back to your skin checks" : "Back to Skin Check"}
+            className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full text-brand-muted hover:bg-brand-linen hover:text-brand-ink"
+          >
+            <ChevronLeft aria-hidden className="h-5 w-5" />
+          </Link>
+          <div className="min-w-0 flex-1">
+            <h1 className="flex items-center gap-2 font-display text-[30px] font-semibold leading-[1.15] tracking-[-0.025em] text-brand-title sm:text-[40px]">
+              <span aria-hidden className="grid size-9 place-items-center rounded-full bg-brand-mist text-brand-forest">
+                <MessageCircle size={18} />
+              </span>
+              {E.title}
+            </h1>
+            <p className="mt-1 text-sm text-brand-muted">{E.intro(date)}</p>
+          </div>
+          <AccountButton />
+        </header>
 
-      {/* Underline tab treatment, matching EchoTwin's category strip — not a
-          filled pill (same "not a SaaS chatbot" reasoning as EchoBubble). */}
-      <div
-        className="mt-4 flex shrink-0 gap-4 overflow-x-auto pb-1 [mask-image:linear-gradient(to_right,transparent,black_12px,black_calc(100%-12px),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-        role="tablist"
-        aria-label="Skin regions"
-      >
-        {ECHO_REGIONS.map((region) => {
-          const active = region === activeRegion;
-          return (
+        <div role="group" aria-label={E.areaPicker} className="mt-4 flex shrink-0 gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
+          {ECHO_REGIONS.map((region) => (
             <button
               key={region}
               type="button"
-              role="tab"
-              aria-selected={active}
+              aria-pressed={region === activeRegion}
               onClick={() => setActiveRegion(region)}
-              className="flex shrink-0 items-center px-1 py-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              className="min-h-11 shrink-0 rounded-full border border-brand-line bg-brand-linen px-4 text-sm font-medium aria-pressed:border-brand-action aria-pressed:bg-brand-action aria-pressed:text-white"
             >
-              <span
-                className={`border-b-2 pb-1 text-label uppercase tracking-label transition-colors duration-150 ${
-                  active ? "border-text text-text" : "border-transparent text-muted-foreground"
-                }`}
-              >
-                {ECHO_REGION_LABELS[region]}
-              </span>
+              {ECHO_REGION_LABELS[region]}
             </button>
-          );
-        })}
-      </div>
-
-      {regionBands && (
-        <div className="mt-4 shrink-0 rounded-2xl bg-canvas p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-label font-semibold uppercase tracking-label text-muted-foreground">
-              {ECHO_REGION_LABELS[activeRegion]} readings
-            </p>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1.5">
-            {CATEGORY_KEYS.map((key) => (
-              <div key={key} className="flex items-center justify-between">
-                <span className="text-xs text-text/60">{CATEGORY_LABELS[key]}</span>
-                <span className="text-xs font-medium text-blush">
-                  {key === "pores" ? "Not measured yet" : regionBands[key]}
-                </span>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
-      )}
 
-      <div ref={scrollRef} className="mt-4 min-h-0 flex-1 space-y-5 overflow-y-auto">
-        {messages.length === 0 && <EchoBubble message={greetingFor(activeRegion)} />}
+        {/* Phone and tablet: the same readings, folded away until asked for. */}
+        <details className="group mt-3 shrink-0 rounded-2xl border border-brand-card-line bg-brand-paper px-4 py-2 lg:hidden">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between font-medium [&::-webkit-details-marker]:hidden">
+            {E.readingsSummary}
+            <ChevronDown aria-hidden size={18} className="transition-transform group-open:rotate-180" />
+          </summary>
+          <div className="pb-3 pt-2">{panel}</div>
+        </details>
+
+        <div ref={scrollRef} role="log" aria-live="polite" className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pb-4">
+        {messages.length === 0 && (
+          <p className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">{greetingFor(activeRegion)}</p>
+        )}
         {messages.map((m) =>
           m.role === "echo" ? (
-            // Plain left-aligned body copy, no bubble/avatar chrome — same
-            // "doesn't read as a chatbot" intent as EchoBubble, sized for a
-            // running multi-turn reply rather than EchoBubble's single
-            // editorial question/prompt treatment (which EchoBubble is now
-            // used for elsewhere — see SkinCheckFlow.tsx).
-            <p key={m.id} className="max-w-[90%] text-body leading-relaxed text-text">
+<p key={m.id} className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">
               {m.text}
             </p>
           ) : (
             <div key={m.id} className="flex justify-end">
-              <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-text px-4 py-3">
-                <p className="text-[1.0625rem] leading-snug text-white">{m.text}</p>
+              <div className="max-w-[85%] rounded-2xl rounded-br-md bg-brand-action px-4 py-3">
+                <p className="leading-snug text-white">{m.text}</p>
               </div>
             </div>
           )
         )}
         <AnimatePresence initial={false}>
           {isThinking && (
-            <TypingIndicator key="thinking" className="rounded-tl-sm bg-blush-soft text-blush" />
+            <TypingIndicator key="thinking" className="rounded-tl-sm bg-brand-paper text-brand-muted" />
           )}
         </AnimatePresence>
-        {activeError && (
-          <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl bg-blush-soft px-4 py-3">
+        {activeError?.code === "AI_CONSENT_REQUIRED" && (
+          <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl border border-brand-line bg-brand-paper px-4 py-3">
+            <p className="text-body text-text">{AI_SHARE_CONSENT_COPY}</p>
+            <button
+              type="button"
+              onClick={() => void grantAiShare()}
+              disabled={consentSaving || sendingRegion !== null}
+              className={btnPrimary}
+            >
+              I agree
+            </button>
+            {consentFailed && (
+              <p className="text-sm text-text/70">We couldn&apos;t save that. Please reload the page and try again.</p>
+            )}
+          </div>
+        )}
+        {activeError && activeError.code !== "AI_CONSENT_REQUIRED" && (
+          <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl border border-brand-line bg-brand-paper px-4 py-3">
             <p className="text-body text-text">
-              {activeError.retryable ? RETRYABLE_ERROR_MESSAGE : CONFIG_ERROR_MESSAGE}
+              {GATE_MESSAGES[activeError.code ?? ""] ?? (activeError.retryable ? RETRYABLE_ERROR_MESSAGE : CONFIG_ERROR_MESSAGE)}
             </p>
             {activeError.retryable && (
               <button
                 type="button"
                 onClick={handleRetry}
                 disabled={sendingRegion !== null}
-                className="text-label font-semibold uppercase tracking-label text-blush underline underline-offset-2 disabled:opacity-50"
+                className="inline-flex min-h-11 items-center font-semibold text-brand-forest underline underline-offset-2 disabled:opacity-50"
               >
                 Retry
               </button>
             )}
           </div>
         )}
+        </div>
+
+        <form
+          className="flex shrink-0 items-center gap-2 border-t border-brand-line py-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleSend();
+          }}
+        >
+          <input
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder={E.placeholder(areaLabel)}
+            aria-label={E.placeholder(areaLabel)}
+            // Matches ChatMessageSchema's text bound (app/api/skin-check/chat/
+            // route.ts) — caps client-side so a too-long message fails to type
+            // rather than failing at send with a 400 the UI can't usefully retry.
+            maxLength={2000}
+            disabled={sendingRegion !== null}
+            className="h-12 min-w-0 flex-1 rounded-full border border-brand-line bg-brand-paper px-4 text-base text-brand-ink disabled:opacity-60"
+          />
+          <button
+            type="submit"
+            disabled={sendingRegion !== null || !draft.trim()}
+            aria-label={E.send}
+            className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-action text-white hover:bg-brand-action-hover disabled:bg-brand-linen2 disabled:text-brand-muted"
+          >
+            <SendHorizontal aria-hidden size={20} />
+          </button>
+        </form>
       </div>
 
-      <div className="mt-4 flex shrink-0 items-center gap-2 pb-safe-bottom">
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") handleSend();
-          }}
-          placeholder={`Ask Echo about your ${ECHO_REGION_LABELS[activeRegion].toLowerCase()}...`}
-          aria-label={`Ask Echo about your ${ECHO_REGION_LABELS[activeRegion].toLowerCase()}`}
-          // Matches ChatMessageSchema's text bound (app/api/skin-check/chat/
-          // route.ts) — caps client-side so a too-long message fails to type
-          // rather than failing at send with a 400 the UI can't usefully retry.
-          maxLength={2000}
-          disabled={sendingRegion !== null}
-          className="h-12 flex-1 rounded-full border border-border bg-canvas px-4 text-sm text-text outline-none focus:border-blush/40 disabled:opacity-60"
-        />
-        <button
-          type="button"
-          onClick={handleSend}
-          disabled={sendingRegion !== null || !draft.trim()}
-          aria-label="Send"
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-text text-white transition-colors hover:bg-text/85 disabled:opacity-30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-            <path
-              d="M2 9h14M9 2l7 7-7 7"
-              stroke="currentColor"
-              strokeWidth="1.75"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      </div>
-    </div>
+      <aside aria-label={E.readingsSummary} className="hidden min-h-0 overflow-y-auto px-6 py-8 lg:block">
+        {panel}
+      </aside>
+    </main>
   );
 }

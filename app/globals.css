@@ -5,48 +5,38 @@
 @layer base {
   :root {
     /* Shadcn required variables — mapped to The Project SKIN tokens */
-    --background: 60 20% 98%;
-    --foreground: 25 8% 10%;
-    --card: 30 20% 95%;
-    --card-foreground: 25 8% 10%;
-    --popover: 60 20% 98%;
-    --popover-foreground: 25 8% 10%;
-    --primary: 150 28% 32%;       /* sage-500 */
-    --primary-foreground: 60 20% 98%;
-    --secondary: 30 20% 95%;
-    --secondary-foreground: 25 8% 10%;
-    --muted: 30 20% 95%;
-    --muted-foreground: 25 10% 40%;
-    --accent: 14 80% 55%;         /* rebel-500 */
-    --accent-foreground: 60 20% 98%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 60 20% 98%;
-    --border: 25 20% 88%;
-    --input: 25 20% 88%;
-    --ring: 150 28% 32%;
+    --background: 0 0% 100%;            /* store paper */
+    --foreground: 60 2% 17%;            /* store ink #2c2c2a */
+    --card: 0 0% 100%;                  /* white cards on the linen page */
+    --card-foreground: 60 2% 17%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 60 2% 17%;
+    --primary: 166 39% 20%;             /* live theme green #1f473e */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 43 27% 95%;
+    --secondary-foreground: 60 2% 17%;
+    --muted: 43 27% 95%;
+    --muted-foreground: 40 4% 40%;      /* store muted #6b6862 */
+    --accent: 40 21% 92%;               /* store surface-alt #eeeae5 */
+    --accent-foreground: 60 2% 17%;
+    --destructive: 4 76% 40%;           /* #b42318 */
+    --destructive-foreground: 0 0% 100%;
+    --border: 40 18% 84%;               /* store border #ddd8ce */
+    --input: 40 18% 84%;
+    --ring: 166 39% 20%;                /* live theme green #1f473e */
     --radius: 0.5rem;
 
-    /* Glassmorphism recipe — the redesigned screens' shared surface.
-       Text-heavy panels (quiz questions, consent copy) use --glass-bg-strong
-       instead of --glass-bg to keep contrast legible over the gradient. */
-    --glass-bg: rgba(255, 255, 255, 0.45);
-    --glass-bg-strong: rgba(255, 255, 255, 0.65);
-    --glass-border: rgba(255, 255, 255, 0.7);
-    --app-gradient: linear-gradient(160deg, #e1f5ee 0%, #f0f7f4 40%, #fbeaf0 100%);
-    /* Unfilled track behind score dials/gauges, drawn over the glass. */
-    --ring-track: rgba(4, 52, 44, 0.12);
   }
 
-  .dark {
-    --glass-bg: rgba(255, 255, 255, 0.08);
-    --glass-bg-strong: rgba(255, 255, 255, 0.16);
-    --glass-border: rgba(255, 255, 255, 0.15);
-    --app-gradient: linear-gradient(160deg, #04342c 0%, #0a2420 45%, #1a0e14 100%);
-    --ring-track: rgba(255, 255, 255, 0.18);
-  }
 
   * {
     @apply border-border;
+  }
+
+  /* Live site card titles: Bai Jamjuree 600, -0.01em (system.md §0). */
+  h3 {
+    font-family: var(--font-display), system-ui, sans-serif;
+    letter-spacing: -0.01em;
   }
 
   html {
@@ -56,7 +46,11 @@
   }
 
   body {
-    @apply bg-skin-base text-sage-900;
+    /* Live site body: linen page, Plus Jakarta Sans 15px weight 500, 1.5 (system.md §0). */
+    @apply bg-brand-linen text-text;
+    font-size: 15px;
+    font-weight: 500;
+    line-height: 1.5;
     /* Smooth scrolling for the whole app */
     scroll-behavior: smooth;
     /* Prevent overscroll bounce on iOS for the app shell */
@@ -78,7 +72,9 @@
     outline: none;
   }
   :focus-visible {
-    @apply outline-none ring-2 ring-sage-500 ring-offset-2;
+    /* The live theme green, 2px outline with a 2px offset (system.md §5). */
+    outline: 2px solid #1f473e;
+    outline-offset: 2px;
   }
 }
 
@@ -88,32 +84,7 @@
     @apply font-display font-medium tracking-tight;
   }
 
-  /* Card surface */
-  .card-surface {
-    @apply rounded-card bg-white shadow-card;
-  }
 
-  /* Shared gradient background for the redesigned screens (landing, quiz,
-     consent, capture, formation, dashboard, Echo tab). */
-  .app-gradient-bg {
-    background: var(--app-gradient);
-  }
-
-  /* The glassmorphism recipe — see GlassCard. Kept as a class too so screens
-     that need the look without the component wrapper (e.g. one-off panels)
-     can apply it directly. */
-  .glass-surface {
-    background: var(--glass-bg);
-    border: 0.5px solid var(--glass-border);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-  }
-  .glass-surface-strong {
-    background: var(--glass-bg-strong);
-    border: 0.5px solid var(--glass-border);
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
-  }
 
   /* Confidence badge base */
   .confidence-badge {

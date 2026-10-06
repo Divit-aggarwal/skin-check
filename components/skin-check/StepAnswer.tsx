@@ -18,14 +18,14 @@ interface StepAnswerProps {
   onChange: (value: StepAnswerValue) => void;
   onCommit: () => void;
   scan: SkinScanState;
-  onScanChange: (scan: SkinScanState) => void;
+  onScanChange: (scan: SkinScanState, forScanId?: string) => void;
   /** Whole-questionnaire context, needed by the final phone step to
       associate the finished session with the authenticated user. */
   answers: SkinCheckAnswers;
   /** Stable id for this scan attempt — the final step writes under it. */
   scanId: string;
   /** Clears the local draft once the scan is safely persisted. */
-  onSaved: () => void;
+  onSaved: (forScanId: string) => boolean;
 }
 
 export function StepAnswer({

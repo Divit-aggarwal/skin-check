@@ -76,7 +76,8 @@ export function summarizeConcerns(
 
 function summaryLineFor(ranked: BandableMetric[]): string {
   if (ranked.length === 0) {
-    return "Nothing stood out in this photo. Keep doing what you're doing.";
+    // No claim about the user's routine (red team I02, E-F5).
+    return "Nothing stood out in this photo.";
   }
   if (ranked.length === 1) {
     return `${cap(CONCERN_NOUNS[ranked[0]!])} is the one thing worth attention right now.`;

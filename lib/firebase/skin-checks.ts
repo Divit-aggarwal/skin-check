@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, type Timestamp } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, type Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import { scanImageKey } from "@/lib/s3-key";
@@ -129,9 +129,16 @@ export async function saveSkinCheck(
     // The rules deny `update`, so this is what a duplicate submission looks
     // like from the client: the scan is already saved and the second write
     // was correctly refused. Not an error the user should ever see.
+    //
+    // But every rule rejection looks the same (stale consent version, no or
+    // another user's auth), so it only counts as saved if the doc really
+    // exists. Otherwise the original error goes back up and the draft stays.
     if ((error as { code?: string })?.code === "permission-denied") {
-      console.info("[skin-check] scan already saved, duplicate write refused:", scanId);
-      return;
+      const existing = await getDoc(doc(db(), "users", uid, "skinChecks", scanId)).catch(() => null);
+      if (existing?.exists()) {
+        console.info("[skin-check] scan already saved, duplicate write refused:", scanId);
+        return;
+      }
     }
     throw error;
   }

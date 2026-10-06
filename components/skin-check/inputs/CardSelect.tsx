@@ -13,7 +13,7 @@ interface CardSelectProps {
 
 export function CardSelect({ step, value, onChange, onCommit }: CardSelectProps) {
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-2.5 sm:max-w-md">
       {step.options.map((opt) => {
         const selected = value === opt.value;
         return (
@@ -25,18 +25,18 @@ export function CardSelect({ step, value, onChange, onCommit }: CardSelectProps)
               onCommit();
             }}
             className={cn(
-              "flex items-center justify-between gap-3 rounded-lg border px-4 py-3.5 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
-              selected ? "border-blush bg-blush-soft" : "border-text/10 bg-white hover:border-blush/40"
+              "flex items-center justify-between gap-3 rounded-lg border px-4 py-3.5 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-forest focus-visible:ring-offset-2",
+              selected ? "border-brand-action bg-brand-mist" : "border-brand-line bg-white hover:border-brand-ink/40"
             )}
           >
             <span>
               <span className="block text-[0.9375rem] font-medium text-text">{opt.label}</span>
-              <span className="mt-0.5 block text-xs text-text/55">{opt.description}</span>
+              <span className="mt-0.5 block text-sm text-brand-muted">{opt.description}</span>
             </span>
             <span
               className={cn(
                 "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border",
-                selected ? "border-blush bg-blush text-white" : "border-text/20"
+                selected ? "border-brand-action bg-brand-action text-white" : "border-brand-line"
               )}
             >
               {selected && <Check className="h-3 w-3" strokeWidth={3} />}

@@ -24,6 +24,7 @@ vi.mock("@/lib/firebase/admin", async () => {
 vi.mock("@/lib/s3", () => ({
   presignOriginalUpload,
   UPLOAD_URL_TTL_SECONDS: 300,
+  MAX_ORIGINAL_BYTES: 25 * 1024 * 1024,
   S3NotConfiguredError: class S3NotConfiguredError extends Error {},
 }));
 
@@ -36,6 +37,7 @@ const SCAN_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const CONSENT = {
   imageRetentionConsent: true,
   imageRetentionConsentVersion: "skin image retention version 1",
+  contentLength: 2_000_000,
 };
 
 // The route rate-limits per client IP before it does anything else (same
@@ -113,7 +115,7 @@ describe("ownership", () => {
   it("builds the key from the DECODED uid", async () => {
     const res = await post({ scanId: SCAN_ID, ...CONSENT }, "Bearer good");
     expect(res.status).toBe(200);
-    expect(presignOriginalUpload).toHaveBeenCalledWith(`users/verified-uid/scans/${SCAN_ID}/original.jpg`);
+    expect(presignOriginalUpload).toHaveBeenCalledWith(`users/verified-uid/scans/${SCAN_ID}/original.jpg`, 2_000_000);
     expect((await res.json()).key).toBe(`users/verified-uid/scans/${SCAN_ID}/original.jpg`);
   });
 
@@ -123,7 +125,7 @@ describe("ownership", () => {
       "Bearer good"
     );
     expect(res.status).toBe(200);
-    expect(presignOriginalUpload).toHaveBeenCalledWith(`users/verified-uid/scans/${SCAN_ID}/original.jpg`);
+    expect(presignOriginalUpload).toHaveBeenCalledWith(`users/verified-uid/scans/${SCAN_ID}/original.jpg`, 2_000_000);
     expect(presignOriginalUpload.mock.calls[0]![0]).not.toContain("victim-uid");
   });
 
@@ -234,5 +236,29 @@ describe("image-retention consent (the request contract)", () => {
     const res = await post({ scanId: SCAN_ID, ...CONSENT }, "Bearer good");
     expect(res.status).toBe(200);
     expect(presignOriginalUpload).toHaveBeenCalledOnce();
+  });
+});
+
+// Second security review (H20): the URL is signed for one exact size, capped.
+describe("upload size", () => {
+  it.each([
+    ["missing", undefined, 400],
+    ["zero", 0, 400],
+    ["negative", -1, 400],
+    ["fractional", 1.5, 400],
+    ["a string", "1000", 400],
+    ["over the cap", 25 * 1024 * 1024 + 1, 413],
+  ] as const)("%s size is refused before anything is presigned", async (_name, contentLength, status) => {
+    const res = await post({ scanId: SCAN_ID, ...CONSENT, contentLength }, "Bearer good");
+    expect(res.status).toBe(status);
+    expect(presignOriginalUpload).not.toHaveBeenCalled();
+  });
+
+  it("control: a normal photo size and exactly the cap are signed for that size", async () => {
+    for (const size of [3_500_000, 25 * 1024 * 1024]) {
+      presignOriginalUpload.mockClear();
+      expect((await post({ scanId: SCAN_ID, ...CONSENT, contentLength: size }, "Bearer good")).status).toBe(200);
+      expect(presignOriginalUpload).toHaveBeenCalledWith(`users/verified-uid/scans/${SCAN_ID}/original.jpg`, size);
+    }
   });
 });

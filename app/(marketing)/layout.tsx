@@ -1,25 +1,12 @@
-import { Space_Grotesk, Inter } from "next/font/google";
 import { SkinCheckSessionProvider } from "@/lib/skin-check-session-context";
-import "./home.css";
+import { AppShell } from "@/components/shell/AppShell";
 
-const spaceGrotesk = Space_Grotesk({
-  subsets: ["latin"],
-  variable: "--font-home-display",
-  weight: ["500", "600", "700"],
-  display: "swap",
-});
-
-const inter = Inter({
-  subsets: ["latin"],
-  variable: "--font-home-body",
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
-
-export default function HomeLayout({ children }: { children: React.ReactNode }) {
+// Every page shares one shell (G03): navigation when signed in, a logo bar
+// when signed out. Fonts and colours come from the root layout (store theme).
+export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className={`skin-home ${spaceGrotesk.variable} ${inter.variable}`}>
-      <SkinCheckSessionProvider>{children}</SkinCheckSessionProvider>
-    </div>
+    <SkinCheckSessionProvider>
+      <AppShell>{children}</AppShell>
+    </SkinCheckSessionProvider>
   );
 }

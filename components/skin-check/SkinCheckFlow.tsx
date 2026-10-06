@@ -13,6 +13,7 @@ import { ProgressHeader } from "./ProgressHeader";
 import { EchoBubble } from "./EchoBubble";
 import { StepAnswer } from "./StepAnswer";
 import { SkinCheckDashboard } from "./SkinCheckDashboard";
+import { DashboardLink } from "@/components/dashboard/DashboardLink";
 
 // Section-to-section only — individual questions within a section never
 // slide, they fade in and accumulate on the growing page.
@@ -51,6 +52,9 @@ export function SkinCheckFlow() {
     direction,
     complete,
     blocked,
+    confirmingUnder18,
+    confirmUnder18,
+    lastAnswerHints,
   } = useSkinCheckFlow();
 
   // Keyed by step id so a freshly revealed question can be scrolled into
@@ -98,14 +102,14 @@ export function SkinCheckFlow() {
   // reactStrictMode on) — cleanup fires, the effect re-enters, and an
   // identical `advanceSignal` short-circuits it, so the advance silently
   // never happens. Keeping `advanceSignal` as the only dependency avoids that.
-  const latest = useRef({ isSectionComplete, complete, blocked, next });
-  latest.current = { isSectionComplete, complete, blocked, next };
+  const latest = useRef({ isSectionComplete, complete, blocked, confirmingUnder18, next });
+  latest.current = { isSectionComplete, complete, blocked, confirmingUnder18, next };
 
   useEffect(() => {
     if (advanceSignal === 0) return;
     const t = setTimeout(() => {
       const s = latest.current;
-      if (!s.complete && !s.blocked && s.isSectionComplete) s.next();
+      if (!s.complete && !s.blocked && !s.confirmingUnder18 && s.isSectionComplete) s.next();
     }, AUTO_ADVANCE_DELAY_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -116,35 +120,62 @@ export function SkinCheckFlow() {
   // restored position a tick later would be a visible flash, so hold the
   // frame — this resolves synchronously off localStorage in practice.
   if (!restored) {
-    return <div className="min-h-dvh bg-white" />;
+    return <div className="min-h-dvh bg-brand-linen" />;
   }
 
   return (
-    <div className="min-h-dvh bg-white">
-      <div ref={headerRef} className="mx-auto flex max-w-xl items-center gap-3 px-6 pt-6">
-        <button
-          type="button"
-          onClick={back}
-          disabled={isFirst}
-          aria-label="Go back"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-text/60 transition-opacity hover:text-text disabled:opacity-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
-        >
-          <ChevronLeft className="h-5 w-5" />
-        </button>
+    <div className="min-h-dvh bg-brand-linen">
+      {/* Back and the Home link share a row above the progress bar, so the bar
+          and every question start on the same edge (design review G03). */}
+      <div ref={headerRef} className={`mx-auto flex flex-col gap-2 px-4 pt-4 sm:px-6 sm:pt-6 ${complete ? "max-w-6xl lg:px-8" : "max-w-2xl"}`}>
+        <div className="flex min-h-11 items-center justify-between">
+          <button
+            type="button"
+            onClick={back}
+            disabled={isFirst}
+            aria-label="Go back"
+            className="-ml-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-brand-muted hover:bg-brand-linen hover:text-brand-ink disabled:invisible"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          {/* O-D3: the signed-in start page links to /dashboard. */}
+          {isFirst && !complete && (
+            <DashboardLink />
+          )}
+        </div>
         {!complete && (
-          <div className="flex-1">
-            <ProgressHeader
-              sectionLabels={ALL_SECTION_LABELS}
-              activeSectionIndex={sectionIndex}
-              activeSectionFill={sectionFill}
-              activeSectionLabel={section.label}
-            />
-          </div>
+          <ProgressHeader
+            sectionLabels={ALL_SECTION_LABELS}
+            activeSectionIndex={sectionIndex}
+            activeSectionFill={sectionFill}
+            activeSectionLabel={section.label}
+          />
         )}
       </div>
 
       <AnimatePresence mode="wait" initial={false} custom={direction}>
-        {blocked ? (
+        {confirmingUnder18 ? (
+          <motion.div
+            key="confirm-under-18"
+            custom={direction}
+            variants={sectionSlideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
+            className="mx-auto flex max-w-2xl flex-col gap-5 px-4 pb-10 pt-10 sm:px-6"
+          >
+            <EchoBubble message="You chose under 18. Is that right?" />
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Button type="button" variant="ink" size="lg" onClick={() => confirmUnder18(true)} className="flex-1">
+                Yes, I&apos;m under 18
+              </Button>
+              <Button type="button" variant="outlineLight" size="lg" onClick={() => confirmUnder18(false)} className="flex-1">
+                No, change my answer
+              </Button>
+            </div>
+          </motion.div>
+        ) : blocked ? (
           <motion.div
             key="blocked"
             custom={direction}
@@ -153,9 +184,14 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto max-w-xl px-6 pb-10 pt-10"
+            className="mx-auto max-w-2xl px-4 pb-10 pt-10 sm:px-6"
           >
-            <EchoBubble message="This experience isn't available yet for users under 18. If that's not right, tap back to change your answer." />
+            <div role="status" className="flex flex-col items-start gap-4 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
+              <p>This experience isn&apos;t available yet for users under 18. If that&apos;s not right, change your answer.</p>
+              <Button type="button" variant="ink" size="lg" onClick={back}>
+                Change my answer
+              </Button>
+            </div>
           </motion.div>
         ) : complete ? (
           <motion.div
@@ -166,35 +202,29 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto max-w-5xl px-6 pb-16 pt-6 sm:px-10"
+            className="mx-auto max-w-6xl px-4 pb-16 pt-6 sm:px-6 lg:px-8"
           >
             <div className="flex flex-col gap-10">
-              <div className="flex flex-col gap-3 text-center">
-                <p className="text-label font-semibold uppercase tracking-label text-blush">
-                  Your Results
-                </p>
-                <h1 className="font-display text-4xl italic leading-tight text-text sm:text-5xl">
-                  Your skin, understood.
-                </h1>
-                <p className="mx-auto max-w-md text-body text-text/70">
-                  {formatPrompt("Thanks, {name} — here's a visual reading of your skin, based on your scan.", answers)}
+              <div className="flex flex-col gap-3">
+                <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">Your check</p>
+                <h1 className="font-display text-[30px] font-semibold leading-[1.15] tracking-[-0.025em] text-brand-title sm:text-[40px]">Your photo reading</h1>
+                <p className="max-w-prose text-brand-muted">
+                  {formatPrompt("Thanks, {name}. Here is how each area of your face showed up in this one photo.", answers)}
                 </p>
               </div>
-              <SkinCheckDashboard scan={scan} scanId={scanId} onScanChange={setScan} answers={answers} />
+              <SkinCheckDashboard scan={scan} scanId={scanId} onScanChange={setScan} onRetake={startNewScan} answers={answers} />
 
-              {/* The storage model has always allowed many scans per user
-                  (each is its own document); without this there was simply
-                  no way to start the next one without a hard reload.
-                  The /account link is the only in-app route to a returning
-                  user's saved scans — without it that page is reachable by
-                  typing the URL and nothing else. */}
-              <div className="mx-auto flex w-full max-w-md flex-col gap-3 sm:flex-row">
-                <Button type="button" variant="ink" size="lg" onClick={startNewScan} className="flex-1">
-                  Take a new scan
+              {/* A new check starts here without a reload; every past check is on
+                  /checks (one history list, TD-25 (6)); Home is one tap away. */}
+              <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+                <Button type="button" variant="ink" size="lg" onClick={startNewScan}>
+                  Take a new check
                 </Button>
-                <Button asChild variant="outlineLight" size="lg" className="flex-1">
-                  <Link href="/account">Your previous scans</Link>
+                <Button asChild variant="outlineLight" size="lg">
+                  <Link href="/checks">All your checks</Link>
                 </Button>
+                {/* O-D3: the results screen links to /dashboard. */}
+                <DashboardLink />
               </div>
             </div>
           </motion.div>
@@ -207,7 +237,7 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto flex max-w-xl flex-col gap-10 px-6 pb-10 pt-10"
+            className="mx-auto flex max-w-2xl flex-col gap-10 px-4 pb-10 pt-10 sm:px-6"
           >
             {visibleSteps.map((step) => (
               <motion.div
@@ -222,6 +252,11 @@ export function SkinCheckFlow() {
                 className="flex flex-col gap-5"
               >
                 <EchoBubble message={formatPrompt(step.prompt, answers)} />
+                {/* R9, decision 10a: re-confirmed steps start blank; last time's
+                    answer is shown, never filled in. Only those steps have a hint. */}
+                {lastAnswerHints[step.id] && (
+                  <p className="text-sm text-brand-muted">{lastAnswerHints[step.id]}</p>
+                )}
                 <StepAnswer
                   step={step}
                   value={answers[step.id] ?? defaultAnswerFor(step)}

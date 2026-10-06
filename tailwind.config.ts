@@ -2,6 +2,8 @@ import type { Config } from "tailwindcss";
 
 const config: Config = {
   darkMode: ["class"],
+  // A hover tint must not stick after a tap on touch screens (design review G03 part 5).
+  future: { hoverOnlyWhenSupported: true },
   content: [
     "./pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
@@ -49,7 +51,7 @@ const config: Config = {
         },
         // Backgrounds
         skin: {
-          base: "#FAFAF8",       // warm white — page background
+          base: "#FFFFFF",       // store --color-paper — page background
           muted: "#F2EDE8",      // warm off-white — card backgrounds
           border: "#E8E0D8",     // warm border
         },
@@ -119,24 +121,57 @@ const config: Config = {
         // (AUDIT.md S0-2). Values match the raw hex already used ad hoc
         // for the same roles elsewhere in this feature (EchoPage.tsx,
         // SkinCheckFlow.tsx, the inputs/* components), not a new palette.
-        canvas:  "#FAF4EF",  // warm off-white panel background
-        surface: "#FFFFFF",  // card/photo-frame background
-        text:    "#1A1A1A",  // primary text
+        // G03 (docs/design/system.md): mapped to the Shopify store theme, so
+        // every screen that already uses these names takes the store's look.
+        canvas:  "#F5F3EE",  // store --color-linen (the page; cards are white, system.md §0)
+        surface: "#FFFFFF",  // store --color-paper
+        text:    "#2C2C2A",  // store --color-ink
 
         // Restrained accent for the Skin Check quiz + results redesign
         // (PART 4 of the redesign brief) — small selected-state touches
         // only (a filled chip, an underline), never a large fill. Not the
         // same as `rebel`/`confidence` above, which belong to the older
         // marketing-home palette this feature no longer draws from.
+        // G03: the old mauve accent now maps to the store's forest/mist, the
+        // one accent that passes contrast for text (system.md §2).
+        // G03 part 1 (2026-10-06): the live site's theme green #1f473e.
         blush: {
-          DEFAULT: "#9C6B76",
-          soft: "#F4E8E6",
+          DEFAULT: "#1F473E",
+          soft: "#E4E9E8",
+        },
+        // The store theme by role (docs/design/system.md §0-2; sources:
+        // docs/design/brand-source-root.css and the computed styles read from
+        // the live site, docs/design/live-styles-2026-10-06.json). `error` is
+        // the one value not from the store.
+        brand: {
+          paper: "#FFFFFF",
+          linen: "#F5F3EE",
+          linen2: "#EEEAE5",
+          line: "#DDD8CE",
+          ink: "#2C2C2A",
+          muted: "#6B6862",
+          // Live site: theme-color and the main pill button (.ps-button) are #1f473e.
+          action: "#1F473E",
+          "action-hover": "#17362F",
+          forest: "#1F473E",
+          // #1f473e at 12% on white: the live site's rgba(31,71,62,.12) lines.
+          mist: "#E4E9E8",
+          // Live small uppercase labels (eyebrows, actives) keep the older green.
+          eyebrow: "#0F6E56",
+          // Live section titles and product card borders.
+          title: "#111111",
+          "card-line": "#ECE8E1",
+          accent: "#B98783",
+          "accent-soft": "#F3E9E7",
+          taupe: "#B7A58F",
+          error: "#B42318",
         },
       },
 
       // ─── Typography ────────────────────────────────────────────────
       fontFamily: {
-        display: ["var(--font-fraunces)", "Georgia", "serif"],
+        // Store theme: Bai Jamjuree headings, Plus Jakarta Sans body (system.md §3).
+        display: ["var(--font-display)", "system-ui", "sans-serif"],
         body:    ["var(--font-jakarta)", "system-ui", "sans-serif"],
         mono:    ["var(--font-mono)", "monospace"],
       },

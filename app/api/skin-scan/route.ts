@@ -1,7 +1,20 @@
+import { createHash, randomUUID } from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
+import { FieldValue } from "firebase-admin/firestore";
 import { checkRequestRate, consumeDailyQuota, SKIN_SCAN_ROUTE_LIMITS } from "@/lib/rate-limit";
-import { AdminNotConfiguredError, bearerToken, verifyFirebaseIdToken } from "@/lib/firebase/admin";
-import { SkinScanResultSchema } from "@/types/skin-scan";
+import { AdminNotConfiguredError, adminDb, bearerToken, verifyFirebaseIdToken } from "@/lib/firebase/admin";
+import { isValidScanId } from "@/lib/s3-key";
+import { appendConsent, scanAgeGate, withLedgerTimeout } from "@/app/api/account/_ledger";
+import { PROCESSING_CONSENT_COPY, PROCESSING_CONSENT_VERSION } from "@/lib/consent";
+import {
+  buildScanAnalysisRecord,
+  MAX_RECORD_BYTES,
+  recordByteSize,
+  scanAnalysisDocId,
+} from "@/lib/scan-analysis-record";
+import { SkinScanResultSchema, type CaptureMethod, type SkinScanResult } from "@/types/skin-scan";
+import { parseCaptureQuality } from "@/lib/capture-quality/schema";
+import type { CaptureQuality } from "@/lib/capture-quality/types";
 
 // firebase-admin needs Node APIs and hard-fails on the Edge runtime. This is
 // already the App Router default; stated explicitly so a future edge opt-in
@@ -10,6 +23,9 @@ export const runtime = "nodejs";
 
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const UPSTREAM_TIMEOUT_MS = 30_000;
+// Hard ceiling on the C2 analysis write (both attempts together). The scan
+// result is already in hand; a hung Firestore must never hold it hostage.
+const PERSIST_TIMEOUT_MS = 3_000;
 
 // Matches SkinScanScoresSchema's 7 categories (types/skin-scan.ts). Allowlist,
 // not passthrough — the value lands in an upstream query string, and
@@ -76,15 +92,13 @@ export async function POST(request: NextRequest) {
     return unauthorized();
   }
 
+  let uid: string;
   try {
     // The ONLY source of identity for this request. There is no uid in the
     // body, the query, or any other header, and if one were ever added it
-    // would be client-asserted data, never this.
-    //
-    // The returned uid is deliberately not bound to a local: nothing in this
-    // route consumes an identity yet (FastAPI neither expects nor uses one).
-    // Phase 3 is what starts reading it — see verifyFirebaseIdToken.
-    await verifyFirebaseIdToken(token);
+    // would be client-asserted data, never this. C2 uses it for exactly one
+    // thing: the users/{uid}/scanAnalyses path of the server-written record.
+    uid = await verifyFirebaseIdToken(token);
   } catch (err) {
     if (err instanceof AdminNotConfiguredError) {
       // Names of unset env vars only — never a credential value.
@@ -103,6 +117,14 @@ export async function POST(request: NextRequest) {
     );
     return unauthorized();
   }
+
+  // ── lane:privacy (H02a, D-19) ── preamble only. An under-18 record is
+  // refused before the image is read or the engine called (the D-03a
+  // exception the owner approved). No record, or an unreadable ledger, goes
+  // ahead (decision 3a, D-03).
+  const ageRefusal = await scanAgeGate(uid, "skin-scan");
+  if (ageRefusal) return ageRefusal;
+  // ── end lane:privacy ──
 
   let formData: FormData;
   try {
@@ -148,10 +170,12 @@ export async function POST(request: NextRequest) {
   const timeoutId = setTimeout(() => controller.abort(), UPSTREAM_TIMEOUT_MS);
 
   // No overlay requested means no overlay returned — the cheapest path, not
-  // the most expensive one.
-  const scanUrl = overlay
-    ? `${SKIN_SCAN_API_URL}/scan?overlays=${encodeURIComponent(overlay)}`
-    : `${SKIN_SCAN_API_URL}/scan`;
+  // the most expensive one. stats=both (D-07, gate 04) adds the uncorrected
+  // "native" colour statistics the measurement-validation protocol needs;
+  // every corrected field the UI reads is unchanged by it.
+  const query = new URLSearchParams({ stats: "both" });
+  if (overlay) query.set("overlays", overlay);
+  const scanUrl = `${SKIN_SCAN_API_URL}/scan?${query}`;
 
   let upstreamResponse: Response;
   try {
@@ -359,5 +383,104 @@ export async function POST(request: NextRequest) {
     console.warn("skin-scan response fields dropped by schema:", droppedKeys);
   }
 
-  return NextResponse.json({ ok: true, result: parsed.data });
+  // C2: persist the full analysis (incl. region_raw/region_hist, which the
+  // client-side skinChecks write drops) — only when the client names the
+  // scan. No scanId (old bundles) → response is byte-identical to before.
+  const scanId = formData.get("scanId");
+  if (!isValidScanId(scanId)) {
+    return NextResponse.json({ ok: true, result: parsed.data });
+  }
+  const capture = formData.get("captureMethod");
+  const captureMethod: CaptureMethod | undefined =
+    capture === "native" || capture === "canvas" ? capture : undefined;
+  const persistAttempt = formData.get("persistAttempt") === "recovery" ? "recovery" : undefined;
+  // C01, client-asserted: an invalid value is dropped, never a reason to refuse the scan.
+  const captureQuality = parseCaptureQuality(formData.get("captureQuality"), captureMethod);
+  // R4 (D-16, D-03a): without the current processing-consent version the user
+  // still gets the result, but no analysis record is written.
+  if (formData.get("processingConsentVersion") !== PROCESSING_CONSENT_VERSION) {
+    return NextResponse.json({ ok: true, result: parsed.data, persisted: false, reason: "consent_missing" });
+  }
+  // Also on the recovery re-send: persistAttempt is client-asserted, so skipping
+  // here would let a record exist with no entry. A duplicate entry is harmless.
+  await recordProcessingConsent(uid, scanId);
+  const persisted = await persistScanAnalysis(uid, scanId, image, parsed.data, captureMethod, persistAttempt, captureQuality);
+  return NextResponse.json({ ok: true, result: parsed.data, persisted });
+}
+
+/** Best-effort (D-03): a failed ledger write is logged and the scan goes on. */
+async function recordProcessingConsent(uid: string, scanId: string): Promise<void> {
+  try {
+    await withLedgerTimeout(
+      appendConsent(uid, {
+        purpose: "processing",
+        granted: true,
+        version: PROCESSING_CONSENT_VERSION,
+        copy: PROCESSING_CONSENT_COPY,
+        scanId,
+        source: "scan",
+      })
+    );
+  } catch (err) {
+    // Name and code only: Firestore messages embed the doc path (the uid).
+    console.error("skin-scan: processing consent not recorded:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
+  }
+}
+
+const isAlreadyExists = (err: unknown) => {
+  const code = (err as { code?: unknown })?.code;
+  return code === 6 || code === "already-exists";
+};
+
+/**
+ * Writes users/{uid}/scanAnalyses/{scanId}_{sha16} with `.create()` — never
+ * an update. Same bytes → same doc (ALREADY_EXISTS is success); a retake
+ * under a reused scanId → a different doc. Never throws: any failure is
+ * `false`, and the user's scan proceeds regardless.
+ */
+async function persistScanAnalysis(
+  uid: string,
+  scanId: string,
+  image: Blob,
+  result: SkinScanResult,
+  captureMethod: CaptureMethod | undefined,
+  persistAttempt: "recovery" | undefined,
+  captureQuality: CaptureQuality | undefined
+): Promise<boolean> {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const inputSha256 = createHash("sha256").update(Buffer.from(await image.arrayBuffer())).digest("hex");
+    // Only reached after the route checked this exact version (R4 above).
+    const record = buildScanAnalysisRecord(result, { scanId, inputSha256, requestId: randomUUID(), captureMethod, persistAttempt, captureQuality, processingConsentVersion: PROCESSING_CONSENT_VERSION });
+    const bytes = recordByteSize(record);
+    if (bytes > MAX_RECORD_BYTES) {
+      console.error(`skin-scan: analysis record too large (${bytes} bytes) — not persisted.`);
+      return false;
+    }
+    const ref = adminDb().collection("users").doc(uid).collection("scanAnalyses").doc(scanAnalysisDocId(scanId, inputSha256));
+    const data = { ...record, createdAt: FieldValue.serverTimestamp() };
+
+    const write = async () => {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          await ref.create(data);
+          return true;
+        } catch (err) {
+          if (isAlreadyExists(err)) return true;
+          if (attempt >= 1) throw err;
+        }
+      }
+    };
+    const timeout = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => reject(new Error("persist timeout")), PERSIST_TIMEOUT_MS);
+    });
+    return await Promise.race([write(), timeout]);
+  } catch (err) {
+    // name/code only: Firestore messages embed the doc path, i.e. the uid.
+    const e = err as { name?: string; code?: unknown };
+    console.error("skin-scan: analysis record not persisted:", e?.name ?? "unknown", e?.code ?? "");
+    return false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }

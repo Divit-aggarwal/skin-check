@@ -1,16 +1,20 @@
 import { z } from "zod";
+import type { CaptureQuality, RetakeReason } from "@/lib/capture-quality/types";
 
 // Matches the skin-scan service's POST /scan response exactly — the 7th key
 // is `pigment`, not `pigmentation`. Do not rename to match Gemini's vision
 // category naming (types/gemini.ts) — these are separate services.
+// Scores are per-image-relative floats in [0, 1] (MEASUREMENT_VALIDATION_STATUS).
+// Anything else is not a reading (red team I02, area A: 1e308 and -5 were banded).
+const score = z.number().finite().min(0).max(1);
 export const SkinScanScoresSchema = z.object({
-  redness: z.number(),
-  oiliness: z.number(),
-  texture: z.number(),
-  pores: z.number(),
-  blemishes: z.number(),
-  hydration: z.number(),
-  pigment: z.number(),
+  redness: score,
+  oiliness: score,
+  texture: score,
+  pores: score,
+  blemishes: score,
+  hydration: score,
+  pigment: score,
 });
 
 // The service only fills these in when the request passes ?overlays= — by
@@ -146,8 +150,16 @@ export type CaptureMethod = "native" | "canvas";
 // (lib/consent.ts); its absence is what stops the upload from happening at
 // all, and it is never carried over from another scan or restored from a
 // draft.
+//
+// `quality` is the on-device capture gate result for `photo` (C01). It is
+// client-asserted (D-26): shown and stored for provenance, never used for
+// comparability. `retakeReason` is set when the engine refused the photo for
+// a reason a retake can fix (lib/capture-quality/retake.ts).
+// `processingConsentVersion` (D-16, R3) is the processing consent this photo
+// was analyzed under; the scan route writes no analysis record without it. It
+// is not draft-persisted, so a restored scan's retry is not recorded (fails closed).
 export type SkinScanState =
   | { status: "idle" }
   | { status: "loading" }
-  | { status: "success"; result: SkinScanResult; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined }
-  | { status: "error"; message: string; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined };
+  | { status: "success"; result: SkinScanResult; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined; processingConsentVersion?: string | undefined }
+  | { status: "error"; message: string; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined; retakeReason?: RetakeReason | undefined; processingConsentVersion?: string | undefined };

@@ -10,8 +10,30 @@ service cloud.firestore {
     // A user owns exactly their own profile doc and nothing else. No list
     // rule — phone numbers must not be enumerable, and nothing in the app
     // queries the collection.
+    // H04 (TD-19): after an erase, erasedAccounts/{uid} exists until the
+    // sweep. An ID token issued before the erase still verifies here (rules
+    // do not check revocation), so every client write for that uid is refused
+    // while the marker exists. erasedAccounts itself is unmatched: no client
+    // can read or write it.
+    function notErased(uid) {
+      return !exists(/databases/$(database)/documents/erasedAccounts/$(uid));
+    }
+
+    // H24 (owner TD-20): under18Accounts/{uid} is written by the attestation
+    // route with an under-18 answer. The server already refuses scan, upload
+    // and chat; this stops a modified client storing a minor's questionnaire.
+    // Unmatched below: no client can read or write the marker.
+    function notUnder18(uid) {
+      return !exists(/databases/$(database)/documents/under18Accounts/$(uid));
+    }
+
     match /users/{uid} {
-      allow get, create, update: if request.auth != null && request.auth.uid == uid;
+      allow get: if request.auth != null && request.auth.uid == uid;
+      // Red team (I02, area A F8): the profile holds exactly what the app
+      // writes (lib/auth-context.tsx), and the phone number is the token's own.
+      allow create, update: if request.auth != null && request.auth.uid == uid && notErased(uid)
+                            && request.resource.data.keys().hasOnly(['phoneNumber', 'lastSeenAt'])
+                            && request.resource.data.phoneNumber == request.auth.token.phone_number;
       allow delete: if false;
 
       // Completed Skin Check questionnaires. This is the whole server-side
@@ -22,17 +44,34 @@ service cloud.firestore {
       match /skinChecks/{checkId} {
         allow get, list: if request.auth != null && request.auth.uid == uid;
         allow create: if request.auth != null && request.auth.uid == uid
+                      && notErased(uid)
+                      && notUnder18(uid)
+                      // Red team (I02, area A F5): the date is the server's and the
+                      // record names its own check, so a forged future date cannot pin
+                      // itself at the top of the history.
+                      && request.resource.data.createdAt == request.time
+                      && request.resource.data.get('scanId', checkId) == checkId
+                      && imageStoredIsBool()
                       && imageKeyIsOwn(uid, checkId)
                       && storedImageHasConsent();
         allow update, delete: if false;
       }
 
+      // C2. Full analysis records, written ONLY by /api/skin-scan through the
+      // Admin SDK (which bypasses these rules). The owner may read; no client
+      // may ever create, change, or delete one.
+      match /scanAnalyses/{id} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+
       // PHASE 3 consent gate. A record may only claim that the original image
       // is stored if it also carries image-retention consent at the current
-      // version. The presign route asks the client for the same flag, but that
-      // is a client assertion — THIS is the check a tampered client cannot get
-      // past, and it is what keeps a stored object from being recorded as
-      // consented-to when it was not.
+      // version. Both fields are in the same client-written record, so this
+      // only stops the app's own flow from recording a stored image without
+      // consent; a tampered client can write both (red team I02, area C F6).
+      // The authoritative record is the image_retention ledger entry the
+      // presign route writes on the server.
       //
       // Nothing is asserted about the timestamp: serverTimestamp() resolves
       // after evaluation, and a client clock would be no evidence anyway.
@@ -52,12 +91,50 @@ service cloud.firestore {
       // user's key inside its own document — this makes that write fail
       // instead of relying on the client to be honest. A record that claims
       // nothing is stored (or no image at all) is unconstrained.
+      // Red team (I02, area A F7): "stored" is a boolean or absent; a string
+      // "true" would slip past the key and consent checks below.
+      function imageStoredIsBool() {
+        let img = request.resource.data.get('image', null);
+        return img == null || !('stored' in img) || img.stored is bool;
+      }
+
       function imageKeyIsOwn(uid, checkId) {
         let img = request.resource.data.get('image', null);
         return img == null
                || img.get('stored', false) != true
                || img.get('key', '') == 'users/' + uid + '/scans/' + checkId + '/original.jpg';
       }
+
+      // ── lane:routine ──
+      // E03 routine events (docs/lanes/routine-design.md, R-6 A). Written ONLY
+      // by /api/routine/events through the Admin SDK, which bypasses these
+      // rules; the route builds the path from the verified uid and creates,
+      // never updates. The owner may read; no client may create, change or
+      // delete an event, so the history is append-only.
+      match /routineEvents/{eventId} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+      // ── end lane:routine ──
+      // ── lane:privacy ──
+      // D-16 consent ledger. Written ONLY by the server through the Admin SDK
+      // (app/api/account/_ledger.ts), which bypasses these rules. The owner
+      // may read their own entries; no client may create, change or delete one.
+      match /consentLedger/{entryId} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+      // ── end lane:privacy ──
+      // ── lane:context ──
+      // D-15 chat turns (docs/lanes/context-design.md §3.8). Written ONLY by
+      // the chat route through the Admin SDK, which bypasses these rules. The
+      // owner may read their own turns; no client may create, change or
+      // delete one, so stored history cannot be forged.
+      match /chatTurns/{turnId} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+      // ── end lane:context ──
     }
   }
 }

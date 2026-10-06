@@ -149,27 +149,27 @@ export const SECTIONS: SectionConfig[] = [
           {
             value: "small_bumps",
             label: "Small bumps or clogged pores",
-            imagePlaceholder: "Macro texture — small bumps/clogged pores",
+            image: { src: "/quiz/breakout-small-bumps.svg", alt: "Small raised bumps and blocked pores on the skin surface." },
           },
           {
             value: "red_inflamed",
             label: "Red or inflamed pimples",
-            imagePlaceholder: "Macro texture — red/inflamed pimples",
+            image: { src: "/quiz/breakout-red-inflamed.svg", alt: "Raised bumps, each with a swollen ring around it." },
           },
           {
             value: "deep_painful",
             label: "Deep or painful breakouts",
-            imagePlaceholder: "Macro texture — deep/painful breakouts",
+            image: { src: "/quiz/breakout-deep-painful.svg", alt: "Seen from the side: a large bump deep under the skin surface." },
           },
           {
             value: "leaves_dark_marks",
             label: "Breakouts that leave dark marks",
-            imagePlaceholder: "Macro texture — dark marks",
+            image: { src: "/quiz/breakout-dark-marks.svg", alt: "Flat darker marks left on the skin." },
           },
           {
             value: "leaves_scars",
             label: "Breakouts that leave scars or indentations",
-            imagePlaceholder: "Macro texture — scars/indentations",
+            image: { src: "/quiz/breakout-scars.svg", alt: "Seen from the side: small dips in the skin surface." },
           },
         ],
       },

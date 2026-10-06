@@ -2,6 +2,7 @@
 
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanResult } from "@/types/skin-scan";
+import type { CaptureQuality } from "@/lib/capture-quality/types";
 
 // Anonymous, pre-authentication draft storage for an in-progress Skin Check.
 //
@@ -124,6 +125,16 @@ export interface DraftScan {
   /** null while the CV call is still in flight or failed. */
   result: SkinScanResult | null;
   captureMethod: CaptureMethod;
+  /**
+   * Restored onto the scan so a resumed draft's record says what actually
+   * happened to the original (D11). Always written together: a stored:true
+   * record without the matching consent version is refused by the rules.
+   * Optional because drafts written before these fields existed lack them.
+   */
+  originalStored?: boolean | undefined;
+  retentionConsentVersion?: string | undefined;
+  /** The capture gate result for `photo` (C01). Absent on older drafts. */
+  quality?: CaptureQuality | undefined;
 }
 
 function openDb(): Promise<IDBDatabase | null> {

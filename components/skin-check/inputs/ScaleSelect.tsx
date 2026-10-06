@@ -28,10 +28,10 @@ export function ScaleSelect({ step, value, onChange, onCommit }: ScaleSelectProp
                   onCommit();
                 }}
                 className={cn(
-                  "flex h-11 w-11 items-center justify-center rounded-full border text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
+                  "flex h-11 w-11 items-center justify-center rounded-full border text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-forest focus-visible:ring-offset-2",
                   selected
-                    ? "border-blush bg-blush text-white"
-                    : "border-text/10 bg-white text-text hover:border-blush/40"
+                    ? "border-brand-action bg-brand-action text-white"
+                    : "border-brand-line bg-white text-text hover:border-brand-ink/40"
                 )}
               >
                 {level}
@@ -39,12 +39,12 @@ export function ScaleSelect({ step, value, onChange, onCommit }: ScaleSelectProp
             );
           })}
         </div>
-        <div className="flex justify-between text-[0.6875rem] font-medium uppercase tracking-wide text-text/45">
+        <div className="flex justify-between text-xs font-bold uppercase tracking-[0.08em] text-brand-muted">
           <span>{step.minLabel}</span>
           <span>{step.maxLabel}</span>
         </div>
       </div>
-      {value && <p className="max-w-sm text-xs text-text/55">{step.reflections[value]}</p>}
+      {value && <p className="max-w-sm text-sm text-brand-muted">{step.reflections[value]}</p>}
     </div>
   );
 }

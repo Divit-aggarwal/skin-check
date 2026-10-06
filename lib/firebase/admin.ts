@@ -1,5 +1,7 @@
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import type { Auth, DecodedIdToken } from "firebase-admin/auth";
 
 // SERVER ONLY. This module holds the service-account credential that can mint
 // and inspect tokens for the whole Firebase project — the exact opposite of
@@ -47,9 +49,25 @@ export class AdminNotConfiguredError extends Error {
 // getApps() keeps repeat calls and dev fast-refresh on one instance.
 const APP_NAME = "admin";
 
+export function usesEmulators(): boolean {
+  return (
+    process.env.NODE_ENV !== "production" &&
+    !!process.env.FIREBASE_AUTH_EMULATOR_HOST &&
+    !!process.env.FIRESTORE_EMULATOR_HOST
+  );
+}
+
 function adminApp(): App {
   const existing = getApps().find((app) => app.name === APP_NAME);
   if (existing) return existing;
+
+  // Local stack only (npm run dev:local): both emulators set, never in
+  // production. firebase-admin then talks to the emulators and needs no
+  // credential; production keeps the fail-closed path below.
+  if (usesEmulators()) {
+    if (!PROJECT_ID) throw new AdminNotConfiguredError(["FIREBASE_PROJECT_ID (or NEXT_PUBLIC_FIREBASE_PROJECT_ID)"]);
+    return initializeApp({ projectId: PROJECT_ID }, APP_NAME);
+  }
 
   const missing: string[] = [];
   if (!PROJECT_ID) missing.push("FIREBASE_PROJECT_ID (or NEXT_PUBLIC_FIREBASE_PROJECT_ID)");
@@ -76,6 +94,16 @@ function adminApp(): App {
 }
 
 /**
+ * Admin Firestore for server-written records (C2: users/{uid}/scanAnalyses).
+ * Same lazy app and same AdminNotConfiguredError as token verification.
+ * Bypasses firestore.rules entirely — every path it writes must be built
+ * from a VERIFIED uid, never one read from the request.
+ */
+export function adminDb(): Firestore {
+  return getFirestore(adminApp());
+}
+
+/**
  * Verifies a Firebase ID token and returns the uid it was issued for.
  *
  * The uid comes out of the token's verified signature, so it cannot be
@@ -92,6 +120,11 @@ function adminApp(): App {
  * inspecting why; the reason stays server-side.
  */
 export async function verifyFirebaseIdToken(idToken: string): Promise<string> {
+  // With FIREBASE_AUTH_EMULATOR_HOST set, firebase-admin accepts UNSIGNED
+  // tokens. Never in a production build: fail closed as misconfigured.
+  if (process.env.NODE_ENV === "production" && process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+    throw new AdminNotConfiguredError(["FIREBASE_AUTH_EMULATOR_HOST must be unset in production"]);
+  }
   const decoded = await getAuth(adminApp()).verifyIdToken(idToken, true);
   return decoded.uid;
 }
@@ -105,4 +138,30 @@ export function bearerToken(header: string | null): string | null {
   if (!header) return null;
   const match = /^Bearer\s+(\S+)$/i.exec(header.trim());
   return match ? match[1]! : null;
+}
+
+// ─── Privacy lane (H01b erasure), owner decision 12 / R2: add-only ──────────
+// The two functions below are new. Nothing above was changed.
+
+/**
+ * Admin Auth for server-side account operations (H01b erasure: revoke
+ * sessions, delete the user). Same lazy app and AdminNotConfiguredError as
+ * everything else here. Every uid passed to it must come from a VERIFIED token.
+ */
+export function adminAuth(): Auth {
+  return getAuth(adminApp());
+}
+
+/**
+ * Like verifyFirebaseIdToken, but returns the whole decoded token, so a route
+ * can read `auth_time` (the erase route requires a recent sign-in). Repeats
+ * the same production-emulator guard and `checkRevoked: true` on purpose,
+ * rather than refactoring verifyFirebaseIdToken to call this: that function
+ * stays byte-identical.
+ */
+export async function verifyFirebaseIdTokenClaims(idToken: string): Promise<DecodedIdToken> {
+  if (process.env.NODE_ENV === "production" && process.env.FIREBASE_AUTH_EMULATOR_HOST) {
+    throw new AdminNotConfiguredError(["FIREBASE_AUTH_EMULATOR_HOST must be unset in production"]);
+  }
+  return getAuth(adminApp()).verifyIdToken(idToken, true);
 }

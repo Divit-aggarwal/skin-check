@@ -2,9 +2,11 @@ import { z } from "zod";
 import { getIdToken } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
+import { MAX_ORIGINAL_BYTES } from "@/lib/s3-key";
 import { SkinScanResultSchema } from "@/types/skin-scan";
-import type { SkinScanResult, SkinScanScores } from "@/types/skin-scan";
-import type { SkinCheckAnswers } from "@/types/skin-check";
+import type { CaptureMethod, SkinScanResult } from "@/types/skin-scan";
+import type { CaptureQuality } from "@/lib/capture-quality/types";
+import type { EchoRegion } from "@/lib/echo-regions";
 
 class ApiError extends Error {
   constructor(
@@ -24,7 +26,18 @@ class ApiError extends Error {
 const SkinScanResponseSchema = z.object({
   ok: z.literal(true),
   result: SkinScanResultSchema,
+  // C2: whether the server wrote users/{uid}/scanAnalyses. Absent when no
+  // scanId was sent (or from an older route) — unknown, treated as fine.
+  persisted: z.boolean().optional(),
+  // R4: persisted:false because the processing consent was missing. Not a
+  // write failure, so the recovery re-send would only be refused again.
+  reason: z.literal("consent_missing").optional(),
 });
+
+// Delay before the one background re-request after persisted:false — long
+// enough for a transient Firestore blip to clear, short enough that the tab
+// is very likely still open.
+const PERSIST_RETRY_DELAY_MS = 5_000;
 
 // Above the server route's own 30s upstream timeout (app/api/skin-scan/route.ts)
 // on purpose — that route always resolves (success, or a clean 502/504) within
@@ -61,8 +74,21 @@ async function freshIdToken(): Promise<string> {
 
 export async function getSkinScanResult(
   photo: Blob,
-  overlay?: string | string[] | null
+  overlay?: string | string[] | null,
+  scanId?: string
 ): Promise<SkinScanResult> {
+  return (await requestSkinScan(photo, overlay, scanId)).result;
+}
+
+async function requestSkinScan(
+  photo: Blob,
+  overlay: string | string[] | null | undefined,
+  scanId: string | undefined,
+  captureMethod?: CaptureMethod,
+  persistAttempt?: "recovery",
+  captureQuality?: CaptureQuality,
+  processingConsentVersion?: string
+): Promise<{ result: SkinScanResult; persisted?: boolean | undefined; reason?: "consent_missing" | undefined }> {
   // PHASE 1 fast path — a signed-out caller is stopped before a request is
   // even built. Every route that can put a facial image on the wire funnels
   // through here.
@@ -76,6 +102,18 @@ export async function getSkinScanResult(
   // per category.
   const overlayParam = Array.isArray(overlay) ? overlay.join(",") : overlay;
   if (overlayParam) formData.append("overlay", overlayParam);
+  // C2: lets the server persist the full analysis under this scan. Optional
+  // — without it the route analyzes exactly as before and writes nothing.
+  if (scanId) formData.append("scanId", scanId);
+  // Which capture branch produced `photo` (PhotoCapture), for the server's
+  // analysis record. Absent only from callers that have no capture.
+  if (captureMethod) formData.append("captureMethod", captureMethod);
+  if (persistAttempt) formData.append("persistAttempt", persistAttempt);
+  // C01 capture gate result for `photo`, client-asserted; the route validates or drops it.
+  if (captureQuality) formData.append("captureQuality", JSON.stringify(captureQuality));
+  // R3/R4 (D-16): the processing consent this photo was taken under. Without
+  // it the route still analyzes but writes no analysis record.
+  if (processingConsentVersion) formData.append("processingConsentVersion", processingConsentVersion);
 
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), SKIN_SCAN_CLIENT_TIMEOUT_MS);
@@ -106,7 +144,14 @@ export async function getSkinScanResult(
     if (response.status === 401) {
       throw new ApiError(401, "Your session expired. Please verify your phone number again.", "auth/required");
     }
-    throw new ApiError(response.status, "Failed to analyze photo.");
+    // The route's own error `code` (e.g. NO_FACE_DETECTED) is passed through
+    // so the capture step can name a retake reason (owner O-5). Same status
+    // and message as before. The client-only codes are never taken from the
+    // server, so isAuthError / isUploadError keep their meaning.
+    const body: unknown = await response.json().catch(() => null);
+    const code = body && typeof body === "object" ? (body as { code?: unknown }).code : undefined;
+    const passThrough = typeof code === "string" && code !== "auth/required" && code !== "upload/failed" ? code : undefined;
+    throw new ApiError(response.status, "Failed to analyze photo.", passThrough);
   }
 
   const parsed = SkinScanResponseSchema.safeParse(await response.json());
@@ -115,7 +160,7 @@ export async function getSkinScanResult(
     throw new ApiError(0, "Unexpected skin-scan response shape.");
   }
 
-  return parsed.data.result;
+  return { result: parsed.data.result, persisted: parsed.data.persisted, reason: parsed.data.reason };
 }
 
 // ─── Original image upload (private S3) ────────────────────────────────────
@@ -144,6 +189,8 @@ const UPLOAD_TIMEOUT_MS = 120_000;
  * scanId and gets back a URL that can only write one object.
  */
 export async function uploadOriginalImage(scanId: string, original: Blob): Promise<void> {
+  // TD-18 (3): the cap is 25 MB; say so plainly, before asking for a URL.
+  if (original.size > MAX_ORIGINAL_BYTES) throw new ApiError(413, UPLOAD_TOO_LARGE_MESSAGE, "upload/too-large");
   const idToken = await freshIdToken();
 
   const presignResponse = await fetch("/api/skin-scan/upload", {
@@ -153,6 +200,8 @@ export async function uploadOriginalImage(scanId: string, original: Blob): Promi
     // request contract — the route refuses to sign anything without it.
     body: JSON.stringify({
       scanId,
+      // Signed into the URL: S3 accepts exactly this many bytes (H20).
+      contentLength: original.size,
       imageRetentionConsent: true,
       imageRetentionConsentVersion: IMAGE_RETENTION_CONSENT_VERSION,
     }),
@@ -162,6 +211,7 @@ export async function uploadOriginalImage(scanId: string, original: Blob): Promi
     if (presignResponse.status === 401) {
       throw new ApiError(401, "Your session expired. Please verify your phone number again.", "auth/required");
     }
+    if (presignResponse.status === 413) throw new ApiError(413, UPLOAD_TOO_LARGE_MESSAGE, "upload/too-large");
     throw new ApiError(presignResponse.status, "Couldn't prepare your photo for upload.", "upload/failed");
   }
 
@@ -226,12 +276,15 @@ export async function uploadOriginalImage(scanId: string, original: Blob): Promi
 export async function runSkinScan(opts: {
   scanId: string;
   photo: Blob;
+  captureMethod: CaptureMethod;
   original?: Blob | undefined;
   retentionConsent?: boolean;
   alreadyStored?: boolean;
   overlays?: string | string[] | null;
-}): Promise<{ result: SkinScanResult; originalStored: boolean }> {
-  const { scanId, photo, original, retentionConsent = false, alreadyStored = false, overlays } = opts;
+  captureQuality?: CaptureQuality | undefined;
+  processingConsentVersion?: string | undefined;
+}): Promise<{ result: SkinScanResult; originalStored: boolean; persisted?: boolean | undefined }> {
+  const { scanId, photo, captureMethod, original, retentionConsent = false, alreadyStored = false, overlays, captureQuality, processingConsentVersion } = opts;
 
   let originalStored = alreadyStored;
   if (original && retentionConsent && !alreadyStored) {
@@ -239,13 +292,38 @@ export async function runSkinScan(opts: {
     originalStored = true;
   }
 
-  const result = await getSkinScanResult(photo, overlays);
-  return { result, originalStored };
+  const { result, persisted, reason } = await requestSkinScan(photo, overlays, scanId, captureMethod, undefined, captureQuality, processingConsentVersion);
+  if (persisted === false && reason !== "consent_missing") {
+    // The server's analysis-record write failed, and nothing else would ever
+    // retry it. Re-send the same bytes under the same scanId ONCE so the
+    // SERVER re-analyzes and re-writes; the doc id is (scanId, sha256(bytes)),
+    // so this can't duplicate — and if the first write did land late,
+    // ALREADY_EXISTS keeps that original record unmarked. No overlays (never
+    // stored, costly to render). Marked persistAttempt=recovery for provenance.
+    // Fire-and-forget: the user already has `result`, and the retry's result
+    // is never applied. The browser never writes measurements itself.
+    setTimeout(() => {
+      requestSkinScan(photo, null, scanId, captureMethod, "recovery", captureQuality, processingConsentVersion)
+        .then((retry) => {
+          if (retry.persisted === false) console.warn("skin-scan: analysis record still not persisted after retry.");
+        })
+        .catch(() => console.warn("skin-scan: analysis record persist retry failed."));
+    }, PERSIST_RETRY_DELAY_MS);
+  }
+  return { result, originalStored, persisted };
 }
 
 /** True when the ORIGINAL image upload failed — the analysis never ran. */
+/** TD-18 (3): shown when the original is over the 25 MB cap. */
+export const UPLOAD_TOO_LARGE_MESSAGE = "This photo is too large to save (the limit is 25 MB). Please take a new photo and try again.";
+
+/** Any upload failure, too large included: nothing was stored and the analysis did not run. */
 export function isUploadError(error: unknown): boolean {
-  return error instanceof ApiError && error.code === "upload/failed";
+  return error instanceof ApiError && (error.code === "upload/failed" || error.code === "upload/too-large");
+}
+
+export function isUploadTooLarge(error: unknown): boolean {
+  return error instanceof ApiError && error.code === "upload/too-large";
 }
 
 /**
@@ -270,6 +348,7 @@ export interface EchoChatMessage {
 const SkinCheckChatResponseSchema = z.object({
   ok: z.literal(true),
   reply: z.string(),
+  historyToken: z.string(),
 });
 
 // The route's error responses (both the upfront CHAT_MISCONFIGURED check and
@@ -281,31 +360,32 @@ const ChatErrorResponseSchema = z.object({
   code: z.string().optional(),
 });
 
-export interface SkinCheckRegionFocus {
-  region: string;
-  scores: SkinScanScores;
-}
-
 // Above lib/gemini.ts's worst-case retry budget for one call (3 attempts at
 // GEMINI_REQUEST_TIMEOUT_MS=10s each, plus backoff — roughly 32s), so this
 // only fires on a request that never got a response at all.
 const CHAT_CLIENT_TIMEOUT_MS = 40_000;
 
-// `composite` is not sent — the server recomputes it from `scores` itself
-// (app/api/skin-check/chat/route.ts), since it's a pure function of scores
-// and trusting a client-supplied summaryLine string used to be a
-// prompt-injection path into Gemini's systemInstruction.
+// Gate 02: only the scan's identity, the region, and the thread are sent —
+// scores, region scores, and quiz answers are loaded server-side under the
+// verified uid (app/api/skin-check/chat/route.ts). `history` is the thread
+// BEFORE `message`; non-empty history must carry the historyToken the
+// previous reply returned, and the reply comes back with the next one.
 //
 // `signal` is optional and caller-supplied (EchoPage.tsx aborts it on
 // unmount, e.g. the user navigates away from /echo mid-request) — it
 // composes with, rather than replaces, this function's own timeout abort.
 export async function getSkinCheckChatReply(
-  messages: EchoChatMessage[],
-  answers: SkinCheckAnswers,
-  scores: SkinScanScores | null,
-  regionFocus: SkinCheckRegionFocus | null = null,
+  scanId: string,
+  region: EchoRegion,
+  history: EchoChatMessage[],
+  historyToken: string | null,
+  message: string,
   signal?: AbortSignal
-): Promise<string> {
+): Promise<{ reply: string; historyToken: string }> {
+  // Gate 02: the route verifies this itself. No user → ApiError auth/required
+  // before a request is built.
+  const idToken = await freshIdToken();
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), CHAT_CLIENT_TIMEOUT_MS);
   const onExternalAbort = () => controller.abort();
@@ -315,8 +395,8 @@ export async function getSkinCheckChatReply(
   try {
     response = await fetch("/api/skin-check/chat", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages, answers, scores, regionFocus }),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ scanId, region, history, historyToken, message }),
       signal: controller.signal,
     });
   } catch (err) {
@@ -327,6 +407,11 @@ export async function getSkinCheckChatReply(
   } finally {
     clearTimeout(timeoutId);
     signal?.removeEventListener("abort", onExternalAbort);
+  }
+
+  // Same code as freshIdToken's, so isAuthError covers a token the server refused.
+  if (response.status === 401) {
+    throw new ApiError(401, "Echo requires a verified phone number.", "auth/required");
   }
 
   if (!response.ok) {
@@ -341,7 +426,7 @@ export async function getSkinCheckChatReply(
     throw new ApiError(0, "Unexpected skin-check chat response shape.");
   }
 
-  return parsed.data.reply;
+  return { reply: parsed.data.reply, historyToken: parsed.data.historyToken };
 }
 
 export { ApiError };

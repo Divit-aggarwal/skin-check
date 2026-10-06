@@ -45,10 +45,18 @@ next-env.d.ts
 .env.sentry-build-plugin
 
 # Claude Code local session state
-.claude/
+.claude/*
+!.claude/settings.json
+!.claude/agents/
 
 # Local working docs and leftovers — kept on disk, not in the repo
 *.md
+# Architecture planning docs and the research they are built on ARE tracked.
+!docs/architecture/*.md
+!docs/Longitudinal skin platform architecture.md
+!docs/research/**/*.md
+!docs/PROJECT_SKIN_EXECUTION_TRACKER.md
+!docs/design/*.md
 /scan-response.json
 /supabase/
 /.mcp.json
@@ -57,3 +65,13 @@ next-env.d.ts
 .firebase/
 ui-debug.log
 database-debug.log
+!CLAUDE.md
+!.claude/agents/*.md
+!docs/PHASE_0_RUNBOOK.md
+
+# Local stack (scripts/local-stack.sh): generated per checkout
+firebase.local.json
+.local-stack/
+.env.lane
+!docs/lanes/*.md
+docs/design/wip/

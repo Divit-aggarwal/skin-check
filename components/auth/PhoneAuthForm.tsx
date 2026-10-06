@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 // Matches the questionnaire's other text inputs (TextInput/PhoneInput) so the
 // auth step doesn't read as a different product.
 const inputClass =
-  "w-full rounded-lg border bg-white px-4 py-3 text-[1.0625rem] text-text shadow-sm outline-none placeholder:text-text/35 focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2";
+  "h-12 w-full rounded-lg border bg-brand-paper px-4 text-base text-brand-ink placeholder:text-brand-muted/70";
 
 interface PhoneAuthFormProps {
   onAuthenticated?: (user: User) => void;
@@ -42,10 +42,13 @@ export function PhoneAuthForm({
     <div className="flex flex-col gap-4">
       {auth.screen === "phone" ? (
         <div className="flex flex-col gap-3">
+          <label htmlFor="phone-auth-number" className="text-sm font-medium">
+            Mobile number
+          </label>
           <div className="flex max-w-sm items-stretch gap-2">
             <span
               aria-hidden
-              className="flex shrink-0 items-center rounded-lg border border-text/10 bg-canvas px-3 text-[1.0625rem] text-text/70"
+              className="flex h-12 shrink-0 items-center rounded-lg border border-brand-line bg-brand-paper px-3 text-base text-brand-muted"
             >
               {auth.country.dialCode}
             </span>
@@ -67,13 +70,13 @@ export function PhoneAuthForm({
               placeholder="10-digit mobile number"
               className={cn(
                 inputClass,
-                auth.validPhone ? "border-blush/50" : "border-text/10 focus:border-blush/50"
+                "border-brand-line"
               )}
             />
           </div>
           <Button
             variant="ink"
-            size="sm"
+            size="lg"
             onClick={() => void auth.sendCode()}
             disabled={!auth.validPhone || auth.busy}
             aria-busy={auth.status === "sending"}
@@ -81,13 +84,13 @@ export function PhoneAuthForm({
           >
             {auth.status === "sending" ? "Sending code…" : sendLabel}
           </Button>
-          <p className="max-w-sm text-xs text-text/45">{note}</p>
+          <p className="max-w-sm text-sm text-brand-muted">{note}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
-          <p className="text-body text-text/70">
+          <p>
             We sent a {OTP_LENGTH}-digit code to{" "}
-            <span className="whitespace-nowrap text-text">{auth.e164}</span>
+            <span className="whitespace-nowrap font-semibold">{auth.e164}</span>
           </p>
           <input
             ref={codeInputRef}
@@ -112,13 +115,13 @@ export function PhoneAuthForm({
             className={cn(
               inputClass,
               "max-w-sm text-center font-mono text-2xl tracking-[0.4em]",
-              auth.validCode ? "border-blush/50" : "border-text/10 focus:border-blush/50"
+              "border-brand-line"
             )}
           />
           <div className="flex flex-wrap items-center gap-2">
             <Button
               variant="ink"
-              size="sm"
+              size="lg"
               onClick={() => void auth.verifyCode()}
               disabled={!auth.validCode || auth.busy}
               aria-busy={auth.status === "verifying"}
@@ -127,7 +130,8 @@ export function PhoneAuthForm({
             </Button>
             <Button
               variant="ghost"
-              size="sm"
+              size="lg"
+              className="rounded-full px-4 text-brand-forest"
               onClick={() => void auth.sendCode()}
               disabled={auth.resendIn > 0 || auth.busy}
             >
@@ -137,7 +141,7 @@ export function PhoneAuthForm({
                   ? `Resend code in ${auth.resendIn}s`
                   : "Resend code"}
             </Button>
-            <Button variant="ghost" size="sm" onClick={auth.changeNumber} disabled={auth.busy}>
+            <Button variant="ghost" size="lg" className="rounded-full px-4 text-brand-forest" onClick={auth.changeNumber} disabled={auth.busy}>
               Change phone number
             </Button>
           </div>
@@ -146,7 +150,7 @@ export function PhoneAuthForm({
 
       {/* Announced without moving anything: the block is always in the tree,
           so an error appearing never shifts the buttons under the user's thumb. */}
-      <p role="status" aria-live="polite" className="min-h-5 max-w-sm text-sm text-status-error">
+      <p role="status" aria-live="polite" className="max-w-sm text-sm text-brand-error empty:hidden">
         {auth.error}
       </p>
 

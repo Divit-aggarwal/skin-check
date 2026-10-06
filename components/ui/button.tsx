@@ -18,19 +18,16 @@ const buttonVariants = cva(
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
         ghost: "hover:bg-accent hover:text-accent-foreground",
         link: "text-primary underline-offset-4 hover:underline",
-        // Hardcoded (not theme tokens) — used only by the isolated
-        // app/home marketing page, never by the shared app shell.
-        magenta: "bg-[#E02D79] text-white hover:bg-[#c92569]",
         outlineLight:
-          "border border-[#1A1A1A]/15 bg-white text-[#1A1A1A] hover:bg-white/80",
+          "rounded-full border border-brand-line bg-transparent font-semibold text-brand-ink hover:border-brand-ink disabled:border-brand-line disabled:text-brand-muted disabled:opacity-100",
         // Primary action for the Skin Check quiz/results redesign — near-
         // black, no gradient/glow, per the "restrained" brief (PART 25).
-        ink: "bg-text text-white hover:bg-text/85",
+        ink: "rounded-full border border-transparent bg-brand-action text-white hover:bg-brand-action-hover disabled:border-brand-line disabled:bg-brand-paper disabled:text-brand-muted disabled:opacity-100",
       },
       size: {
         default: "h-10 px-4 py-2",
         sm: "h-9 rounded-md px-3",
-        lg: "h-11 rounded-md px-8",
+        lg: "h-12 px-8 text-base sm:h-11",
         icon: "h-10 w-10",
       },
     },

@@ -1,0 +1,139 @@
+# MEASUREMENT_METRIC_DECISION
+
+**Authoritative record of which SkinState fields proceed into the human measurement-validation study.**
+
+| | |
+|---|---|
+| Decision | **MD-1**, 2026-10-03 |
+| Status | **ACCEPTED** for study design. It changes **no production behaviour and no contract**. The `skinstate-1` field names and classes are untouched |
+| Evidence | [PHASE_0_RESULTS.md](../research/measurement-validation/PHASE_0_RESULTS.md): a **partial** Phase 0, on one image, on the production digest `sha256:668b1f56…`. Determinism: 500/500 bit-identical |
+| Applies to | Engine `scan-0.1.5-provisional` (deployed digest `668b1f56…`) **and `scan-0.1.6-provisional`** at the bench digest `sha256:ce51ed2d…` (skin-scan `8dc37dc`, gate 04, not deployed). Re-confirmed by full Phase 0 re-runs: Addendum A (bench build) and **Addendum B (release candidate `sha256:9a8f96c0…`, authoritative for 0.1.6)**, §6–§7. Any other engine build re-opens every row (ACCEPTANCE §G, PROTOCOL §8), **including CI's eventual build of `8dc37dc`**, whose digest will differ |
+| Supersedes | The P1–P5/D1 primary list in PROTOCOL §2.2, **for the human study only** (see §3). Only P5's removal is forced by a gate failure. Removing P2, P4 and D1 (all INCONCLUSIVE) follows the smallest-set instruction, and **the owner may reverse it before Phase 1 pre-registration** |
+| DECISION_LOG | Not edited here, because uncommitted entries D-22 and D-24 belong to another session. Add **D-25 → this file** when those are committed |
+
+**Nothing in this record is a skin measurement.** KEEP means "a photo statistic that passed bench screening and earns a human test–retest study". It does not mean valid, calibrated, comparable or showable.
+
+---
+
+## 1. Classes
+
+| Class | Meaning | Consequence |
+|---|---|---|
+| **KEEP FOR HUMAN VALIDATION** | Passed the pre-registered bench gates A3 (slope 0.8–1.2) and A4 (leakage ≤ 10%) in every region | A primary endpoint in Phases 1–3, **conditional on** the complete Phase 0 confirming it (§4) |
+| **DROP** | Failed a gate, or carries a defect, through an identified engine mechanism | Excluded from any change claim **for this engine version**. Not a study endpoint. Its raw values are still stored verbatim (DATA_SPEC §5) |
+| **INCONCLUSIVE** | Not screenable under the frozen protocol, or confounded without a mechanism | Recorded passively in the study. **Not an endpoint**, no claim. Promotion needs a new pre-registered bench test |
+
+## 2. Decision table
+
+| Field | Regions | Class | Failure mode / limit | Ever surfaced to users? |
+|---|---|---|---|---|
+| `colour.native.aStarMean` | cheeks, forehead, nose, chin | **KEEP** | Exposure: ±0.5 EV ≈ ±1.1–1.4 a\* units | Only after Phases 1–3 pass, production sends `stats=both` (D-07), and the comparability key is complete. Wording ceiling: "beyond measurement noise" |
+| `colour.native.lStarMean` | cheeks, forehead, nose, chin | **KEEP** | Exposure: 0.5 EV ≈ 5.9–9.0 L\* units, about the whole −8 L\* bench injection. **C4 is the main risk** | Same as above |
+| `colour.native.aStarP90` | all | KEEP (secondary) | Integer-valued and redundant with `aStarMean`. **Not an endpoint** | No |
+| `colour.native.bStarMean` | all | INCONCLUSIVE | No pre-registered face-b\* perturbation. Exploratory slope about 1 | Not until screened |
+| D1 ITA | cheeks | INCONCLUSIVE | Depends on unscreened b\*. ±0.5 EV ≈ ±17–19° | Not until screened |
+| `colour.native.aStarSd`, `colour.native.lStarSd` | all | INCONCLUSIVE | No intended change exists | No |
+| `colour.native.aStarHist`, `colour.native.localLContrastHist` | all | INCONCLUSIVE | Redundant with the scalars | No |
+| `colour.corrected.aStarMean` | all | **DROP** | Gray-world: slope about 0.5; background leakage 48–59%, opposite sign | Never (this engine) |
+| `colour.corrected.aStarP90` | all | **DROP** | Gray-world plus quantisation: slope 0.59–0.75, non-monotone | Never (this engine) |
+| `colour.corrected.bStarMean` | all | **DROP** | Gray-world: background leakage 57–71% | Never (this engine) |
+| `colour.corrected.lStarMeanPostClahe` | all | **DROP** | CLAHE plus gamma: slope 0.31–0.83, region-dependent | Never (this engine) |
+| `colour.corrected.aStarSd` | all | **DROP** | Gray-world: background leakage up to 11.7% | Never (this engine) |
+| `colour.corrected.lStarSdPostClahe` | all | INCONCLUSIVE | CLAHE redistributes lightness by design | No |
+| `colour.corrected.aStarHist`, `texture.localLContrastHist` | all | INCONCLUSIVE | Corrected a\* histogram clips above 1% on the nose under a +8 shift | No |
+| `texture.laplacianVarMean` | all | INCONCLUSIVE | Blur σ 1: −28% to −37%. Scale 0.8×: +36% to +62%. JPEG 0.75: +27% to +32%. A framing and compression statistic | No |
+| `texture.lbpEntropy` | all | INCONCLUSIVE | About 1% chroma-only spread. JPEG +1.3% to +3.7%; −1 EV +1.8% to +5.0%. Blur response region-inconsistent. **No evidence it tracks texture** | No |
+| `texture.gradientMean` | all | **DROP** | Definition defect: > 99.99% of the value is 10⁶ × (zero-gradient pixel count) / N | Never (this engine). A future contract version should deprecate it |
+| `specular.fraction` | all | **DROP** | Fixed V threshold on the gray-world image. A background-only cast moves it up to 57%; −1 EV gives up to −100% | Never (this engine) |
+| `pixelCount` | all | not a candidate | Quality covariate | n/a |
+| `scores`, `region_scores` (deprecated) | — | not a candidate | Image-relative. Exposure moves them as much as the named change | Never |
+
+**Two DROPs are declared deviations** from the pre-written classification rule: `gradientMean` and `specular.fraction` (PHASE_0_RESULTS §6). Both rest on a verified mechanism. Neither would be in the candidate set either way.
+
+## 3. FINAL CANDIDATE SET
+
+**Two metrics.**
+
+| # | Field | Regions (unchanged from PROTOCOL §2.2) | Replaces |
+|---|---|---|---|
+| 1 | `colour.native.lStarMean` | cheeks, forehead | P1 |
+| 2 | `colour.native.aStarMean` | cheeks, nose | P3 |
+
+**Removed from the primary endpoints, versus PROTOCOL §2.2:**
+- **P2 `native.bStarMean` and D1 ITA → INCONCLUSIVE.** The protocol has no face-b\* perturbation. They can re-enter only through the amendment in §4.
+- **P4 `texture.lbpEntropy` → INCONCLUSIVE.** Nothing shows it responds to texture, and it moves with JPEG and exposure.
+- **P5 `specular.fraction` → DROP.**
+
+**Effect on the human study.**
+- Fewer primary endpoints means less multiplicity. ANALYSIS_PLAN §8's sample size was driven by the per-band ICC precision of each field, not by the number of fields, so n does not shrink.
+- **All raw fields are still captured**, because responses are stored verbatim. The excluded fields are analysed only as exploratory.
+
+**KEEP was close to guaranteed by construction.** The native path only resizes, so the bench mainly confirms that nothing hidden (normalisation, mask coupling) breaks these two fields. It does **not** show that phones deliver face colour faithfully. The tests that can really fail them are §4.5 (ColorChecker under real capture) and C4.
+
+**The central risk to the candidate set is exposure.**
+- Half a stop of global exposure moves native L\* by about the whole −8 L\* injected change, and a\* by about 1.3 units.
+- Production has no exposure or illuminant signal. So either ACCEPTANCE C4 passes in the COND block, or a versioned quality producer must exist before any calibration is published.
+- **Expect L\* to be the more likely of the two to fail C4.**
+
+## 4. Conditions that bind this decision
+
+1. **Complete Phase 0 before Phase 1 counts.** This decision rests on one retouched image of one person, whose MST tone was not rated.
+   - KEEP must be confirmed on the remaining **9 images, spread across MST bands, with and without beards**.
+   - Also required: A2 on real iOS Safari and Android Chrome; the §4.5 ColorChecker under 3 illuminants; native linux/amd64 hardware.
+   - **A KEEP field that fails A3 or A4 on any image or band becomes DROP.** (No DROP can be revived by more images: each rests on a mechanism.)
+2. **Protocol amendment (pre-register before the complete Phase 0):**
+   - add a face-only b\* shift (+1, +2, +4, +8) as the A3 test for `native.bStarMean`, and so for ITA;
+   - add a pre-registered **chroma-only spread** criterion for texture fields (§3.4 of the results), so that "indistinguishable from small-input instability" is a rule, not a judgement.
+   - If native b\* then passes A3 and A4 on all 10 images, `bStarMean` (cheeks, forehead) and ITA (cheeks) may re-enter as primary.
+3. **Production prerequisites (unchanged, STATUS doc):**
+   - `stats=both` (D-07), `engine.build` and `captureMethod`. All three are implemented in gate 04 (`1e4919d`, skin-scan `8dc37dc`), but **not deployed**.
+   - Until gate 04 is deployed, every production record has `colour.native = null`, and **neither candidate exists in production**.
+4. **Wording ceiling:** even after Phases 1–3 pass, at most "this photo measurement differs from your baseline by more than measurement noise". Anything about skin needs Phase 4 (ACCEPTANCE §E).
+
+## 5. What this decision does NOT change
+- The `skinstate-1` contract: no rename, no reclassification, no new field. `texture.gradientMean`'s documented unit is now known to be wrong. That is recorded here for the **next** contract version, not edited.
+- Any production code, route, rule, prompt or engine setting.
+- Any user-facing threshold. **No longitudinal threshold is introduced.**
+
+## 6. Addendum A (2026-10-03): Phase 0 re-run on scan-0.1.6
+
+**Evidence:** [PHASE_0_0_1_6_RESULTS.md](../research/measurement-validation/PHASE_0_0_1_6_RESULTS.md). The rule was pre-registered in `phase0/CLASSIFICATION_RULE_0_1_6.md` (`fb9dfc2`) before any 0.1.6 response existed.
+
+- **Engine:** `scan-0.1.6-provisional`, a local bench build of skin-scan `8dc37dc` from a clean export, pinned at `sha256:ce51ed2dce3e2d4a3c3a00deadcd123e2f799ec785f348a4bd98802e2760088c`.
+  - `engine_build` is `bench-local-8dc37dc…`, because no CI or ECR artifact exists.
+  - It ran under the same emulated amd64 runtime and flags as the 0.1.5 run. No production call.
+- **Result: every class in §2 is unchanged.**
+  - For identical transmitted bytes, all 30 matrix responses and all 500 determinism submissions (5 fresh containers) are **bit-identical** to the 0.1.5 digest, apart from `pipeline_version` and the new `engine_build` key.
+  - The unchanged analysis reproduces the 0.1.5 summary byte for byte.
+  - Both declared DROP deviations were re-declared under their pre-registered conditions (mechanism code unchanged; signature reproduced).
+- **Premise correction:** 0.1.6 does not add native colour. `stats=both` already existed in 0.1.5, and the 0.1.5 bench used it. 0.1.6 adds only `engine_build` and the version string.
+- **Build drift, recorded:** a fresh build of the same pins resolved 11 transitive pip packages and one apt package differently from `668b1f56`. Every measurement-path package (numpy, opencv, mediapipe, scikit-image, pillow) was identical, and no measured value moved. Each future image still needs this replay.
+- **What the re-run does not add:** new evidence about any field. It is still one retouched image, n = 1; native KEEP is still close to guaranteed by construction; and A2, §4.5 and native hardware remain unrun. §4's conditions bind unchanged.
+- **One correction to PHASE_0_RESULTS §3.3 and §4 Q2,** from the same data: native `aStarMean` is also flat (non-increasing) on cheeks at +1 EV (+1.34 → +1.30), not only on forehead and nose.
+
+**FINAL 0.1.6 CANDIDATE SET: unchanged.** `colour.native.lStarMean` (cheeks, forehead) and `colour.native.aStarMean` (cheeks, nose), both KEEP FOR HUMAN VALIDATION. Neither is a validated skin measurement.
+
+## 7. Addendum B (2026-10-03): Phase 0 on the 0.1.6 release candidate
+
+**Evidence:** [PHASE_0_0_1_6_RESULTS.md](../research/measurement-validation/PHASE_0_0_1_6_RESULTS.md) Part I. The rule addendum `phase0/CLASSIFICATION_RULE_0_1_6_RELEASE.md` (`ebbe755`) was committed before the image was built.
+
+- **Image:** the exact image the deployment plan will push.
+  - skin-scan `8dc37dc`, from a clean export.
+  - Tag `…/skin-scan:sha-8dc37dc501ea974825427c665acd7019120c20ec`.
+  - Local digest `sha256:9a8f96c0a54025c4137b89dee181ba7fb140db1431fa95156cc20d8880e1fc2c`.
+  - `engine_build` equal to the tag. Not pushed or deployed.
+- **Result:**
+  - Every response is bit-identical to 0.1.5 (`668b1f56`) and to the bench build, apart from `pipeline_version` and `engine_build`.
+  - 500/500 determinism submissions across 5 fresh containers.
+  - The analysis is byte-identical to 0.1.5.
+- **Comparison per field:**
+  - all **same behaviour**;
+  - improved: none; degraded: none; newly inconclusive: none; newly eligible: none.
+- **Candidate set: unchanged on the evidence, not carried over.** It was re-derived from the release image's data by the unchanged rule: `colour.native.lStarMean` (cheeks, forehead) and `colour.native.aStarMean` (cheeks, nose), both KEEP FOR HUMAN VALIDATION. Neither is a validated skin measurement.
+- **Still impossible here:** A2, §4.5, 9 of 10 images, native amd64 hardware, and the ECR-digest equality check (it happens at push).
+- **Architecture: no decision changes.** Open items made concrete by 0.1.6, none decided here:
+  - a verified 0.1.6 row in the skinstate-1 engine table;
+  - mapping `engine.build`;
+  - any declared 0.1.5 ↔ 0.1.6 equivalence for comparability;
+  - deployment of **this** image, not a rebuild.
+

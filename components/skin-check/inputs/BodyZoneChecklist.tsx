@@ -3,6 +3,7 @@
 import { ArrowRight, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { BodyMapStep } from "@/types/skin-check";
+import { multiSelectHint } from "./ImageCardMultiSelect";
 
 // Simplified checklist fallback for the acne-area body map — an interactive
 // SVG hotspot diagram on a face/shoulders illustration is flagged as a
@@ -27,6 +28,7 @@ export function BodyZoneChecklist({ step, value, onChange, onCommit }: BodyZoneC
 
   return (
     <div className="flex flex-col gap-4">
+      <p className="text-sm text-brand-muted">{multiSelectHint(step.maxSelections, step.options.length)}</p>
       <div className="flex max-w-sm flex-col gap-2">
         {step.options.map((opt) => {
           const selected = value.includes(opt.value);
@@ -38,19 +40,19 @@ export function BodyZoneChecklist({ step, value, onChange, onCommit }: BodyZoneC
               onClick={() => toggle(opt.value)}
               disabled={disabled}
               className={cn(
-                "flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2",
+                "flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-forest focus-visible:ring-offset-2",
                 selected
-                  ? "border-blush bg-blush-soft"
+                  ? "border-brand-action bg-brand-mist"
                   : disabled
-                    ? "cursor-not-allowed border-text/10 bg-white opacity-40"
-                    : "border-text/10 bg-white hover:border-blush/40"
+                    ? "cursor-not-allowed border-brand-line bg-white opacity-40"
+                    : "border-brand-line bg-white hover:border-brand-ink/40"
               )}
             >
               <span className="text-sm font-medium text-text">{opt.label}</span>
               <span
                 className={cn(
                   "flex h-5 w-5 shrink-0 items-center justify-center rounded-md border",
-                  selected ? "border-blush bg-blush text-white" : "border-text/20"
+                  selected ? "border-brand-action bg-brand-action text-white" : "border-brand-line"
                 )}
               >
                 {selected && <Check className="h-3 w-3" strokeWidth={3} />}
@@ -64,7 +66,7 @@ export function BodyZoneChecklist({ step, value, onChange, onCommit }: BodyZoneC
           type="button"
           onClick={onCommit}
           aria-label="Confirm selection"
-          className="flex h-9 w-9 items-center justify-center rounded-full bg-blush text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blush/50 focus-visible:ring-offset-2"
+          className="flex h-11 w-11 items-center justify-center rounded-full bg-brand-action text-white transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-forest focus-visible:ring-offset-2"
         >
           <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
         </button>

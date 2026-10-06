@@ -4,7 +4,7 @@
 // is explicit that this shouldn't read as a chatbot.
 export function EchoBubble({ message }: { message: string }) {
   return (
-    <p className="font-display text-2xl italic leading-snug text-text sm:text-[1.75rem]">
+    <p className="font-display text-2xl font-semibold leading-snug text-brand-ink sm:text-[1.75rem]">
       {message}
     </p>
   );

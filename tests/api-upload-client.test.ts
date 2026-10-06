@@ -62,6 +62,7 @@ describe("uploadOriginalImage", () => {
     expect((presign.init.headers as Record<string, string>).Authorization).toBe("Bearer fresh-id-token");
     expect(JSON.parse(presign.init.body as string)).toEqual({
       scanId: SCAN_ID,
+      contentLength: original.size,
       imageRetentionConsent: true,
       imageRetentionConsentVersion: "skin image retention version 1",
     });
@@ -95,12 +96,32 @@ describe("uploadOriginalImage", () => {
     stubFetch({ put: new Response("AccessDenied", { status: 403 }) });
     await expect(uploadOriginalImage(SCAN_ID, original)).rejects.toSatisfy(isUploadError);
   });
+
+  // TD-18 (3): the 25 MB cap with a clear message.
+  it("an original over 25 MB is refused before any request, with the too-large message", async () => {
+    const { isUploadTooLarge, UPLOAD_TOO_LARGE_MESSAGE } = await import("@/lib/api");
+    const calls = stubFetch();
+    const big = { size: 25 * 1024 * 1024 + 1, type: "image/jpeg" } as Blob;
+    const err = await uploadOriginalImage(SCAN_ID, big).catch((e: unknown) => e);
+    expect(isUploadTooLarge(err) && isUploadError(err)).toBe(true);
+    expect((err as Error).message).toBe(UPLOAD_TOO_LARGE_MESSAGE);
+    expect(UPLOAD_TOO_LARGE_MESSAGE).toMatch(/too large.*25 MB/);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("a 413 from the presign route is the too-large error too; other refusals are not", async () => {
+    const { isUploadTooLarge } = await import("@/lib/api");
+    stubFetch({ presign: json({ code: "IMAGE_TOO_LARGE" }, 413) });
+    expect(isUploadTooLarge(await uploadOriginalImage(SCAN_ID, original).catch((e: unknown) => e))).toBe(true);
+    stubFetch({ presign: json({ error: "nope" }, 500) });
+    expect(isUploadTooLarge(await uploadOriginalImage(SCAN_ID, original).catch((e: unknown) => e))).toBe(false);
+  });
 });
 
 describe("runSkinScan", () => {
   it("stores the original BEFORE running the analysis", async () => {
     const calls = stubFetch();
-    const { result, originalStored } = await runSkinScan({ scanId: SCAN_ID, photo, original, retentionConsent: true });
+    const { result, originalStored } = await runSkinScan({ scanId: SCAN_ID, photo, captureMethod: "native", original, retentionConsent: true });
 
     expect(calls.map((c) => c.url)).toEqual(["/api/skin-scan/upload", UPLOAD_URL, "/api/skin-scan"]);
     expect(originalStored).toBe(true);
@@ -109,34 +130,34 @@ describe("runSkinScan", () => {
 
   it("does NOT run the analysis when the upload fails", async () => {
     const calls = stubFetch({ put: new Response("boom", { status: 500 }) });
-    await expect(runSkinScan({ scanId: SCAN_ID, photo, original, retentionConsent: true })).rejects.toSatisfy(isUploadError);
+    await expect(runSkinScan({ scanId: SCAN_ID, photo, captureMethod: "native", original, retentionConsent: true })).rejects.toSatisfy(isUploadError);
     expect(calls.some((c) => c.url === "/api/skin-scan")).toBe(false);
   });
 
   it("still analyzes when there are no original bytes left (restored draft), and says nothing was stored", async () => {
     const calls = stubFetch();
-    const { originalStored } = await runSkinScan({ scanId: SCAN_ID, photo, retentionConsent: true });
+    const { originalStored } = await runSkinScan({ scanId: SCAN_ID, photo, captureMethod: "native", retentionConsent: true });
     expect(calls.map((c) => c.url)).toEqual(["/api/skin-scan"]);
     expect(originalStored).toBe(false);
   });
 
   it("does not re-upload on retry when the original is already stored", async () => {
     const calls = stubFetch();
-    const { originalStored } = await runSkinScan({ scanId: SCAN_ID, photo, original, retentionConsent: true, alreadyStored: true });
+    const { originalStored } = await runSkinScan({ scanId: SCAN_ID, photo, captureMethod: "native", original, retentionConsent: true, alreadyStored: true });
     expect(calls.map((c) => c.url)).toEqual(["/api/skin-scan"]);
     expect(originalStored).toBe(true);
   });
 
   it("reports a CV failure as a scan error, not an upload error — the object stays in S3", async () => {
     stubFetch({ scan: json({ error: "boom" }, 502) });
-    await expect(runSkinScan({ scanId: SCAN_ID, photo, original, retentionConsent: true })).rejects.not.toSatisfy(isUploadError);
+    await expect(runSkinScan({ scanId: SCAN_ID, photo, captureMethod: "native", original, retentionConsent: true })).rejects.not.toSatisfy(isUploadError);
   });
 });
 
 describe("retention consent gates persistent storage", () => {
   it("does NOT upload when retention consent was not given — but still analyzes", async () => {
     const calls = stubFetch();
-    const { result, originalStored } = await runSkinScan({ scanId: SCAN_ID, photo, original });
+    const { result, originalStored } = await runSkinScan({ scanId: SCAN_ID, photo, captureMethod: "native", original });
 
     // Analysis consent and retention consent are separate permissions: the
     // user agreed to have this photo read, not to have it kept.
@@ -147,7 +168,7 @@ describe("retention consent gates persistent storage", () => {
 
   it("does NOT upload when retention consent is explicitly false", async () => {
     const calls = stubFetch();
-    const { originalStored } = await runSkinScan({ scanId: SCAN_ID, photo, original, retentionConsent: false });
+    const { originalStored } = await runSkinScan({ scanId: SCAN_ID, photo, captureMethod: "native", original, retentionConsent: false });
     expect(calls.some((c) => c.url === "/api/skin-scan/upload")).toBe(false);
     expect(calls.some((c) => c.url === UPLOAD_URL)).toBe(false);
     expect(originalStored).toBe(false);
@@ -155,7 +176,7 @@ describe("retention consent gates persistent storage", () => {
 
   it("uploads when retention consent is given", async () => {
     const calls = stubFetch();
-    const { originalStored } = await runSkinScan({ scanId: SCAN_ID, photo, original, retentionConsent: true });
+    const { originalStored } = await runSkinScan({ scanId: SCAN_ID, photo, captureMethod: "native", original, retentionConsent: true });
     expect(calls.map((c) => c.url)).toEqual(["/api/skin-scan/upload", UPLOAD_URL, "/api/skin-scan"]);
     expect(originalStored).toBe(true);
   });
