@@ -36,6 +36,26 @@ export const ROUTINE_COPY = {
   skipped: "Skipped",
   status: { used: "Used", skipped: "Skipped", unknown: "Not logged" },
   todayTitle: "Today's routine",
+  // The store's four steps (theprojectskin.com). The store calls the second
+  // step "Treat", but D-12 (LOCKED) bans that word in routine copy; "Serum" is
+  // the store's own name for it in the kit's how-to-use. One-line swap if the
+  // owner approves "Treat" (tracker G08).
+  steps: { cleanse: "Cleanse", serum: "Serum", moisturise: "Moisturise", protect: "Protect" },
+  stepNumber: (n: number) => `Step ${n}`,
+  emptyStep: "Nothing in this step yet.",
+  addToStep: "Add a product",
+  addToStepLabel: (step: string, slot: string) => `Add a product to ${step}, ${slot}`,
+  eveningProtect: "Sunscreen is a morning step.",
+  otherGroup: "Other products",
+  otherNote: "Products that are not ours are listed here, not in a step.",
+  todayStatus: (status: string) => `Today: ${status}`,
+  notToday: "Not on today's days",
+  noProductForStep: "No other product of ours fits this step right now. You can add a product that is not ours.",
+  addFor: (step: string) => `Adding to ${step}`,
+  allSteps: "Any step",
+  stepLabel: "Step",
+  manage: "Change or stop",
+  stepOf: (step: string) => `Step: ${step}`,
   nothingToday: "Nothing on your routine for today.",
   open: "Open your routine",
   logAs: (status: string, name: string, slot: string) => `${status}: ${name}, ${slot}`,

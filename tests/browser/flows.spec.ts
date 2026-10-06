@@ -149,42 +149,55 @@ test("withdraw AI-share consent on the dashboard, then Echo asks again", async (
   await expect(page.getByText(AI_SHARE_CONSENT_COPY)).toBeVisible();
 });
 
-test("routine: add a product, mark used, mark skipped, add other product, reload, all still there", async ({ page }) => {
+test("routine: the four steps, an empty step invites an add, used and skipped in one tap, reload, all still there", async ({ page }) => {
   await signIn(page, U.routine!.phoneNumber);
   await page.goto("/routine");
   await expect(page.getByText(R.empty)).toBeVisible();
+  const morning = page.getByRole("region", { name: R.slot.AM, exact: true });
+  const evening = page.getByRole("region", { name: R.slot.PM, exact: true });
+  for (const step of Object.values(R.steps)) await expect(morning.getByText(step, { exact: true })).toBeVisible();
+  await expect(evening.getByText(R.eveningProtect)).toBeVisible();
 
+  // An empty step opens the add form for that step and slot. There is no
+  // serum in the catalogue yet, so the form says so.
+  await morning.getByRole("link", { name: R.addToStepLabel(R.steps.serum, R.slot.AM.toLowerCase()) }).click();
   const addSection = page.locator("section", { has: page.getByRole("heading", { name: R.add }) });
+  await expect(addSection.getByLabel(R.stepLabel)).toHaveValue("serum");
+  await expect(addSection.getByText(R.noProductForStep)).toBeVisible();
+  await addSection.getByLabel(R.stepLabel).selectOption("");
+
   const product = addSection.getByLabel(R.product);
   const first = await product.locator("option").nth(1).textContent();
   await product.selectOption({ index: 1 });
   await addSection.getByRole("button", { name: R.addButton, exact: true }).click();
-  // By the product name heading only: every card's "Swap for" list also names the other products.
-  const card = (name: string) => page.locator("article[data-routine-card]").filter({ has: page.locator("h3").getByText(name, { exact: true }) });
-  await expect(card(first!)).toBeVisible();
-  await card(first!).getByRole("button", { name: R.logAs(R.status.used, first!, R.slot.AM.toLowerCase()) }).click();
-  await expect(card(first!).getByText(`${R.today}, ${R.slot.AM}: ${R.status.used}`)).toBeVisible();
+  const entry = (name: string) => morning.locator("[data-routine-entry]").filter({ has: page.getByText(name, { exact: true }) });
+  await expect(entry(first!)).toBeVisible();
+  await entry(first!).getByRole("button", { name: R.logAs(R.status.used, first!, R.slot.AM.toLowerCase()) }).click();
+  await expect(entry(first!).getByText(R.todayStatus(R.status.used))).toBeVisible();
 
   await addSection.getByLabel(R.product).selectOption({ label: R.otherProduct });
   await addSection.getByRole("button", { name: R.addButton, exact: true }).click();
-  await expect(card(R.otherProduct)).toBeVisible();
-  await card(R.otherProduct).getByRole("button", { name: R.logAs(R.status.skipped, R.otherProduct, R.slot.AM.toLowerCase()) }).click();
-  await expect(card(R.otherProduct).getByText(`${R.today}, ${R.slot.AM}: ${R.status.skipped}`)).toBeVisible();
+  await expect(morning.getByText(R.otherGroup)).toBeVisible();
+  await entry(R.otherProduct).getByRole("button", { name: R.logAs(R.status.skipped, R.otherProduct, R.slot.AM.toLowerCase()) }).click();
+  await expect(entry(R.otherProduct).getByText(R.todayStatus(R.status.skipped))).toBeVisible();
 
   // Keyboard focus stays on the pressed button while it saves (flow review G03).
-  const skipped = card(first!).getByRole("button", { name: R.logAs(R.status.skipped, first!, R.slot.AM.toLowerCase()) });
+  const skipped = entry(first!).getByRole("button", { name: R.logAs(R.status.skipped, first!, R.slot.AM.toLowerCase()) });
   await skipped.focus();
   await page.keyboard.press("Enter");
-  await expect(card(first!).getByText(`${R.today}, ${R.slot.AM}: ${R.status.skipped}`)).toBeVisible();
+  await expect(entry(first!).getByText(R.todayStatus(R.status.skipped))).toBeVisible();
   await expect(skipped).toBeFocused();
   await skipped.focus();
-  await card(first!).getByRole("button", { name: R.logAs(R.status.used, first!, R.slot.AM.toLowerCase()) }).click();
+  await entry(first!).getByRole("button", { name: R.logAs(R.status.used, first!, R.slot.AM.toLowerCase()) }).click();
   await page.reload();
-  await expect(card(first!).getByText(`${R.today}, ${R.slot.AM}: ${R.status.used}`)).toBeVisible();
-  await expect(card(R.otherProduct).getByText(`${R.today}, ${R.slot.AM}: ${R.status.skipped}`)).toBeVisible();
+  await expect(entry(first!).getByText(R.todayStatus(R.status.used))).toBeVisible();
+  await expect(entry(R.otherProduct).getByText(R.todayStatus(R.status.skipped))).toBeVisible();
+  // No reading or photo next to a routine entry.
+  await expect(page.locator("main")).not.toContainText(/\b(Low|Moderate|Elevated)\b/);
+  await expect(page.locator("main img")).toHaveCount(0);
   // R-6: the page fits a 390 px phone screen, with long product names in every list.
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
-  for (const el of await page.locator("select, article[data-routine-card]").all()) {
+  for (const el of await page.locator("select, article[data-routine-card], [data-routine-entry]").all()) {
     const box = await el.boundingBox();
     expect(box!.x + box!.width, await el.evaluate((n) => n.outerHTML.slice(0, 80))).toBeLessThanOrEqual(390);
   }
@@ -206,7 +219,8 @@ test("Home: today's routine logs used or skipped in one tap, and the entry shows
   const used = today.getByRole("button", { name: R.logAs(R.status.used, name, R.slot.AM.toLowerCase()) });
   await used.click();
   await expect(used).toHaveAttribute("aria-pressed", "true");
-  await expect(today.locator("li", { hasText: name }).filter({ hasText: R.slot.AM }).getByText(`${R.slot.AM} · ${R.status.used}`)).toBeVisible();
+  const morningEntry = today.getByRole("region", { name: R.slot.AM, exact: true }).locator("[data-routine-entry]", { hasText: name });
+  await expect(morningEntry.getByText(R.todayStatus(R.status.used))).toBeVisible();
   const recent = page.locator("section", { has: page.getByRole("heading", { name: T.recent }) });
   await expect(recent.getByText(T.routine.usage(name, R.slot.AM.toLowerCase(), R.status.used))).toBeVisible();
   await shot(page, "home-routine");
