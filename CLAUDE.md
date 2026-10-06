@@ -40,3 +40,11 @@ All architectural decisions must be documented.
    (`npm run dev:local`, `npm run test:local`), which uses no production keys.
 3. The full deploy happens at the end, with docs/PHASE_0_RUNBOOK.md (C2
    onward, then A, B, D). Do not mark a paused deploy task as done.
+
+## Owner note, 2026-10-07: Stage 1 deploy
+The owner authorises the agent to run every step of
+docs/PHASE_0_RUNBOOK.md Stage 1 itself, including steps that change
+production. This covers deleting and recreating the Firestore
+(default) database in Job A1 only; the data is disposable test
+data. No other database may be deleted. This note is removed when
+the deploy ends.
