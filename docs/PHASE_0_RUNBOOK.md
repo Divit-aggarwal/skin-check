@@ -19,7 +19,7 @@ Stage 1 puts everything on `longitudinal-platform` into production and checks it
 | 5 | **Job B**: Vercel functions to bom1 | Owner | 15 min | **STOP: JOB B DONE** |
 | 6 | **Job S**: S1 erase user, S2 erase keys, S3 `CRON_SECRET`, S4 no dev settings, **S6 `GEMINI_MODEL_SYNTHESIS`**, **S7 read-only photo user, S8 its keys** (Stage 1 needs S6-S8). Skip S5 (photo expiry) until decision 5 | Owner | 35 min | **STOP: JOB S DONE** |
 | 7 | **Job D**: D0 A14 merge (resolve `DECISION_LOG.md` and `vercel.json`), D1 push and PR, D2 merge = production deploy, D3 rules and chat-turn expiry right after Ready | Owner | 45 min | **STOP before D2**: tests green on the merged branch. **STOP before D3**: D2 Ready |
-| 8 | **D4** checks with two made-up test accounts: login, photo upload, engine, Gemini (English and Hinglish), rate limit, trust boundary, delete and the next daily sweep; then the redesign checks (items 9-14): sign in lands on Home, navigation on a phone and a desktop, a past check with its photo, the face drawing, the routine steps, `/dev/recommendations` returns 404 | Owner | 80 min + next sweep (03:00-03:59 IST) | **STOP: JOB D DONE**. Stage 1 is live |
+| 8 | **D4** checks with two made-up test accounts: login, photo upload, engine, Gemini (English and Hinglish), rate limit, trust boundary, delete and the next daily sweep; then the redesign checks (items 9-14): sign in lands on Home, navigation on a phone and a desktop, a past check with its photo, the face drawing, the routine steps, `/dev/recommendations` returns 404 | Owner | 80 min + next sweep (02:30-03:29 IST) | **STOP: JOB D DONE**. Stage 1 is live |
 
 Total: about 5 hours of owner time, plus waiting for the next daily sweep (step 8).
 
@@ -151,7 +151,7 @@ No other setting was added: `git diff 050af54..HEAD` adds no other `process.env`
 
 Unchanged by the redesign: still the one cron in `vercel.json`.
 
-- `vercel.json` (on the branch) declares one Vercel cron: `GET /api/account/erase/sweep`, schedule `30 21 * * *` (UTC), i.e. once a day between 03:00 and 03:59 India time. The Hobby plan allows one run a day at any minute of the scheduled hour.
+- `vercel.json` (on the branch) declares one Vercel cron: `GET /api/account/erase/sweep`, schedule `30 21 * * *` (UTC), i.e. once a day at some minute of the 21:00 UTC hour, i.e. between 02:30 and 03:29 India time. The Hobby plan allows one run a day and fires it anywhere in the scheduled hour (Vercel docs: `0 1 * * *` "will trigger anywhere between 1:00 am and 1:59 am"; checked 2026-10-06). The comment in `lib/consent.ts` (`ERASE_SWEEP_SCHEDULE`) still says 03:00-03:59: tracker G12.
 - Vercel sends `Authorization: Bearer $CRON_SECRET`. The route refuses (500) when `CRON_SECRET` is unset and (401) on any other header.
 - What it does: for every `erasedAccounts/{uid}` whose `sweepAfter` (erase + 70 minutes) has passed, it erases S3 `users/{uid}/`, the Firestore tree, `under18Accounts/{uid}` and the Auth user again, then removes the marker. A failed account keeps its marker and is retried next run.
 - The delete copy promises "within 2 days" (H26): 70 minutes + at most 24 h 59 min between runs. `ERASE_SWEEP_SCHEDULE` in `lib/consent.ts` and `vercel.json` are pinned together by a test. On a Pro plan the schedule can run more often; change both and the copy together.
@@ -655,7 +655,7 @@ printf 'gemini-3.6-flash' | vercel env add GEMINI_MODEL_SYNTHESIS production --n
 ```
 - Who: owner. For Stage 2, use the model G1 approves, and confirm it accepts `thinkingLevel: MINIMAL` before switching.
 - Good output: `Removed …` then `Added Environment Variable GEMINI_MODEL_SYNTHESIS to Project skin-check`.
-- Check (read-only): `vercel env ls production | grep GEMINI_MODEL_SYNTHESIS` shows it as a plain (non-secret) value; D4 item 4 shows `modelId: "gemini-3.6-flash"` on the echo turn.
+- Check (read-only): `vercel env ls production | grep GEMINI_MODEL_SYNTHESIS` lists the name (`vercel env ls` never shows values); D4 item 4 confirms the value: it shows `modelId: "gemini-3.6-flash"` on the echo turn.
 - Undo: `vercel env rm GEMINI_MODEL_SYNTHESIS production --yes` (the code then uses its default, `gemini-3.6-flash`). The old value cannot be restored, because it was never readable.
 
 ### S7. Create the read-only photo user (kept photos only, no listing)
@@ -863,17 +863,17 @@ The local stack uses emulators, S3Mock, a fake Gemini and the engine image by ID
    - A forged chat history (edit one earlier message in the browser devtools request) returns `400 CHAT_HISTORY_INVALID`.
    - Console → Firestore → Rules Playground, signed in as the test uid: `create` on `users/<uid>/scanAnalyses/x` is denied; `get` on `erasedAccounts/<uid>` and on `under18Accounts/<uid>` is denied; `get` on another uid's `users/<other>` is denied.
    - The sweep without the secret: `curl -s -o /dev/null -w '%{http_code}\n' https://skin-check-sigma.vercel.app/api/account/erase/sweep` prints `401`.
-7. **Erase and the sweep.** With a second made-up account that has one check with a photo: delete the account on `/account`. Right away (read-only): the S3 prefix `users/<uid2>/` lists nothing, the console has no `users/<uid2>` tree, Firebase Auth has no such user, and `erasedAccounts/<uid2>` exists. After the next cron run (03:00-03:59 India time, at least 70 minutes after the delete), `erasedAccounts/<uid2>` is gone. Vercel dashboard → project → Settings → Cron Jobs shows the run with status 200. To run it at once, use **Run** on that page (a STOP step; it only re-erases already erased accounts).
+7. **Erase and the sweep.** With a second made-up account that has one check with a photo: delete the account on `/account`. Right away (read-only): the S3 prefix `users/<uid2>/` lists nothing, the console has no `users/<uid2>` tree, Firebase Auth has no such user, and `erasedAccounts/<uid2>` exists. After the next cron run (02:30-03:29 India time, at least 70 minutes after the delete), `erasedAccounts/<uid2>` is gone. Vercel dashboard → project → Settings → Cron Jobs shows the run with status 200. To run it at once, use **Run** on that page (a STOP step; it only re-erases already erased accounts).
 8. **Region.** `curl -s -o /dev/null -D - -X POST https://skin-check-sigma.vercel.app/api/skin-scan | grep -i x-vercel-id` shows `bom1::bom1::`.
 
-9. **Sign in lands on Home.** Signed out, open `https://skin-check-sigma.vercel.app/`: the check flow starts. There is no redirect to `/skin-check` any more; `/` is a page. Sign in on `/account` with the test phone: you land on `/dashboard` ("Your skin checks"). Open `/` again while signed in: Home.
+9. **Sign in lands on Home.** Signed out, open `https://skin-check-sigma.vercel.app/`: the page itself sends you on to `/skin-check` (`app/(marketing)/page.tsx`; there is no server redirect any more). Sign in on `/account` with the test phone: you land on `/dashboard` ("Your skin checks"). Open `/` again while signed in: it sends you to `/dashboard` (Home).
 10. **Navigation on a phone and a desktop.**
     - Phone (a real phone, or a desktop browser under 640 px wide): a bottom bar with Home, Checks, New check (the round button in the middle), Routine and Echo. Account is the round button at the top right of each page. Each item opens its page and is shown as current.
     - Desktop (1024 px or wider): a white side bar with the name, New check, Home, Checks, Routine, Echo, and Account with the phone's last 4 digits at the bottom.
     - On either, press Tab at the top of a page: the first stop is "Skip to content".
 11. **A past check with its photo** (needs S7 and S8). Use the account from item 2, which kept its photo.
     - Open Checks. The check shows a small photo. The opened check shows it too, with its readings and the fixed line "Photos differ in light and angle…".
-    - In devtools → Network, `GET /api/checks/photo?scanId=…` answers `200` with `Cache-Control: private, no-store, max-age=0`. A check with no kept photo shows no photo, and its request answers `404`.
+    - In devtools → Network, `GET /api/checks/photo?scanId=…` answers `200` with `Cache-Control: private, no-store, max-age=0`. A check with no kept photo shows no photo and sends no `/api/checks/photo` request. A `404 NO_PHOTO` appears only when the check record says the photo was kept but the object is missing.
     - Without a login it answers `401`:
       ```bash
       curl -s -o /dev/null -w '%{http_code}\n' 'https://skin-check-sigma.vercel.app/api/checks/photo?scanId=<scanId>'
