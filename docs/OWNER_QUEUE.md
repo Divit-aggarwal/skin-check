@@ -160,7 +160,7 @@ Echo is on by default (`ECHO_SWITCH` is not set). To turn it off:
 printf 'off' | vercel env add ECHO_SWITCH production --no-sensitive
 vercel redeploy $(vercel api /v9/projects/skin-check | jq -r '.targets.production.id') --target production
 ```
-A Vercel setting takes effect only with a new deployment, hence the redeploy (about 2 minutes). Use `redeploy`, not `rollback` (rollback turns off automatic updates). A red-flag or self-harm message still gets the referral with the helpline while Echo is off. To turn Echo back on: `vercel env rm ECHO_SWITCH production --yes`, then the same redeploy.
+A Vercel setting takes effect only with a new deployment, hence the redeploy (about 2 minutes). The value is built into the code, so tell the agent afterwards: it loads https://skin-check-sigma.vercel.app/echo and checks the page source contains "Echo is paused for now". If it does not (a redeploy that reused an old build), run `vercel deploy --prod --force` from an up-to-date `master` checkout, which builds without the cache. Use `redeploy`, not `rollback` (rollback turns off automatic updates). A red-flag or self-harm message still gets the referral with the helpline while Echo is off. To turn Echo back on: `vercel env rm ECHO_SWITCH production --yes`, then the same redeploy.
 
 ## Step 7. Checks on your phone after the merge (made-up test accounts only)
 

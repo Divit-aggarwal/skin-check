@@ -198,7 +198,8 @@ export async function POST(request: NextRequest) {
   };
 
   // TD-29 (5): the off switch, after the referral (which always goes out) and
-  // before anything that reads, spends or calls Gemini.
+  // before anything that spends or calls Gemini. The only read before the
+  // refusal is the split red-flag check above (the user's own turns).
   if (!echoOn()) {
     return (await splitReferral()) ?? NextResponse.json({ error: ECHO_OFF_COPY, code: "ECHO_OFF" }, { status: 503 });
   }
