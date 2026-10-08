@@ -17,6 +17,7 @@ import { ROUTINE_COPY } from "@/lib/routine/copy";
 import { AccountButton, btnPrimary, btnSecondary, EmptyState, SignedOutCard, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";
 import { CHECKS_COPY as K } from "./copy";
 import { Thumb } from "./Thumb";
+import { echoOn } from "@/lib/echo-limits";
 
 // G03 3.3 / 3.4. /checks: every check by date (date, kind, photo check, kept
 // photo), or the timeline of checks and routine entries. /checks/[scanId]: one
@@ -211,10 +212,13 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
         <p>{K.noReadings}</p>
       )}
       <div className="flex flex-wrap gap-3 border-t border-brand-line pt-5">
+        {/* TD-29 (5): no way into Echo while it is switched off. */}
         {newest ? (
-          <Link href="/echo" className={btnPrimary}>
-            {K.askEcho}
-          </Link>
+          echoOn() && (
+            <Link href="/echo" className={btnPrimary}>
+              {K.askEcho}
+            </Link>
+          )
         ) : (
           check.view && <p className="w-full text-sm text-brand-muted">{K.echoNewestOnly}</p>
         )}

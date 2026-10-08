@@ -14,7 +14,14 @@ const h = vi.hoisted(() => ({
   docs: new Map<string, Record<string, unknown>>(),
   failTx: false,
   paths: [] as string[],
+  splitTurns: [] as { role: "user"; text: string }[],
 }));
+
+// The context path's stored user turns for the split check (lib/context/chat-turns.ts).
+vi.mock("@/lib/context/chat-turns", async () => {
+  const actual = await vi.importActual<typeof import("@/lib/context/chat-turns")>("@/lib/context/chat-turns");
+  return { ...actual, loadSplitCheckTurns: async () => h.splitTurns };
+});
 
 vi.mock("@/lib/echo-newest-scan", () => ({ checkEchoScan: async () => "ok" }));
 vi.mock("@/lib/firebase/admin", async () => {
@@ -76,6 +83,7 @@ beforeEach(() => {
   h.docs.clear();
   h.paths = [];
   h.failTx = false;
+  h.splitTurns = [];
   h.verifyFirebaseIdToken.mockResolvedValue("uid-x");
   h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: {}, answers: {} });
   h.getSkinCheckChatReply.mockResolvedValue("Your cheeks read Moderate for redness in this photo.");
@@ -120,7 +128,15 @@ describe("the Echo switch (ECHO_SWITCH)", () => {
     const { readFileSync } = await import("node:fs");
     expect(readFileSync("app/(marketing)/echo/page.tsx", "utf8")).toContain("<EchoPage echoOn={echoOn()} />");
     const page = readFileSync("components/skin-check/EchoPage.tsx", "utf8");
-    expect(page).toMatch(/\{!echoOn \? \(\s*<p role="status"[^>]*>\s*\{E\.off\}/);
+    // The notice, then the help line (safety review: a user who cannot write still sees it).
+    expect(page).toMatch(/\{!echoOn \? \(\s*<div role="status"[^>]*>\s*<p>\{E\.off\}<\/p>\s*<p>\{withPhoneLinks\(REFERRAL_LINE\)\}<\/p>/);
+    // Every other way into Echo is hidden while it is off, and the browser build reads the same value.
+    expect(readFileSync("next.config.js", "utf8")).toContain('env: { ECHO_SWITCH: process.env.ECHO_SWITCH ?? "" }');
+    expect(readFileSync("components/dashboard/DashboardPage.tsx", "utf8")).toContain("{echoOn() && <ChatSection");
+    expect(readFileSync("components/checks/ChecksView.tsx", "utf8")).toMatch(/echoOn\(\) && \(\s*<Link href="\/echo"/);
+    expect(readFileSync("components/skin-check/SkinCheckDashboard.tsx", "utf8")).toMatch(/\{echoOn\(\) && \(\s*<div className="sticky/);
+    // No greeting inviting a question while Echo is off.
+    expect(page).toContain("{echoOn && messages.length === 0 && (");
     expect(page.indexOf("{!echoOn ? (")).toBeLessThan(page.indexOf("<form"));
   });
 });
@@ -182,5 +198,48 @@ describe("20 questions per user per day (lib/echo-quota.ts)", () => {
     h.latestGrant.mockResolvedValue(null);
     expect((await post("hi")).status).toBe(403);
     expect(h.docs.size).toBe(0);
+  });
+});
+
+// Safety review 2026-10-09: a red flag split over two turns must get the referral even when
+// the answer would otherwise be a refusal (Echo off, the daily limit, the limit store down).
+describe("a split red flag beats every refusal (context path, the one that ships)", () => {
+  beforeEach(() => {
+    vi.stubEnv("ECHO_CONTEXT_PATH", "");
+    h.splitTurns = [{ role: "user", text: "i want to" }];
+  });
+
+  it("control: 'die' alone is not a red flag, 'i want to' + 'die' is", async () => {
+    const { redFlagHit } = await import("@/lib/context/prefilter");
+    expect(redFlagHit("die")).toBe(false);
+    expect(redFlagHit("i want to die")).toBe(true);
+  });
+
+  it("Echo off: the referral, not ECHO_OFF", async () => {
+    vi.stubEnv("ECHO_SWITCH", "off");
+    const res = await post("die");
+    expect(res.status).toBe(200);
+    expect((await res.json()).reply).toBe(REFERRAL_COPY);
+  });
+
+  it("at the daily limit: the referral, not ECHO_DAILY_LIMIT, and Gemini is never called", async () => {
+    h.docs.set("users/uid-x/echoUsage/daily", { day: quotaDay(new Date()), count: ECHO_DAILY_QUESTIONS_PER_USER });
+    const res = await post("die");
+    expect(res.status).toBe(200);
+    expect((await res.json()).reply).toBe(REFERRAL_COPY);
+    expect(h.getSkinCheckChatReply).not.toHaveBeenCalled();
+  });
+
+  it("limit store down: the referral, not 503", async () => {
+    h.failTx = true;
+    const res = await post("die");
+    expect(res.status).toBe(200);
+    expect((await res.json()).reply).toBe(REFERRAL_COPY);
+  });
+
+  it("control: an ordinary message at the limit still gets ECHO_DAILY_LIMIT", async () => {
+    h.splitTurns = [{ role: "user", text: "what is my redness" }];
+    h.docs.set("users/uid-x/echoUsage/daily", { day: quotaDay(new Date()), count: ECHO_DAILY_QUESTIONS_PER_USER });
+    expect((await (await post("and my cheeks?")).json()).code).toBe("ECHO_DAILY_LIMIT");
   });
 });

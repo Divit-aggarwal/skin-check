@@ -10,18 +10,6 @@ export function contextChatEnabled(): boolean {
   return !(devOrTest && process.env.ECHO_CONTEXT_PATH === "off");
 }
 
-/**
- * Owner decision TD-29 (5), 2026-10-09: a production setting that turns Echo
- * off quickly. Echo is on unless ECHO_SWITCH is exactly "off" (unset, empty
- * or anything else is on). Off stops Echo: the chat route refuses every
- * question with ECHO_OFF before any Gemini call (a red-flag message still gets
- * the referral first), and /echo shows ECHO_OFF_COPY instead of the input. It
- * never falls back to the older Echo (contextChatEnabled above is separate).
- * A Vercel setting takes effect on the next deployment: flip it, then
- * redeploy production (docs/OWNER_QUEUE.md).
- */
-export function echoOn(): boolean {
-  return process.env.ECHO_SWITCH !== "off";
-}
-
-export const ECHO_OFF_COPY = "Echo is turned off for now. Please try again later.";
+// TD-29 (5): the Echo off switch lives in lib/echo-limits.ts (client-safe,
+// so pages outside the chat layer can read it too).
+export { ECHO_OFF_COPY, echoOn } from "@/lib/echo-limits";

@@ -72,9 +72,12 @@ describe("red-flag pre-filter (§6)", () => {
 
   // F06, TD-29 (2): the only number is the Tele-MANAS helpline, confirmed on an official
   // Government of India page (source in lib/context/prefilter.ts), and its hours.
-  it("the referral copy carries the verified Tele-MANAS number and no other number", () => {
-    expect(REFERRAL_COPY).toContain("Tele-MANAS on 14416 (free, 24x7)");
-    expect(REFERRAL_COPY.match(new RegExp(String.raw`\p{Nd}+`, "gu"))).toEqual(["14416", "24", "7"]);
+  // 112: India's single emergency number (112.gov.in). Safety review 2026-10-09: the help
+  // line comes first, so a person in crisis does not first read a dermatology refusal.
+  it("the referral copy carries the verified Tele-MANAS numbers and 112, no other number, help line first", () => {
+    expect(REFERRAL_COPY).toContain("call Tele-MANAS on 14416 or 1800-89-14416. It is free and open 24 hours a day. In an emergency, call 112");
+    expect(REFERRAL_COPY.match(new RegExp(String.raw`\p{Nd}+`, "gu"))).toEqual(["14416", "1800", "89", "14416", "24", "112"]);
+    expect(REFERRAL_COPY.startsWith("If you feel unsafe or might hurt yourself")).toBe(true);
   });
 });
 
@@ -329,7 +332,7 @@ describe("unsupported script (H22)", () => {
     expect(UNSUPPORTED_SCRIPT_COPY).toMatch(/English and Hindi only/);
     expect(UNSUPPORTED_SCRIPT_COPY.endsWith(REFERRAL_LINE)).toBe(true);
     // TD-29 (2): the referral line's helpline is its only number.
-    expect(UNSUPPORTED_SCRIPT_COPY.match(/\d+/g)).toEqual(["14416", "24", "7"]);
+    expect(UNSUPPORTED_SCRIPT_COPY.match(/\d+/g)).toEqual(["14416", "1800", "89", "14416", "24", "112"]);
   });
 });
 

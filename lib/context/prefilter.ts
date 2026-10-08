@@ -441,11 +441,15 @@ export const checkComparisonHit = (message: string): boolean => CHECK_COMPARISON
 // https://dghs.mohfw.gov.in/national-mental-health-programme.php: "The public
 // can access the Tele MANAS helpline by dialing toll-free helpline number
 // 1800-89-14416 or short code 14416", and the programme provides "24X7
-// tele-mental health services". Re-check the source before changing this.
+// tele-mental health services". 112 is India's single emergency number
+// (Emergency Response Support System, https://112.gov.in/, checked the same
+// day). Re-check the sources before changing this. The help line comes first
+// (safety review 2026-10-09: a person in crisis must not first read a
+// dermatology refusal), in short sentences that read on a phone.
 export const REFERRAL_LINE =
-  "If you feel unsafe or might hurt yourself, please call Tele-MANAS on 14416 (free, 24x7), or contact your local emergency services or someone you trust right now.";
+  "If you feel unsafe or might hurt yourself, call Tele-MANAS on 14416 or 1800-89-14416. It is free and open 24 hours a day. In an emergency, call 112, or reach someone you trust right now.";
 export const REFERRAL_COPY =
-  "This is something a doctor or dermatologist should look at in person, so Echo can't answer it here. " + REFERRAL_LINE;
+  REFERRAL_LINE + " If this is about a health problem, a doctor or dermatologist should see it in person, so Echo can't answer it here.";
 
 /**
  * F16: the model asked for a doctor (a medicine, a product's safety, a

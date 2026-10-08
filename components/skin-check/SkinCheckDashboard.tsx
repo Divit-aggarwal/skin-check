@@ -14,6 +14,7 @@ import { useSkinCheckSession } from "@/lib/skin-check-session-context";
 import type { SkinScanState } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import { EchoTwin, type AnalysisCategory } from "./EchoTwin";
+import { echoOn } from "@/lib/echo-limits";
 
 // The category the results screen shows FIRST — the user's own stated
 // primary concern from the quiz if they gave one, else whichever metric
@@ -187,6 +188,8 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
           of a long page and was easy to never see. Sticky rather than fixed,
           because the results container animates with a transform, which
           breaks `position: fixed`. */}
+      {/* TD-29 (5): no way into Echo while it is switched off. */}
+      {echoOn() && (
       <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-raised -mx-4 -mt-6 border-t border-brand-line bg-brand-linen/95 px-4 py-3 backdrop-blur sm:bottom-0 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:mt-0 lg:rounded-2xl lg:border lg:px-6">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 lg:max-w-none">
           <p className="text-sm text-brand-muted">Questions about this check?</p>
@@ -195,6 +198,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
           </Button>
         </div>
       </div>
+      )}
     </div>
   );
 }

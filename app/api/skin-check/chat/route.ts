@@ -16,6 +16,7 @@ import { ageStatus, latestGrant, withLedgerTimeout, type AgeStatus } from "@/app
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 import { contextChatEnabled, ECHO_OFF_COPY, echoOn } from "@/lib/context/switch";
 import { handleContextChat, recordReferral } from "@/lib/context/chat";
+import { loadSplitCheckTurns } from "@/lib/context/chat-turns";
 import { checkComparisonHit, comparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY, referralCopyFor, UNSUPPORTED_SCRIPT_COPY, unsupportedScript, withoutReferrals } from "@/lib/context/prefilter";
 import { buildContextPackage } from "@/lib/context/builder";
 import { comparisonAnswer, fallbackLines } from "@/lib/context/answer";
@@ -168,10 +169,38 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, reply: fixedReply, ...(referralToken ? { historyToken: referralToken } : {}) });
   }
 
+  // Safety review 2026-10-09: a red flag split over turns ("i want to" then
+  // "die") is caught by the split check (the context path's inside
+  // handleContextChat, today's Echo's below), which a refusal (Echo off, the
+  // daily limit, the limit store down) would skip. So before any of those
+  // refusals the joined turns are checked; a hit gets the referral instead.
+  // Unverified client history can only add a referral, never remove one. A
+  // read failure lets the refusal go out; its copy carries the referral line.
+  const splitReferral = async (): Promise<NextResponse | null> => {
+    let joined: string;
+    try {
+      const prior = contextChatEnabled() ? await loadSplitCheckTurns(uid, scanId, region) : withoutReferrals(history).slice(-19);
+      joined = joinedUserTurns(prior, message);
+    } catch (err) {
+      console.error("skin-check chat: split check before a refusal failed:", (err as Error)?.name ?? "unknown");
+      return null;
+    }
+    if (!redFlagHit(joined)) return null;
+    const reply = referralCopyFor(joined);
+    const turns = [...(historyOk ? history : []), { role: "user" as const, text: message }, { role: "echo" as const, text: reply }];
+    let token: string | undefined;
+    try {
+      token = signHistory(uid, scanId, region, turns);
+    } catch {
+      token = undefined; // not configured: the referral still goes out
+    }
+    return NextResponse.json({ ok: true, reply, ...(token ? { historyToken: token } : {}) });
+  };
+
   // TD-29 (5): the off switch, after the referral (which always goes out) and
   // before anything that reads, spends or calls Gemini.
   if (!echoOn()) {
-    return NextResponse.json({ error: ECHO_OFF_COPY, code: "ECHO_OFF" }, { status: 503 });
+    return (await splitReferral()) ?? NextResponse.json({ error: ECHO_OFF_COPY, code: "ECHO_OFF" }, { status: 503 });
   }
 
   if (historyError instanceof AdminNotConfiguredError) return misconfigured(historyError);
@@ -258,7 +287,7 @@ export async function POST(request: NextRequest) {
   // TD-29 (5): 20 questions per user per day (lib/echo-quota.ts), counted
   // here, after every gate, so a refused question spends nothing.
   const quotaLimited = await consumeEchoQuestion(uid);
-  if (quotaLimited) return quotaLimited;
+  if (quotaLimited) return (await splitReferral()) ?? quotaLimited;
 
   try {
     // F12 (TD-20): the context-package path is the chat that ships. Today's

@@ -1,5 +1,4 @@
-import { ECHO_DAILY_LIMIT_COPY } from "@/lib/echo-limits";
-import { ECHO_OFF_COPY } from "@/lib/context/switch";
+import { ECHO_DAILY_LIMIT_COPY, ECHO_OFF_COPY } from "@/lib/echo-limits";
 
 // Every new word on the Echo screen (G03 3.6). Checked by
 // tests/ui-wording.test.ts with every D-12 lexicon.
