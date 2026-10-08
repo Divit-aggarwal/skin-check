@@ -124,6 +124,9 @@ npx -y firebase-tools@latest firestore:backups:schedules:create --database "(def
 3. Open https://vercel.com → project **skin-check** → **Settings** → **Environment Variables**.
 4. Find `GEMINI_API_KEY` with environment **Production** → the **⋯** menu → **Edit** → paste the key into the value field → **Save**. (If it offers only "Remove", remove it and use **Add New**: name `GEMINI_API_KEY`, value the key, environment Production only, **Sensitive** on.)
 5. Do not redeploy now: the merge in step 6 builds with the new value.
+6. **Spend guard (tracker B13).** With a paid key and 20 questions per user, extra accounts mean extra spend:
+   - Firebase console → https://console.firebase.google.com/project/projectskin-a202c/authentication/providers → the **Sign-in method** list must show **Phone** as the only enabled provider. If any other one (Anonymous, Email/Password, Google…) says Enabled, click it → switch **Enable** off → **Save**.
+   - Budget alert on the paid key's Google Cloud project: https://console.cloud.google.com/billing → choose the billing account of the paid key's project → **Budgets & alerts** → **Create budget** → scope: that project → amount: your monthly limit (for example ₹2,000) → alerts at 50%, 90% and 100% → **Finish**.
 
 - Check (agent): `vercel env ls production` lists `GEMINI_API_KEY` with an updated time of today. Which key it is can only be confirmed by Echo answering after step 6 (phone check 7.5).
 - Undo: edit it back to the previous key (if you still have it).
@@ -146,6 +149,7 @@ gh pr merge release/real-users --merge
 ```
 - Good output: `✓ Merged pull request #…`. Vercel builds `master` for production (about 2 minutes).
 - Check (agent): production deployment READY, its commit equals `origin/master`, regions `[bom1]`, the sweep cron still registered; `/dev/recommendations` answers 404; a chat request without a login answers 401; the live rules unchanged from step 5. No other rules or index deploy is needed.
+- Note: a browser tab left open from before the merge still runs the old page; a check with a kept photo fails there once (the upload now needs consent version 2). Reloading the page fixes it.
 - Undo:
   - Fast: `vercel rollback dpl_4yYMPGgiMj3hjEeeWWP9J7K3UKyA` (today's production). A rollback turns off automatic production updates; after the problem is fixed, `vercel promote <new deployment id>` turns them back on. The rules from step 5 stay (they suit both versions).
   - Git: `git revert -m 1 <merge commit>` in a new pull request; its merge redeploys the previous code.
