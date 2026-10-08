@@ -53,14 +53,14 @@ export const AGE_ATTESTATION_COPY = "I confirm I am 18 or older.";
 // Owner decision TD-29 (4), 2026-10-09: the GEMINI_BOUNDARY §8 draft wording
 // is version 1, DRAFT removed. A grant recorded against the earlier
 // "ai share DRAFT version 1" no longer counts, so those users are asked
-// again. Legal review before advertising: tracker H28.
+// again. Legal review before advertising: tracker H29.
 export const AI_SHARE_CONSENT_VERSION = "ai share version 1";
 export const AI_SHARE_CONSENT_COPY =
   "Share my skin check with the AI assistant (processed by Google, outside India).";
 
 // D-16 processing consent, recorded per scan (privacy step 14, R3/R4). Owner
 // decision TD-29 (4), 2026-10-09: the checkbox wording is version 1 as it is,
-// DRAFT removed from the version. Legal review before advertising: H28.
+// DRAFT removed from the version. Legal review before advertising: H29.
 export const PROCESSING_CONSENT_VERSION = "processing version 1";
 export const PROCESSING_CONSENT_TERMS_LABEL = "Terms & Conditions";
 export const PROCESSING_CONSENT_COPY = `I agree to the ${PROCESSING_CONSENT_TERMS_LABEL} and consent to my photo being collected and processed for this skin analysis.`;
