@@ -12,7 +12,7 @@ State when this was written (2026-10-09, all checked by the agent):
 - Engine: `skin-scan-service` on task definition `skin-scan:3` (1 vCPU / 2 GB, image digest `sha256:9a8f96c0…`), 1 running copy, HEALTHY, in the **public** subnets with a public IP, outbound 443 to anywhere allowed, Container Insights off. **All four paid interface endpoints still exist** (Logs is the recreated `vpce-068f7263470a72713`).
 - Website: production `dpl_4yYMPGgiMj3hjEeeWWP9J7K3UKyA`, commit `3537f82` (PR #5), region `bom1`.
 - Firestore `(default)`: asia-south1, delete protection on, point-in-time recovery off, no backup schedule; branch rules and the chat-turn expiry policy live (D3).
-- The release branch `release/real-users` and its pull request are open, **not merged** (see step 6).
+- The release branch `release/real-users` and its pull request #6 (https://github.com/Divit-aggarwal/skin-check/pull/6) are open, **not merged** (see step 6).
 
 ---
 
@@ -145,9 +145,9 @@ git fetch origin && git worktree add /tmp/skin-check-release origin/release/real
 ## Step 6. Merge the pull request: this is the production deploy
 
 ```bash
-gh pr merge release/real-users --merge
+gh pr merge 6 --merge
 ```
-- Good output: `✓ Merged pull request #…`. Vercel builds `master` for production (about 2 minutes).
+- Good output: `✓ Merged pull request #6`. Vercel builds `master` for production (about 2 minutes).
 - Check (agent): production deployment READY, its commit equals `origin/master`, regions `[bom1]`, the sweep cron still registered; `/dev/recommendations` answers 404; a chat request without a login answers 401; the live rules unchanged from step 5. No other rules or index deploy is needed.
 - Note: a browser tab left open from before the merge still runs the old page; a check with a kept photo fails there once (the upload now needs consent version 2). Reloading the page fixes it.
 - Undo:
