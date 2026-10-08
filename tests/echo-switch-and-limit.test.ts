@@ -135,6 +135,9 @@ describe("the Echo switch (ECHO_SWITCH)", () => {
     expect(readFileSync("components/dashboard/DashboardPage.tsx", "utf8")).toContain("{echoOn() && <ChatSection");
     expect(readFileSync("components/checks/ChecksView.tsx", "utf8")).toMatch(/echoOn\(\) && \(\s*<Link href="\/echo"/);
     expect(readFileSync("components/skin-check/SkinCheckDashboard.tsx", "utf8")).toMatch(/\{echoOn\(\) && \(\s*<div className="sticky/);
+    // Every refusal that stops the user writing carries the help line, the limit-store outage too (retryable).
+    for (const code of ["ECHO_OFF", "ECHO_DAILY_LIMIT", "ECHO_LIMIT_UNAVAILABLE"]) expect(page).toMatch(new RegExp(`${code}: \`\\$\\{E\\.\\w+\\} \\$\\{REFERRAL_LINE\\}\``));
+    expect(page).not.toMatch(/NOT_RETRYABLE = new Set\([^)]*ECHO_LIMIT_UNAVAILABLE/);
     // No greeting inviting a question while Echo is off.
     expect(page).toContain("{echoOn && messages.length === 0 && (");
     expect(page.indexOf("{!echoOn ? (")).toBeLessThan(page.indexOf("<form"));

@@ -22,4 +22,5 @@ export const ECHO_COPY = {
   // TD-29 (5): the off switch and the per-user daily limit.
   off: ECHO_OFF_COPY,
   dailyLimit: ECHO_DAILY_LIMIT_COPY,
+  limitUnavailable: "Echo can't check your settings right now. Please try again.",
 } as const;

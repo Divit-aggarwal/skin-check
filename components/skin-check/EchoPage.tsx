@@ -52,6 +52,9 @@ const GATE_MESSAGES: Record<string, string> = {
   // Both carry the help line: the user cannot write to Echo for now.
   ECHO_OFF: `${E.off} ${REFERRAL_LINE}`,
   ECHO_DAILY_LIMIT: `${E.dailyLimit} ${REFERRAL_LINE}`,
+  // The limit store could not be read: retryable, and it happens exactly when the
+  // split red-flag check cannot read turns either, so the help line goes with it.
+  ECHO_LIMIT_UNAVAILABLE: `${E.limitUnavailable} ${REFERRAL_LINE}`,
 };
 const NOT_RETRYABLE = new Set(["CHAT_MISCONFIGURED", "UNDER_18", "ATTESTATION_REQUIRED", "AI_CONSENT_REQUIRED", "CHAT_NOT_NEWEST", "ECHO_OFF", "ECHO_DAILY_LIMIT"]);
 
