@@ -32,15 +32,28 @@ describe("E01 catalogue schema", () => {
     expect(CATALOG_SCHEMA_VERSION).toBe(1);
     expect(CATALOG_VERSION).toMatch(/\S/);
     expect(CATALOGUE.version).toBe(CATALOG_VERSION);
-    expect(getProduct("sample-cleanser")?.id).toBe("sample-cleanser");
+    expect(getProduct("refreshing-cleanser")?.id).toBe("refreshing-cleanser");
     expect(getProduct("nope")).toBeUndefined();
   });
 
-  it("the sample is visibly synthetic (R-3 A)", () => {
+  // TD-29 (1): the six store products replace the synthetic sample. No sample row is left,
+  // and no store marketing text is recorded as a claim (D-12).
+  it("TD-29 (1): the store's six products, owner data, no synthetic row and no claims", () => {
+    expect(CATALOGUE.products.map((p) => p.shopifyHandle).sort()).toEqual([
+      "5-niacinamide-serum-acne-prone-skin",
+      "active-boba-encapsulated-cream-acne-prone-skin",
+      "calming-moisturiser-acne-prone-skin",
+      "clear-seal",
+      "protecting-sunscreen-acne-prone-skin",
+      "refreshing-cleanser-acne-prone-skin",
+    ]);
     for (const p of CATALOGUE.products) {
-      expect(p.dataSource).toBe("synthetic");
-      expect(p.name).toContain("SYNTHETIC");
+      expect(p.dataSource).toBe("owner");
+      expect(p.shopifyHandleVerified).toBe(true);
+      expect(`${p.id} ${p.name} ${p.versionId}`).not.toMatch(/synthetic|sample/i);
+      expect(p.claims).toEqual([]);
     }
+    expect(CATALOG_VERSION).not.toMatch(/synthetic/i);
   });
 
   it("a valid minimal product passes", () => expect(ok(valid())).toBe(true));
@@ -224,13 +237,13 @@ describe("E01 catalogue-template.csv", () => {
 
   it("each row converts to a valid product; the example row equals the shipped sample", () => {
     for (const r of rows) expect(ProductSchema.safeParse(rowToProduct(header!, r)).error).toBeUndefined();
-    expect(rowToProduct(header!, rows[0]!)).toEqual(getProduct("sample-cleanser"));
+    expect(rowToProduct(header!, rows[0]!)).toEqual(getProduct("refreshing-cleanser"));
   });
 
   it("extra claim_<n>_* columns map by pattern", () => {
     const h = [...header!, "claim_4_text", "claim_4_evidence_level", "claim_4_source", "claim_4_date"];
     const p = rowToProduct(h, [...rows[0]!, "Feels light", "consumer-perception", "Survey 2", "2026-09-01"]);
-    expect(p.claims).toHaveLength(2);
+    expect(p.claims).toHaveLength(rowToProduct(header!, rows[0]!).claims.length + 1);
     expect(ProductSchema.safeParse(p).success).toBe(true);
   });
 });

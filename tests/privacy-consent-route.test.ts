@@ -74,8 +74,12 @@ describe("AI-share consent route", () => {
     expect(appendConsent).not.toHaveBeenCalled();
   });
 
-  it("decision 7(b): the copy in use is the DRAFT, so production is blocked until final copy replaces it", () => {
-    expect(AI_SHARE_CONSENT_VERSION).toContain("DRAFT");
-    expect(AI_SHARE_CONSENT_COPY.startsWith("DRAFT")).toBe(true);
+  // Owner decision TD-29 (4): the draft wording is version 1. No DRAFT text or version ships,
+  // and the version differs from the draft one, so an old draft grant no longer counts.
+  it("TD-29 (4): version 1 copy, no DRAFT in the version or the copy", () => {
+    expect(AI_SHARE_CONSENT_VERSION).toBe("ai share version 1");
+    expect(AI_SHARE_CONSENT_VERSION).not.toMatch(/draft/i);
+    expect(AI_SHARE_CONSENT_COPY).not.toMatch(/draft/i);
+    expect(AI_SHARE_CONSENT_COPY).toBe("Share my skin check with the AI assistant (processed by Google, outside India).");
   });
 });

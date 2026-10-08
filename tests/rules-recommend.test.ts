@@ -362,12 +362,16 @@ describe("recommend: details", () => {
     ]);
   });
 
-  it("the real synthetic catalogue has no serum: the active fires with no item and a gap line", () => {
+  // TD-29 (1): on the real catalogue the rules keep only the serum and the moisturiser. The
+  // cleanser (2% Salicylic Acid) and the sunscreen (with Niacinamide) fall outside the current
+  // rule set, so the base routine has a gap: the rules/store mismatches for the clinical
+  // reviewer (G09, /dev/recommendations). Recommendations stay off in production (E05).
+  it("the real catalogue: serum and moisturiser only, the cleanser and sunscreen are outside the rule set, a gap line", () => {
     const r = recommend({ answers: CLEAN, confirmedThisScan: ALL }, CATALOGUE);
-    expect(ids(r)).toEqual(["sample-cleanser", "sample-moisturiser", "sample-sunscreen"]);
+    expect(ids(r)).toEqual(["niacinamide-serum", "calming-moisturiser"]);
     expect(firedIds(r)).toContain("active.niacinamide");
     expect(r.limits).toEqual([{ ruleId: "catalogue.gap", text: COPY.gap }]);
-    expect(r.notices).toEqual([]);
+    expect(r.notices.map((n) => n.ruleId)).toEqual(["notice.one_at_a_time"]);
     expect(r.catalogVersion).toBe(CATALOGUE.version);
   });
 

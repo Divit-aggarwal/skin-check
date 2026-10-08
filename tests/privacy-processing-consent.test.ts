@@ -161,7 +161,8 @@ describe("client: processing consent travels with the photo (R3)", () => {
     expect(src).not.toContain("consent to my photo being collected and processed");
   });
 
-  it("the version says DRAFT until the owner supplies the D-16 copy (decision 7a)", () => {
-    expect(PROCESSING_CONSENT_VERSION).toContain("DRAFT");
+  it("TD-29 (4): the version is version 1, with no DRAFT", () => {
+    expect(PROCESSING_CONSENT_VERSION).toBe("processing version 1");
+    expect(PROCESSING_CONSENT_VERSION).not.toMatch(/draft/i);
   });
 });

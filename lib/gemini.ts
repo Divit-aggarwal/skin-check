@@ -7,7 +7,7 @@ import { summarizeConcerns, type CompositeScore } from "@/lib/skin-check-score";
 import { bandScores } from "@/lib/skin-check-rules";
 import type { CautionAnswer } from "@/lib/contracts/safety-state";
 import { extraCautionAnswers } from "@/lib/rules/safety";
-import { REFERRAL_COPY } from "@/lib/context/prefilter";
+import { MODEL_REFERRAL_COPY } from "@/lib/context/prefilter";
 
 export interface EchoChatMessage {
   role: "user" | "echo";
@@ -147,7 +147,7 @@ name an active ingredient, a brand or a product to buy. Always write in Latin
 letters: in English, or in Hinglish if the user writes in Hindi.
 
 If the user describes self-harm, wanting to die, feeling unsafe, or a medical
-emergency, reply with exactly this and nothing else: ${REFERRAL_COPY}
+emergency, reply with exactly this and nothing else: ${MODEL_REFERRAL_COPY}
 
 Never use these words or their variants: diagnose, diagnosis, cure, heal,
 treat, prescription, guaranteed, proven to, will improve, causes, caused by.

@@ -46,8 +46,10 @@ vi.mock("@/lib/firebase/admin", async () => {
 vi.mock("@/lib/gemini", () => ({ getSkinCheckChatReply }));
 vi.mock("@/lib/rate-limit", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
-  return { ...actual, checkRequestRate: () => null, consumeDailyQuota: () => null };
+  return { ...actual, checkRequestRate: () => null };
 });
+// TD-29 (5): the per-user daily limit replaced the shared quota.
+vi.mock("@/lib/echo-quota", () => ({ consumeEchoQuestion: () => null }));
 
 // Privacy lane (H02a/H03c): this suite tests auth and trusted context, not the
 // consent gates (tests/privacy-chat-gate.test.ts), so the user is attested and consented.

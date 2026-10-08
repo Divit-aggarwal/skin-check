@@ -9,8 +9,8 @@ export const runtime = "nodejs";
 
 // H03c: the AI-share consent (D-16, D-14 Gemini boundary), recorded in the
 // ledger; the chat route reads the newest entry at the current version.
-// LOCAL ONLY until the owner answers decision 6 (Gemini key and tier) and
-// supplies final copy (decision 7a): the copy is a DRAFT.
+// Owner decisions 2026-10-09: version 1 copy (TD-29 (4)) and a paid Gemini
+// key owned by the owner (TD-32).
 // A grant and a withdrawal are both just entries; the newest wins.
 const BodySchema = z
   .object({ purpose: z.literal("ai_share"), granted: z.boolean(), version: z.string().max(200) })

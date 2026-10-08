@@ -122,3 +122,23 @@ describe("age gate wiring (gate logic: privacy-ledger.test.ts)", () => {
     expect(presignOriginalUpload).not.toHaveBeenCalled();
   });
 });
+
+// Owner decision TD-29 (3): photos are kept until the user deletes the account, the
+// consent text says so, and there is no expiry period.
+describe("retention version 2 (TD-29 (3))", () => {
+  it("the copy says the photo is kept until the account is deleted; version 2; no period", async () => {
+    const c = await import("@/lib/consent");
+    expect(c.IMAGE_RETENTION_CONSENT_COPY).toContain("kept until I delete my account");
+    expect(c.IMAGE_RETENTION_CONSENT_VERSION).toBe("skin image retention version 2");
+    expect(c.IMAGE_RETENTION_CONSENT_VERSIONS).toEqual(["skin image retention version 1", "skin image retention version 2"]);
+    expect(c.IMAGE_RETENTION_PERIOD_DAYS).toBeNull();
+  });
+
+  it("firestore.rules accepts exactly the versions in IMAGE_RETENTION_CONSENT_VERSIONS", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { IMAGE_RETENTION_CONSENT_VERSIONS } = await import("@/lib/consent");
+    const rules = readFileSync("firestore.rules", "utf8");
+    const list = /imageRetentionVersion', ''\) in \[([^\]]*)\]/.exec(rules)?.[1];
+    expect(list?.split(",").map((v) => v.trim().replace(/^'|'$/g, ""))).toEqual([...IMAGE_RETENTION_CONSENT_VERSIONS]);
+  });
+});

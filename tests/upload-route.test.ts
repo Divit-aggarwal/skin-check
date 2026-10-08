@@ -36,7 +36,7 @@ const SCAN_ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 // Every presign carries image-retention consent — the route refuses without it.
 const CONSENT = {
   imageRetentionConsent: true,
-  imageRetentionConsentVersion: "skin image retention version 1",
+  imageRetentionConsentVersion: "skin image retention version 2",
   contentLength: 2_000_000,
 };
 
@@ -217,7 +217,9 @@ describe("image-retention consent (the request contract)", () => {
   });
 
   it("refuses a wrong or superseded consent version", async () => {
-    for (const version of ["skin image retention version 0", "", "v1", null, undefined]) {
+    // "skin image retention version 1" is superseded by version 2 (TD-29 (3)): an old tab's
+    // version-1 consent no longer signs an upload.
+    for (const version of ["skin image retention version 0", "skin image retention version 1", "", "v1", null, undefined]) {
       const res = await post(
         { scanId: SCAN_ID, imageRetentionConsent: true, imageRetentionConsentVersion: version },
         "Bearer good"

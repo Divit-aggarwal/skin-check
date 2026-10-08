@@ -4,8 +4,8 @@ import type { Catalogue, Product } from "@/lib/catalog/schema";
 // FROM THE PUBLIC STORE, NOT VERIFIED BY THE OWNER. Read from
 // https://theprojectskin.com/products/<handle> on 2026-10-06: name, step, key
 // ingredient, size and price as the product pages show them. Nothing here is
-// used outside /dev/recommendations; the synthetic catalogue (lib/catalog)
-// stays the app's catalogue.
+// used outside /dev/recommendations. Since TD-29 (1), 2026-10-09, the app's
+// own catalogue (lib/catalog) is these six products as owner data.
 //
 // Each product is also written in the rules' vocabulary (category, ingredient
 // classes, declared active), because that is all lib/rules reads. Those

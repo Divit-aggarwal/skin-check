@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
-import { checkRequestRate, consumeDailyQuota, GEMINI_ROUTE_LIMITS } from "@/lib/rate-limit";
+import { checkRequestRate, GEMINI_ROUTE_LIMITS } from "@/lib/rate-limit";
+import { consumeEchoQuestion } from "@/lib/echo-quota";
 import { AdminNotConfiguredError, bearerToken, verifyFirebaseIdToken } from "@/lib/firebase/admin";
 import { getSkinCheckChatReply, isGeminiTimeout } from "@/lib/gemini";
 import { geminiApiKey } from "@/lib/gemini-key";
@@ -13,7 +14,7 @@ import { bandScores } from "@/lib/skin-check-rules";
 import { summarizeConcerns } from "@/lib/skin-check-score";
 import { ageStatus, latestGrant, withLedgerTimeout, type AgeStatus } from "@/app/api/account/_ledger";
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
-import { contextChatEnabled } from "@/lib/context/switch";
+import { contextChatEnabled, ECHO_OFF_COPY, echoOn } from "@/lib/context/switch";
 import { handleContextChat, recordReferral } from "@/lib/context/chat";
 import { checkComparisonHit, comparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY, referralCopyFor, UNSUPPORTED_SCRIPT_COPY, unsupportedScript, withoutReferrals } from "@/lib/context/prefilter";
 import { buildContextPackage } from "@/lib/context/builder";
@@ -167,6 +168,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, reply: fixedReply, ...(referralToken ? { historyToken: referralToken } : {}) });
   }
 
+  // TD-29 (5): the off switch, after the referral (which always goes out) and
+  // before anything that reads, spends or calls Gemini.
+  if (!echoOn()) {
+    return NextResponse.json({ error: ECHO_OFF_COPY, code: "ECHO_OFF" }, { status: 503 });
+  }
+
   if (historyError instanceof AdminNotConfiguredError) return misconfigured(historyError);
   if (historyError) throw historyError;
   if (!historyOk) {
@@ -248,7 +255,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const quotaLimited = consumeDailyQuota(request, GEMINI_ROUTE_LIMITS);
+  // TD-29 (5): 20 questions per user per day (lib/echo-quota.ts), counted
+  // here, after every gate, so a refused question spends nothing.
+  const quotaLimited = await consumeEchoQuestion(uid);
   if (quotaLimited) return quotaLimited;
 
   try {

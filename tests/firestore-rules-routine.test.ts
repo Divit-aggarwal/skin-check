@@ -21,7 +21,7 @@ describe.skipIf(!EMULATOR)("firestore.rules — routineEvents (lane:routine)", (
   const event = {
     type: "start",
     eventId: EVENT_ID,
-    productId: "sample-cleanser",
+    productId: "refreshing-cleanser",
     effectiveDate: "2026-10-01",
     timeZone: "Asia/Kolkata",
     schedule: { slot: "AM", days: [1, 3, 5] },
@@ -81,8 +81,8 @@ describe.skipIf(!EMULATOR)("firestore.rules — routineEvents (lane:routine)", (
   });
 
   it("the owner cannot update", async () => {
-    await assertFails(updateDoc(ref(OWNER), { productId: "sample-sunscreen" }));
-    await assertFails(setDoc(ref(OWNER), { ...event, productId: "sample-sunscreen" }));
+    await assertFails(updateDoc(ref(OWNER), { productId: "protecting-sunscreen" }));
+    await assertFails(setDoc(ref(OWNER), { ...event, productId: "protecting-sunscreen" }));
   });
 
   it("the owner cannot delete", async () => {

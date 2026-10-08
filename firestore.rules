@@ -82,7 +82,11 @@ service cloud.firestore {
                || img.get('stored', false) != true
                || (consent != null
                    && consent.get('imageRetention', false) == true
-                   && consent.get('imageRetentionVersion', '') == 'skin image retention version 1');
+                   // Every version in lib/consent.ts IMAGE_RETENTION_CONSENT_VERSIONS
+                   // (TD-29 (3)): the app writes only the newest, but the live site
+                   // writes version 1 until the new code is deployed, so these rules
+                   // go out first and accept both.
+                   && consent.get('imageRetentionVersion', '') in ['skin image retention version 1', 'skin image retention version 2']);
       }
 
       // PHASE 3. `image.key` names an object in a private S3 bucket. The

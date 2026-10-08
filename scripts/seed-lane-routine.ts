@@ -31,15 +31,15 @@ const d = (daysAgo: number) => addDays(today, -daysAgo);
 
 const SEED: Record<string, Record<string, unknown>[]> = {
   "seed-user-asha": [
-    { type: "start", productId: "sample-cleanser", effectiveDate: d(14), schedule: { slot: "AM_PM", days: EVERY_DAY } },
-    { type: "start", productId: "sample-sunscreen", effectiveDate: d(10), schedule: { slot: "AM", days: [1, 2, 3, 4, 5] } },
-    { type: "usage", productId: "sample-cleanser", effectiveDate: d(2), slot: "AM", status: "used" },
-    { type: "usage", productId: "sample-cleanser", effectiveDate: d(2), slot: "PM", status: "skipped" },
-    { type: "usage", productId: "sample-cleanser", effectiveDate: d(1), slot: "AM", status: "used" },
+    { type: "start", productId: "refreshing-cleanser", effectiveDate: d(14), schedule: { slot: "AM_PM", days: EVERY_DAY } },
+    { type: "start", productId: "protecting-sunscreen", effectiveDate: d(10), schedule: { slot: "AM", days: [1, 2, 3, 4, 5] } },
+    { type: "usage", productId: "refreshing-cleanser", effectiveDate: d(2), slot: "AM", status: "used" },
+    { type: "usage", productId: "refreshing-cleanser", effectiveDate: d(2), slot: "PM", status: "skipped" },
+    { type: "usage", productId: "refreshing-cleanser", effectiveDate: d(1), slot: "AM", status: "used" },
   ],
   "seed-user-ravi": [
-    { type: "start", productId: "sample-moisturiser", effectiveDate: d(7), schedule: { slot: "PM", days: EVERY_DAY } },
-    { type: "substitute", productId: "sample-moisturiser", toProductId: OTHER_PRODUCT_ID, effectiveDate: d(3), schedule: { slot: "PM", days: EVERY_DAY } },
+    { type: "start", productId: "calming-moisturiser", effectiveDate: d(7), schedule: { slot: "PM", days: EVERY_DAY } },
+    { type: "substitute", productId: "calming-moisturiser", toProductId: OTHER_PRODUCT_ID, effectiveDate: d(3), schedule: { slot: "PM", days: EVERY_DAY } },
     { type: "usage", productId: OTHER_PRODUCT_ID, effectiveDate: d(1), slot: "PM", status: "used" },
   ],
 };

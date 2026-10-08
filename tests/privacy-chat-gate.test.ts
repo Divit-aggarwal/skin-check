@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // H02a/H03c gates on /api/skin-check/chat: Gemini is never called, and no
 // quota is spent, for an under-18, unattested or (later) unconsented user.
-const { verifyFirebaseIdToken, getSkinCheckChatReply, consumeDailyQuota, loadTrustedEchoContext, ageStatus, latestGrant } =
+const { verifyFirebaseIdToken, getSkinCheckChatReply, consumeEchoQuestion, loadTrustedEchoContext, ageStatus, latestGrant } =
   vi.hoisted(() => ({
     verifyFirebaseIdToken: vi.fn(),
     getSkinCheckChatReply: vi.fn(),
-    consumeDailyQuota: vi.fn(),
+    consumeEchoQuestion: vi.fn(),
     loadTrustedEchoContext: vi.fn(),
     ageStatus: vi.fn(),
     latestGrant: vi.fn(),
@@ -22,8 +22,10 @@ vi.mock("@/lib/gemini", () => ({ getSkinCheckChatReply }));
 vi.mock("@/lib/echo-trusted-context", () => ({ loadTrustedEchoContext }));
 vi.mock("@/lib/rate-limit", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
-  return { ...actual, checkRequestRate: () => null, consumeDailyQuota };
+  return { ...actual, checkRequestRate: () => null };
 });
+// TD-29 (5): the per-user daily limit replaced the shared quota.
+vi.mock("@/lib/echo-quota", () => ({ consumeEchoQuestion }));
 vi.mock("@/app/api/account/_ledger", async () => {
   const actual = await vi.importActual<typeof import("@/app/api/account/_ledger")>("@/app/api/account/_ledger");
   return { ...actual, ageStatus, latestGrant, withLedgerTimeout: <T,>(p: Promise<T>) => actual.withLedgerTimeout(p, 20) };
@@ -49,7 +51,7 @@ async function expectRefused(status: number, code: string) {
   expect(res.status).toBe(status);
   expect((await res.json()).code).toBe(code);
   expect(getSkinCheckChatReply).not.toHaveBeenCalled();
-  expect(consumeDailyQuota).not.toHaveBeenCalled();
+  expect(consumeEchoQuestion).not.toHaveBeenCalled();
 }
 
 beforeEach(() => {
@@ -59,7 +61,7 @@ beforeEach(() => {
   vi.stubEnv("GEMINI_API_KEY", "test-key");
   vi.stubEnv("FIREBASE_PRIVATE_KEY", "test-private-key"); // seeds the history MAC
   verifyFirebaseIdToken.mockResolvedValue("uid-chat");
-  consumeDailyQuota.mockReturnValue(null);
+  consumeEchoQuestion.mockReturnValue(null);
   loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: {}, answers: {} });
   getSkinCheckChatReply.mockResolvedValue("reply");
   ageStatus.mockResolvedValue("over18");

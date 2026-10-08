@@ -11,7 +11,9 @@ const SLUG = /^[a-z0-9-]{1,40}$/;
 
 /** Texts that fail today, each an owner action in the tracker. Must match the real failures exactly. */
 const KNOWN_FAILURES: Record<string, string> = {
-  "Sample Sunscreen SPF 50 (SYNTHETIC - replace)": "digits: any SPF number fails the no-number screen (tracker E08)",
+  // TD-29 (1): the real catalogue's two names with digits. Dropped from Echo's product list while recommendations are off anyway (E05).
+  "5% Niacinamide Serum": "digits: a percentage fails the no-number screen (tracker E08)",
+  "Protecting Sunscreen SPF 50 PA++++": "digits: any SPF number fails the no-number screen (tracker E08)",
 };
 
 // TD-17 (2), E08: an owner-approved name passes by exact match only. Its claim text is still screened.

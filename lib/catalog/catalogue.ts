@@ -1,11 +1,22 @@
 import { CATALOG_SCHEMA_VERSION, CatalogueSchema, type Catalogue, type Product } from "./schema";
 import type { NameException } from "./wording";
 
-// E01 catalogue data. SYNTHETIC until the owner supplies real products through
-// lib/catalog/catalogue-template.csv (decision R-3 A). Every sample product has
-// dataSource "synthetic" and "SYNTHETIC" in its name; replace before the final
-// deploy. Bump CATALOG_VERSION on any data change: routine events record it.
-export const CATALOG_VERSION = "catalog-0-synthetic";
+// E01 catalogue data. Owner decision TD-29 (1), 2026-10-09: the six products
+// on the public store (theprojectskin.com, read on 2026-10-09 from its
+// products.json and each product page; the 4-step kit is a bundle of these,
+// not a product) are the real catalogue. Ingredient classes, the declared
+// active and the usage text follow each product page's "Key actives" and
+// "How to use"; usage and warnings are reworded only where the page uses a
+// D-12 word ("treat", "clear", "reduce"). Names are the store titles without the store's "- Acne
+// Prone Skin" suffix (a D-12 word, and not part of the product name); the
+// two owner name exceptions below are kept. claims is empty: store marketing
+// text is not evidence (D-12). inci is empty where the store lists none, and
+// active is set only where the name states the concentration. Usage text is
+// a neutral instruction, checked against the D-12 word list. mrpInr is the
+// higher of the store's price and compare-at price. Product recommendations
+// stay off (E05). Bump CATALOG_VERSION on any data change: routine events
+// record it.
+export const CATALOG_VERSION = "catalog-1-store-2026-10-09";
 
 /**
  * Registered own-brand product names that may contain a word the D-12 word
@@ -20,12 +31,12 @@ export const PRODUCT_NAME_EXCEPTIONS: readonly NameException[] = [
   { name: "Calming Moisturiser", approvedBy: "owner", date: "2026-10-06", reason: "Own-brand product name, same exact-name rule as Clear Seal (TD-26 (2))" },
 ];
 
-const synthetic = {
-  dataSource: "synthetic",
-  shopifyHandleVerified: false,
+const own = {
+  dataSource: "owner",
+  shopifyHandleVerified: true,
+  inci: [],
   warnings: [],
   contraindications: [],
-  availability: "available",
   regions: ["IN"],
   claims: [],
 } as const;
@@ -36,55 +47,91 @@ export const CATALOGUE: Catalogue = CatalogueSchema.parse({
   products: [
     // Must equal the example row of catalogue-template.csv (tested).
     {
-      ...synthetic,
-      id: "sample-cleanser",
-      versionId: "sample-cleanser-v1",
-      name: "Sample Gentle Cleanser (SYNTHETIC - replace)",
+      ...own,
+      id: "refreshing-cleanser",
+      versionId: "refreshing-cleanser-2026-10-09",
+      name: "Refreshing Cleanser",
       category: "cleanser",
       slot: "AM_PM",
-      shopifyHandle: "sample-gentle-cleanser",
-      ingredientClasses: ["surfactant", "humectant"],
-      inci: ["Aqua", "Glycerin", "Sodium Cocoyl Isethionate"],
-      active: null,
-      warnings: ["Avoid contact with eyes"],
-      price: { mrpInr: 349, packSize: "100 ml" },
-      usageText: "Massage onto damp skin and rinse.",
-      claims: [
-        {
-          text: "Cleanses without leaving a residue",
-          evidenceLevel: "consumer-perception",
-          source: "SYNTHETIC - no study",
-          date: "2026-10-03",
-        },
-      ],
+      shopifyHandle: "refreshing-cleanser-acne-prone-skin",
+      ingredientClasses: ["surfactant", "bha", "aha"],
+      active: { ingredient: "Salicylic Acid", concentrationPct: 2 },
+      warnings: ["If skin feels tight, use once a day and use moisturiser."],
+      price: { mrpInr: 499, packSize: "100 ml" },
+      availability: "available",
+      usageText: "Massage onto damp skin morning and/or night, then rinse thoroughly.",
     },
     {
-      ...synthetic,
-      id: "sample-moisturiser",
-      versionId: "sample-moisturiser-v1",
-      name: "Sample Daily Moisturiser (SYNTHETIC - replace)",
+      ...own,
+      id: "niacinamide-serum",
+      versionId: "niacinamide-serum-2026-10-09",
+      name: "5% Niacinamide Serum",
+      category: "serum",
+      slot: "AM_PM",
+      shopifyHandle: "5-niacinamide-serum-acne-prone-skin",
+      ingredientClasses: ["niacinamide", "humectant", "other"],
+      active: { ingredient: "Niacinamide", concentrationPct: 5 },
+      warnings: ["Patch test first.", "Start once a day if your skin barrier is reactive."],
+      price: { mrpInr: 649, packSize: "30 ml" },
+      availability: "available",
+      usageText: "After cleansing, apply 2 to 3 drops to dry skin, then moisturiser, and sunscreen in the morning.",
+    },
+    {
+      ...own,
+      id: "calming-moisturiser",
+      versionId: "calming-moisturiser-2026-10-09",
+      name: "Calming Moisturiser",
       category: "moisturiser",
       slot: "AM_PM",
-      shopifyHandle: null,
-      ingredientClasses: ["humectant", "emollient"],
-      inci: [],
+      shopifyHandle: "calming-moisturiser-acne-prone-skin",
+      ingredientClasses: ["emollient", "humectant", "other"],
       active: null,
-      price: { mrpInr: 499, packSize: "50 g" },
-      usageText: "Apply a small amount after cleansing.",
+      price: { mrpInr: 449, packSize: "60 g" },
+      availability: "available",
+      usageText: "After the serum (or after cleansing), apply a thin layer morning and night. In the morning, follow with sunscreen.",
     },
     {
-      ...synthetic,
-      id: "sample-sunscreen",
-      versionId: "sample-sunscreen-v1",
-      name: "Sample Sunscreen SPF 50 (SYNTHETIC - replace)",
+      ...own,
+      id: "protecting-sunscreen",
+      versionId: "protecting-sunscreen-2026-10-09",
+      name: "Protecting Sunscreen SPF 50 PA++++",
       category: "sunscreen",
       slot: "AM",
-      shopifyHandle: null,
-      ingredientClasses: ["uv-filter"],
-      inci: [],
+      shopifyHandle: "protecting-sunscreen-acne-prone-skin",
+      ingredientClasses: ["uv-filter", "niacinamide", "other"],
       active: null,
-      price: { mrpInr: 599, packSize: "50 g" },
-      usageText: "Apply as the last morning step, before going outdoors.",
+      price: { mrpInr: 649, packSize: "60 g" },
+      availability: "available",
+      usageText: "Apply generously as the last morning step, after moisturiser. Apply again after sweating or a long time outdoors.",
+    },
+    {
+      ...own,
+      id: "active-boba-cream",
+      versionId: "active-boba-cream-2026-10-09",
+      name: "Active Boba Encapsulated Cream",
+      category: "other",
+      slot: "AM_PM",
+      shopifyHandle: "active-boba-encapsulated-cream-acne-prone-skin",
+      ingredientClasses: ["niacinamide", "bha", "emollient", "other"],
+      active: null,
+      warnings: ["Introduce slowly if your skin barrier is compromised."],
+      price: { mrpInr: 1499, packSize: "70 g" },
+      availability: "out_of_stock",
+      usageText: "After cleansing, activate a capsule and apply as directed. Follow with moisturiser if needed, and sunscreen in the morning.",
+    },
+    {
+      ...own,
+      id: "clear-seal",
+      versionId: "clear-seal-2026-10-09",
+      name: "Clear Seal",
+      category: "other",
+      slot: "AM_PM",
+      shopifyHandle: "clear-seal",
+      ingredientClasses: ["bha", "aha", "niacinamide", "other"],
+      active: null,
+      price: { mrpInr: 399, packSize: "20 ml" },
+      availability: "available",
+      usageText: "Apply a thin layer on a clean, dry spot and let it dry to a film. Use on single spots; use moisturiser around the area if needed.",
     },
   ],
 });

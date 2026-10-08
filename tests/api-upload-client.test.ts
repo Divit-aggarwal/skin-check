@@ -64,7 +64,7 @@ describe("uploadOriginalImage", () => {
       scanId: SCAN_ID,
       contentLength: original.size,
       imageRetentionConsent: true,
-      imageRetentionConsentVersion: "skin image retention version 1",
+      imageRetentionConsentVersion: "skin image retention version 2",
     });
   });
 
@@ -185,6 +185,6 @@ describe("retention consent gates persistent storage", () => {
     const calls = stubFetch();
     await uploadOriginalImage(SCAN_ID, original);
     expect(JSON.parse(calls[0]!.init.body as string).imageRetentionConsentVersion)
-      .toBe("skin image retention version 1");
+      .toBe("skin image retention version 2");
   });
 });

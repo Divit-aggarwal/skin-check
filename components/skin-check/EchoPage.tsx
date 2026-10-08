@@ -31,8 +31,11 @@ const GATE_MESSAGES: Record<string, string> = {
   CHAT_TIMEOUT: "Echo took too long to answer. Please try again.",
   // F13: a newer check exists; Echo talks about that one (open it from the dashboard).
   CHAT_NOT_NEWEST: "Echo talks about your newest check only. Open it from your dashboard.",
+  // TD-29 (5): Echo switched off, or this user's questions for today used up.
+  ECHO_OFF: E.off,
+  ECHO_DAILY_LIMIT: E.dailyLimit,
 };
-const NOT_RETRYABLE = new Set(["CHAT_MISCONFIGURED", "UNDER_18", "ATTESTATION_REQUIRED", "AI_CONSENT_REQUIRED", "CHAT_NOT_NEWEST"]);
+const NOT_RETRYABLE = new Set(["CHAT_MISCONFIGURED", "UNDER_18", "ATTESTATION_REQUIRED", "AI_CONSENT_REQUIRED", "CHAT_NOT_NEWEST", "ECHO_OFF", "ECHO_DAILY_LIMIT"]);
 
 function greetingFor(region: EchoRegion): string {
   return `Hey — let's talk about your ${ECHO_REGION_LABELS[region].toLowerCase()}. What would you like to know?`;
@@ -48,7 +51,7 @@ let messageSeq = 0;
 // scan success; if it's empty (fresh tab, or a refresh — session is
 // deliberately in-memory only, see Step 4b spec) there's nothing to ground
 // Echo in, so this shows a way back to /skin-check instead of a blind chat.
-export function EchoPage() {
+export function EchoPage({ echoOn = true }: { echoOn?: boolean } = {}) {
   const searchParams = useSearchParams();
   const { session, threads, setThread } = useSkinCheckSession();
 
@@ -234,8 +237,8 @@ export function EchoPage() {
   }
 
   // H03c: the server refused because there is no AI-share consent. Record the
-  // user's yes, then resend the turn that was refused. LOCAL ONLY for now:
-  // DRAFT copy (decision 7b), Gemini key pending (decision 6).
+  // user's yes, then resend the turn that was refused (version 1 copy,
+  // TD-29 (4)).
   async function grantAiShare() {
     if (!activeError || consentSaving) return;
     if (!user) {
@@ -366,6 +369,12 @@ export function EchoPage() {
         )}
         </div>
 
+        {/* TD-29 (5): with Echo switched off, a plain notice replaces the input. */}
+        {!echoOn ? (
+          <p role="status" className="shrink-0 border-t border-brand-line py-4 text-sm text-brand-muted">
+            {E.off}
+          </p>
+        ) : (
         <form
           className="flex shrink-0 items-center gap-2 border-t border-brand-line py-3"
           onSubmit={(e) => {
@@ -394,6 +403,7 @@ export function EchoPage() {
             <SendHorizontal aria-hidden size={20} />
           </button>
         </form>
+        )}
       </div>
 
       <aside aria-label={E.readingsSummary} className="hidden min-h-0 overflow-y-auto px-6 py-8 lg:block">

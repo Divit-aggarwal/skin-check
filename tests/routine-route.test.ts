@@ -32,7 +32,7 @@ const UID = "verified-uid";
 const ID1 = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const ID2 = "1b9d6bcd-bbfd-4b2d-9b5d-ab8dfbbd4bed";
 const SCHED = { slot: "AM", days: [0, 1, 2, 3, 4, 5, 6] };
-const start = { type: "start", eventId: ID1, productId: "sample-cleanser", effectiveDate: "2026-10-01", timeZone: "Asia/Kolkata", schedule: SCHED };
+const start = { type: "start", eventId: ID1, productId: "refreshing-cleanser", effectiveDate: "2026-10-01", timeZone: "Asia/Kolkata", schedule: SCHED };
 
 function fakeDb() {
   const collection = (prefix: string) => ({
@@ -102,7 +102,7 @@ describe("POST /api/routine/events", () => {
 
   it("OTHER_PRODUCT_ID is accepted as productId and toProductId", async () => {
     expect((await post({ ...start, productId: OTHER_PRODUCT_ID })).status).toBe(201);
-    const sub = { ...start, eventId: ID2, type: "substitute", productId: "sample-cleanser", toProductId: OTHER_PRODUCT_ID };
+    const sub = { ...start, eventId: ID2, type: "substitute", productId: "refreshing-cleanser", toProductId: OTHER_PRODUCT_ID };
     expect((await post(sub)).status).toBe(201);
   });
 
@@ -173,13 +173,13 @@ describe("POST /api/routine/events", () => {
 
   it("the same eventId with a different body gives 409", async () => {
     await post(start);
-    expect(await code(await post({ ...start, productId: "sample-sunscreen" }))).toBe("event_id_conflict");
+    expect(await code(await post({ ...start, productId: "protecting-sunscreen" }))).toBe("event_id_conflict");
   });
 
   it("a substitution creates a new document and leaves the earlier start unchanged", async () => {
     await post(start);
     const before = structuredClone(store.get(path(ID1)));
-    const sub = { ...start, eventId: ID2, type: "substitute", toProductId: "sample-moisturiser", effectiveDate: "2026-10-02" };
+    const sub = { ...start, eventId: ID2, type: "substitute", toProductId: "calming-moisturiser", effectiveDate: "2026-10-02" };
     expect((await post(sub)).status).toBe(201);
     expect(store.size).toBe(2);
     expect(store.get(path(ID1))).toEqual(before);
@@ -193,13 +193,13 @@ describe("GET /api/routine/events", () => {
 
   it("returns only the caller's events, with routine and adherence", async () => {
     await post(start);
-    store.set(path(ID2, "victim"), { ...start, eventId: ID2, productId: "sample-sunscreen", recordedAt: Timestamp.now() });
+    store.set(path(ID2, "victim"), { ...start, eventId: ID2, productId: "protecting-sunscreen", recordedAt: Timestamp.now() });
     const r = await get();
     expect(r.status).toBe(200);
     const body = await r.json();
     expect(body.events.map((e: { eventId: string }) => e.eventId)).toEqual([ID1]);
     expect(body.today).toBe("2026-10-03");
-    expect(body.routine).toEqual([{ productId: "sample-cleanser", schedule: SCHED, since: "2026-10-01" }]);
+    expect(body.routine).toEqual([{ productId: "refreshing-cleanser", schedule: SCHED, since: "2026-10-01" }]);
     expect(body.adherence.counts).toEqual({ used: 0, skipped: 0, unknown: 3 });
     expect(JSON.stringify(body.products)).not.toContain("claims");
   });
