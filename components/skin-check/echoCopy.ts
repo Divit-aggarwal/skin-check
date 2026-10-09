@@ -1,3 +1,5 @@
+import { ECHO_DAILY_LIMIT_COPY, ECHO_OFF_COPY } from "@/lib/echo-limits";
+
 // Every new word on the Echo screen (G03 3.6). Checked by
 // tests/ui-wording.test.ts with every D-12 lexicon.
 export const ECHO_COPY = {
@@ -17,4 +19,8 @@ export const ECHO_COPY = {
   signedOut: "Sign in to talk with Echo about your newest check.",
   loadFailed: "Echo could not load your checks just now.",
   tryAgain: "Try again",
+  // TD-29 (5): the off switch and the per-user daily limit.
+  off: ECHO_OFF_COPY,
+  dailyLimit: ECHO_DAILY_LIMIT_COPY,
+  limitUnavailable: "Echo can't check your settings right now. Please try again.",
 } as const;

@@ -8,12 +8,27 @@
 // this analysis; this one permits RETAINING the original in private S3. They
 // are never combined into one boolean, in the UI or in the record.
 
-/** Bump when the retention copy below changes. Persisted verbatim per scan. */
-export const IMAGE_RETENTION_CONSENT_VERSION = "skin image retention version 1";
+/**
+ * Bump when the retention copy below changes. Persisted verbatim per scan.
+ * Version 2 (owner decision TD-29 (3), 2026-10-09): the copy says photos are
+ * kept until the user deletes their account.
+ */
+export const IMAGE_RETENTION_CONSENT_VERSION = "skin image retention version 2";
+
+/**
+ * Every retention version a stored photo may carry, oldest first. Only the
+ * current one is ever written; the earlier ones are accepted when READING
+ * (firestore.rules' storedImageHasConsent, the dashboard's "kept" line) so a
+ * photo kept under version 1 still shows as kept.
+ */
+export const IMAGE_RETENTION_CONSENT_VERSIONS: readonly string[] = [
+  "skin image retention version 1",
+  IMAGE_RETENTION_CONSENT_VERSION,
+];
 
 /** Exact approved copy for the retention checkbox. */
 export const IMAGE_RETENTION_CONSENT_COPY =
-  "I consent to Project SKIN securely retaining my skin image and associated skin-analysis data for the purposes of providing, maintaining, and improving my skin analysis experience. I understand that my image will be stored securely and handled according to the Project SKIN Privacy Policy.";
+  "I consent to Project SKIN securely retaining my skin image and associated skin-analysis data for the purposes of providing, maintaining, and improving my skin analysis experience. I understand that my image will be stored securely, kept until I delete my account, and handled according to the Project SKIN Privacy Policy.";
 
 // A constant, not an env var, deliberately. The canonical Project SKIN privacy
 // policy is a fixed public URL, and the one existing legal-URL env var
@@ -35,34 +50,34 @@ export const AGE_ATTESTATION_VERSION = "age 18 plus attestation version 1";
 /** Draft (design §2.2); the owner approves the final copy. */
 export const AGE_ATTESTATION_COPY = "I confirm I am 18 or older.";
 
-// Decision 7(b): the GEMINI_BOUNDARY §8 draft, for local use only. "DRAFT" is
-// in the version, so a ledger entry recorded against it can never pass for
-// the final wording. Production waits for the owner's copy (decision 7a) and
-// the Gemini key answer (decision 6).
-export const AI_SHARE_CONSENT_VERSION = "ai share DRAFT version 1";
+// Owner decision TD-29 (4), 2026-10-09: the GEMINI_BOUNDARY §8 draft wording
+// is version 1, DRAFT removed. A grant recorded against the earlier
+// "ai share DRAFT version 1" no longer counts, so those users are asked
+// again. Legal review before advertising: tracker H29.
+export const AI_SHARE_CONSENT_VERSION = "ai share version 1";
 export const AI_SHARE_CONSENT_COPY =
-  "DRAFT: Share my skin check with the AI assistant (processed by Google, outside India).";
+  "Share my skin check with the AI assistant (processed by Google, outside India).";
 
-// D-16 processing consent, recorded per scan (privacy step 14, R3/R4). The
-// checkbox wording is unchanged. "DRAFT" is in the version because D-16 needs
-// new copy that also covers storing measurements; the owner supplies it
-// (decision 7a) before production, and the version is bumped with it.
-export const PROCESSING_CONSENT_VERSION = "processing DRAFT version 1";
+// D-16 processing consent, recorded per scan (privacy step 14, R3/R4). Owner
+// decision TD-29 (4), 2026-10-09: the checkbox wording is version 1 as it is,
+// DRAFT removed from the version. Legal review before advertising: H29.
+export const PROCESSING_CONSENT_VERSION = "processing version 1";
 export const PROCESSING_CONSENT_TERMS_LABEL = "Terms & Conditions";
 export const PROCESSING_CONSENT_COPY = `I agree to the ${PROCESSING_CONSENT_TERMS_LABEL} and consent to my photo being collected and processed for this skin analysis.`;
 
 // R-1 A (routine lane, D-16): the purpose of the user's own routine record.
 // Shown on /routine; not a ledger purpose (nothing to grant or revoke).
 // TD-24 (2): the routine is shown next to the user's own checks on the
-// dashboard and timeline; still never sent to Gemini. DRAFT until the owner's
-// final copy (decision 7a).
+// dashboard and timeline; still never sent to Gemini. Owner decision TD-29
+// (4), 2026-10-09: this wording is final, DRAFT removed.
 export const ROUTINE_PURPOSE_COPY =
-  "DRAFT: So you can keep a record of your own routine and see it next to your own checks. Only you see it. It is not used for analytics and not sent to Gemini.";
+  "So you can keep a record of your own routine and see it next to your own checks. Only you see it. It is not used for analytics and not sent to Gemini.";
 
 /**
- * How long original photos are kept, in days. Decision 5 is NOT made: no
- * number is invented here. While this is null, no copy states a period and
- * nothing enforces one (an S3 lifecycle rule is an infra OWNER ACTION).
+ * How long original photos are kept, in days. Owner decision TD-29 (3),
+ * 2026-10-09 (closes decision 5): no period. Photos are kept until the user
+ * deletes their account (the retention copy says so), and there is no S3
+ * expiry rule. null means exactly that.
  */
 export const IMAGE_RETENTION_PERIOD_DAYS: number | null = null;
 

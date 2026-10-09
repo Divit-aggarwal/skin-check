@@ -110,13 +110,13 @@ export function consumeDailyQuota(
   return null;
 }
 
-// All four Gemini routes share one free-tier quota (~20 req/day across vision
-// + synthesis), so they share a scope and a global budget with headroom.
+// The chat route's per-IP burst limit. Its daily limit is per user, not per
+// IP or shared (owner decision TD-29 (5), lib/echo-quota.ts), so the chat
+// route no longer calls consumeDailyQuota with these: perDay is unused.
 export const GEMINI_ROUTE_LIMITS: PublicRouteLimits = {
   scope: "gemini",
   perMinute: 5,
-  perDay: 10,
-  globalPerDay: 18,
+  perDay: 0,
 };
 
 // Self-hosted FastAPI — no external quota, so burst protection only.

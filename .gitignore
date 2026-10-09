@@ -75,3 +75,4 @@ firebase.local.json
 .env.lane
 !docs/lanes/*.md
 docs/design/wip/
+!docs/OWNER_QUEUE.md

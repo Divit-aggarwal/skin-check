@@ -9,11 +9,11 @@ import {
 import { CATALOGUE } from "@/lib/catalog/catalogue";
 
 const SCHED = { slot: "AM_PM", days: [0, 1, 2, 3, 4, 5, 6] } as const;
-const base = { eventId: "0f8fad5b-d9cb-469f-a165-70867728950e", productId: "sample-cleanser", effectiveDate: "2026-10-01", timeZone: "Asia/Kolkata" };
+const base = { eventId: "0f8fad5b-d9cb-469f-a165-70867728950e", productId: "refreshing-cleanser", effectiveDate: "2026-10-01", timeZone: "Asia/Kolkata" };
 const inputs = {
   start: { ...base, type: "start", schedule: SCHED },
   stop: { ...base, type: "stop" },
-  substitute: { ...base, type: "substitute", toProductId: "sample-moisturiser", schedule: SCHED },
+  substitute: { ...base, type: "substitute", toProductId: "calming-moisturiser", schedule: SCHED },
   schedule_change: { ...base, type: "schedule_change", schedule: SCHED },
   usage: { ...base, type: "usage", slot: "AM", status: "used" },
 };

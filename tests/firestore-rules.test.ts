@@ -19,7 +19,7 @@ describe.skipIf(!EMULATOR)("firestore.rules — skinChecks image metadata", () =
   const VICTIM = "victim-uid";
   const SCAN = "0f8fad5b-d9cb-469f-a165-70867728950e";
 
-  const CONSENT_VERSION = "skin image retention version 1";
+  const CONSENT_VERSION = "skin image retention version 2";
   const consented = {
     imageRetention: true,
     imageRetentionVersion: CONSENT_VERSION,
@@ -146,6 +146,21 @@ describe.skipIf(!EMULATOR)("firestore.rules — skinChecks image metadata", () =
       imageRetentionVersion: CONSENT_VERSION,
     });
     expect(snap.data()?.consent?.imageRetentionConsentedAt).toBeTruthy();
+  });
+
+  // TD-29 (3): the rules accept every version in IMAGE_RETENTION_CONSENT_VERSIONS (version 1
+  // until the new code is live, version 2 after) and nothing else.
+  it("accepts a stored image under version 1 or version 2, and no other version", async () => {
+    const at = new Date();
+    await assertSucceeds(write(OWNER, "scan-consent-v1", storedImage(OWNER, "scan-consent-v1"), { imageRetention: true, imageRetentionVersion: "skin image retention version 1", imageRetentionConsentedAt: at }));
+    await assertSucceeds(write(OWNER, "scan-consent-v2", storedImage(OWNER, "scan-consent-v2"), { imageRetention: true, imageRetentionVersion: "skin image retention version 2", imageRetentionConsentedAt: at }));
+    const bad = ["skin image retention version 3", "skin image retention version 0", "Skin image retention version 2", ""];
+    for (let i = 0; i < bad.length; i++) {
+      const v = bad[i]!;
+      await assertFails(write(OWNER, `scan-consent-bad-${i}`, storedImage(OWNER, `scan-consent-bad-${i}`), { imageRetention: true, imageRetentionVersion: v, imageRetentionConsentedAt: at }));
+    }
+    const { IMAGE_RETENTION_CONSENT_VERSIONS } = await import("@/lib/consent");
+    expect(IMAGE_RETENTION_CONSENT_VERSIONS).toEqual(["skin image retention version 1", "skin image retention version 2"]);
   });
 
   it("uses the same version string the application code uses", async () => {

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   verifyFirebaseIdToken: vi.fn(),
   getSkinCheckChatReply: vi.fn(),
-  consumeDailyQuota: vi.fn(),
+  consumeEchoQuestion: vi.fn(),
   loadTrustedEchoContext: vi.fn(),
   ageStatus: vi.fn(),
   latestGrant: vi.fn(),
@@ -48,8 +48,10 @@ vi.mock("@/lib/context/chat", async () => {
 });
 vi.mock("@/lib/rate-limit", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
-  return { ...actual, checkRequestRate: () => null, consumeDailyQuota: h.consumeDailyQuota };
+  return { ...actual, checkRequestRate: () => null };
 });
+// TD-29 (5): the per-user daily limit replaced the shared quota.
+vi.mock("@/lib/echo-quota", () => ({ consumeEchoQuestion: h.consumeEchoQuestion }));
 vi.mock("@/app/api/account/_ledger", async () => {
   const actual = await vi.importActual<typeof import("@/app/api/account/_ledger")>("@/app/api/account/_ledger");
   return { ...actual, ageStatus: h.ageStatus, latestGrant: h.latestGrant, withLedgerTimeout: <T,>(p: Promise<T>) => actual.withLedgerTimeout(p, 20) };
@@ -82,7 +84,7 @@ beforeEach(async () => {
   vi.stubEnv("ECHO_CONTEXT_PATH", "on");
   h.verifyFirebaseIdToken.mockResolvedValue("uid-ctx");
   h.checkEchoScan.mockResolvedValue("ok");
-  h.consumeDailyQuota.mockReturnValue(null);
+  h.consumeEchoQuestion.mockReturnValue(null);
   h.ageStatus.mockResolvedValue("over18");
   h.latestGrant.mockResolvedValue(true);
   h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers: { skin_type: "oily", primary_concerns: ["redness"] } });
@@ -135,7 +137,7 @@ describe("switch on: the gates still refuse before any package is built", () => 
     const res = await post("what does my cheek reading mean?");
     expect(res.status).toBe(status);
     expect((await res.json()).code).toBe(code);
-    for (const fn of [h.buildContextPackage, h.loadTrustedEchoContext, h.generateContent, h.recordChatTurns, h.consumeDailyQuota]) expect(fn).not.toHaveBeenCalled();
+    for (const fn of [h.buildContextPackage, h.loadTrustedEchoContext, h.generateContent, h.recordChatTurns, h.consumeEchoQuestion]) expect(fn).not.toHaveBeenCalled();
   });
 
   // Second security review (H20): a red-flag message gets the referral before any gate can refuse it.
@@ -150,7 +152,7 @@ describe("switch on: the gates still refuse before any package is built", () => 
     expect(res.status).toBe(200);
     expect((await res.json()).reply).toBe(REFERRAL_COPY);
     // Nothing about a user the gates would refuse is stored.
-    for (const fn of [h.buildContextPackage, h.loadTrustedEchoContext, h.generateContent, h.consumeDailyQuota, h.recordChatTurns]) expect(fn).not.toHaveBeenCalled();
+    for (const fn of [h.buildContextPackage, h.loadTrustedEchoContext, h.generateContent, h.consumeEchoQuestion, h.recordChatTurns]) expect(fn).not.toHaveBeenCalled();
   });
 
   it("H22: a message in an unsupported script gets the fixed reply, is recorded as such, and nothing is built", async () => {
@@ -417,7 +419,7 @@ describe("only the newest measured check (F13)", () => {
     expect(res.status).toBe(409);
     expect((await res.json()).code).toBe("CHAT_NOT_NEWEST");
     expect(h.checkEchoScan).toHaveBeenCalledWith("uid-ctx", SCAN_ID);
-    for (const fn of [h.ageStatus, h.consumeDailyQuota, h.loadTrustedEchoContext, h.generateContent, h.getSkinCheckChatReply, h.recordChatTurns]) expect(fn).not.toHaveBeenCalled();
+    for (const fn of [h.ageStatus, h.consumeEchoQuestion, h.loadTrustedEchoContext, h.generateContent, h.getSkinCheckChatReply, h.recordChatTurns]) expect(fn).not.toHaveBeenCalled();
   });
 
   it("a red-flag message about an older check still gets the referral", async () => {
@@ -430,7 +432,7 @@ describe("only the newest measured check (F13)", () => {
     const res = await post();
     expect(res.status).toBe(409);
     expect((await res.json()).code).toBe("CHAT_ANALYSIS_UNAVAILABLE");
-    for (const fn of [h.consumeDailyQuota, h.generateContent, h.getSkinCheckChatReply, h.recordChatTurns]) expect(fn).not.toHaveBeenCalled();
+    for (const fn of [h.consumeEchoQuestion, h.generateContent, h.getSkinCheckChatReply, h.recordChatTurns]) expect(fn).not.toHaveBeenCalled();
   });
 
   it("a read error refuses (503), never lets the check through", async () => {
@@ -439,7 +441,7 @@ describe("only the newest measured check (F13)", () => {
     expect(res.status).toBe(503);
     expect((await res.json()).code).toBe("CHAT_CHECK_UNAVAILABLE");
     expect(h.generateContent).not.toHaveBeenCalled();
-    expect(h.consumeDailyQuota).not.toHaveBeenCalled();
+    expect(h.consumeEchoQuestion).not.toHaveBeenCalled();
   });
 });
 

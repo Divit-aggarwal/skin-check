@@ -9,3 +9,7 @@ export function contextChatEnabled(): boolean {
   const devOrTest = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
   return !(devOrTest && process.env.ECHO_CONTEXT_PATH === "off");
 }
+
+// TD-29 (5): the Echo off switch lives in lib/echo-limits.ts (client-safe,
+// so pages outside the chat layer can read it too).
+export { ECHO_OFF_COPY, echoOn } from "@/lib/echo-limits";

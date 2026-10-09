@@ -61,9 +61,11 @@ describe("the store catalogue", () => {
     expect(STORE_CATALOGUE.products.every((p) => !p.shopifyHandleVerified)).toBe(true);
   });
 
-  it("does not replace the synthetic catalogue", () => {
+  // TD-29 (1): the app's catalogue is now the same six store products (owner data).
+  it("the app catalogue is the same six store products, by store handle", () => {
     expect(CATALOGUE.version).toBe(CATALOG_VERSION);
-    expect(CATALOGUE.products.map((p) => p.id)).toEqual(["sample-cleanser", "sample-moisturiser", "sample-sunscreen"]);
+    const handles = (ps: readonly { shopifyHandle: string | null }[]) => ps.map((p) => p.shopifyHandle).sort();
+    expect(handles(CATALOGUE.products)).toEqual(handles(STORE_CATALOGUE.products));
   });
 });
 

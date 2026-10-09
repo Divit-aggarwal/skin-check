@@ -12,6 +12,12 @@ const nextConfig = {
 
   compress: true,
 
+  // TD-29 (5): the Echo off switch, built into both the server and the
+  // browser code, so /echo, the chat route and every "Ask Echo" button read
+  // the same value. Not a secret ("off" or unset). Like any Vercel setting it
+  // takes effect with the next deployment (docs/OWNER_QUEUE.md).
+  env: { ECHO_SWITCH: process.env.ECHO_SWITCH ?? "" },
+
   // "/" is app/(marketing)/page.tsx (G03, TD-24 (3)): Home when signed in,
   // the check flow when not. It replaced a fixed redirect to /skin-check.
 

@@ -367,6 +367,11 @@ describe("photo kept (H27)", () => {
     expect(photoKeptFrom(claim, [presign("a")])).toBe(true);
   });
 
+  // TD-29 (3): a photo kept under retention version 1 (before the copy said "until I delete my account") is still kept.
+  it("an entry at retention version 1 still counts: kept", () => {
+    expect(photoKeptFrom(claim, [presign("a", { version: "skin image retention version 1" })])).toBe(true);
+  });
+
   it.each([
     ["no ledger entry", []],
     ["an entry for another check", [presign("b")]],

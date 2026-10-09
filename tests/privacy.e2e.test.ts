@@ -72,7 +72,7 @@ describe.skipIf(!WEB)("privacy: erasure end to end", () => {
     const presign = await fetch(`${WEB}/api/skin-scan/upload`, {
       method: "POST",
       headers: bearer,
-      body: JSON.stringify({ scanId: "privacy-after-erase", contentLength: 1000, imageRetentionConsent: true, imageRetentionConsentVersion: "skin image retention version 1" }),
+      body: JSON.stringify({ scanId: "privacy-after-erase", contentLength: 1000, imageRetentionConsent: true, imageRetentionConsentVersion: "skin image retention version 2" }),
     });
     expect(presign.status).toBe(401);
 
@@ -143,7 +143,7 @@ describe.skipIf(!WEB)("privacy: nothing written after an erase stays", () => {
     const presign = await fetch(`${WEB}/api/skin-scan/upload`, {
       method: "POST",
       headers: bearer,
-      body: JSON.stringify({ scanId: "late-scan-000001", contentLength: photo.length, imageRetentionConsent: true, imageRetentionConsentVersion: "skin image retention version 1" }),
+      body: JSON.stringify({ scanId: "late-scan-000001", contentLength: photo.length, imageRetentionConsent: true, imageRetentionConsentVersion: "skin image retention version 2" }),
     });
     expect(presign.status).toBe(200);
     const { uploadUrl, contentType } = (await presign.json()) as { uploadUrl: string; contentType: string };

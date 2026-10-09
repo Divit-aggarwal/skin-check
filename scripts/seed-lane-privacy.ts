@@ -87,7 +87,7 @@ async function main() {
     const event = RoutineEventInputSchema.parse({
       eventId: "5eed0000-0000-4000-8000-00000000e1a5",
       type: "start",
-      productId: "sample-cleanser",
+      productId: "refreshing-cleanser",
       effectiveDate: "2026-10-01",
       schedule: { slot: "AM", days: [0, 1, 2, 3, 4, 5, 6] },
       timeZone: "Asia/Kolkata",

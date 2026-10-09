@@ -18,6 +18,23 @@ import { getSkinCheckChatReply, ApiError } from "@/lib/api";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import { useAuth } from "@/lib/auth-context";
 import { AI_SHARE_CONSENT_COPY, AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
+import { REFERRAL_LINE } from "@/lib/context/prefilter";
+
+// The helpline numbers in Echo's fixed replies (lib/context/prefilter.ts) as
+// tap-to-call links. Gemini's own answers never carry a number (the
+// validator refuses one), so only fixed text is ever linked.
+const PHONE = /(1800-89-14416|\b14416\b|\b112\b)/;
+function withPhoneLinks(text: string) {
+  return text.split(PHONE).map((part, i) =>
+    i % 2 === 1 ? (
+      <a key={i} href={`tel:${part.replace(/-/g, "")}`} className="font-semibold underline underline-offset-2">
+        {part}
+      </a>
+    ) : (
+      part
+    )
+  );
+}
 
 const RETRYABLE_ERROR_MESSAGE = "Couldn't reach Echo just now. Please try again.";
 const CONFIG_ERROR_MESSAGE = "Echo isn't set up yet — this isn't something retrying will fix.";
@@ -31,8 +48,15 @@ const GATE_MESSAGES: Record<string, string> = {
   CHAT_TIMEOUT: "Echo took too long to answer. Please try again.",
   // F13: a newer check exists; Echo talks about that one (open it from the dashboard).
   CHAT_NOT_NEWEST: "Echo talks about your newest check only. Open it from your dashboard.",
+  // TD-29 (5): Echo switched off, or this user's questions for today used up.
+  // Both carry the help line: the user cannot write to Echo for now.
+  ECHO_OFF: `${E.off} ${REFERRAL_LINE}`,
+  ECHO_DAILY_LIMIT: `${E.dailyLimit} ${REFERRAL_LINE}`,
+  // The limit store could not be read: retryable, and it happens exactly when the
+  // split red-flag check cannot read turns either, so the help line goes with it.
+  ECHO_LIMIT_UNAVAILABLE: `${E.limitUnavailable} ${REFERRAL_LINE}`,
 };
-const NOT_RETRYABLE = new Set(["CHAT_MISCONFIGURED", "UNDER_18", "ATTESTATION_REQUIRED", "AI_CONSENT_REQUIRED", "CHAT_NOT_NEWEST"]);
+const NOT_RETRYABLE = new Set(["CHAT_MISCONFIGURED", "UNDER_18", "ATTESTATION_REQUIRED", "AI_CONSENT_REQUIRED", "CHAT_NOT_NEWEST", "ECHO_OFF", "ECHO_DAILY_LIMIT"]);
 
 function greetingFor(region: EchoRegion): string {
   return `Hey — let's talk about your ${ECHO_REGION_LABELS[region].toLowerCase()}. What would you like to know?`;
@@ -48,7 +72,7 @@ let messageSeq = 0;
 // scan success; if it's empty (fresh tab, or a refresh — session is
 // deliberately in-memory only, see Step 4b spec) there's nothing to ground
 // Echo in, so this shows a way back to /skin-check instead of a blind chat.
-export function EchoPage() {
+export function EchoPage({ echoOn = true }: { echoOn?: boolean } = {}) {
   const searchParams = useSearchParams();
   const { session, threads, setThread } = useSkinCheckSession();
 
@@ -234,8 +258,8 @@ export function EchoPage() {
   }
 
   // H03c: the server refused because there is no AI-share consent. Record the
-  // user's yes, then resend the turn that was refused. LOCAL ONLY for now:
-  // DRAFT copy (decision 7b), Gemini key pending (decision 6).
+  // user's yes, then resend the turn that was refused (version 1 copy,
+  // TD-29 (4)).
   async function grantAiShare() {
     if (!activeError || consentSaving) return;
     if (!user) {
@@ -310,13 +334,13 @@ export function EchoPage() {
         </details>
 
         <div ref={scrollRef} role="log" aria-live="polite" className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pb-4">
-        {messages.length === 0 && (
+        {echoOn && messages.length === 0 && (
           <p className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">{greetingFor(activeRegion)}</p>
         )}
         {messages.map((m) =>
           m.role === "echo" ? (
 <p key={m.id} className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">
-              {m.text}
+              {withPhoneLinks(m.text)}
             </p>
           ) : (
             <div key={m.id} className="flex justify-end">
@@ -350,7 +374,7 @@ export function EchoPage() {
         {activeError && activeError.code !== "AI_CONSENT_REQUIRED" && (
           <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl border border-brand-line bg-brand-paper px-4 py-3">
             <p className="text-body text-text">
-              {GATE_MESSAGES[activeError.code ?? ""] ?? (activeError.retryable ? RETRYABLE_ERROR_MESSAGE : CONFIG_ERROR_MESSAGE)}
+              {withPhoneLinks(GATE_MESSAGES[activeError.code ?? ""] ?? (activeError.retryable ? RETRYABLE_ERROR_MESSAGE : CONFIG_ERROR_MESSAGE))}
             </p>
             {activeError.retryable && (
               <button
@@ -366,6 +390,13 @@ export function EchoPage() {
         )}
         </div>
 
+        {/* TD-29 (5): with Echo switched off, a plain notice replaces the input. */}
+        {!echoOn ? (
+          <div role="status" className="shrink-0 space-y-2 border-t border-brand-line py-4 text-sm text-brand-muted">
+            <p>{E.off}</p>
+            <p>{withPhoneLinks(REFERRAL_LINE)}</p>
+          </div>
+        ) : (
         <form
           className="flex shrink-0 items-center gap-2 border-t border-brand-line py-3"
           onSubmit={(e) => {
@@ -382,18 +413,20 @@ export function EchoPage() {
             // route.ts) — caps client-side so a too-long message fails to type
             // rather than failing at send with a 400 the UI can't usefully retry.
             maxLength={2000}
-            disabled={sendingRegion !== null}
+            // TD-29 (5): after the day's limit, every question would fail the same way.
+            disabled={sendingRegion !== null || activeError?.code === "ECHO_DAILY_LIMIT"}
             className="h-12 min-w-0 flex-1 rounded-full border border-brand-line bg-brand-paper px-4 text-base text-brand-ink disabled:opacity-60"
           />
           <button
             type="submit"
-            disabled={sendingRegion !== null || !draft.trim()}
+            disabled={sendingRegion !== null || !draft.trim() || activeError?.code === "ECHO_DAILY_LIMIT"}
             aria-label={E.send}
             className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-action text-white hover:bg-brand-action-hover disabled:bg-brand-linen2 disabled:text-brand-muted"
           >
             <SendHorizontal aria-hidden size={20} />
           </button>
         </form>
+        )}
       </div>
 
       <aside aria-label={E.readingsSummary} className="hidden min-h-0 overflow-y-auto px-6 py-8 lg:block">

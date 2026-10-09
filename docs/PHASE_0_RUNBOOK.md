@@ -99,6 +99,7 @@ Names only. Set with `vercel env add <NAME> production` (the value is read from 
 | `GEMINI_MODEL_VISION` | Not read by the code any more | Owner | may be removed | Present (unused) |
 | `NEXT_PUBLIC_APP_ENV` | Only turns on full fetch-URL logging when `development` | Owner | `production` | Present |
 | `NEXT_PUBLIC_TERMS_URL` | Terms link on the photo step | Owner | the terms page URL | Present |
+| `ECHO_SWITCH` | Echo off switch (TD-29 (5), added 2026-10-09 on `release/real-users`): exactly `off` turns Echo off; unset or anything else is on. Built into the server and browser code (next.config.js), so a change needs a redeploy (docs/OWNER_QUEUE.md step 6) | Owner, only to turn Echo off | unset | Not set (Echo on) |
 
 **New since the runbook was last checked (2026-10-06, the redesign):**
 

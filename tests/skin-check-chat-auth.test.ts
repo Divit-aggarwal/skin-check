@@ -3,11 +3,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // Gate 02: /api/skin-check/chat sits behind a verified Firebase ID token.
 // Firebase, Gemini, and the rate limiter are stubbed; the auth ordering under
 // test is the route's own.
-const { verifyFirebaseIdToken, getSkinCheckChatReply, consumeDailyQuota, loadTrustedEchoContext } = vi.hoisted(
+const { verifyFirebaseIdToken, getSkinCheckChatReply, consumeEchoQuestion, loadTrustedEchoContext } = vi.hoisted(
   () => ({
     verifyFirebaseIdToken: vi.fn(),
     getSkinCheckChatReply: vi.fn(),
-    consumeDailyQuota: vi.fn(),
+    consumeEchoQuestion: vi.fn(),
     loadTrustedEchoContext: vi.fn(),
   })
 );
@@ -27,8 +27,10 @@ vi.mock("@/lib/gemini", () => ({ getSkinCheckChatReply }));
 vi.mock("@/lib/echo-trusted-context", () => ({ loadTrustedEchoContext }));
 vi.mock("@/lib/rate-limit", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
-  return { ...actual, checkRequestRate: () => null, consumeDailyQuota };
+  return { ...actual, checkRequestRate: () => null };
 });
+// TD-29 (5): the per-user daily limit replaced the shared quota.
+vi.mock("@/lib/echo-quota", () => ({ consumeEchoQuestion }));
 
 // Privacy lane (H02a/H03c): this suite tests auth and trusted context, not the
 // consent gates (tests/privacy-chat-gate.test.ts), so the user is attested and consented.
@@ -59,7 +61,7 @@ async function expectUnauthorized(res: Response) {
   expect(res.status).toBe(401);
   expect(await res.json()).toEqual({ error: "Authentication required.", code: "AUTH_REQUIRED" });
   expect(getSkinCheckChatReply).not.toHaveBeenCalled();
-  expect(consumeDailyQuota).not.toHaveBeenCalled();
+  expect(consumeEchoQuestion).not.toHaveBeenCalled();
 }
 
 beforeEach(() => {
@@ -70,7 +72,7 @@ beforeEach(() => {
   vi.stubEnv("GEMINI_API_KEY", "test-key");
   vi.stubEnv("FIREBASE_PRIVATE_KEY", "test-private-key");
   loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: {}, answers: {} });
-  consumeDailyQuota.mockReturnValue(null);
+  consumeEchoQuestion.mockReturnValue(null);
   getSkinCheckChatReply.mockResolvedValue("hello from echo");
   verifyFirebaseIdToken.mockResolvedValue("user-a");
 });
@@ -112,7 +114,7 @@ describe("Echo chat authentication", () => {
     expect(await res.json()).toEqual({ ok: true, reply: "hello from echo", historyToken: expect.any(String) });
     expect(verifyFirebaseIdToken).toHaveBeenCalledWith("good");
     expect(getSkinCheckChatReply).toHaveBeenCalledTimes(1);
-    expect(consumeDailyQuota).toHaveBeenCalledTimes(1);
+    expect(consumeEchoQuestion).toHaveBeenCalledTimes(1);
   });
 
   it("a uid in the body is not an identity source", async () => {

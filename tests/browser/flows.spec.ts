@@ -5,10 +5,13 @@ import { CAPTURE_QUALITY_SETTINGS } from "@/lib/capture-quality/settings";
 import { RETAKE_COPY } from "@/lib/capture-quality/retake";
 import { AI_SHARE_CONSENT_COPY, ERASE_CONFIRMATION } from "@/lib/consent";
 import { ROUTINE_COPY as R } from "@/lib/routine/copy";
+import { CATALOGUE } from "@/lib/catalog/catalogue";
 import { TIMELINE_COPY as T } from "@/components/timeline/copy";
 import { ECHO_COPY as E } from "@/components/skin-check/echoCopy";
 import { DASHBOARD_SEED as U } from "./seed-users";
 import { shot, signIn } from "./helpers";
+
+const SERUM = CATALOGUE.products.find((p) => p.category === "serum")!.name;
 
 // Browser tests 2-10 of docs/lanes/dashboard-design.md §6, on a phone screen.
 // Several change data (scan, withdraw, delete): restart the stack before a rerun.
@@ -158,12 +161,13 @@ test("routine: the four steps, an empty step invites an add, used and skipped in
   for (const step of Object.values(R.steps)) await expect(morning.getByText(step, { exact: true })).toBeVisible();
   await expect(evening.getByText(R.eveningProtect)).toBeVisible();
 
-  // An empty step opens the add form for that step and slot. There is no
-  // serum in the catalogue yet, so the form says so.
+  // An empty step opens the add form for that step and slot. The real
+  // catalogue (TD-29 (1)) has a serum, so the form offers it.
   await morning.getByRole("link", { name: R.addToStepLabel(R.steps.serum, R.slot.AM.toLowerCase()) }).click();
   const addSection = page.locator("section", { has: page.getByRole("heading", { name: R.add }) });
   await expect(addSection.getByLabel(R.stepLabel)).toHaveValue("serum");
-  await expect(addSection.getByText(R.noProductForStep)).toBeVisible();
+  await expect(addSection.getByLabel(R.product).locator("option", { hasText: SERUM })).toHaveCount(1);
+  await expect(addSection.getByText(R.noProductForStep)).toHaveCount(0);
   await addSection.getByLabel(R.stepLabel).selectOption("");
 
   const product = addSection.getByLabel(R.product);

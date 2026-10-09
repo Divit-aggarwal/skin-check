@@ -6,7 +6,7 @@
 // any direction. Bands are the per-photo bands the results screen already
 // shows; one view holds one check.
 
-import { AI_SHARE_CONSENT_VERSION, IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
+import { AI_SHARE_CONSENT_VERSION, IMAGE_RETENTION_CONSENT_VERSIONS } from "@/lib/consent";
 import { startingCheckCount, startingChecks, usableForEveryQuantity } from "@/lib/longitudinal/baseline";
 import { BASELINE_RULE } from "@/lib/longitudinal/settings";
 import { bandScores, type Band, type BandableMetric } from "@/lib/skin-check-rules";
@@ -324,7 +324,8 @@ export function photoKeptFrom(photo: Dashboard["photo"], ledger: readonly Doc[])
       e.data.purpose === "image_retention" &&
       e.data.granted === true &&
       e.data.source === "presign" &&
-      e.data.version === IMAGE_RETENTION_CONSENT_VERSION &&
+      // Any retention version (a photo kept under version 1 is still kept).
+      IMAGE_RETENTION_CONSENT_VERSIONS.includes(e.data.version as string) &&
       e.data.scanId === photo.scanId
   );
   return backed ? true : null;

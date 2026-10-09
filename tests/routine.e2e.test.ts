@@ -34,7 +34,7 @@ describe.skipIf(!WEB)("routine end to end", () => {
 
     const before = await fetch(`${WEB}/api/routine/events?tz=Asia/Kolkata`, { headers: auth }).then((r) => r.json());
     expect(before.routine.map((i: { productId: string }) => i.productId)).toEqual(["other-not-ours"]);
-    expect(before.events.every((e: { productId: string }) => e.productId !== "sample-sunscreen")).toBe(true); // Asha's
+    expect(before.events.every((e: { productId: string }) => e.productId !== "protecting-sunscreen")).toBe(true); // Asha's
 
     const usage = {
       type: "usage",

@@ -48,7 +48,8 @@ export const ROUTINE_COPY = {
   addToStepLabel: (step: string, slot: string) => `Add a product to ${step}, ${slot}`,
   eveningProtect: "Sunscreen is a morning step.",
   otherGroup: "Other products",
-  otherNote: "Products that are not ours are listed here, not in a step.",
+  // TD-29 (1): two of our own products (Clear Seal, Active Boba) are not one of the four steps either.
+  otherNote: "Products outside the four steps are listed here.",
   todayStatus: (status: string) => `Today: ${status}`,
   notToday: "Not on today's days",
   noProductForStep: "No other product of ours fits this step right now. You can add a product that is not ours.",

@@ -365,7 +365,8 @@ export const joinedUserTurns = (history: readonly { role: string; text: string }
  * them out (chat-turns.ts historyExcluded).
  */
 export function withoutReferrals<T extends { role: string; text: string }>(history: readonly T[]): T[] {
-  const fixed = (t: T | undefined) => t !== undefined && t.role === "echo" && PREFILTER_REPLIES.includes(t.text);
+  const fixed = (t: T | undefined) =>
+    t !== undefined && t.role === "echo" && (PREFILTER_REPLIES.includes(t.text) || LEGACY_PREFILTER_REPLIES.includes(t.text));
   return history.filter((t, i) => !fixed(t) && !(t.role === "user" && fixed(history[i + 1])));
 }
 
@@ -433,11 +434,22 @@ const CHECK_COMPARISON = re([
 ]);
 export const checkComparisonHit = (message: string): boolean => CHECK_COMPARISON.test(fold(message)) || CHECK_COMPARISON.test(message);
 
-// No helpline number until one is verified (GEMINI_BOUNDARY §6).
+// F06, owner decision TD-29 (2): Tele-MANAS, the Government of India's
+// national tele mental health helpline. Number and hours confirmed on
+// 2026-10-09 on the Directorate General of Health Services (Ministry of
+// Health and Family Welfare) page
+// https://dghs.mohfw.gov.in/national-mental-health-programme.php: "The public
+// can access the Tele MANAS helpline by dialing toll-free helpline number
+// 1800-89-14416 or short code 14416", and the programme provides "24X7
+// tele-mental health services". 112 is India's single emergency number
+// (Emergency Response Support System, https://112.gov.in/, checked the same
+// day). Re-check the sources before changing this. The help line comes first
+// (safety review 2026-10-09: a person in crisis must not first read a
+// dermatology refusal), in short sentences that read on a phone.
 export const REFERRAL_LINE =
-  "If you feel unsafe or might hurt yourself, please contact your local emergency services or someone you trust right now.";
+  "If you feel unsafe or might hurt yourself, call Tele-MANAS on 14416 or 1800-89-14416. It is free and open 24 hours a day. In an emergency, call 112, or reach someone you trust right now.";
 export const REFERRAL_COPY =
-  "This is something a doctor or dermatologist should look at in person, so Echo can't answer it here. " + REFERRAL_LINE;
+  REFERRAL_LINE + " If this is about a health problem, a doctor or dermatologist should see it in person, so Echo can't answer it here.";
 
 /**
  * F16: the model asked for a doctor (a medicine, a product's safety, a
@@ -469,5 +481,27 @@ export const unsupportedScript = (message: string): boolean =>
 
 /** Every fixed reply a pre-filter gives. An exchange answered with one is never sent to Gemini later. */
 export const PREFILTER_REPLIES: readonly string[] = [REFERRAL_COPY, DOCTOR_REFERRAL_COPY, UNSUPPORTED_SCRIPT_COPY];
+
+/**
+ * The fixed replies before the helpline was added (TD-29 (2)). A history
+ * signed before that deploy can still carry them, so withoutReferrals drops
+ * them too and an old referred exchange never reaches Gemini.
+ */
+const LEGACY_REFERRAL_LINE = "If you feel unsafe or might hurt yourself, please contact your local emergency services or someone you trust right now.";
+/**
+ * What today's Echo (lib/gemini.ts, development and test only) asks Gemini to
+ * write for a referral: the referral without the helpline number, so no
+ * phone-like number is ever sent to Gemini (H03 inventory). Gemini's copy is
+ * never shown: screenEchoReply reads it as a red flag and the route answers
+ * with REFERRAL_COPY, which carries the number.
+ */
+export const MODEL_REFERRAL_COPY =
+  "This is something a doctor or dermatologist should look at in person, so Echo can't answer it here. " +
+  "If you feel unsafe or might hurt yourself, please contact your local emergency services or someone you trust right now.";
+
+export const LEGACY_PREFILTER_REPLIES: readonly string[] = [
+  "This is something a doctor or dermatologist should look at in person, so Echo can't answer it here. " + LEGACY_REFERRAL_LINE,
+  "Echo understands English and Hindi only. Please write your question in English or Hindi. " + LEGACY_REFERRAL_LINE,
+];
 
 export const COMPARISON_LEAD = "Each check reads one photo on its own, so we can't compare checks yet. Here is what this check showed:";

@@ -19,6 +19,7 @@ import { DASHBOARD_COPY as C } from "./copy";
 import { loadDashboard, type DashboardData } from "./data";
 import { deriveDashboard, isEmpty, type Dashboard } from "./state";
 import { newestEchoSession } from "./echo-session";
+import { echoOn } from "@/lib/echo-limits";
 
 // Home (G03, docs/design/map.md). The newest reading by face area, the
 // starting point, recent timeline, Echo, a new check, today's routine and
@@ -135,7 +136,8 @@ export function DashboardPage() {
             <TrendSection trend={dashboard.trend} />
           </div>
           <div className="order-4">
-            <ChatSection uid={user.uid} dashboard={dashboard} data={load.data} />
+            {/* TD-29 (5): no way into Echo while it is switched off. */}
+            {echoOn() && <ChatSection uid={user.uid} dashboard={dashboard} data={load.data} />}
           </div>
           {/* Only when the lead card does not already offer a new check. */}
           {dashboard.current.kind === "reading" && (

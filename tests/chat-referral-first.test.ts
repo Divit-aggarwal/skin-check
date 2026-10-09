@@ -6,11 +6,11 @@ import { NextResponse } from "next/server";
 // fail or refuse; a forged history is never signed; a referred message never
 // reaches Gemini on a later turn; the split-message check covers the turns
 // Gemini receives.
-const { verifyFirebaseIdToken, getSkinCheckChatReply, consumeDailyQuota, loadTrustedEchoContext, ageStatus, latestGrant } =
+const { verifyFirebaseIdToken, getSkinCheckChatReply, consumeEchoQuestion, loadTrustedEchoContext, ageStatus, latestGrant } =
   vi.hoisted(() => ({
     verifyFirebaseIdToken: vi.fn(),
     getSkinCheckChatReply: vi.fn(),
-    consumeDailyQuota: vi.fn(),
+    consumeEchoQuestion: vi.fn(),
     loadTrustedEchoContext: vi.fn(),
     ageStatus: vi.fn(),
     latestGrant: vi.fn(),
@@ -26,8 +26,10 @@ vi.mock("@/lib/gemini", async () => ({ ...(await vi.importActual<typeof import("
 vi.mock("@/lib/echo-trusted-context", () => ({ loadTrustedEchoContext }));
 vi.mock("@/lib/rate-limit", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit");
-  return { ...actual, checkRequestRate: () => null, consumeDailyQuota };
+  return { ...actual, checkRequestRate: () => null };
 });
+// TD-29 (5): the per-user daily limit replaced the shared quota.
+vi.mock("@/lib/echo-quota", () => ({ consumeEchoQuestion }));
 vi.mock("@/app/api/account/_ledger", async () => {
   const actual = await vi.importActual<typeof import("@/app/api/account/_ledger")>("@/app/api/account/_ledger");
   return { ...actual, ageStatus, latestGrant, withLedgerTimeout: <T,>(p: Promise<T>) => actual.withLedgerTimeout(p, 20) };
@@ -60,7 +62,7 @@ beforeEach(() => {
   vi.stubEnv("FIREBASE_PRIVATE_KEY", "test-private-key");
   vi.stubEnv("ECHO_CONTEXT_PATH", "off"); // today's Echo (F12: only behind the switch)
   verifyFirebaseIdToken.mockResolvedValue(UID);
-  consumeDailyQuota.mockReturnValue(null);
+  consumeEchoQuestion.mockReturnValue(null);
   loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: {}, answers: {}, regionLowConfidence: {}, pipelineVersion: null, schemaVersion: 1 });
   getSkinCheckChatReply.mockResolvedValue("reply");
   ageStatus.mockResolvedValue("over18");
@@ -69,7 +71,7 @@ beforeEach(() => {
 });
 
 const SITUATIONS: [string, () => void][] = [
-  ["over quota", () => consumeDailyQuota.mockReturnValue(NextResponse.json({ code: "RATE_LIMITED" }, { status: 429 }))],
+  ["over quota", () => consumeEchoQuestion.mockReturnValue(NextResponse.json({ code: "RATE_LIMITED" }, { status: 429 }))],
   ["ledger timeout", () => ageStatus.mockImplementation(() => new Promise(() => {}))],
   ["no Gemini key", () => vi.stubEnv("GEMINI_API_KEY", "")],
   ["under 18", () => ageStatus.mockResolvedValue("under18")],
@@ -83,7 +85,7 @@ describe("a red-flag message gets the referral before any check can refuse it", 
     expect(res.status).toBe(200);
     expect((await res.json()).reply).toBe(REFERRAL_COPY);
     expect(getSkinCheckChatReply).not.toHaveBeenCalled();
-    expect(consumeDailyQuota).not.toHaveBeenCalled();
+    expect(consumeEchoQuestion).not.toHaveBeenCalled();
     expect(loadTrustedEchoContext).not.toHaveBeenCalled();
   });
 
@@ -162,14 +164,14 @@ describe("history Gemini receives on today's Echo", () => {
 describe("a message in a script Echo does not support (H22)", () => {
   it("gets the fixed reply before any gate, never reaches Gemini, and is left out of later history", async () => {
     const { UNSUPPORTED_SCRIPT_COPY } = await import("@/lib/context/prefilter");
-    consumeDailyQuota.mockReturnValue(NextResponse.json({ code: "RATE_LIMITED" }, { status: 429 }));
+    consumeEchoQuestion.mockReturnValue(NextResponse.json({ code: "RATE_LIMITED" }, { status: 429 }));
     const res = await post("என் தோல் எண்ணெய் பசையாக உள்ளது");
     const { reply, historyToken } = await res.json();
     expect(reply).toBe(UNSUPPORTED_SCRIPT_COPY);
     expect(getSkinCheckChatReply).not.toHaveBeenCalled();
-    expect(consumeDailyQuota).not.toHaveBeenCalled();
+    expect(consumeEchoQuestion).not.toHaveBeenCalled();
 
-    consumeDailyQuota.mockReturnValue(null);
+    consumeEchoQuestion.mockReturnValue(null);
     const prior: Turn[] = [{ role: "user", text: "என் தோல் எண்ணெய் பசையாக உள்ளது" }, { role: "echo", text: UNSUPPORTED_SCRIPT_COPY }];
     const next = await post("what does oiliness mean?", prior, historyToken);
     expect((await next.json()).reply).toBe("reply");
@@ -226,7 +228,13 @@ describe("today's Echo: Gemini's reply is checked before it is shown or signed",
     expect(src).not.toMatch(/root-cause\s+tags|sub-scores|actual score|whole-face numbers|already shown to the user/);
     expect(src).toMatch(/never say a\s+reading changed/);
     expect(src).toMatch(/Never write a number or a percentage/);
-    expect(src).toMatch(/reply with exactly this and nothing else: \$\{REFERRAL_COPY\}/);
+    expect(src).toMatch(/reply with exactly this and nothing else: \$\{MODEL_REFERRAL_COPY\}/);
+    // TD-29 (2): Gemini's referral carries no number, and the user never sees it: it reads as a red flag, so the route answers with REFERRAL_COPY.
+    const { MODEL_REFERRAL_COPY, REFERRAL_COPY } = await import("@/lib/context/prefilter");
+    const { screenEchoReply } = await import("@/lib/echo-reply-screen");
+    expect(MODEL_REFERRAL_COPY).not.toMatch(new RegExp(String.raw`\p{Nd}`, "u"));
+    expect(screenEchoReply(MODEL_REFERRAL_COPY).kind).toBe("referral");
+    expect(REFERRAL_COPY).toContain("14416");
   });
 });
 
