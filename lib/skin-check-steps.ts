@@ -225,7 +225,15 @@ export const SECTIONS: SectionConfig[] = [
           { value: "cleanser_moisturizer", label: "Cleanser & moisturizer" },
           { value: "actives", label: "Actives", description: "Retinoids, AHA/BHA, vitamin C, etc." },
           { value: "prescription", label: "A prescription product" },
+          // TD-33 (2): new in questionnaire version 2, for the second name box.
+          { value: "other_products", label: "Other products" },
         ],
+        // TD-33 (2): the only two free-text fields. Shown under the option while
+        // it is picked; stored as productNames, never in answers.
+        nameBoxes: {
+          prescription: "Which prescription product? (optional)",
+          other_products: "Which other products? (optional)",
+        },
       },
     ],
   },

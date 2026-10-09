@@ -1,14 +1,20 @@
 "use client";
 
+import { Fragment } from "react";
 import { ArrowRight, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PRODUCT_NAME_OPTIONS, type ProductNameKey, type ProductNames } from "@/lib/skin-check-validation";
 import type { MultiSelectCardsStep } from "@/types/skin-check";
+import { ProductNameBox } from "./ProductNameBox";
 
 interface ImageCardMultiSelectProps {
   step: MultiSelectCardsStep;
   value: string[];
   onChange: (value: string[]) => void;
   onCommit: () => void;
+  /** TD-33 (2): text of the name boxes (step.nameBoxes), kept outside the answer. */
+  productNames?: ProductNames | undefined;
+  onProductNameChange?: ((key: ProductNameKey, text: string) => void) | undefined;
 }
 
 /** Tells the user more than one answer is allowed (design review G11). */
@@ -16,7 +22,7 @@ export function multiSelectHint(maxSelections: number | undefined, optionCount: 
   return maxSelections !== undefined && maxSelections < optionCount ? `Choose up to ${maxSelections}.` : "Choose all that apply.";
 }
 
-export function ImageCardMultiSelect({ step, value, onChange, onCommit }: ImageCardMultiSelectProps) {
+export function ImageCardMultiSelect({ step, value, onChange, onCommit, productNames = {}, onProductNameChange }: ImageCardMultiSelectProps) {
   function toggle(optValue: string) {
     if (step.exclusiveValue === optValue) {
       onChange(value.includes(optValue) ? [] : [optValue]);
@@ -42,9 +48,11 @@ export function ImageCardMultiSelect({ step, value, onChange, onCommit }: ImageC
         {step.options.map((opt) => {
           const selected = value.includes(opt.value);
           const disabled = !selected && opt.value !== step.exclusiveValue && atMax;
+          const boxLabel = step.nameBoxes?.[opt.value];
+          const boxKey = PRODUCT_NAME_OPTIONS[opt.value as keyof typeof PRODUCT_NAME_OPTIONS];
           return (
+            <Fragment key={opt.value}>
             <button
-              key={opt.value}
               type="button"
               onClick={() => toggle(opt.value)}
               disabled={disabled}
@@ -82,6 +90,11 @@ export function ImageCardMultiSelect({ step, value, onChange, onCommit }: ImageC
                 <span className="text-xs leading-snug text-brand-muted">{opt.description}</span>
               )}
             </button>
+            {/* Under its option, full width, only while it is picked; unpicking clears it (useSkinCheckFlow). */}
+            {selected && boxLabel && boxKey && onProductNameChange && (
+              <ProductNameBox label={boxLabel} value={productNames[boxKey] ?? ""} onChange={(text) => onProductNameChange(boxKey, text)} />
+            )}
+            </Fragment>
           );
         })}
       </div>

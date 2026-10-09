@@ -1,6 +1,7 @@
 "use client";
 
 import type { SkinCheckAnswers, StepAnswerValue, StepConfig } from "@/types/skin-check";
+import type { ProductNameKey, ProductNames } from "@/lib/skin-check-validation";
 import type { SkinScanState } from "@/types/skin-scan";
 import { TextInput } from "./inputs/TextInput";
 import { PhoneAuthStep } from "./inputs/PhoneAuthStep";
@@ -26,6 +27,9 @@ interface StepAnswerProps {
   scanId: string;
   /** Clears the local draft once the scan is safely persisted. */
   onSaved: (forScanId: string) => boolean;
+  /** TD-33 (2): the product-name boxes' text, outside answers; saved by the final step. */
+  productNames?: ProductNames | undefined;
+  onProductNameChange?: ((key: ProductNameKey, text: string) => void) | undefined;
 }
 
 export function StepAnswer({
@@ -38,6 +42,8 @@ export function StepAnswer({
   answers,
   scanId,
   onSaved,
+  productNames,
+  onProductNameChange,
 }: StepAnswerProps) {
   switch (step.type) {
     case "text":
@@ -53,6 +59,7 @@ export function StepAnswer({
           scanId={scanId}
           scan={scan}
           onSaved={onSaved}
+          productNames={productNames}
         />
       );
     case "photo-capture":
@@ -78,6 +85,8 @@ export function StepAnswer({
           value={value as string[]}
           onChange={onChange}
           onCommit={onCommit}
+          productNames={productNames}
+          onProductNameChange={onProductNameChange}
         />
       );
     case "body-map":

@@ -71,3 +71,91 @@ export function reusableAnswers(answers: SkinCheckAnswers): SkinCheckAnswers | n
   );
   return complete ? reusable : null;
 }
+
+// ─── Optional questionnaire (TD-33 (1), docs/design/optional-questionnaire.md) ─
+
+/** The optional questions: everything after the photo except the final save step. */
+export const QUESTION_SECTION_IDS = new Set(["your-skin", "personal-context", "diet-hydration", "sun-protection"]);
+
+/** The one hand-typed estimate behind "about N minutes". */
+export const SECONDS_PER_QUESTION = 10;
+
+/** The optional questions this user would be asked (the gender branch decides one). */
+export function questionSteps(answers: SkinCheckAnswers): StepConfig[] {
+  return SECTIONS.filter((s) => QUESTION_SECTION_IDS.has(s.id)).flatMap((s) =>
+    s.steps.filter((step) => !step.condition || step.condition(answers))
+  );
+}
+
+export const questionMinutes = (count: number) => Math.max(1, Math.ceil((count * SECONDS_PER_QUESTION) / 60));
+
+const QUESTION_STEP_IDS = new Set(
+  SECTIONS.filter((s) => QUESTION_SECTION_IDS.has(s.id)).flatMap((s) => s.steps.map((step) => step.id))
+);
+
+/** Whether any optional question is answered (own keys only). Name, age and gender do not count. */
+export function hasQuestionAnswers(answers: Record<string, unknown>): boolean {
+  return Object.keys(answers).some((id) => QUESTION_STEP_IDS.has(id) && Object.hasOwn(answers, id));
+}
+
+/** Only the optional questions' answers: what an answer-later record may hold. */
+export function questionAnswersOnly(answers: SkinCheckAnswers): SkinCheckAnswers {
+  return Object.fromEntries(Object.entries(answers).filter(([id]) => QUESTION_STEP_IDS.has(id)));
+}
+
+const BASIC_IDS = ["name", "age", "gender"];
+
+/**
+ * TD-33 (1): the last check skipped the questions, so only name, age and
+ * gender carry over and the user is offered the choice again, with no
+ * re-confirm steps. null for an under-18 answer or missing basics.
+ */
+export function reusableBasics(answers: SkinCheckAnswers): SkinCheckAnswers | null {
+  if (hasQuestionAnswers(answers) || answers.age === "under-18") return null;
+  const step = (id: string) => SECTIONS[0]!.steps.find((s) => s.id === id)!;
+  const basics = Object.fromEntries(BASIC_IDS.flatMap((id) => (typeof answers[id] === "string" ? [[id, answers[id]]] : [])));
+  return BASIC_IDS.every((id) => isStepAnswerValid(step(id), basics[id] ?? "")) ? basics : null;
+}
+
+// ─── Product-name boxes (TD-33 (2)) ─────────────────────────────────────────
+
+export const PRODUCT_NAME_MAX = 200;
+
+/** current_products option → its key in `productNames`. The only two free-text fields. */
+export const PRODUCT_NAME_OPTIONS = { prescription: "prescription", other_products: "other" } as const;
+export type ProductNameKey = (typeof PRODUCT_NAME_OPTIONS)[keyof typeof PRODUCT_NAME_OPTIONS];
+export type ProductNames = Partial<Record<ProductNameKey, string>>;
+
+/** A stored productNames value, read safely: only the two keys, only non-empty strings. */
+export function productNamesFrom(raw: unknown): ProductNames {
+  const out: ProductNames = {};
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return out;
+  for (const key of Object.values(PRODUCT_NAME_OPTIONS)) {
+    const v = (raw as Record<string, unknown>)[key];
+    if (typeof v === "string" && v) out[key] = v;
+  }
+  return out;
+}
+
+/** Each name's heading where it is shown back: its option's own label in the questionnaire. */
+export function productNameLabel(key: ProductNameKey): string {
+  const step = SECTIONS.flatMap((s) => s.steps).find((s) => s.id === "current_products");
+  const option = Object.entries(PRODUCT_NAME_OPTIONS).find(([, k]) => k === key)![0];
+  return step && "options" in step ? step.options.find((o) => o.value === option)?.label ?? option : option;
+}
+
+/**
+ * The names to keep for this current_products answer: only for options still
+ * picked, trimmed, never empty, at most PRODUCT_NAME_MAX. Kept out of
+ * `answers` everywhere, so nothing that reads answers can reach them.
+ */
+export function keptProductNames(currentProducts: StepAnswerValue | undefined, names: ProductNames): ProductNames {
+  const picked = Array.isArray(currentProducts) ? currentProducts : [];
+  const out: ProductNames = {};
+  for (const [option, key] of Object.entries(PRODUCT_NAME_OPTIONS)) {
+    // Over the limit is dropped, not cut: a cut can split an emoji in two.
+    const text = names[key]?.trim();
+    if (picked.includes(option) && text && text.length <= PRODUCT_NAME_MAX) out[key] = text;
+  }
+  return out;
+}

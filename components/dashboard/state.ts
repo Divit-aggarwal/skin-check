@@ -14,6 +14,7 @@ import { METRIC_LABELS } from "@/lib/skin-check-skus";
 import { toSkinState2, type SkinState2 } from "@/lib/skin-state-2";
 import { SkinScanScoresSchema } from "@/types/skin-scan";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, type EchoRegion } from "@/lib/echo-regions";
+import { hasQuestionAnswers, productNamesFrom, type ProductNames } from "@/lib/skin-check-validation";
 
 /** One Firestore document: its id and its data, as read. */
 export interface Doc {
@@ -280,6 +281,35 @@ export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: r
     echoScanId: echoScanIdFrom(uid, analyses),
     photo: withPhoto ? { scanId: withPhoto.id, claimsStored: (withPhoto.data.image as Obj).stored === true } : null,
   };
+}
+
+// ─── Optional questionnaire (TD-33) ─────────────────────────────────────────
+
+/** Whether a check has its questionnaire answers, given at the check or later (same test as Echo's loader). */
+export function questionsDone(check: Doc, laterAnswers: readonly Doc[]): boolean {
+  const later = laterAnswers.find((l) => l.id === check.id);
+  const own = isObj(check.data.answers) ? check.data.answers : {};
+  const added = later && isObj(later.data.answers) ? later.data.answers : {};
+  return hasQuestionAnswers({ ...own, ...added });
+}
+
+/**
+ * The check "Answer the questions" fills in: the one Echo talks about when its
+ * questions are not done (answering any other would never unlock Echo), else
+ * the newest check when its questions are not done; null when nothing waits.
+ */
+export function questionsTarget(uid: string, checks: readonly Doc[], analyses: readonly Doc[], laterAnswers: readonly Doc[]): Doc | null {
+  const waiting = (c: Doc | undefined) => (c && !questionsDone(c, laterAnswers) && c.data.questionnaire === "skipped" ? c : null);
+  const echoId = echoScanIdFrom(uid, analyses);
+  const newest = [...checks].sort((a, b) => newestFirst(toDate(a.data.createdAt), toDate(b.data.createdAt)))[0];
+  return waiting(checks.find((c) => c.id === echoId)) ?? waiting(newest);
+}
+
+/** The product names on a check (TD-33 (2)), from the check or its later answers. Shown only on that opened check. */
+export function productNamesOf(check: Doc | undefined, laterAnswers: readonly Doc[]): ProductNames {
+  if (!check) return {};
+  const later = laterAnswers.find((l) => l.id === check.id);
+  return productNamesFrom(isObj(check.data.productNames) ? check.data.productNames : later?.data.productNames);
 }
 
 export interface PastCheck extends HistoryRow {

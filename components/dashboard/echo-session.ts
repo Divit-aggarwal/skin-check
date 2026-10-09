@@ -22,7 +22,11 @@ export function newestEchoSession(uid: string, data: DashboardData): SkinCheckSe
   const { bands } = bandScores(result.scores);
   return {
     scanId,
-    answers: (data.checks.find((c) => c.id === scanId)?.data.answers ?? {}) as SkinCheckAnswers,
+    // TD-33 (1): with any answers given later (never the product names).
+    answers: {
+      ...((data.checks.find((c) => c.id === scanId)?.data.answers ?? {}) as SkinCheckAnswers),
+      ...((data.laterAnswers.find((l) => l.id === scanId)?.data.answers ?? {}) as SkinCheckAnswers),
+    },
     result,
     composite: summarizeConcerns(result.scores, bands),
     // ponytail: no photo is held here; Echo never reads it. Load the stored original if Echo ever shows it.

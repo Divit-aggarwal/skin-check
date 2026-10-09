@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { SkinScanRegionLowConfidenceSchema, SkinScanScoresSchema, type SkinScanScores } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import { toSkinState2 } from "@/lib/skin-state-2";
+import { hasQuestionAnswers } from "@/lib/skin-check-validation";
 
 // SERVER ONLY (imports lib/firebase/admin.ts). Gate 02: client-provided
 // analysis measurements and analysis identity are never authoritative. Every
@@ -53,9 +54,11 @@ const millis = (value: unknown): number =>
  */
 export async function loadTrustedEchoContext(uid: string, scanId: string): Promise<TrustedEchoContext | null> {
   const user = adminDb().collection("users").doc(uid);
-  const [analyses, skinCheck] = await Promise.all([
+  const [analyses, skinCheck, later] = await Promise.all([
     user.collection("scanAnalyses").where("scanId", "==", scanId).get(),
     user.collection("skinChecks").doc(scanId).get(),
+    // TD-33 (1): answers given later for a skipped check (create-only, owner-only).
+    user.collection("laterAnswers").doc(scanId).get(),
   ]);
 
   const docs = analyses.docs
@@ -76,12 +79,20 @@ export async function loadTrustedEchoContext(uid: string, scanId: string): Promi
 
   // Echo still works without quiz context, so a missing or malformed answers
   // map degrades to {} instead of blocking the chat.
+  // Only `.answers` is read from either record: productNames (TD-33 (2)) is
+  // never loaded here, so no Echo path can carry it to Gemini.
   const answers = AnswersSchema.safeParse(skinCheck.exists ? skinCheck.data()?.answers : undefined);
+  const laterAnswers = AnswersSchema.safeParse(later.exists ? later.data()?.answers : undefined);
+  const merged = { ...(answers.success ? answers.data : {}), ...(laterAnswers.success ? laterAnswers.data : {}) };
 
   return {
     scores: analysis.data.scores,
     regionScores: analysis.data.region_scores ?? {},
-    answers: answers.success ? answers.data : {},
+    // TD-33 (1): name, age and gender alone are not answers. A check whose
+    // questions were skipped (and not answered later) reads as no answers, so
+    // Echo gives the F11 fixed reply and makes no Gemini call, whatever the
+    // client-written `questionnaire` flag says.
+    answers: hasQuestionAnswers(merged) ? merged : {},
     regionLowConfidence: analysis.data.region_low_confidence ?? {},
     pipelineVersion: analysis.data.pipeline_version ?? null,
     schemaVersion: analysis.data.schemaVersion ?? null,

@@ -5,9 +5,13 @@ import { SECTIONS } from "@/lib/skin-check-steps";
 import {
   defaultAnswerFor,
   isStepAnswerValid,
+  keptProductNames,
   PER_SCAN_SECTION_IDS,
+  QUESTION_SECTION_IDS,
   RECONFIRM_EACH_SCAN_IDS,
   reusableAnswers,
+  reusableBasics,
+  type ProductNames,
 } from "@/lib/skin-check-validation";
 import { reconfirmHints } from "@/lib/skin-check-format";
 import { markUnder18Chosen, postAgeAttestation } from "@/lib/consent";
@@ -56,34 +60,40 @@ export function revealCountFor(section: SectionConfig, answers: SkinCheckAnswers
 // well, leaving only the per-scan ones: verify → photo → results — plus any
 // section holding a question re-confirmed on every scan (D-19), which is
 // shown with its other answers already filled in and that one blank.
-function isSkipped(idx: number, answers: SkinCheckAnswers, reusing: boolean): boolean {
+// TD-33 (1): "skip for now" skips every optional question section too.
+function isSkipped(idx: number, answers: SkinCheckAnswers, reusing: boolean, skipQuestions = false): boolean {
   const section = SECTIONS[idx]!;
   const eligible = eligibleStepsFor(section, answers);
   return (
     eligible.length === 0 ||
+    (skipQuestions && QUESTION_SECTION_IDS.has(section.id)) ||
     (reusing &&
       !PER_SCAN_SECTION_IDS.has(section.id) &&
       !eligible.some((step) => RECONFIRM_EACH_SCAN_IDS.includes(step.id)))
   );
 }
 
-export function nextEligibleIndex(fromIndex: number, answers: SkinCheckAnswers, reusing: boolean): number {
+export function nextEligibleIndex(fromIndex: number, answers: SkinCheckAnswers, reusing: boolean, skipQuestions = false): number {
   let idx = fromIndex;
-  while (idx < SECTIONS.length && isSkipped(idx, answers, reusing)) {
+  while (idx < SECTIONS.length && isSkipped(idx, answers, reusing, skipQuestions)) {
     idx++;
   }
   return idx;
 }
 
-export function prevEligibleIndex(fromIndex: number, answers: SkinCheckAnswers, reusing: boolean): number {
+export function prevEligibleIndex(fromIndex: number, answers: SkinCheckAnswers, reusing: boolean, skipQuestions = false): number {
   let idx = fromIndex;
-  while (idx > 0 && isSkipped(idx, answers, reusing)) {
+  while (idx > 0 && isSkipped(idx, answers, reusing, skipQuestions)) {
     idx--;
   }
   return idx;
 }
 
 const VERIFY_INDEX = SECTIONS.findIndex((section) => section.id === "verify");
+const ABOUT_INDEX = SECTIONS.findIndex((section) => section.id === "about-you");
+
+/** TD-33 (1): the answer to "Before the questions"; "pending" until the user chooses. */
+export type QuestionsChoice = "pending" | "answer" | "skip";
 export const PHOTO_INDEX = SECTIONS.findIndex((section) => section.id === "skin-photo");
 
 /**
@@ -227,6 +237,14 @@ export function useSkinCheckFlow() {
   // so it is never saved to the draft or to Firestore. Rendering it is
   // SkinCheckFlow's job (request R9).
   const [lastAnswerHints, setLastAnswerHints] = useState<Record<string, string>>({});
+  // TD-33 (1): answer the questions now or skip them. Shown right after About
+  // you ("Before the questions"); a reused, answered questionnaire is "answer".
+  const [questionsChoice, setQuestionsChoice] = useState<QuestionsChoice>(() => (session ? "answer" : "pending"));
+  const [choosingQuestions, setChoosingQuestions] = useState(false);
+  // TD-33 (2): the two product-name boxes. Memory only: never in answers, the
+  // draft or the session, so a refresh loses them (like the phone number) and
+  // nothing typed outlives an account erase on this device.
+  const [productNames, setProductNames] = useState<ProductNames>({});
   const [revealCount, setRevealCount] = useState(() => revealCountFor(SECTIONS[0]!, {}));
   // Bumped on every commit (not just the section's last step — an edit to
   // an earlier answer while reviewing a completed section must be able to
@@ -268,6 +286,7 @@ export function useSkinCheckFlow() {
 
     setScanId(draft.scanId);
     setAnswers(draft.answers);
+    setQuestionsChoice(draft.questionsChoice ?? "pending");
     const idx = Math.min(Math.max(draft.sectionIndex, 0), SECTIONS.length - 1);
     setSectionIndex(idx);
     // Derived, never persisted — reveal position is a pure function of which
@@ -365,9 +384,20 @@ export function useSkinCheckFlow() {
         if (!previous || now.complete || now.sectionIndex > PHOTO_INDEX) return;
         // Anything already answered in this visit wins over the saved copy.
         const reuse = reusableAnswers({ ...previous, ...now.answers });
-        if (!reuse) return;
+        if (!reuse) {
+          // TD-33 (1): the last check skipped the questions. Its name, age and
+          // gender carry over and the choice is offered again, with no
+          // re-confirm steps and no "Last time" hints.
+          const basics = reusableBasics(previous);
+          if (basics && now.sectionIndex === 0 && Object.keys(now.answers).length === 0) {
+            setAnswers((prev) => ({ ...basics, ...prev }));
+            setChoosingQuestions(true);
+          }
+          return;
+        }
         setAnswers((prev) => ({ ...reuse, ...prev }));
         setReusing(true);
+        setQuestionsChoice("answer");
         setLastAnswerHints(reconfirmHints(previous));
         if (now.sectionIndex === 0 && Object.keys(now.answers).length === 0) {
           setSectionIndex(VERIFY_INDEX);
@@ -386,8 +416,8 @@ export function useSkinCheckFlow() {
   // lands, and writing it back would resurrect a cleared draft.
   useEffect(() => {
     if (!restored || complete || draftFinished) return;
-    saveDraft({ scanId, answers, sectionIndex });
-  }, [restored, complete, draftFinished, scanId, answers, sectionIndex]);
+    saveDraft({ scanId, answers, sectionIndex, questionsChoice });
+  }, [restored, complete, draftFinished, scanId, answers, sectionIndex, questionsChoice]);
 
   // The photo is written as soon as it's captured (PhotoCapture, result
   // still null) and rewritten here once the analysis lands, so a refresh at
@@ -438,14 +468,19 @@ export function useSkinCheckFlow() {
     void clearDraft();
     setDraftFinished(false);
     const reuse = reusableAnswers(answers);
+    // TD-33 (1): after a skipped check, name, age and gender carry over and the choice comes again.
+    const basics = reuse ? null : reusableBasics(answers);
     const idx = reuse ? VERIFY_INDEX : 0;
     setScanId(newScanId());
-    setAnswers(reuse ?? {});
+    setAnswers(reuse ?? basics ?? {});
     setReusing(reuse !== null);
+    setQuestionsChoice(reuse ? "answer" : "pending");
+    setChoosingQuestions(basics !== null);
+    setProductNames({});
     setLastAnswerHints(reuse ? reconfirmHints(answers) : {});
     setScan({ status: "idle" });
     setSectionIndex(idx);
-    setRevealCount(revealCountFor(SECTIONS[idx]!, reuse ?? {}));
+    setRevealCount(revealCountFor(SECTIONS[idx]!, reuse ?? basics ?? {}));
     setComplete(false);
     setBlocked(false);
     setConfirmingUnder18(false);
@@ -476,6 +511,13 @@ export function useSkinCheckFlow() {
 
   const setAnswer = useCallback((stepId: string, value: StepAnswerValue) => {
     setAnswers((prev) => ({ ...prev, [stepId]: value }));
+    // TD-33 (2): unpicking an option (or picking "Nothing right now") clears its box.
+    if (stepId === "current_products") setProductNames((prev) => keptProductNames(value, prev));
+  }, []);
+
+  /** Typed text for one box, as typed; trimmed and checked only when saved. */
+  const setProductName = useCallback((key: keyof ProductNames, text: string) => {
+    setProductNames((prev) => ({ ...prev, [key]: text }));
   }, []);
 
   // Only advances reveal when the step committing is the currently-active
@@ -545,7 +587,13 @@ export function useSkinCheckFlow() {
       setConfirmingUnder18(true);
       return;
     }
-    const idx = nextEligibleIndex(sectionIndex + 1, answers, reusing);
+    // TD-33 (1): "Before the questions" comes right after About you, unless a
+    // reused, answered questionnaire already settled it.
+    if (section.id === "about-you" && !reusing) {
+      setChoosingQuestions(true);
+      return;
+    }
+    const idx = nextEligibleIndex(sectionIndex + 1, answers, reusing, questionsChoice === "skip");
     if (idx < SECTIONS.length) {
       const nextSection = SECTIONS[idx]!;
       setSectionIndex(idx);
@@ -553,12 +601,40 @@ export function useSkinCheckFlow() {
     } else {
       setComplete(true);
     }
-  }, [section, sectionIndex, answers, reusing]);
+  }, [section, sectionIndex, answers, reusing, questionsChoice]);
+
+  /** The answer to "Before the questions": go on to Verify either way. */
+  const chooseQuestions = useCallback(
+    (choice: "answer" | "skip") => {
+      setDirection(1);
+      setQuestionsChoice(choice);
+      setChoosingQuestions(false);
+      if (choice === "skip") {
+        // Nothing answered in a question section is kept for a skipped check.
+        setAnswers((prev) => {
+          const kept = { ...prev };
+          for (const step of SECTIONS.filter((x) => QUESTION_SECTION_IDS.has(x.id)).flatMap((x) => x.steps)) delete kept[step.id];
+          return kept;
+        });
+        setProductNames({});
+      }
+      const idx = nextEligibleIndex(ABOUT_INDEX + 1, answers, reusing, choice === "skip");
+      setSectionIndex(idx);
+      setRevealCount(revealCountFor(SECTIONS[idx]!, answers));
+    },
+    [answers, reusing]
+  );
 
   const back = useCallback(() => {
     setDirection(-1);
     if (confirmingUnder18) {
       setConfirmingUnder18(false);
+      return;
+    }
+    if (choosingQuestions) {
+      setChoosingQuestions(false);
+      setSectionIndex(ABOUT_INDEX);
+      setRevealCount(revealCountFor(SECTIONS[ABOUT_INDEX]!, answers));
       return;
     }
     if (blocked) {
@@ -569,11 +645,17 @@ export function useSkinCheckFlow() {
       setComplete(false);
       return;
     }
-    const idx = prevEligibleIndex(Math.max(sectionIndex - 1, 0), answers, reusing);
+    const idx = prevEligibleIndex(Math.max(sectionIndex - 1, 0), answers, reusing, questionsChoice === "skip");
+    // Back from Verify lands on "Before the questions", the screen just before it.
+    if (SECTIONS[idx]!.id === "about-you" && !reusing && sectionIndex > ABOUT_INDEX) {
+      setSectionIndex(ABOUT_INDEX);
+      setChoosingQuestions(true);
+      return;
+    }
     const prevSection = SECTIONS[idx]!;
     setSectionIndex(idx);
     setRevealCount(revealCountFor(prevSection, answers));
-  }, [confirmingUnder18, blocked, complete, sectionIndex, answers, reusing]);
+  }, [confirmingUnder18, choosingQuestions, blocked, complete, sectionIndex, answers, reusing, questionsChoice]);
 
   return {
     scanId,
@@ -592,7 +674,7 @@ export function useSkinCheckFlow() {
     revealTarget,
     isSectionComplete,
     sectionFill,
-    isFirst: sectionIndex === 0 && !complete && !blocked && !confirmingUnder18,
+    isFirst: sectionIndex === 0 && !complete && !blocked && !confirmingUnder18 && !choosingQuestions,
     next,
     back,
     direction,
@@ -601,5 +683,10 @@ export function useSkinCheckFlow() {
     confirmingUnder18,
     confirmUnder18,
     lastAnswerHints,
+    choosingQuestions,
+    questionsChoice,
+    chooseQuestions,
+    productNames,
+    setProductName,
   };
 }

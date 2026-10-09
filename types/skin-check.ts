@@ -72,6 +72,8 @@ export interface MultiSelectCardsStep extends BaseStep {
   exclusiveValue?: string;
   /** Once this many are selected, remaining unselected options are disabled. */
   maxSelections?: number;
+  /** TD-33 (2): option value → label of the optional name box shown under it while picked. */
+  nameBoxes?: Record<string, string>;
 }
 
 export interface BodyZoneOption {

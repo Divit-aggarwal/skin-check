@@ -53,8 +53,56 @@ service cloud.firestore {
                       && request.resource.data.get('scanId', checkId) == checkId
                       && imageStoredIsBool()
                       && imageKeyIsOwn(uid, checkId)
-                      && storedImageHasConsent();
+                      && storedImageHasConsent()
+                      && questionnaireIsKnown()
+                      && productNamesOk(request.resource.data);
         allow update, delete: if false;
+      }
+
+      // TD-33 (1): answers given later for a check that skipped the questions.
+      // Create-only and owner-only, like skinChecks; the check itself is never
+      // edited. Only for an existing check of this user that says "skipped"
+      // (get() of a missing check fails, so the write is refused).
+      match /laterAnswers/{scanId} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow create: if request.auth != null && request.auth.uid == uid
+                      && notErased(uid)
+                      && notUnder18(uid)
+                      && request.resource.data.keys().hasOnly(['scanId', 'answers', 'productNames', 'questionnaireVersion', 'createdAt'])
+                      && request.resource.data.scanId == scanId
+                      && request.resource.data.createdAt == request.time
+                      && request.resource.data.answers is map
+                      && get(/databases/$(database)/documents/users/$(uid)/skinChecks/$(scanId)).data.get('questionnaire', '') == 'skipped'
+                      && productNamesOk(request.resource.data);
+        allow update, delete: if false;
+      }
+
+      // TD-33: a record from before the optional questionnaire has no field.
+      function questionnaireIsKnown() {
+        return request.resource.data.get('questionnaire', 'answered') in ['answered', 'skipped'];
+      }
+
+      // TD-33 (2): the two product-name boxes. Absent, or a map with only these
+      // keys, each a string of 1-200 characters, and only while its
+      // current_products option is picked. The record's path rule already
+      // limits the writer to the account's owner.
+      function productNamesOk(data) {
+        let names = data.get('productNames', null);
+        let products = data.get('answers', {}).get('current_products', []);
+        return names == null
+               || (names is map
+                   && names.keys().hasOnly(['prescription', 'other'])
+                   && productNameOk(names, 'prescription', 'prescription', products)
+                   && productNameOk(names, 'other', 'other_products', products));
+      }
+
+      function productNameOk(names, key, option, products) {
+        return !(key in names)
+               || (names[key] is string
+                   && names[key].size() >= 1
+                   && names[key].size() <= 200
+                   && products is list
+                   && option in products);
       }
 
       // C2. Full analysis records, written ONLY by /api/skin-scan through the

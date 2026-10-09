@@ -9,7 +9,9 @@ import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
 import { CheckReadings, KnownAndNotKnown, PhotoCheckLine } from "@/components/dashboard/CheckReadings";
 import { formatDate } from "@/components/dashboard/format";
 import { loadDashboard, type DashboardData } from "@/components/dashboard/data";
-import { deriveDashboard, pastCheck, type Dashboard } from "@/components/dashboard/state";
+import { deriveDashboard, pastCheck, productNamesOf, questionsDone, questionsTarget, type Dashboard } from "@/components/dashboard/state";
+import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
+import { productNameLabel, type ProductNameKey } from "@/lib/skin-check-validation";
 import { useRoutine } from "@/components/routine/useRoutine";
 import { mergeTimeline, dayOf } from "@/components/timeline/timeline";
 import { TimelineList } from "@/components/timeline/TimelineList";
@@ -184,6 +186,11 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
   if (!check) return <EmptyState title={C.history.notFound} body={K.notFoundBody} />;
   const date = formatDate(check.date);
   const newest = dashboard.echoScanId === check.scanId;
+  const record = data.checks.find((c) => c.id === check.scanId);
+  // TD-33 (2): the typed names are shown here, on the user's own check, and nowhere else.
+  const names = productNamesOf(record, data.laterAnswers);
+  const skipped = record?.data.questionnaire === "skipped" && !questionsDone(record, data.laterAnswers);
+  const canAnswer = questionsTarget(uid, data.checks, data.analyses, data.laterAnswers)?.id === check.scanId;
   return (
     <section aria-labelledby="check-title" className="flex flex-col gap-5 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
       <div className="flex items-start justify-between gap-4">
@@ -210,6 +217,29 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
         </>
       ) : (
         <p>{K.noReadings}</p>
+      )}
+      {skipped && (
+        <div className="flex flex-col items-start gap-1 border-t border-brand-line pt-5">
+          <p className="text-brand-muted">{Q.checkSkipped}</p>
+          {canAnswer && (
+            <Link href="/questions" className={textLink}>
+              {Q.answerLink}
+            </Link>
+          )}
+        </div>
+      )}
+      {Object.keys(names).length > 0 && (
+        <div className="flex flex-col gap-2 border-t border-brand-line pt-5">
+          <h3 className="font-display text-base font-semibold tracking-[-0.01em]">{Q.namedTitle}</h3>
+          <dl className="flex flex-col gap-2">
+            {(Object.entries(names) as [ProductNameKey, string][]).map(([key, text]) => (
+              <div key={key}>
+                <dt className="text-sm text-brand-muted">{productNameLabel(key)}</dt>
+                <dd className="whitespace-pre-wrap break-words">{text}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       )}
       <div className="flex flex-wrap gap-3 border-t border-brand-line pt-5">
         {/* TD-29 (5): no way into Echo while it is switched off. */}
