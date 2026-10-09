@@ -1,6 +1,6 @@
 import type { ContextPackage } from "@/lib/contracts/context-package";
 import { ECHO_SAFETY_INSTRUCTION } from "@/lib/gemini";
-import { packageFacts, packageJson } from "./builder";
+import { packageJson } from "./builder";
 
 // F02 (docs/lanes/context-design.md §3.5; GEMINI_BOUNDARY §2, §5). The user's
 // message and the stored history go only in `contents`, never here.
@@ -47,7 +47,17 @@ export function renderSystemInstruction(pkg: ContextPackage, retryChecks: string
   return `${RULES}\n\n${ECHO_SAFETY_INSTRUCTION}\n\nCONTEXT PACKAGE:\n${packageJson(pkg)}${retry}`;
 }
 
-/** responseJsonSchema: fact ids and claim types are enums of this package's own values. */
+/**
+ * responseJsonSchema. Claim types are an enum (7 fixed values). Fact ids are
+ * plain strings, not an enum of this package's facts: Gemini refuses a schema
+ * past a size limit (400 INVALID_ARGUMENT, "Request contains an invalid
+ * argument."), and the fact list grows with the user's answers and the
+ * region. A real user with every answer and the forehead crossed it (44 fact
+ * ids, 2026-10-09; tracker F19). The validator rejects any id that is not a
+ * fact of this package (unknown_fact_id), so nothing uncited gets through.
+ * The schema must not depend on the package's facts:
+ * tests/context-schema-size.test.ts.
+ */
 export function responseSchema(pkg: ContextPackage): Record<string, unknown> {
   return {
     type: "object",
@@ -61,7 +71,7 @@ export function responseSchema(pkg: ContextPackage): Record<string, unknown> {
           properties: {
             claim_type: { type: "string", enum: [...pkg.allowedClaims] },
             text: { type: "string" },
-            fact_ids: { type: "array", maxItems: 4, items: { type: "string", enum: packageFacts(pkg).map((f) => f.id) } },
+            fact_ids: { type: "array", maxItems: 4, items: { type: "string" } },
           },
           required: ["claim_type", "text", "fact_ids"],
         },

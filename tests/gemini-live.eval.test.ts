@@ -18,12 +18,13 @@ const LIVE = process.env.GEMINI_LIVE_EVAL === "1";
 
 const h = vi.hoisted(() => ({
   trusted: null as unknown,
+  series: [] as unknown[],
   turns: [] as { meta: Record<string, unknown> }[],
   raw: [] as string[],
 }));
 
 vi.mock("@/lib/echo-trusted-context", () => ({ loadTrustedEchoContext: async () => h.trusted }));
-vi.mock("@/lib/skin-state-2-loader", () => ({ loadTrustedSkinState2Series: async () => [] }));
+vi.mock("@/lib/skin-state-2-loader", () => ({ loadTrustedSkinState2Series: async () => h.series }));
 vi.mock("@/lib/context/chat-turns", () => ({
   recordChatTurns: async (_u: string, _s: string, _r: string, _m: string, _reply: string, meta: Record<string, unknown>) => void h.turns.push({ meta }),
   loadChatHistory: async () => [],
@@ -112,7 +113,45 @@ describe.skipIf(!LIVE)("context path against the real Gemini model (F07)", () =>
       // Free-tier pacing.
       await new Promise((r) => setTimeout(r, 4000));
     }
+    // F19: the made-up user with every answer filled in (the longest fact list), on all
+    // four face areas through handleContextChat, and the whole face through the same
+    // package, renderer, Gemini call and validator (the chat route always names an area).
+    if (process.env.GEMINI_LIVE_FULL !== "0") {
+      const full = await import("./full-answers-user");
+      const { evaluateSafety } = await import("@/lib/rules/safety");
+      const { buildContextPackage } = await import("@/lib/context/builder");
+      const { answerFromPackage } = await import("@/lib/context/answer");
+      const { generateContextAnswer } = await import("@/lib/gemini");
+      const message = "What does my reading here mean?";
+      for (const area of ["forehead", "nose", "cheeks", "chin", "whole_face"] as const) {
+        h.trusted = { ...full.FULL_SKIN, answers: full.FULL_ANSWERS };
+        h.series = full.fullSeries();
+        h.turns.length = 0;
+        h.raw.length = 0;
+        let outcome: string;
+        let reply = "";
+        let validator: { passed: boolean; fallback: boolean; failures: string[]; regenerated: boolean } | null = null;
+        try {
+          if (area === "whole_face") {
+            const safety = evaluateSafety({ answers: full.FULL_ANSWERS, confirmedThisScan: [] });
+            const o = await answerFromPackage(buildContextPackage(full.fullAnswersInput(null, safety)), message, [], { generate: generateContextAnswer, redFlag: safety.redFlag });
+            reply = o.reply;
+            validator = o.validator;
+          } else {
+            const r = await handleContextChat({ uid: full.FULL_UID, scanId: full.FULL_SCAN_ID, region: area, message });
+            reply = r.ok ? r.reply : `${r.code}`;
+            validator = (h.turns.at(-1)?.meta.validator as typeof validator) ?? null;
+          }
+          outcome = validator?.fallback ? "rejected" : validator?.passed ? "passed" : "other";
+        } catch (err) {
+          outcome = `error:${(err as Error)?.name}:${String((err as { status?: unknown })?.status ?? "")}`;
+        }
+        results.push({ id: `full-${area}`, category: "full_answers", expect: "answer", message, outcome, reply, failures: validator?.failures ?? [], regenerated: validator?.regenerated ?? false, modelId: null, raw: [...h.raw] });
+        await new Promise((r) => setTimeout(r, 4000));
+      }
+      h.series = [];
+    }
     if (process.env.GEMINI_LIVE_OUT) writeFileSync(process.env.GEMINI_LIVE_OUT, JSON.stringify(results, null, 2));
-    expect(results).toHaveLength(set.length);
+    expect(results.length).toBeGreaterThanOrEqual(set.length);
   }, 60 * 60 * 1000);
 });
