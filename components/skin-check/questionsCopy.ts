@@ -2,12 +2,12 @@
 // D-12 wording test (tests/ui-wording.test.ts) checks them all.
 
 export const QUESTIONS_COPY = {
-  title: "Before the questions",
+  title: "About the questions",
   // Count and minutes come from the real list for this user (questionSteps).
   howMany: (count: number, minutes: number) =>
     `There are ${count} questions about your skin, the products you use and your habits. They take about ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`,
   whyTitle: "Why we ask",
-  why: "A photo shows how your skin looks today. It cannot show what you use on it or what else is going on. Your answers let Echo explain your readings for you.",
+  why: "A photo shows how your skin looks today. It cannot show what you use on it or what else is going on. With your answers, Echo can talk you through your readings.",
   skipTitle: "If you skip for now",
   skip: [
     "You still get your photo check and your readings.",

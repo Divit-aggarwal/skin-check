@@ -154,7 +154,7 @@ export function SkinCheckFlow() {
             sectionLabels={ALL_SECTION_LABELS}
             activeSectionIndex={sectionIndex}
             activeSectionFill={sectionFill}
-            activeSectionLabel={choosingQuestions ? "BEFORE THE QUESTIONS" : section.label}
+            activeSectionLabel={choosingQuestions ? "ABOUT THE QUESTIONS" : section.label}
           />
         )}
       </div>

@@ -169,6 +169,7 @@ function QuestionsForm({ uid, target, isEcho, onSaved }: { uid: string; target: 
               if (el) stepRefs.current.set(step.id, el);
               else stepRefs.current.delete(step.id);
             }}
+            data-step={step.id}
             className="flex flex-col gap-4"
           >
             <EchoBubble message={formatPrompt(step.prompt, all)} />

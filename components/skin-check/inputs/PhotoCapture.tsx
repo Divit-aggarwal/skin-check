@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState, type ChangeEvent } from "react";
 import { AlertCircle, Camera, RotateCcw } from "lucide-react";
+import { CAPTURE_COPY as K, cameraView } from "../captureStates";
 import { useCameraStream } from "@/hooks/useCameraStream";
 import { useAuth } from "@/lib/auth-context";
 import { isAuthError, isUploadError, isUploadTooLarge, runSkinScan, UPLOAD_TOO_LARGE_MESSAGE } from "@/lib/api";
@@ -20,6 +21,7 @@ import { frameFromBlob } from "@/lib/capture-quality/frame";
 import { canAnalyze, canOverride, captureFlowReducer, initialCaptureFlow, runCaptureGate } from "@/lib/capture-quality/gate";
 import { isRetakeError, RETAKE_COPY, retakeReasonFromServerCode } from "@/lib/capture-quality/retake";
 import { Button } from "@/components/ui/button";
+import { btnPrimary, btnSecondary } from "@/components/ui/page";
 import type { PhotoCaptureStep } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanState } from "@/types/skin-scan";
 
@@ -110,7 +112,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   const { user, loading: authLoading } = useAuth();
   // Computed once — the device type doesn't change mid-session.
   const [isMobile] = useState(isMobileCaptureDevice);
-  const { videoRef, status, error, requestCamera, stopCamera } = useCameraStream();
+  const { videoRef, status, requestCamera, stopCamera } = useCameraStream();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -153,17 +155,21 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   // object on every hourly token refresh, and depending on that would tear
   // down and re-acquire the camera mid-capture.
   const uid = user?.uid ?? null;
+  // G16: the laptop no longer asks for the camera when the step appears; it
+  // asks on "Open camera", so the user knows what the browser's prompt is
+  // for. No prompt without a verified user either: the button only renders
+  // past the !user guard below. The stream still stops when the step goes.
+  // Native capture is driven entirely by the hidden <input type="file">.
   useEffect(() => {
-    // Native capture is driven entirely by the hidden <input type="file">
-    // below — no getUserMedia stream to request or tear down.
     if (isMobile) return;
-    // No camera permission prompt for someone who hasn't verified a number:
-    // the request would be for a photo they aren't allowed to submit.
-    if (!uid) return;
-    if (value !== "done") requestCamera();
     return () => stopCamera();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid]);
+  const takeRef = useRef<HTMLButtonElement>(null);
+  // Ready: focus moves to "Take photo", so a keyboard user is one key away.
+  useEffect(() => {
+    if (!isMobile && status === "active" && previewUrl === null) takeRef.current?.focus();
+  }, [isMobile, status, previewUrl]);
 
   // The committed-photo summary view (value === "done") can be reached by a
   // fresh remount — going forward a section then back — at which point the
@@ -421,31 +427,41 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
         <button
           type="button"
           onClick={handleRetakeFromDone}
-          className="inline-flex min-h-11 items-center text-sm font-medium text-brand-forest underline-offset-4 hover:underline sm:ml-auto"
+          className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-brand-forest underline-offset-4 hover:underline sm:ml-auto"
         >
-          Retake photo
+          <RotateCcw aria-hidden className="h-4 w-4" />
+          {K.retake}
         </button>
       </div>
     );
   }
 
-  if (status === "denied" || status === "unavailable") {
-    return (
-      <div className="flex flex-col gap-3 rounded-2xl border border-brand-card-line bg-brand-paper p-4">
-        <p className="text-sm text-brand-muted">{error ?? "Camera access is needed for this step."}</p>
-        <Button type="button" variant="outlineLight" size="sm" onClick={requestCamera}>
-          Try again
-        </Button>
-      </div>
-    );
-  }
+  const view = cameraView(isMobile, status, hasCaptured);
+  const blocked = view === "refused" || view === "unavailable" || view === "failed";
+  const openCamera = () => {
+    if (isMobile) fileInputRef.current?.click();
+    else void requestCamera();
+  };
+  const howToAllow = (
+    <ul className="flex flex-col gap-2">
+      {K.how.map((h) => (
+        <li key={h.device}>
+          <span className="font-semibold">{h.device}: </span>
+          {h.steps}
+        </li>
+      ))}
+    </ul>
+  );
 
   return (
     <div className="flex flex-col gap-4">
+      {/* The video stays mounted on the laptop from "start" to "ready": the
+          stream attaches to it while the browser asks (useCameraStream). */}
       <div className="relative aspect-[3/4] w-full max-w-[320px] overflow-hidden rounded-2xl bg-brand-ink">
         {!isMobile && !hasCaptured && (
           <video
             ref={videoRef}
+            aria-label={K.previewLabel}
             className="absolute inset-0 h-full w-full object-cover"
             playsInline
             muted
@@ -457,14 +473,16 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           <img src={previewUrl} alt="Captured photo preview" className="absolute inset-0 h-full w-full object-cover" />
         )}
         {!isMobile && <canvas ref={canvasRef} className="hidden" />}
-        {!isMobile && status === "requesting" && !hasCaptured && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+        {(view === "start" || blocked) && (
+          <div aria-hidden className="absolute inset-0 flex items-center justify-center">
+            <div className="flex h-[58%] w-[62%] items-center justify-center rounded-[50%] border-2 border-dashed border-white/40">
+              <Camera className="h-10 w-10 text-white/60" />
+            </div>
           </div>
         )}
-        {isMobile && !hasCaptured && (
-          <div className="absolute inset-0 flex items-center justify-center">
-            <Camera className="h-10 w-10 text-white/40" />
+        {view === "loading" && (
+          <div aria-hidden className="absolute inset-0 flex items-center justify-center">
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-white/30 border-t-white motion-reduce:animate-none" />
           </div>
         )}
       </div>
@@ -482,19 +500,66 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
 
       <p className="max-w-sm text-sm text-brand-muted">{step.note}</p>
 
-      {!hasCaptured ? (
-        <Button
-          type="button"
-          variant="ink"
-          size="lg"
-          disabled={!isMobile && status !== "active"}
-          onClick={isMobile ? () => fileInputRef.current?.click() : handleCapture}
-          className="w-fit gap-2"
-        >
-          <Camera className="h-4 w-4" />
-          Capture
-        </Button>
-      ) : (
+      {/* Camera state for screen readers: loading, ready and the refusal are announced. */}
+      <div aria-live="polite" className="max-w-sm text-sm">
+        {view === "loading" && <p role="status">{K.loading}</p>}
+        {view === "ready" && <p className="text-brand-ink">{K.ready}</p>}
+      </div>
+
+      {blocked && (
+        <div role="alert" className="flex max-w-md flex-col gap-3 rounded-2xl border border-brand-line bg-brand-paper p-4 text-brand-ink">
+          <p className="flex items-start gap-2 font-semibold">
+            <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-brand-error" />
+            <span>{view === "refused" ? K.refusedTitle : view === "unavailable" ? K.unavailable : K.failed}</span>
+          </p>
+          {view === "refused" && (
+            <div className="flex flex-col gap-2 text-sm">
+              <p className="font-semibold">{K.howTitle}</p>
+              {howToAllow}
+            </div>
+          )}
+          <button type="button" onClick={openCamera} className={`${btnSecondary} w-fit`}>
+            <Camera aria-hidden className="h-4 w-4" />
+            {K.tryAgain}
+          </button>
+        </div>
+      )}
+
+      {view === "start" && (
+        <div className="flex max-w-md flex-col gap-2">
+          <button type="button" onClick={openCamera} className={`${btnPrimary} w-full sm:w-fit`} aria-describedby="camera-next">
+            <Camera aria-hidden className="h-5 w-5" />
+            {K.open}
+          </button>
+          <p id="camera-next" className="text-sm text-brand-muted">
+            {isMobile ? K.nextPhone : K.nextLaptop}
+          </p>
+          {isMobile && (
+            <details className="text-sm text-brand-ink">
+              <summary className="inline-flex min-h-11 cursor-pointer items-center font-medium text-brand-forest underline-offset-4 hover:underline">
+                {K.phoneHelp}
+              </summary>
+              <div className="pb-2 pt-1">{howToAllow}</div>
+            </details>
+          )}
+        </div>
+      )}
+
+      {view === "loading" && (
+        <button type="button" aria-disabled className={`${btnPrimary} w-full sm:w-fit`}>
+          <Camera aria-hidden className="h-5 w-5" />
+          {K.take}
+        </button>
+      )}
+
+      {view === "ready" && (
+        <button ref={takeRef} type="button" onClick={handleCapture} className={`${btnPrimary} w-full sm:w-fit`}>
+          <Camera aria-hidden className="h-5 w-5" />
+          {K.take}
+        </button>
+      )}
+
+      {hasCaptured && (
         <div className="flex flex-col gap-4">
           {/* Required consent gate — the scan request below never fires
               until this is checked (PART 13). Unchecked by default, real
@@ -578,8 +643,8 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
               onClick={handleRetake}
               className="gap-2"
             >
-              <RotateCcw className="h-4 w-4" />
-              Retake
+              <RotateCcw aria-hidden className="h-4 w-4" />
+              {K.retake}
             </Button>
             <Button
               type="button"

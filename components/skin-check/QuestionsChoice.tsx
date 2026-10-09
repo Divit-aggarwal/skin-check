@@ -6,7 +6,7 @@ import { btnPrimary, btnSecondary, card, h2, textLink } from "@/components/ui/pa
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import { QUESTIONS_COPY as Q } from "./questionsCopy";
 
-/** TD-33 (1): "Before the questions", right after About you. */
+/** TD-33 (1): "About the questions", right after About you. */
 export function QuestionsChoice({ answers, onChoose }: { answers: SkinCheckAnswers; onChoose: (choice: "answer" | "skip") => void }) {
   const count = questionSteps(answers).length;
   return (

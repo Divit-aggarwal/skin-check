@@ -45,6 +45,19 @@ describe.skipIf(!WEB)("privacy: erasure end to end", () => {
     // Wave-2 wiring 7: A has one stored chat turn (D-15) before the erase.
     const chatTurns = () => db.collection("users").doc(A.uid).collection("chatTurns").get();
     expect((await chatTurns()).size).toBe(1);
+    // TD-33 (2): typed product names, on a check and on a later-answers record,
+    // before the erase. Written with the Admin SDK (A's seed has an under-18
+    // answer); tests/firestore-rules-questionnaire.test.ts covers the client path.
+    const CANARY = "ZZERASECANARYZZ Tretinoin";
+    const userRef = db.collection("users").doc(A.uid);
+    await userRef.collection("skinChecks").doc("erase-names-check").set({ answers: { current_products: ["prescription", "other_products"] }, questionnaire: "answered", productNames: { prescription: CANARY, other: CANARY } });
+    await userRef.collection("skinChecks").doc("erase-names-skipped").set({ answers: { gender: "female" }, questionnaire: "skipped" });
+    await userRef.collection("laterAnswers").doc("erase-names-skipped").set({ scanId: "erase-names-skipped", answers: { current_products: ["prescription"] }, productNames: { prescription: CANARY } });
+    const namesLeft = async () =>
+      (await Promise.all([db.collectionGroup("skinChecks").get(), db.collectionGroup("laterAnswers").get()]))
+        .flatMap((q) => q.docs)
+        .filter((d) => JSON.stringify(d.data()).includes(CANARY)).length;
+    expect(await namesLeft()).toBe(2); // the check and the later-answers record
     const under18 = (uid: string) =>
       db.collection("users").doc(uid).collection("consentLedger").where("purpose", "==", "age_18_plus").where("granted", "==", false).get();
     expect((await under18(A.uid)).size).toBe(1);
@@ -67,6 +80,9 @@ describe.skipIf(!WEB)("privacy: erasure end to end", () => {
     await expect(auth.getUser(A.uid)).rejects.toMatchObject({ code: "auth/user-not-found" });
     expect((await under18(A.uid)).size).toBe(0);
     expect((await chatTurns()).size).toBe(0);
+    // TD-33 (2): no product name is left anywhere in the database.
+    expect((await userRef.collection("laterAnswers").get()).size).toBe(0);
+    expect(await namesLeft()).toBe(0);
 
     // A's old token no longer opens a server route.
     const presign = await fetch(`${WEB}/api/skin-scan/upload`, {

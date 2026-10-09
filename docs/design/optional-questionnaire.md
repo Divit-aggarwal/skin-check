@@ -13,11 +13,11 @@ Owner decisions (TD-33):
 ### Where it sits
 
 ```
-About you (name, age, gender) → [Before the questions] → Verify → Photo → questions… → Get your results
+About you (name, age, gender) → [About the questions] → Verify → Photo → questions… → Get your results
                                           └ skip ───────────────────→ Verify → Photo → Get your results
 ```
 
-"Before the questions" is a flow screen, not a `SECTIONS` entry (it is not a question, and the
+"About the questions" is a flow screen, not a `SECTIONS` entry (it is not a question, and the
 rules, Gemini inventory and progress labels all iterate `SECTIONS`). It comes right after About
 you, after the under-18 confirm.
 
@@ -76,7 +76,7 @@ are done", link "Answer the questions").
 | Last check | New check |
 |---|---|
 | answered (at the check or later) | as today: reuse, start at Verify, re-confirm `current_products` and `female_skin_context` |
-| skipped, no later answers | name, age, gender reused; lands on "Before the questions"; no re-confirm steps. Answer now = every question, blank, no "Last time" hints |
+| skipped, no later answers | name, age, gender reused; lands on "About the questions"; no re-confirm steps. Answer now = every question, blank, no "Last time" hints |
 
 ### Places that assumed answers exist
 
@@ -138,8 +138,8 @@ The laptop no longer asks for the camera the moment the step appears: it asks on
 
 ## 4. Edge cases
 
-- Under 18: the confirm and block come before "Before the questions"; nothing changes there.
-- Back from "Before the questions" goes to About you; back from Verify goes to "Before the questions".
+- Under 18: the confirm and block come before "About the questions"; nothing changes there.
+- Back from "About the questions" goes to About you; back from Verify goes to "About the questions".
 - A draft remembers the skip/answer choice (draft version 3; older drafts are discarded). It never
   holds the product names: like the phone number, they stay in memory only, so a refresh loses them
   and nothing typed outlives an account erase in localStorage or IndexedDB.

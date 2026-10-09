@@ -218,12 +218,17 @@ test("check flow to results", async ({ page }) => {
   await shots(page, "flow-questions");
   await question(page);
   await page.getByRole("button", { name: "Female", exact: true }).click();
+  await shots(page, "flow-questions-choice");
+  await page.getByRole("button", { name: "Answer the questions now" }).click();
   const file = page.locator('input[type="file"]');
-  const capture = page.getByRole("button", { name: "Capture", exact: true });
-  await expect(file.or(capture).first()).toBeAttached({ timeout: 30_000 });
+  // G16: the laptop asks for the camera from "Open camera"; then "Take photo".
+  const open = page.getByRole("button", { name: "Open camera", exact: true });
+  const capture = page.getByRole("button", { name: "Take photo", exact: true });
+  await expect(open).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(2000);
   await shots(page, "flow-photo-step");
   await question(page);
+  if (!(await file.count())) await open.click();
   if (await file.count()) {
     await file.setInputFiles({ name: "face.png", mimeType: "image/png", buffer: readFileSync(FACE) });
   } else {
@@ -233,7 +238,7 @@ test("check flow to results", async ({ page }) => {
     for (let i = 0; i < 6 && !(await anyway.isVisible()); i++) {
       await page.waitForTimeout(1000);
       if (await anyway.isVisible()) break;
-      const retake = page.getByRole("button", { name: "Retake", exact: true });
+      const retake = page.getByRole("button", { name: "Retake photo", exact: true });
       if (!(await retake.isVisible())) break;
       await retake.click();
       await capture.click();
@@ -277,6 +282,7 @@ test("check flow: the phone question, signed out", async ({ page }) => {
   await name.press("Enter");
   await page.getByRole("button", { name: "25–34", exact: true }).click();
   await page.getByRole("button", { name: "Male", exact: true }).click();
+  await page.getByRole("button", { name: "Answer the questions now" }).click();
   await expect(page.getByText(/let's confirm it's you/)).toBeVisible();
   await question(page);
 });
@@ -292,10 +298,14 @@ test("check flow: the male-only question (nothing saved)", async ({ page }) => {
   await name.press("Enter");
   await page.getByRole("button", { name: "25–34", exact: true }).click();
   await page.getByRole("button", { name: "Male", exact: true }).click();
+  await page.getByRole("button", { name: "Answer the questions now" }).click();
   const file = page.locator('input[type="file"]');
-  const capture = page.getByRole("button", { name: "Capture", exact: true });
-  await expect(file.or(capture).first()).toBeAttached({ timeout: 30_000 });
+  // G16: the laptop asks for the camera from "Open camera"; then "Take photo".
+  const open = page.getByRole("button", { name: "Open camera", exact: true });
+  const capture = page.getByRole("button", { name: "Take photo", exact: true });
+  await expect(open).toBeVisible({ timeout: 30_000 });
   await page.waitForTimeout(2000); // the file input replaces the camera button once the page knows the device
+  if (!(await file.count())) await open.click();
   if (await file.count()) await file.setInputFiles({ name: "face.png", mimeType: "image/png", buffer: readFileSync(FACE) });
   else {
     await expect(capture).toBeEnabled({ timeout: 30_000 });
@@ -303,7 +313,7 @@ test("check flow: the male-only question (nothing saved)", async ({ page }) => {
     const anyway = page.getByRole("button", { name: "Use this photo anyway" });
     for (let i = 0; i < 6 && !(await anyway.isVisible()); i++) {
       await page.waitForTimeout(1000);
-      const retake = page.getByRole("button", { name: "Retake", exact: true });
+      const retake = page.getByRole("button", { name: "Retake photo", exact: true });
       if ((await anyway.isVisible()) || !(await retake.isVisible())) break;
       await retake.click();
       await capture.click();

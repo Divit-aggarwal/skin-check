@@ -92,7 +92,7 @@ export function prevEligibleIndex(fromIndex: number, answers: SkinCheckAnswers, 
 const VERIFY_INDEX = SECTIONS.findIndex((section) => section.id === "verify");
 const ABOUT_INDEX = SECTIONS.findIndex((section) => section.id === "about-you");
 
-/** TD-33 (1): the answer to "Before the questions"; "pending" until the user chooses. */
+/** TD-33 (1): the answer to "About the questions"; "pending" until the user chooses. */
 export type QuestionsChoice = "pending" | "answer" | "skip";
 export const PHOTO_INDEX = SECTIONS.findIndex((section) => section.id === "skin-photo");
 
@@ -238,7 +238,7 @@ export function useSkinCheckFlow() {
   // SkinCheckFlow's job (request R9).
   const [lastAnswerHints, setLastAnswerHints] = useState<Record<string, string>>({});
   // TD-33 (1): answer the questions now or skip them. Shown right after About
-  // you ("Before the questions"); a reused, answered questionnaire is "answer".
+  // you ("About the questions"); a reused, answered questionnaire is "answer".
   const [questionsChoice, setQuestionsChoice] = useState<QuestionsChoice>(() => (session ? "answer" : "pending"));
   const [choosingQuestions, setChoosingQuestions] = useState(false);
   // TD-33 (2): the two product-name boxes. Memory only: never in answers, the
@@ -587,7 +587,7 @@ export function useSkinCheckFlow() {
       setConfirmingUnder18(true);
       return;
     }
-    // TD-33 (1): "Before the questions" comes right after About you, unless a
+    // TD-33 (1): "About the questions" comes right after About you, unless a
     // reused, answered questionnaire already settled it.
     if (section.id === "about-you" && !reusing) {
       setChoosingQuestions(true);
@@ -603,7 +603,7 @@ export function useSkinCheckFlow() {
     }
   }, [section, sectionIndex, answers, reusing, questionsChoice]);
 
-  /** The answer to "Before the questions": go on to Verify either way. */
+  /** The answer to "About the questions": go on to Verify either way. */
   const chooseQuestions = useCallback(
     (choice: "answer" | "skip") => {
       setDirection(1);
@@ -646,7 +646,7 @@ export function useSkinCheckFlow() {
       return;
     }
     const idx = prevEligibleIndex(Math.max(sectionIndex - 1, 0), answers, reusing, questionsChoice === "skip");
-    // Back from Verify lands on "Before the questions", the screen just before it.
+    // Back from Verify lands on "About the questions", the screen just before it.
     if (SECTIONS[idx]!.id === "about-you" && !reusing && sectionIndex > ABOUT_INDEX) {
       setSectionIndex(ABOUT_INDEX);
       setChoosingQuestions(true);
