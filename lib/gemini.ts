@@ -360,3 +360,10 @@ export async function generateContextAnswer(
   );
   return { text: response.text?.trim() ?? "", modelId };
 }
+
+/** F18: the HTTP status and Google's reason code of a Gemini error, and nothing else. */
+export function geminiErrorDetail(err: unknown): string[] {
+  const status = (err as { status?: unknown })?.status;
+  const reason = /"reason":\s*"([A-Z0-9_]{1,64})"/.exec(String((err as Error)?.message ?? ""))?.[1];
+  return [typeof status === "number" ? `status=${status}` : "", reason ? `reason=${reason}` : ""].filter(Boolean);
+}

@@ -3,7 +3,7 @@ import { z } from "zod";
 import { checkRequestRate, GEMINI_ROUTE_LIMITS } from "@/lib/rate-limit";
 import { consumeEchoQuestion } from "@/lib/echo-quota";
 import { AdminNotConfiguredError, bearerToken, verifyFirebaseIdToken } from "@/lib/firebase/admin";
-import { getSkinCheckChatReply, isGeminiTimeout } from "@/lib/gemini";
+import { geminiErrorDetail, getSkinCheckChatReply, isGeminiTimeout } from "@/lib/gemini";
 import { geminiApiKey } from "@/lib/gemini-key";
 import { ECHO_REGIONS, ECHO_REGION_LABELS } from "@/lib/echo-regions";
 import { isValidScanId } from "@/lib/s3-key";
@@ -353,7 +353,11 @@ export async function POST(request: NextRequest) {
     // carry request/response internals that don't belong in server logs.
     // Name and code only: a Firestore failure in loadTrustedEchoContext
     // carries the doc path (users/<uid>/...) in its message.
-    console.error("skin-check Echo chat failed:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
+    // F18: a Gemini ApiError carries its HTTP status in .status (not .code) and
+    // Google's reason code (API_KEY_INVALID, RESOURCE_EXHAUSTED, ...) inside its
+    // message. Only those two are logged: never the message itself, which can
+    // quote the request.
+    console.error("skin-check Echo chat failed:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "", ...geminiErrorDetail(err));
     // F15: a Gemini timeout says so, and asks for another try.
     if (isGeminiTimeout(err)) {
       return NextResponse.json({ error: "Echo took too long to answer. Please try again.", code: "CHAT_TIMEOUT" }, { status: 504 });
