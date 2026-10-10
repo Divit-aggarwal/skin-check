@@ -8,7 +8,7 @@ import { MIN_POINTS } from "@/lib/face-mesh/regions";
 // - The library is @mediapipe/tasks-vision, pinned in package.json, and is
 //   loaded with import() only when a screen asks for a mesh.
 // - Its wasm and the model file come from our own site (/mediapipe/, see
-//   next.config.js and public/mediapipe/README.md). Nothing is fetched from
+//   next.config.js and docs/design/face-mesh.md). Nothing is fetched from
 //   anywhere else, and the photo never leaves the device for this.
 // - Points are never stored or sent anywhere.
 

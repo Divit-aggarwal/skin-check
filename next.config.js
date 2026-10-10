@@ -5,7 +5,7 @@ const path = require("node:path");
 
 // TD-37 (2), (5): the face mesh library's wasm is served from our own site,
 // at /mediapipe/<version>/wasm, copied from the pinned package on every dev
-// start and build (public/mediapipe/README.md). The version in the path is the
+// start and build (docs/design/face-mesh.md). The version in the path is the
 // installed one, so a version change can never serve stale files.
 function copyMediapipeWasm() {
   const pkg = path.join(__dirname, "node_modules/@mediapipe/tasks-vision");

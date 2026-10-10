@@ -19,7 +19,7 @@ describe("mesh files: pinned and served from our own site", () => {
   });
 
   it("the model file is the one recorded, by sha256", () => {
-    const readme = readFileSync("public/mediapipe/README.md", "utf8");
+    const readme = readFileSync("docs/design/face-mesh.md", "utf8");
     const sha = createHash("sha256").update(readFileSync("public/mediapipe/face_landmarker.task")).digest("hex");
     expect(sha).toBe("64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff");
     expect(readme).toContain(sha);
