@@ -5,6 +5,7 @@ import { motion, AnimatePresence, type PanInfo, type Variants } from "framer-mot
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { METRIC_LABELS, type AnswerTopic, type PhotoMetric } from "@/lib/skin-check-skus";
 import { SourcesLine, ToldPanel } from "@/components/dashboard/CheckReadings";
+import { MeshLayer, useFaceMesh } from "@/components/mesh/MeshLayer";
 import type { ToldTopic } from "@/lib/told-topics";
 import type { Band, BandableMetric } from "@/lib/skin-check-rules";
 import type { SkinScanOverlays, SkinScanScores } from "@/types/skin-scan";
@@ -112,6 +113,8 @@ export function EchoTwin({
     return () => URL.revokeObjectURL(url);
   }, [photo]);
 
+  // Only over a photo that was read: a failed check gets no mesh.
+  const { mesh } = useFaceMesh(analyzed ? photo : null);
   const [overlayFailed, setOverlayFailed] = useState(false);
   const [photoFailed, setPhotoFailed] = useState(false);
   // Overlay decode failures are per-image — reset when the selected category
@@ -233,6 +236,8 @@ export function EchoTwin({
             onError={() => setOverlayFailed(true)}
           />
         )}
+        {/* TD-37 (2): the face mesh, a map of the face, over the photo and any overlay. */}
+        {mesh && photoUrl && !photoFailed && <MeshLayer mesh={mesh} />}
         {analyzed && (
           <div className="absolute left-2 top-2 rounded-full bg-brand-paper/90 px-3 py-1 text-xs font-semibold text-brand-ink">
             Photo read

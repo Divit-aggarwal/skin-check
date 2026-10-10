@@ -8,6 +8,7 @@ import type { ToldTopic } from "@/lib/told-topics";
 import { ECHO_REGION_LABELS, ECHO_REGIONS, type EchoRegion } from "@/lib/echo-regions";
 import { DASHBOARD_COPY as C } from "./copy";
 import { FaceDrawing } from "./FaceDrawing";
+import { MeshPicker } from "@/components/mesh/MeshPicker";
 import type { Bands, CheckView } from "./state";
 
 export { formatDate } from "./format";
@@ -41,7 +42,9 @@ export function ReadingRows({ bands }: { bands: Bands | null }) {
 // drawing (the same drawing on Home, an opened check and the results screen).
 // Band words only, all in the same neutral style, so no band reads as good or
 // bad news. No score, no overlay, no other check.
-export function CheckReadings({ view, stack = false }: { view: CheckView; stack?: boolean }) {
+// TD-37 (2): with the user's photo (`photo`), the areas are chosen on the face
+// mesh over it; without one, or until the mesh is ready, on the face drawing.
+export function CheckReadings({ view, stack = false, photo = null }: { view: CheckView; stack?: boolean; photo?: Blob | null }) {
   const [area, setArea] = useState<EchoRegion | null>(null);
   // No drawing of areas when there are no readings to go with it.
   const showFace = view.areas.length > 0 && view.bands !== null;
@@ -52,7 +55,11 @@ export function CheckReadings({ view, stack = false }: { view: CheckView; stack?
       <div className={showFace && !stack ? "grid items-start gap-6 md:grid-cols-[minmax(0,300px)_1fr]" : "flex flex-col gap-6"}>
         {showFace && (
           <div role="group" aria-label={C.current.areaPicker} className="flex flex-col items-center gap-3 rounded-2xl bg-brand-linen p-4">
-            <FaceDrawing selected={area} labels={ECHO_REGION_LABELS} available={view.areas.map((a) => a.region)} onSelect={setArea} />
+            {(() => {
+              const choice = { selected: area, labels: ECHO_REGION_LABELS, available: view.areas.map((a) => a.region), onSelect: setArea };
+              const drawing = <FaceDrawing {...choice} />;
+              return photo ? <MeshPicker photo={photo} areas={choice} fallback={drawing} /> : drawing;
+            })()}
             <button
               type="button"
               aria-pressed={area === null}

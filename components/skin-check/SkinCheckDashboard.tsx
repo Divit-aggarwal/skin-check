@@ -15,6 +15,7 @@ import { useSkinCheckSession } from "@/lib/skin-check-session-context";
 import type { SkinScanState } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import { EchoTwin, type AnalysisCategory } from "./EchoTwin";
+import { ScanningPhoto } from "@/components/mesh/ScanningPhoto";
 import { echoOn } from "@/lib/echo-limits";
 
 // TD-37: the chips in a fixed order, photo readings first. Never sorted by
@@ -85,10 +86,12 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
   if (scan.status === "loading") {
     return (
       <div className="flex flex-col gap-4">
-        <Skeleton className="aspect-[3/4] w-full max-w-[340px] self-center rounded-media" />
+        {/* TD-37 (2): the mesh sweeps over the photo while it is read; without a
+            photo or a mesh, the plain progress state below. */}
+        <ScanningPhoto photo={scan.photo ?? null} />
         {/* Copy, not a bare spinner. The upstream timeout is 30s and the
             previous version showed nothing at all for the duration. */}
-        <p className="text-center text-body text-muted-foreground">
+        <p role="status" className="text-center text-body text-muted-foreground">
           Reading your photo. This takes a few seconds.
         </p>
         <div className="flex flex-col gap-2">
@@ -103,7 +106,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
   if (scan.status === "error") {
     const { message, photo } = scan;
     const handleRetry = async () => {
-      onScanChange({ status: "loading" });
+      onScanChange({ status: "loading", photo: scan.photo });
       onScanChange(await retrySkinScan(scan, scanId), scanId);
     };
 
@@ -162,7 +165,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
           <h2 id="readings-title" className="font-display text-xl font-semibold uppercase leading-tight tracking-[0.04em] text-brand-title sm:text-[22px]">
             What this photo shows
           </h2>
-          {view.bands ? <CheckReadings view={view} stack /> : <p>The readings of this check could not be shown.</p>}
+          {view.bands ? <CheckReadings view={view} stack photo={scan.photo} /> : <p>The readings of this check could not be shown.</p>}
           <p className="text-sm text-brand-muted">
             Each reading is relative to this one photo. It is not a medical opinion and does not set you against other people or other checks.
           </p>

@@ -76,3 +76,6 @@ firebase.local.json
 !docs/lanes/*.md
 docs/design/wip/
 !docs/OWNER_QUEUE.md
+
+# TD-37: copied from node_modules/@mediapipe/tasks-vision at build (next.config.js)
+/public/mediapipe/*/

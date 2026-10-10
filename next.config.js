@@ -1,5 +1,22 @@
 const { PHASE_DEVELOPMENT_SERVER } = require("next/constants");
 const { assertDevEnvSafe } = require("./lib/dev-env-guard.cjs");
+const fs = require("node:fs");
+const path = require("node:path");
+
+// TD-37 (2), (5): the face mesh library's wasm is served from our own site,
+// at /mediapipe/<version>/wasm, copied from the pinned package on every dev
+// start and build (public/mediapipe/README.md). The version in the path is the
+// installed one, so a version change can never serve stale files.
+function copyMediapipeWasm() {
+  const pkg = path.join(__dirname, "node_modules/@mediapipe/tasks-vision");
+  const { version } = require(path.join(pkg, "package.json"));
+  const to = path.join(__dirname, "public/mediapipe", version, "wasm");
+  fs.mkdirSync(to, { recursive: true });
+  for (const f of fs.readdirSync(path.join(pkg, "wasm"))) {
+    if (!/^vision_wasm(_nosimd)?_internal\.(js|wasm)$/.test(f)) continue;
+    fs.copyFileSync(path.join(pkg, "wasm", f), path.join(to, f));
+  }
+}
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -62,5 +79,6 @@ const nextConfig = {
 // (tracker B01). Builds and `next start` are unaffected.
 module.exports = (phase) => {
   if (phase === PHASE_DEVELOPMENT_SERVER) assertDevEnvSafe(process.env);
+  copyMediapipeWasm();
   return nextConfig;
 };
