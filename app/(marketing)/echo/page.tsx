@@ -3,6 +3,7 @@ import { Suspense } from "react";
 import { EchoPage } from "@/components/skin-check/EchoPage";
 import { LoadingState, page } from "@/components/ui/page";
 import { echoOn } from "@/lib/context/switch";
+import { echoProductsOn } from "@/lib/context/products";
 
 export const metadata: Metadata = {
   title: "Echo — The Project SKIN",
@@ -23,7 +24,7 @@ export default function EchoRoute() {
       }
     >
       {/* Read at build time: a Vercel setting change takes effect with the next deployment (TD-29 (5)). */}
-      <EchoPage echoOn={echoOn()} />
+      <EchoPage echoOn={echoOn()} productsOn={echoProductsOn()} />
     </Suspense>
   );
 }

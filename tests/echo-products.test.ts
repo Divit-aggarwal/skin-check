@@ -235,3 +235,22 @@ describe("the answer format stays fixed in size with products on (F19)", () => {
     expect(schema.length).toBeLessThanOrEqual(900);
   });
 });
+
+describe("narrow checker changes found in the live run (TD-34, named)", () => {
+  const says = (text: string) => failed(answer({ claims: [{ claim_type: "out_of_scope", text, fact_ids: [] }] }));
+  it("a refusal that names prices or discounts passes; any other price or buying word still fails", () => {
+    expect(says("I cannot provide discount codes or pricing details.")).toEqual([]);
+    expect(says("I can't share prices, discounts or offers.")).toEqual([]);
+    expect(says("I cannot share prices, but it is cheap.")).toContain("made_up_price");
+    expect(says("I don't know the price but buy it now.")).toContain("purchase_pressure");
+  });
+  it("'Project Skin' is our own name in an uncited claim; another brand still fails", () => {
+    expect(says("I can only talk about Project Skin's products.")).toEqual([]);
+    expect(says("I can only talk about CeraVe products.")).toContain("product_not_in_list");
+  });
+  it("a verbatim quote of a cited product's whole fact passes; its key ingredient alone does not", () => {
+    const fact = pkg.recommendation!.items[0]!;
+    expect(failed(answer({ claims: [{ claim_type: "product", text: fact.text, fact_ids: [fact.id] }] }))).toEqual([]);
+    expect(failed(answer({ claims: [{ claim_type: "product", text: "Refreshing Cleanser has Salicylic Acid 2%.", fact_ids: [fact.id] }] }))).toContain("product_claim");
+  });
+});

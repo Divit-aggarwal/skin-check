@@ -56,9 +56,16 @@ const PRODUCT_RULES = `Products (only Project Skin's own products, the rec facts
 - Each reason repeats one or two facts you were given (what the user told us,
   or a reading) as they are, and cites them in fact_ids. A reason never says
   what a product does, did or will do.
+- The app shows every suggested product as a card with its name, step, key
+  ingredient and how to use it. So do not copy a product's fact into a
+  claim. For a suggestion, one short claim is enough, for example "Here is a
+  simple routine from Project Skin's products." with claim_type "product",
+  citing the suggested products' rec facts.
 - A claim about a product uses claim_type "product", cites that product's
-  rec fact, and uses only the words of that fact. Name a product only by its
-  exact name. Do not repeat the key ingredient: the app shows it.
+  rec fact, and uses only the words of that fact (for example its "How to
+  use" sentence). Name a product only by its exact name. Do not name the key
+  ingredient.
+- If a reason repeats a reading, also add a claim citing an uncertainty fact.
 - Never name any other product, brand, shop or ingredient, and never a
   product that is not a rec fact. If asked about one, say you can only talk
   about Project Skin's products.

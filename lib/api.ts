@@ -345,11 +345,18 @@ export interface EchoChatMessage {
 // ─── Echo chat (/echo) ─────────────────────────────────────────────────────
 // Hits /api/skin-check/chat.
 
+/** TD-34: a suggested own product. The screen draws its card from the catalogue by id. */
+const ShownProductSchema = z.object({ productId: z.string(), reason: z.string() });
+export type ShownProduct = z.infer<typeof ShownProductSchema>;
+
 const SkinCheckChatResponseSchema = z.object({
   ok: z.literal(true),
   reply: z.string(),
   historyToken: z.string(),
+  products: z.array(ShownProductSchema).max(5).optional(),
 });
+
+const EchoOpeningResponseSchema = z.object({ ok: z.literal(true), reply: z.string(), products: z.array(ShownProductSchema).max(5) });
 
 // The route's error responses (both the upfront CHAT_MISCONFIGURED check and
 // the catch-all CHAT_SERVICE_ERROR) — `code` lets the caller tell "Echo isn't
@@ -381,7 +388,7 @@ export async function getSkinCheckChatReply(
   historyToken: string | null,
   message: string,
   signal?: AbortSignal
-): Promise<{ reply: string; historyToken: string }> {
+): Promise<{ reply: string; historyToken: string; products: ShownProduct[] }> {
   // Gate 02: the route verifies this itself. No user → ApiError auth/required
   // before a request is built.
   const idToken = await freshIdToken();
@@ -426,7 +433,40 @@ export async function getSkinCheckChatReply(
     throw new ApiError(0, "Unexpected skin-check chat response shape.");
   }
 
-  return { reply: parsed.data.reply, historyToken: parsed.data.historyToken };
+  return { reply: parsed.data.reply, historyToken: parsed.data.historyToken, products: parsed.data.products ?? [] };
+}
+
+/**
+ * TD-34: Echo's opening suggestion for this check (a routine from the
+ * own-product list). Only the check and the region go up; the server sends
+ * Gemini a fixed request and keeps the answer, so asking again costs nothing.
+ */
+export async function getEchoOpening(scanId: string, region: EchoRegion, signal?: AbortSignal): Promise<{ reply: string; products: ShownProduct[] }> {
+  const idToken = await freshIdToken();
+  // The same timeout and abort as a question (AbortSignal.any is too new for older phones).
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), CHAT_CLIENT_TIMEOUT_MS);
+  const onExternalAbort = () => controller.abort();
+  signal?.addEventListener("abort", onExternalAbort);
+  let response: Response;
+  try {
+    response = await fetch("/api/skin-check/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+      body: JSON.stringify({ scanId, region, opening: true }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+    signal?.removeEventListener("abort", onExternalAbort);
+  }
+  if (!response.ok) {
+    const errorBody = ChatErrorResponseSchema.safeParse(await response.json().catch(() => null));
+    throw new ApiError(response.status, "No suggestion from Echo.", errorBody.success ? errorBody.data.code : undefined);
+  }
+  const parsed = EchoOpeningResponseSchema.safeParse(await response.json());
+  if (!parsed.success) throw new ApiError(0, "Unexpected Echo opening response shape.");
+  return parsed.data;
 }
 
 export { ApiError };

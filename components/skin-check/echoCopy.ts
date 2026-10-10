@@ -23,4 +23,12 @@ export const ECHO_COPY = {
   off: ECHO_OFF_COPY,
   dailyLimit: ECHO_DAILY_LIMIT_COPY,
   limitUnavailable: "Echo can't check your settings right now. Please try again.",
+  // TD-34: Echo's suggested routine and the product cards.
+  openingLoading: "Echo is putting together a suggested routine…",
+  productsLabel: "Suggested products",
+  keyIngredient: "Key ingredient",
+  howToUse: "How to use",
+  echoNote: "Echo's note",
+  onStore: "See it on the store",
+  opensNewTab: "(opens in a new tab)",
 } as const;

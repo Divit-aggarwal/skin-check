@@ -177,6 +177,14 @@ const SAFE_PHRASES = [
   new RegExp(String.raw`\b(?:help(?:s)?|to) explain (?:your|the|these) (?:skin check )?(?:results?|readings?)\b`, "giu"),
 ];
 const neutral = (text: string) => SAFE_PHRASES.reduce((t, re) => t.replace(re, " "), text);
+// TD-34 (live run): a refusal that names what it will not do ("I cannot share
+// prices or discount codes") offers nothing; blanked for the price and buying
+// checks only. Any other price or buying word still fails.
+const REFUSED_SALE = new RegExp(
+  String.raw`\b(?:cannot|can't|can not|unable to|not able to|do not|don't|won't|will not)\s+(?:\w+\s+){0,3}?(?:(?:prices?|pricing|costs?|discounts?|offers?|coupons?|deals?|codes?|buying|purchases?|shopping)(?:\s+(?:or|and)\s+|\s*,\s*|\s+)?)+`,
+  "giu"
+);
+const notSelling = (text: string) => text.replace(REFUSED_SALE, " ");
 const SKIN_CHECK_NAME = new RegExp(String.raw`\byour skin[- ]checks?(?: results?| readings?| analysis| data)?\b`, "giu");
 // F17: an uncited claim (small talk, clarify, out of scope) carries no fact,
 // so it may assert nothing about the world: "the heat is the issue" and "this
@@ -337,7 +345,8 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
       fail("contradicts_package", i);
     }
     if (!MUST_CITE.has(claim.claim_type)) {
-      const proper = firstMatch(UNCITED_PROPER, claim.text);
+      // TD-34 (named change): with products on, our own name "Project Skin" is no outside brand.
+      const proper = firstMatch(UNCITED_PROPER, productsOn ? claim.text.replace(/\bProject Skin(?:'s)?/g, "our") : claim.text);
       if (proper) fail("citation_rule", i, proper);
       const phish = firstMatch(UNCITED_PHISH, text);
       if (phish) fail("citation_rule", i, phish);
@@ -356,7 +365,7 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
 
     for (const [check, pattern] of productsOn ? WORD_CHECKS.concat(PRODUCT_WORD_CHECKS) : WORD_CHECKS) {
       // Numbers also on the raw text: NFKD folds "Ⅳ" to the letters "IV".
-      const term = firstMatch(pattern, neutral(stripped)) ?? (check === "made_up_number" ? firstMatch(pattern, stripQuotes(claim.text, cited)) : null);
+      const term = firstMatch(pattern, check === "made_up_price" || check === "purchase_pressure" ? notSelling(neutral(stripped)) : neutral(stripped)) ?? (check === "made_up_number" ? firstMatch(pattern, stripQuotes(claim.text, cited)) : null);
       if (term) fail(check, i, term);
     }
     // TD-34: another brand, a shop, our kit or one of our products not on the list, quoted or not.
@@ -368,9 +377,10 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
     // like the instruction: a check only some users got would change their
     // retry prompt and so point at a hidden answer (TD-17 (1), tracker H19).
     // TD-34 (named change): with product suggestions on, a cited product's own
-    // exact name ("5% Niacinamide Serum") is not an ingredient; nothing else is exempt.
-    const names = productsOn ? cited.flatMap((f) => (f.kind === "rec" && f.productName ? [normalizeForMatch(f.productName)] : [])) : [];
-    const active = firstMatch(ACTIVE, names.reduce((t, n) => t.replace(new RegExp(escape(n), "giu"), " "), text));
+    // exact name ("5% Niacinamide Serum") and a verbatim quote of its whole fact
+    // (our text) are not an ingredient of Gemini's; the key ingredient alone still is.
+    const own = productsOn ? cited.flatMap((f) => (f.kind === "rec" && f.productName ? [normalizeForMatch(f.text), normalizeForMatch(f.productName)] : [])) : [];
+    const active = firstMatch(ACTIVE, own.reduce((t, n) => t.replace(new RegExp(escape(n), "giu"), " "), text));
     if (active && !failures.some((f) => f.claimIndex === i && f.check === "product_claim")) fail("product_claim", i, active);
 
     // §5 rule 6: a descriptive band word must be a band of a cited reading.
@@ -453,7 +463,7 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
   // The user reads the claims joined: a phrase split across two claims is checked too.
   const joined = answer.claims.map((c) => stripQuotes(normalizeForMatch(c.text), c.fact_ids.flatMap((id) => facts.get(id) ?? []))).join(" ");
   for (const [check, pattern] of productsOn ? WORD_CHECKS.concat(PRODUCT_WORD_CHECKS) : WORD_CHECKS) {
-    const term = firstMatch(pattern, neutral(joined));
+    const term = firstMatch(pattern, check === "made_up_price" || check === "purchase_pressure" ? notSelling(neutral(joined)) : neutral(joined));
     if (term && !failures.some((f) => f.check === check)) fail(check, -1, term);
   }
 
