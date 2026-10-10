@@ -1,5 +1,7 @@
 import { ExternalLink } from "lucide-react";
-import { eyebrow } from "@/components/ui/page";
+import { useId } from "react";
+import { eyebrow, textLink } from "@/components/ui/page";
+import { PRODUCT_DOCTOR_LINE } from "@/lib/context/products";
 import { listedProduct, OWN_PRODUCTS_LINE, STEP_LABEL, STEP_ORDER } from "@/lib/context/products";
 import { ECHO_COPY as E } from "./echoCopy";
 
@@ -7,7 +9,17 @@ import { ECHO_COPY as E } from "./echoCopy";
 // Gemini's words. Gemini's checked reason sits beside each card as "Echo's
 // note". An id that is not on today's list draws nothing. No price, and no
 // buy button: one plain link to the product page on the store.
-export function ProductCards({ products }: { products: readonly { productId: string; reason?: string }[] }) {
+/**
+ * The doctor line (TD-34 guard) as its own fixed panel above the cards, not
+ * the last line of a bubble. The reply still carries it as text.
+ */
+export function splitDoctorLine(text: string): { text: string; doctorLine: boolean } {
+  const tail = `\n${PRODUCT_DOCTOR_LINE}`;
+  return text.endsWith(tail) ? { text: text.slice(0, -tail.length), doctorLine: true } : { text, doctorLine: false };
+}
+
+export function ProductCards({ products, doctorLine = false }: { products: readonly { productId: string; reason?: string }[]; doctorLine?: boolean }) {
+  const headingId = useId();
   const shown = products
     .flatMap((p) => {
       const item = listedProduct(p.productId);
@@ -17,9 +29,13 @@ export function ProductCards({ products }: { products: readonly { productId: str
   if (shown.length === 0) return null;
 
   return (
-    <section aria-label={E.productsLabel} className="flex max-w-[90%] flex-col gap-3">
+    <section aria-labelledby={headingId} className="flex max-w-full flex-col gap-4 sm:max-w-[90%]">
+      <h2 id={headingId} className="sr-only">
+        {E.productsLabel}
+      </h2>
+      {doctorLine && <p className="rounded-2xl bg-brand-mist px-4 py-3 text-brand-ink">{PRODUCT_DOCTOR_LINE}</p>}
       <p className="text-sm font-medium text-brand-ink">{OWN_PRODUCTS_LINE}</p>
-      <ul className="grid gap-3 xl:grid-cols-2">
+      <ul className="grid gap-4 sm:gap-6 xl:grid-cols-2">
         {shown.map((p) => (
           <li key={p.id} className="flex flex-col gap-2 rounded-2xl border border-brand-card-line bg-brand-paper p-4">
             <p className={eyebrow}>{STEP_LABEL[p.step]}</p>
@@ -44,7 +60,7 @@ export function ProductCards({ products }: { products: readonly { productId: str
               href={p.url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center gap-1 self-start font-medium text-brand-forest underline-offset-4 hover:underline"
+              className={`${textLink} self-start`}
             >
               {E.onStore}
               <span className="sr-only"> {E.opensNewTab}</span>

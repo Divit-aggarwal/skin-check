@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
-export function TypingIndicator({ className }: { className?: string }) {
+export function TypingIndicator({ className, label = "Echo is typing" }: { className?: string; label?: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -11,7 +11,7 @@ export function TypingIndicator({ className }: { className?: string }) {
       exit={{ opacity: 0, y: 8 }}
       transition={{ duration: 0.2 }}
       role="status"
-      aria-label="Echo is typing"
+      aria-label={label}
       className="flex items-end gap-2"
     >
       <div

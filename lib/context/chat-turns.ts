@@ -3,6 +3,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import type { EchoChatMessage } from "@/lib/gemini";
 import type { EchoRegion } from "@/lib/echo-regions";
 import type { ProductGuard, ShownProduct, ValidatorRecord } from "./answer";
+import { OWN_PRODUCTS_VERSION } from "./products";
 
 // SERVER ONLY. D-15 (approved for local use): users/{uid}/chatTurns are the
 // only history source; client-sent turns are never fed to Gemini. Written
@@ -27,6 +28,8 @@ export interface EchoTurnRecord {
   products?: ShownProduct[];
   withoutProducts?: string;
   guard?: ProductGuard;
+  /** TD-34: the product list the answer was checked against (OWN_PRODUCTS_VERSION). */
+  listVersion?: string;
   /** TD-34: Echo's opening suggestion. Never in Gemini's history or the split check; read back by loadOpening. */
   opening?: boolean;
 }
@@ -99,6 +102,8 @@ export interface StoredOpening {
   reply: string;
   withoutProducts: string;
   products: ShownProduct[];
+  /** The stored answer fell back: no suggestion to show, and none to generate again. */
+  fallback: boolean;
 }
 
 /**
@@ -111,12 +116,14 @@ export async function loadOpening(uid: string, scanId: string): Promise<StoredOp
     .map((d) => d.data())
     .filter((t) => t.opening === true && t.role === "echo" && typeof t.text === "string")
     .sort((a, b) => (a.createdAt as Timestamp).toMillis() - (b.createdAt as Timestamp).toMillis())[0];
-  if (!found) return null;
+  // An opening checked against another product list (stock or catalogue changed) is made again.
+  if (!found || found.listVersion !== OWN_PRODUCTS_VERSION) return null;
   const products = Array.isArray(found.products)
     ? found.products.flatMap((p: unknown) => {
         const { productId, reason } = (p ?? {}) as Record<string, unknown>;
         return typeof productId === "string" && typeof reason === "string" ? [{ productId, reason }] : [];
       })
     : [];
-  return { reply: found.text as string, withoutProducts: typeof found.withoutProducts === "string" ? found.withoutProducts : "", products };
+  const fallback = (found.validator as { fallback?: unknown } | null)?.fallback === true;
+  return { reply: found.text as string, withoutProducts: typeof found.withoutProducts === "string" ? found.withoutProducts : "", products, fallback };
 }

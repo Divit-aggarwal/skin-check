@@ -194,6 +194,27 @@ describe("TD-34: the opening suggestion (route)", () => {
     expect(h.recordChatTurns).not.toHaveBeenCalled();
   });
 
+  it("an opening that fell back is stored (no spend on reload) but shown as no suggestion; a stored one is not shown either", async () => {
+    h.generateContent.mockResolvedValue({ text: "not json" });
+    const res = await openingPost();
+    expect(res.status).toBe(409);
+    expect((await res.json()).code).toBe("OPENING_UNAVAILABLE");
+    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ opening: true, validator: { fallback: true } });
+    h.generateContent.mockClear();
+    h.consumeEchoQuestion.mockClear();
+    h.loadOpening.mockResolvedValue({ reply: "x", withoutProducts: "x", products: [], fallback: true });
+    expect((await openingPost()).status).toBe(409);
+    expect(h.generateContent).not.toHaveBeenCalled();
+    expect(h.consumeEchoQuestion).not.toHaveBeenCalled();
+  });
+
+  it("the opening skips the split red-flag check over the thread's stored turns (its text is fixed)", async () => {
+    h.loadSplitCheckTurns.mockResolvedValue([{ role: "user", text: "i want to" }]);
+    const res = await openingPost();
+    expect(res.status).toBe(200);
+    expect(h.generateContent).toHaveBeenCalledTimes(1);
+  });
+
   it("the request shape is strict: a message or history is refused", async () => {
     expect((await openingPost({ scanId: SCAN_ID, region: "cheeks", opening: true, message: "hi" })).status).toBe(400);
     expect((await openingPost({ scanId: SCAN_ID, region: "cheeks", opening: false })).status).toBe(400);

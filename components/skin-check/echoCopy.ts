@@ -25,6 +25,7 @@ export const ECHO_COPY = {
   limitUnavailable: "Echo can't check your settings right now. Please try again.",
   // TD-34: Echo's suggested routine and the product cards.
   openingLoading: "Echo is putting together a suggested routine…",
+  openingFailed: "Echo could not put together a suggested routine just now.",
   productsLabel: "Suggested products",
   keyIngredient: "Key ingredient",
   howToUse: "How to use",

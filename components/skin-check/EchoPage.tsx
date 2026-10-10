@@ -12,12 +12,12 @@ import { PhotoCheckLine, ReadingRows } from "@/components/dashboard/CheckReading
 import { formatDate } from "@/components/dashboard/format";
 import { loadDashboard } from "@/components/dashboard/data";
 import { newestEchoSession } from "@/components/dashboard/echo-session";
-import { hasQuestionAnswers } from "@/lib/skin-check-validation";
+import { hasQuestionAnswers, safetyQuestionsAnswered } from "@/lib/skin-check-validation";
 import { QUESTIONS_COPY as Q } from "./questionsCopy";
 import { readingsOf, toDate } from "@/components/dashboard/state";
 import { AccountButton, btnPrimary, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getEchoOpening, getSkinCheckChatReply, ApiError, type ShownProduct } from "@/lib/api";
-import { ProductCards } from "./ProductCards";
+import { ProductCards, splitDoctorLine } from "./ProductCards";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import { useAuth } from "@/lib/auth-context";
 import { AI_SHARE_CONSENT_COPY, AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
@@ -78,8 +78,10 @@ let messageSeq = 0;
 // TD-34: Echo's opening suggestion for the check, fetched once per check on
 // this page (the server keeps it, so a reload costs nothing). "none" covers
 // every refusal (switch off, limit, no answers): the plain greeting stays.
+// "error" is a failure worth one more try (timeout, network, a 5xx).
+const OPENING_NONE = new Set(["OPENING_UNAVAILABLE", "ECHO_PRODUCTS_OFF", "ECHO_OFF", "ECHO_DAILY_LIMIT", "CHAT_NOT_NEWEST", "UNDER_18", "ATTESTATION_REQUIRED", "CHAT_MISCONFIGURED", "CHAT_ANALYSIS_UNAVAILABLE"]);
 type Opening =
-  | { status: "loading" | "none" | "consent"; scanId: string }
+  | { status: "loading" | "none" | "consent" | "error"; scanId: string }
   | { status: "done"; scanId: string; reply: string; products: ShownProduct[] };
 
 export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolean; productsOn?: boolean } = {}) {
@@ -148,7 +150,8 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
   }, []);
 
   const [opening, setOpening] = useState<Opening | null>(null);
-  const openingWanted = !!session && !!user && echoOn && productsOn && hasQuestionAnswers(session.answers);
+  // The same "answered enough" rule as the server (F11), so a partly answered check asks for nothing.
+  const openingWanted = !!session && !!user && echoOn && productsOn && safetyQuestionsAnswered(session.answers);
   const openingScanId = session?.scanId;
   const loadOpening = useRef<(() => void) | null>(null);
   useEffect(() => {
@@ -161,13 +164,17 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
         (err) => {
           if (controller.signal.aborted) return;
           const code = err instanceof ApiError ? err.code : undefined;
-          setOpening({ status: code === "AI_CONSENT_REQUIRED" ? "consent" : "none", scanId: openingScanId });
+          const status = code === "AI_CONSENT_REQUIRED" ? "consent" : code && OPENING_NONE.has(code) ? "none" : "error";
+          setOpening({ status, scanId: openingScanId });
         }
       );
     };
     loadOpening.current = load;
     load();
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      loadOpening.current = null;
+    };
   }, [openingWanted, openingScanId]);
   const shownOpening = opening && opening.scanId === openingScanId ? opening : null;
 
@@ -315,8 +322,8 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
       });
       if (!res.ok) setConsentFailed(true);
       else {
-        // TD-34: the opening waited for this consent too.
-        if (openingConsent) loadOpening.current?.();
+        // TD-34: the opening waited for this consent too (or read the ledger just before it).
+        if (shownOpening && shownOpening.status !== "done") loadOpening.current?.();
         if (activeError) void sendToEcho(activeError.region, activeError.retryBefore, activeError.retryMessage);
       }
     } catch (err) {
@@ -387,29 +394,33 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
         </details>
 
         <div ref={scrollRef} role="log" aria-live="polite" className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pb-4">
-        {echoOn && shownOpening?.status === "done" ? (
+        {echoOn && messages.length === 0 && (
+          <p className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">{greetingFor(activeRegion)}</p>
+        )}
+        {echoOn && shownOpening?.status === "done" && (
           <div className="space-y-3">
-            <p className="max-w-[90%] whitespace-pre-line rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">{withPhoneLinks(shownOpening.reply)}</p>
-            <ProductCards products={shownOpening.products} />
+            <p className="max-w-[90%] whitespace-pre-line rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">{withPhoneLinks(splitDoctorLine(shownOpening.reply).text)}</p>
+            <ProductCards products={shownOpening.products} doctorLine={splitDoctorLine(shownOpening.reply).doctorLine} />
           </div>
-        ) : (
-          echoOn && messages.length === 0 && (
-            <p className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">{greetingFor(activeRegion)}</p>
-          )
+        )}
+        {echoOn && shownOpening?.status === "error" && (
+          <div className="flex flex-wrap items-center gap-x-2 text-sm text-brand-muted">
+            <p>{E.openingFailed}</p>
+            <button type="button" onClick={() => loadOpening.current?.()} className="inline-flex min-h-11 items-center font-semibold text-brand-forest underline underline-offset-2">
+              {E.tryAgain}
+            </button>
+          </div>
         )}
         {echoOn && shownOpening?.status === "loading" && (
-          <div role="status" className="flex items-center gap-2">
-            <TypingIndicator className="rounded-tl-sm bg-brand-paper text-brand-muted" />
-            <span className="sr-only">{E.openingLoading}</span>
-          </div>
+          <TypingIndicator label={E.openingLoading} className="rounded-tl-sm bg-brand-paper text-brand-muted" />
         )}
         {messages.map((m) =>
           m.role === "echo" ? (
             <div key={m.id} className="space-y-3">
               <p className="max-w-[90%] whitespace-pre-line rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">
-                {withPhoneLinks(m.text)}
+                {withPhoneLinks(m.products ? splitDoctorLine(m.text).text : m.text)}
               </p>
-              {m.products && <ProductCards products={m.products} />}
+              {m.products && <ProductCards products={m.products} doctorLine={splitDoctorLine(m.text).doctorLine} />}
             </div>
           ) : (
             <div key={m.id} className="flex justify-end">

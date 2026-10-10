@@ -10,7 +10,7 @@ import type { SkinStateRegionKey } from "@/lib/skin-state";
 import { loadTrustedSkinState2Series } from "@/lib/skin-state-2-loader";
 import type { SkinState2Result } from "@/lib/skin-state-2";
 import { answerFromPackage, comparisonAnswer, fallbackAnswer, FINISH_QUESTIONNAIRE_COPY, guardedReply, productGuard, type ShownProduct } from "./answer";
-import { echoProductsOn, listedProduct, OPENING_MESSAGE } from "./products";
+import { echoProductsOn, listedProduct, OPENING_MESSAGE, OWN_PRODUCTS_VERSION } from "./products";
 import { RULE_INPUT_FIELDS } from "@/lib/rules/settings";
 import { buildContextPackage, packageSha256 } from "./builder";
 import { loadChatHistory, loadSplitCheckTurns, recordChatTurns, type EchoTurnRecord, type StoredOpening } from "./chat-turns";
@@ -102,7 +102,8 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
   // review, wave 2). Stored turns hold no pre-filter or referral turns.
   const history = opening ? [] : await loadChatHistory(uid, scanId, region);
   // Every stored user turn, including ones whose answer fell back (red team pass 2, I02 P2-3).
-  const joined = joinedUserTurns(await loadSplitCheckTurns(uid, scanId, region), message);
+  // TD-34: not for the opening, whose text is fixed and outside any thread.
+  const joined = opening ? message : joinedUserTurns(await loadSplitCheckTurns(uid, scanId, region), message);
   if (redFlagHit(joined)) {
     const reply = referralCopyFor(joined);
     await recordBestEffort(uid, scanId, region, message, reply, meta({ ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: "red_flag", redFlag: true }));
@@ -170,9 +171,11 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
     uid, scanId, region, message, outcome.reply,
     meta({
       ...versions, promptVersion: promptVersionFor(pkg), modelId: outcome.modelId, validator: outcome.validator, prefilter: null, redFlag: outcome.referral,
-      ...(ownProducts ? { products: outcome.products, withoutProducts: outcome.withoutProducts, guard, opening } : {}),
+      ...(ownProducts ? { products: outcome.products, withoutProducts: outcome.withoutProducts, guard, opening, listVersion: OWN_PRODUCTS_VERSION } : {}),
     })
   );
+  // TD-34: an opening that fell back is kept (so a reload spends nothing) but is no suggestion.
+  if (opening && outcome.validator.fallback) return { ok: false, status: 409, code: "OPENING_UNAVAILABLE", error: "No suggestion for this check." };
   return { ok: true, reply: shown.reply, products: onlyListed(shown.products) };
 }
 
@@ -181,6 +184,7 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
  * guards and today's list. No Gemini call. Any safety failure shows no product.
  */
 export async function serveStoredOpening(uid: string, scanId: string, stored: StoredOpening): Promise<ContextChatResult> {
+  if (stored.fallback) return { ok: false, status: 409, code: "OPENING_UNAVAILABLE", error: "No suggestion for this check." };
   const trusted = await loadTrustedEchoContext(uid, scanId);
   if (!trusted) return { ok: false, status: 409, code: "CHAT_ANALYSIS_UNAVAILABLE", error: "This scan's analysis isn't available yet." };
   let guard: ReturnType<typeof productGuard>;

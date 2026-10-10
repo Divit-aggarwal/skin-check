@@ -407,6 +407,7 @@ async function opening(uid: string, body: unknown): Promise<NextResponse> {
   if (refused) return refused;
 
   try {
+    // ponytail: two requests at once (two tabs) can each make an opening and spend a question; the oldest is served. Reserve a fixed doc id if that matters.
     const stored = await loadOpening(uid, scanId);
     if (!stored) {
       const quotaLimited = await consumeEchoQuestion(uid);
