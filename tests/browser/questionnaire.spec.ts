@@ -123,10 +123,12 @@ for (const width of WIDTHS) {
         await aboutYou(page);
         await page.getByRole("button", { name: Q.skipNow }).click();
         await page.getByRole("button", { name: K.open }).click();
+        // Only the title is the alert (announced once); the how-to and Try again sit in its box.
         const alert = page.getByRole("alert").filter({ hasText: K.refusedTitle });
         await expect(alert).toBeVisible();
-        for (const h of K.how) await expect(alert.getByText(h.steps)).toBeVisible();
-        await expect(alert.getByRole("button", { name: K.tryAgain })).toBeVisible();
+        const box = alert.locator("..");
+        for (const h of K.how) await expect(box.getByText(h.steps)).toBeVisible();
+        await expect(box.getByRole("button", { name: K.tryAgain })).toBeVisible();
         await shot(page, "capture-refused", width);
       });
 
