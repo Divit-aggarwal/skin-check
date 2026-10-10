@@ -36,5 +36,8 @@ export default defineConfig({
     viewport: { width: 390, height: 844 },
     baseURL: `http://localhost:${B}`,
     trace: "retain-on-failure",
+    // TD-33 laptop camera states (tests/browser/questionnaire.spec.ts): a fake
+    // webcam that needs no prompt. Phone-device tests never ask for a camera.
+    launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
   },
 });

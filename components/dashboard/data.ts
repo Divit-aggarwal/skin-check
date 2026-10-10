@@ -13,11 +13,13 @@ export const LOAD_TIMEOUT_MS = 15_000;
 export interface DashboardData {
   checks: Doc[];
   analyses: Doc[];
+  /** TD-33 (1): answers given later for skipped checks, keyed by scanId. */
+  laterAnswers: Doc[];
 }
 
 // From the server only: offline, plain getDocs resolves with an EMPTY result
 // from the cache, which would read as "no checks" or "not asked yet".
-async function read(uid: string, name: "skinChecks" | "scanAnalyses" | "consentLedger"): Promise<Doc[]> {
+async function read(uid: string, name: "skinChecks" | "scanAnalyses" | "consentLedger" | "laterAnswers"): Promise<Doc[]> {
   const snap = await getDocsFromServer(collection(db(), "users", uid, name));
   return snap.docs.map((d) => ({ id: d.id, data: d.data() }));
 }
@@ -35,8 +37,10 @@ async function withTimeout<T>(work: Promise<T>): Promise<T> {
 }
 
 export async function loadDashboard(uid: string): Promise<DashboardData> {
-  const [checks, analyses] = await withTimeout(Promise.all([read(uid, "skinChecks"), read(uid, "scanAnalyses")]));
-  return { checks, analyses };
+  const [checks, analyses, laterAnswers] = await withTimeout(
+    Promise.all([read(uid, "skinChecks"), read(uid, "scanAnalyses"), read(uid, "laterAnswers")])
+  );
+  return { checks, analyses, laterAnswers };
 }
 
 export const loadLedger = (uid: string) => withTimeout(read(uid, "consentLedger"));

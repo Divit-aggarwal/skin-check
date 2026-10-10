@@ -13,10 +13,11 @@ in-page ways forward in addition to the shell.
 | **Checks** (history) | `/checks` | Shell; Home "See full timeline" (Timeline tab) and the latest-check card | A check row → Check; Timeline tab; New check |
 | **Check** (one opened) | `/checks/[scanId]` | Checks list; Home latest check; Timeline check item | Phone: Back to all checks; desktop: the list and the List/Timeline tabs stay beside it; Ask Echo (newest reading only); New check |
 | **Timeline** | `/checks?view=timeline` (a tab on Checks) | Checks tab; Home "See full timeline" | A check item → Check; a routine item → Routine |
-| **New check** | `/skin-check` | Shell (centre button on phones); Home; Checks; empty states | Questions → photo → more questions → Results |
+| **New check** | `/skin-check` | Shell (centre button on phones); Home; Checks; empty states | About you → About the questions (answer now or skip) → sign in → photo → questions (if answering) → Results |
 | **Results** | `/skin-check` when finished | End of the check flow | Home; this check → Check; Echo; New check |
 | **Routine** | `/routine` | Shell; Home routine card; Timeline routine item | Add, swap, stop, mark used or skipped; Home |
 | **Echo** | `/echo` | Shell; Home; Check (newest); Results | Chat about one face area at a time (Forehead, Cheeks, Nose, Chin: each area is its own Echo thread, so there is no Whole face chip; the whole-face readings are in the side panel); Open this check; back to Home. With no reading yet: an empty state that leads to New check |
+| **Questions** (answer later, TD-33) | `/questions` | Home and Account card "Your Skin Check questions" (only while a check waits); results screen after a skip; an opened skipped check; Echo's notice | Answer one part at a time, Continue / Back, Save → Ask Echo (when it is Echo's check) or Home; "Not now, go to Home"; nothing waiting → Home |
 | **Account** | `/account` | Shell (phone: header icon); sign-in links | Sign in → Home; consent status and withdraw; Delete account → confirm → signed-out start |
 
 ## Signed-out pages

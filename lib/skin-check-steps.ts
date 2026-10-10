@@ -81,7 +81,8 @@ export const SECTIONS: SectionConfig[] = [
       {
         id: "skin_photo",
         type: "photo-capture",
-        prompt: "One last thing — a quick photo helps us read your skin, not just your answers.",
+        // Owner 2026-10-10 (TD-33): reads right whether the questions come after the photo or were skipped.
+        prompt: "Next, a quick photo of your face, so we can read your skin.",
         note: "Face the camera in good light. This stays on your device until you save your results.",
       },
     ],
@@ -225,7 +226,15 @@ export const SECTIONS: SectionConfig[] = [
           { value: "cleanser_moisturizer", label: "Cleanser & moisturizer" },
           { value: "actives", label: "Actives", description: "Retinoids, AHA/BHA, vitamin C, etc." },
           { value: "prescription", label: "A prescription product" },
+          // TD-33 (2): new in questionnaire version 2, for the second name box.
+          { value: "other_products", label: "Other products" },
         ],
+        // TD-33 (2): the only two free-text fields. Shown under the option while
+        // it is picked; stored as productNames, never in answers.
+        nameBoxes: {
+          prescription: "Which prescription product? (optional)",
+          other_products: "Which other products? (optional)",
+        },
       },
     ],
   },

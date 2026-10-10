@@ -14,6 +14,8 @@ import { EchoBubble } from "./EchoBubble";
 import { StepAnswer } from "./StepAnswer";
 import { SkinCheckDashboard } from "./SkinCheckDashboard";
 import { DashboardLink } from "@/components/dashboard/DashboardLink";
+import { QuestionsChoice, SkippedNote } from "./QuestionsChoice";
+import { hasQuestionAnswers } from "@/lib/skin-check-validation";
 
 // Section-to-section only — individual questions within a section never
 // slide, they fade in and accumulate on the growing page.
@@ -55,6 +57,10 @@ export function SkinCheckFlow() {
     confirmingUnder18,
     confirmUnder18,
     lastAnswerHints,
+    choosingQuestions,
+    chooseQuestions,
+    productNames,
+    setProductName,
   } = useSkinCheckFlow();
 
   // Keyed by step id so a freshly revealed question can be scrolled into
@@ -102,14 +108,14 @@ export function SkinCheckFlow() {
   // reactStrictMode on) — cleanup fires, the effect re-enters, and an
   // identical `advanceSignal` short-circuits it, so the advance silently
   // never happens. Keeping `advanceSignal` as the only dependency avoids that.
-  const latest = useRef({ isSectionComplete, complete, blocked, confirmingUnder18, next });
-  latest.current = { isSectionComplete, complete, blocked, confirmingUnder18, next };
+  const latest = useRef({ isSectionComplete, complete, blocked, confirmingUnder18, choosingQuestions, next });
+  latest.current = { isSectionComplete, complete, blocked, confirmingUnder18, choosingQuestions, next };
 
   useEffect(() => {
     if (advanceSignal === 0) return;
     const t = setTimeout(() => {
       const s = latest.current;
-      if (!s.complete && !s.blocked && !s.confirmingUnder18 && s.isSectionComplete) s.next();
+      if (!s.complete && !s.blocked && !s.choosingQuestions && !s.confirmingUnder18 && s.isSectionComplete) s.next();
     }, AUTO_ADVANCE_DELAY_MS);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -148,7 +154,7 @@ export function SkinCheckFlow() {
             sectionLabels={ALL_SECTION_LABELS}
             activeSectionIndex={sectionIndex}
             activeSectionFill={sectionFill}
-            activeSectionLabel={section.label}
+            activeSectionLabel={choosingQuestions ? "ABOUT THE QUESTIONS" : section.label}
           />
         )}
       </div>
@@ -174,6 +180,19 @@ export function SkinCheckFlow() {
                 No, change my answer
               </Button>
             </div>
+          </motion.div>
+        ) : choosingQuestions ? (
+          <motion.div
+            key="questions-choice"
+            custom={direction}
+            variants={sectionSlideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
+            className="mx-auto max-w-2xl px-4 pb-10 pt-10 sm:px-6"
+          >
+            <QuestionsChoice answers={answers} onChoose={chooseQuestions} />
           </motion.div>
         ) : blocked ? (
           <motion.div
@@ -213,6 +232,10 @@ export function SkinCheckFlow() {
                 </p>
               </div>
               <SkinCheckDashboard scan={scan} scanId={scanId} onScanChange={setScan} onRetake={startNewScan} answers={answers} />
+
+              {/* TD-33 (1): honest about what skipping means, with the way back in. */}
+              {/* From the answers, so it survives a remount from Echo (flow review M2). */}
+              {!hasQuestionAnswers(answers) && <SkippedNote echoCheck={scan.status === "success"} />}
 
               {/* A new check starts here without a reload; every past check is on
                   /checks (one history list, TD-25 (6)); Home is one tap away. */}
@@ -267,6 +290,8 @@ export function SkinCheckFlow() {
                   answers={answers}
                   scanId={scanId}
                   onSaved={finishDraft}
+                  productNames={productNames}
+                  onProductNameChange={setProductName}
                 />
               </motion.div>
             ))}

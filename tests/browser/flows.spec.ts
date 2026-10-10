@@ -44,6 +44,8 @@ async function aboutYou(page: Page, age = "25–34") {
   await page.getByRole("button", { name: age, exact: true }).click();
   // The under-18 confirm comes at the end of the section, after gender.
   await page.getByRole("button", { name: "Female", exact: true }).click();
+  // TD-33 (1): "About the questions" comes next (not for under 18, which is blocked first).
+  if (age !== "<18") await page.getByRole("button", { name: "Answer the questions now" }).click();
 }
 
 const photoInput = (page: Page) => page.locator('input[type="file"]');

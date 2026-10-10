@@ -17,7 +17,8 @@ import { CheckReadings, formatDate, KnownAndNotKnown } from "./CheckReadings";
 import { ConsentSection } from "./ConsentSection";
 import { DASHBOARD_COPY as C } from "./copy";
 import { loadDashboard, type DashboardData } from "./data";
-import { deriveDashboard, isEmpty, type Dashboard } from "./state";
+import { deriveDashboard, isEmpty, waitingQuestions, type Dashboard } from "./state";
+import { QuestionsCard } from "@/components/skin-check/QuestionsChoice";
 import { newestEchoSession } from "./echo-session";
 import { echoOn } from "@/lib/echo-limits";
 
@@ -101,6 +102,7 @@ export function DashboardPage() {
   }
 
 
+  const waiting = waitingQuestions(user.uid, load.data.checks, load.data.analyses, load.data.laterAnswers);
   return (
     <Shell>
       {/* Phone: one column in reading order. Desktop: two columns (8/4); the
@@ -121,6 +123,12 @@ export function DashboardPage() {
               />
             ) : (
               <CurrentSection dashboard={dashboard} />
+            )}
+            {/* TD-33 (1): right under the newest reading, while its questions wait. */}
+            {waiting && (
+              <div className="mt-6">
+                <QuestionsCard isEcho={waiting.isEcho} date={waiting.date ? formatDate(waiting.date) : null} />
+              </div>
             )}
           </div>
           <div className="order-3">

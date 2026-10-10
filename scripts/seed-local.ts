@@ -51,7 +51,7 @@ async function main() {
 
       await userRef.collection("skinChecks").doc(scanId).set({
         schemaVersion: 1,
-        answers: { name: user.displayName.split(" ")[0]!, age: "25-34", gender: "other", primary_concerns: ["redness", "texture"], skin_type: "combination" },
+        answers: { name: user.displayName.split(" ")[0]!, age: "25-34", gender: "other", primary_concerns: ["redness", "texture"], skin_type: "combination", breakout_pattern: ["small_bumps"], pih_scar_tendency: "fades_no_trace", current_products: ["cleanser_moisturizer"] }, // TD-33: every safety question, so Echo answers
         status: "completed",
         image: { stored: false, captureMethod: "native" },
         consent: { imageRetention: false },

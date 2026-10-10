@@ -6,6 +6,7 @@ import type { PhoneStep, SkinCheckAnswers } from "@/types/skin-check";
 import type { SkinScanState } from "@/types/skin-scan";
 import { PhoneAuthForm } from "@/components/auth/PhoneAuthForm";
 import { saveSkinCheck } from "@/lib/firebase/skin-checks";
+import type { ProductNames } from "@/lib/skin-check-validation";
 import { useAuth } from "@/lib/auth-context";
 import { canSaveScan, completeSave, withTimeout } from "@/lib/useSkinCheckFlow";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,8 @@ interface PhoneAuthStepProps {
    * flow has since moved to another scan (a retake mid-save).
    */
   onSaved: (forScanId: string) => boolean;
+  /** TD-33 (2): saved as the record's productNames, never inside answers. */
+  productNames?: ProductNames | undefined;
 }
 
 // This component now serves the flow's TWO phone steps, which are the same
@@ -53,6 +56,7 @@ export function PhoneAuthStep({
   scanId,
   scan,
   onSaved,
+  productNames,
 }: PhoneAuthStepProps) {
   const { user, loading } = useAuth();
   // First of two guards against a double-tap on "Get my results". This one
@@ -101,7 +105,7 @@ export function PhoneAuthStep({
     // permission-denied rule on retry.
     setSaving(true);
     setSaveFailed(false);
-    withTimeout(saveSkinCheck(user.uid, scanId, { ...answers, [step.id]: verified }, scan), SAVE_TIMEOUT_MS)
+    withTimeout(saveSkinCheck(user.uid, scanId, { ...answers, [step.id]: verified }, scan, productNames), SAVE_TIMEOUT_MS)
       .then(() => {
         // The draft has served its purpose once the scan belongs to a real
         // uid. Cleared only on success, so a failed write leaves the user's

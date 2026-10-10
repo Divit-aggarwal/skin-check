@@ -3,6 +3,7 @@ import { db } from "@/lib/firebase/client";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import { scanImageKey } from "@/lib/s3-key";
 import { IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
+import { hasQuestionAnswers, keptProductNames, questionAnswersOnly, type ProductNames } from "@/lib/skin-check-validation";
 import type { SkinScanResult, SkinScanState } from "@/types/skin-scan";
 
 /** Terminal state of one scan, recorded in a single write. */
@@ -12,6 +13,19 @@ export type SkinCheckStatus =
   | "questionnaire_only"; // no photo was captured
 
 export const SKIN_CHECK_SCHEMA_VERSION = 1;
+
+/**
+ * TD-33: 2 adds the "Other products" option, the two product-name boxes and
+ * the optional questionnaire. A record without the field is version 1.
+ * schemaVersion stays 1: the legacy-result fallback is tied to it (DATA_MODEL).
+ */
+export const QUESTIONNAIRE_VERSION = 2;
+
+/** The record's productNames: only names whose option is picked; absent when there are none. */
+function productNamesField(answers: SkinCheckAnswers, names: ProductNames) {
+  const kept = keptProductNames(answers.current_products, names);
+  return Object.keys(kept).length > 0 ? { productNames: kept } : {};
+}
 
 /**
  * What we keep from a scan result, as an allowlist rather than the whole
@@ -64,7 +78,9 @@ export async function saveSkinCheck(
   uid: string,
   scanId: string,
   answers: SkinCheckAnswers,
-  scan: SkinScanState
+  scan: SkinScanState,
+  /** TD-33 (2): kept apart from answers; nothing that reads answers sees them. */
+  productNames: ProductNames = {}
 ): Promise<void> {
   const status: SkinCheckStatus =
     scan.status === "success"
@@ -78,6 +94,10 @@ export async function saveSkinCheck(
       schemaVersion: SKIN_CHECK_SCHEMA_VERSION,
       scanId,
       answers,
+      // From the answers themselves, so the record cannot claim otherwise.
+      questionnaire: hasQuestionAnswers(answers) ? "answered" : "skipped",
+      questionnaireVersion: QUESTIONNAIRE_VERSION,
+      ...productNamesField(answers, productNames),
       status,
       // PHASE 3: the ORIGINAL image lives in a private S3 bucket, never here
       // — no bytes, no base64, no public URL. `key` is only ever the
@@ -212,6 +232,35 @@ export async function latestSkinCheckAnswers(uid: string): Promise<SkinCheckAnsw
   const snapshot = await getDocs(
     query(collection(db(), "users", uid, "skinChecks"), orderBy("createdAt", "desc"), limit(1))
   );
-  const answers: unknown = snapshot.docs[0]?.data().answers;
-  return answers && typeof answers === "object" ? (answers as SkinCheckAnswers) : null;
+  const newest = snapshot.docs[0];
+  const answers: unknown = newest?.data().answers;
+  if (!newest || !answers || typeof answers !== "object") return null;
+  // TD-33: a skipped check answered later counts as answered (its answers only, never its names).
+  const later = await getDoc(doc(db(), "users", uid, "laterAnswers", newest.id)).catch(() => null);
+  const laterAnswers: unknown = later?.exists() ? later.data().answers : null;
+  // Only question answers, and only for a check with none of its own (reviews, TD-33).
+  return laterAnswers && typeof laterAnswers === "object" && !hasQuestionAnswers(answers as SkinCheckAnswers)
+    ? { ...(answers as SkinCheckAnswers), ...questionAnswersOnly(laterAnswers as SkinCheckAnswers) }
+    : (answers as SkinCheckAnswers);
+}
+
+/** Whether the answer-later record for this check exists (a refused duplicate is already saved). */
+export async function laterAnswersSaved(uid: string, scanId: string): Promise<boolean> {
+  return (await getDoc(doc(db(), "users", uid, "laterAnswers", scanId)).catch(() => null))?.exists() ?? false;
+}
+
+/**
+ * TD-33 (1): answers given later for a check that skipped the questions, in
+ * their own create-only record, so the check itself is never edited.
+ * firestore.rules accepts it only for the owner's own skipped check, once.
+ */
+export async function saveLaterAnswers(uid: string, scanId: string, answers: SkinCheckAnswers, productNames: ProductNames): Promise<void> {
+  const own = questionAnswersOnly(answers);
+  await setDoc(doc(db(), "users", uid, "laterAnswers", scanId), {
+    scanId,
+    answers: own,
+    questionnaireVersion: QUESTIONNAIRE_VERSION,
+    ...productNamesField(own, productNames),
+    createdAt: serverTimestamp(),
+  });
 }

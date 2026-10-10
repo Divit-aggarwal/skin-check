@@ -12,8 +12,10 @@ import { PhotoCheckLine, ReadingRows } from "@/components/dashboard/CheckReading
 import { formatDate } from "@/components/dashboard/format";
 import { loadDashboard } from "@/components/dashboard/data";
 import { newestEchoSession } from "@/components/dashboard/echo-session";
+import { hasQuestionAnswers } from "@/lib/skin-check-validation";
+import { QUESTIONS_COPY as Q } from "./questionsCopy";
 import { readingsOf, toDate } from "@/components/dashboard/state";
-import { AccountButton, btnPrimary, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
+import { AccountButton, btnPrimary, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getSkinCheckChatReply, ApiError } from "@/lib/api";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import { useAuth } from "@/lib/auth-context";
@@ -309,6 +311,16 @@ export function EchoPage({ echoOn = true }: { echoOn?: boolean } = {}) {
           </div>
           <AccountButton />
         </header>
+
+        {/* TD-33 (1): F11 is kept, so a check without answers gets no Echo answer; say so up front. */}
+        {!hasQuestionAnswers(session.answers) && (
+          <div role="note" className="mt-4 flex shrink-0 flex-col items-start gap-1 rounded-2xl bg-brand-mist px-4 py-3 text-brand-ink">
+            <p>{Q.echoNotice}</p>
+            <Link href="/questions" className={textLink}>
+              {Q.answerLink}
+            </Link>
+          </div>
+        )}
 
         <div role="group" aria-label={E.areaPicker} className="mt-4 flex shrink-0 gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
           {ECHO_REGIONS.map((region) => (

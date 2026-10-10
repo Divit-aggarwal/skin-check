@@ -23,7 +23,9 @@ import type { CaptureQuality } from "@/lib/capture-quality/types";
 // draft restored against the new SECTIONS array would resume the user at the
 // wrong section (old "skin-photo" → new "verify", and so on), so v1 drafts
 // are discarded rather than misread — see loadDraft's version gate.
-export const DRAFT_VERSION = 2;
+// 3: TD-33 adds the skip/answer choice (questionsChoice) and the "Other
+// products" option; a v2 draft would resume past a choice never made.
+export const DRAFT_VERSION = 3;
 
 const DRAFT_KEY = "skin-check-draft";
 // Abandoned drafts shouldn't resurrect a half-answered questionnaire days
@@ -44,6 +46,8 @@ export interface SkinCheckDraft {
   scanId: string;
   answers: SkinCheckAnswers;
   sectionIndex: number;
+  /** TD-33 (1). Product names are never in a draft (memory only). */
+  questionsChoice?: "pending" | "answer" | "skip";
   updatedAt: number;
 }
 
@@ -89,6 +93,7 @@ export function loadDraft(): SkinCheckDraft | null {
       scanId: draft.scanId,
       answers: draft.answers,
       sectionIndex: typeof draft.sectionIndex === "number" ? draft.sectionIndex : 0,
+      questionsChoice: draft.questionsChoice === "answer" || draft.questionsChoice === "skip" ? draft.questionsChoice : "pending",
       updatedAt: draft.updatedAt,
     };
   } catch {
