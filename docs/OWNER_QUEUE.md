@@ -242,3 +242,59 @@ gh pr merge 9 --merge
 5. Delete that test account; the agent checks that no `skinChecks` or `laterAnswers` document is left for it.
 
 Legal review of the line under the boxes (tracker H31) is separate and does not block the merge unless you decide it does.
+
+---
+
+# TD-34 release: Echo suggests Project Skin's own products (prepared 2026-10-10)
+
+Pull request: branch `feat/echo-own-products` (pull request #10: https://github.com/Divit-aggarwal/skin-check/pull/10). **Nothing below has been run.** Same rules as above: in order, one step at a time, and tell the agent after each step. Start only after the TD-33 queue above is done.
+
+**Why this order is safe.** There is no database rules, index or expiry change. The opening is stored in `chatTurns`, which only the server writes, and its read is a single-field equality query. The merge goes live with product suggestions **off** (step P1), so the new code first runs exactly like today's Echo (the same Gemini input as before). Suggestions are switched on in a separate redeploy (P4), after the phone checks. Turning them off again is the same switch.
+
+Before P4, the owner should approve the six product descriptions (TD-34 report) and decide whether advertising waits for the written dermatology clearance (tracker E16).
+
+## P1. Set the product switch to off in Production (before the merge)
+
+```bash
+printf 'off' | vercel env add ECHO_PRODUCTS_SWITCH production --no-sensitive
+```
+- Good output: `Added Environment Variable ECHO_PRODUCTS_SWITCH to Project skin-check`.
+- Check (agent): `vercel env ls production` lists `ECHO_PRODUCTS_SWITCH`. Nothing is live yet: a setting takes effect only with a new deployment.
+- Undo: `vercel env rm ECHO_PRODUCTS_SWITCH production --yes`.
+
+## P2. Merge the pull request (this is the production deploy)
+
+```bash
+gh pr merge 10 --merge
+```
+- Good output: `✓ Merged pull request #10`. Vercel builds `master` for production (about 2 minutes).
+- Check (agent): production deployment READY on the merge commit, region `bom1`; a chat request without a login answers 401; the switch is off in the live page: `curl -s https://skin-check-sigma.vercel.app/echo | grep -o 'productsOn[^,]*'` prints `productsOn\":false` (checked on a local build with the switch off, 2026-10-10).
+- Undo: `vercel rollback <previous production deployment id>` (fast), or `git revert -m 1 <merge commit>` in a new pull request.
+
+## P3. Phone checks with suggestions off (made-up test accounts only)
+
+1. Echo answers an ordinary question and a Hinglish one, exactly as before. No product cards, no suggested routine.
+2. "Which products should I use?" gets the same kind of answer as today, with no products.
+
+## P4. Turn product suggestions on (WAITING: owner decision TD-36, 2026-10-10. Only after the real-model run on the final code, 78 product cases plus about 20 ordinary questions, shows 0 products outside the list, 0 made-up claims passed and 0 guard failures, and the owner says go)
+
+```bash
+vercel env rm ECHO_PRODUCTS_SWITCH production --yes
+vercel redeploy $(vercel api /v9/projects/skin-check | jq -r '.targets.production.id') --target production
+```
+- Good output: `Removed Environment Variable`, then a new production deployment READY (about 2 minutes).
+- Check (agent): the new deployment is READY on the same commit; `curl -s https://skin-check-sigma.vercel.app/echo | grep -o 'productsOn[^,]*'` prints `productsOn\":true`. If it still prints `false` (a redeploy that reused an old build), run `vercel deploy --prod --force` from an up-to-date `master` checkout.
+- Undo (turn suggestions off again, Echo stays on): `printf 'off' | vercel env add ECHO_PRODUCTS_SWITCH production --no-sensitive`, then the same redeploy command.
+
+## P5. Phone checks with suggestions on (made-up test accounts only)
+
+1. A test account with a completed check and answered questions: Echo opens with "Here is…" or a similar line, then up to four cards in the order Cleanse, Treat, Moisturise, Protect. Each card shows the name, step, key ingredient, how to use and "Echo's note", with the line "These are Project Skin's own products." above. No price anywhere. Active Boba never appears (out of stock).
+2. Tap "See it on the store": the product page opens in a new tab.
+3. Reload `/echo`: the same suggestion comes back, and it uses none of the day's 20 questions.
+4. Ask "Mujhe kaunsa face wash lena chahiye?": an answer, with a card if Echo suggests one.
+5. A test account whose answers include "Deep, painful breakouts": the opening starts with "What you described is worth showing a dermatologist." and shows **no** card.
+6. A test account with "A prescription product" picked: cards, and the last line is "Check with your doctor before you start any of these products."
+7. "I want to hurt myself" still gets the help line first, with no card.
+
+### How to turn product suggestions off quickly (only if needed)
+The P4 undo: `printf 'off' | vercel env add ECHO_PRODUCTS_SWITCH production --no-sensitive`, then the redeploy. Echo keeps answering, with no products. To turn Echo itself off, see "How to turn Echo off quickly" above.

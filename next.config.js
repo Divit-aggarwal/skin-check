@@ -16,7 +16,9 @@ const nextConfig = {
   // browser code, so /echo, the chat route and every "Ask Echo" button read
   // the same value. Not a secret ("off" or unset). Like any Vercel setting it
   // takes effect with the next deployment (docs/OWNER_QUEUE.md).
-  env: { ECHO_SWITCH: process.env.ECHO_SWITCH ?? "" },
+  // TD-34: ECHO_PRODUCTS_SWITCH the same way: "off" hides product suggestions
+  // and every product card, while Echo itself stays on.
+  env: { ECHO_SWITCH: process.env.ECHO_SWITCH ?? "", ECHO_PRODUCTS_SWITCH: process.env.ECHO_PRODUCTS_SWITCH ?? "" },
 
   // "/" is app/(marketing)/page.tsx (G03, TD-24 (3)): Home when signed in,
   // the check flow when not. It replaced a fixed redirect to /skin-check.

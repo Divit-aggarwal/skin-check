@@ -13,7 +13,7 @@ const h = vi.hoisted(() => ({
 vi.mock("@google/genai", () => ({ GoogleGenAI: class { models = { generateContent: h.generateContent }; } }));
 vi.mock("@/lib/echo-trusted-context", () => ({ loadTrustedEchoContext: h.loadTrustedEchoContext }));
 vi.mock("@/lib/skin-state-2-loader", () => ({ loadTrustedSkinState2Series: async () => [] }));
-vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: async () => [], loadSplitCheckTurns: async () => [] }));
+vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: async () => [], loadSplitCheckTurns: async () => [], hadRedFlagTurn: async () => false }));
 vi.mock("@/lib/rules/safety", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rules/safety")>("@/lib/rules/safety");
   h.evaluateSafety.mockImplementation(actual.evaluateSafety);
@@ -48,7 +48,8 @@ describe("production build: the safety check runs, recommendations do not", () =
     const { handleContextChat } = await import("@/lib/context/chat");
     const result = await handleContextChat({ uid: "uid-prod", scanId: SCAN_ID, region: "cheeks", message: "what does my cheek reading mean?" });
 
-    expect(result).toEqual({ ok: true, reply: UNCERTAINTY.text });
+    // TD-34: the result carries the checked product suggestions (none for this question).
+    expect(result).toEqual({ ok: true, reply: UNCERTAINTY.text, products: [] });
     expect(h.evaluateSafety).toHaveBeenCalledTimes(1);
     expect(h.evaluateSafety.mock.results[0]).toMatchObject({ type: "return", value: { reviewStatus: "provisional", extraCaution: true, redFlag: false } });
     expect(h.generateContent).toHaveBeenCalledTimes(1);

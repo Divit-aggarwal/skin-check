@@ -18,6 +18,7 @@ import type { RecommendationResult } from "@/lib/contracts/recommendation-result
 import type { SafetyState } from "@/lib/contracts/safety-state";
 import { GEMINI_FIELD_INVENTORY, withoutCautionAnswers } from "@/lib/gemini";
 import { PRODUCT_NAME_EXCEPTIONS } from "@/lib/catalog/catalogue";
+import { listedProduct, OWN_PRODUCTS, OWN_PRODUCTS_VERSION, productFactText, productQuotes } from "./products";
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { describeStepAnswerParts } from "@/lib/skin-check-format";
 import { bandScores, SCORING_VERSION } from "@/lib/skin-check-rules";
@@ -36,6 +37,8 @@ import {
 
 // ctx-2: no safety section (TD-17 (1), tracker H19).
 export const PACKAGE_VERSION = "ctx-2";
+/** ctx-3 (TD-34): product suggestions on; the "product" claim type and the own-product list. */
+export const PACKAGE_VERSION_PRODUCTS = "ctx-3";
 
 const METRICS: ContextMetric[] = ["redness", "oiliness", "texture", "blemishes", "pigment"];
 
@@ -190,6 +193,13 @@ export interface BuildInput {
   longitudinal?: LongitudinalResult[] | undefined;
   recommendation?: { result: RecommendationResult; products: ProductLookup[] } | undefined;
   safety?: SafetyState | undefined;
+  /**
+   * TD-34: product suggestions are on (echoProductsOn()). The same for every
+   * user. Off, or left out, gives exactly the ctx-2 package.
+   */
+  ownProducts?: boolean;
+  /** TD-34: Echo's opening suggestion (a fixed request), which always carries the product list. */
+  opening?: boolean;
 }
 
 function readings(scores: SkinScanScores, region: ContextRegion, lowConfidence: boolean): MeasuredReading[] {
@@ -282,6 +292,12 @@ function recommendation(input: NonNullable<BuildInput["recommendation"]>): { sec
   return { section: items.length > 0 ? { rulesetVersion: result.rulesetVersion, items } : null, screened };
 }
 
+/** TD-34: the in-stock own products as rec facts. Nothing about the user is read. */
+function ownProductSection(): ContextRecommendation | null {
+  const items = OWN_PRODUCTS.map((p) => ({ id: `rec.${p.id}`, text: productFactText(p), productId: p.id, productName: p.name }));
+  return items.length > 0 ? { rulesetVersion: OWN_PRODUCTS_VERSION, items } : null;
+}
+
 export function buildContextPackage(input: BuildInput): ContextPackage {
   const missingItems: MissingItem[] = [
     missing("hydration", "hydration", MISSING_TEXT.hydration),
@@ -290,7 +306,7 @@ export function buildContextPackage(input: BuildInput): ContextPackage {
   ];
 
   const pkg: ContextPackage = {
-    packageVersion: PACKAGE_VERSION,
+    packageVersion: input.ownProducts ? PACKAGE_VERSION_PRODUCTS : PACKAGE_VERSION,
     regionFocus: input.regionFocus,
     routine: { status: "not_shared", decision: "R-1 A" },
     uncertainty: [UNCERTAINTY, UNCERTAINTY_BANDS],
@@ -302,6 +318,10 @@ export function buildContextPackage(input: BuildInput): ContextPackage {
       "self_report_as_measurement", "diagnosis", "forecast", "self_assigned_confidence",
     ],
   };
+  if (input.ownProducts) {
+    pkg.allowedClaims.push("product");
+    pkg.forbiddenClaims.push("product_not_in_list", "efficacy_claim", "made_up_price", "purchase_pressure");
+  }
 
   if (input.skin) {
     const focus = input.regionFocus;
@@ -327,7 +347,9 @@ export function buildContextPackage(input: BuildInput): ContextPackage {
   if (facts.length === 0 || droppedPairwise) missingItems.push(missing("trend", "trend", MISSING_TEXT.trend));
 
   // No red-flag special case: under a red flag the rules result is already base-routine-only.
-  const rec = input.recommendation && PRODUCT_INTENT.test(input.message) ? recommendation(input.recommendation) : null;
+  const wantsProducts = input.opening === true || PRODUCT_INTENT.test(input.message);
+  const own = input.ownProducts && wantsProducts ? ownProductSection() : null;
+  const rec = own ? { section: own, screened: false } : input.recommendation && PRODUCT_INTENT.test(input.message) ? recommendation(input.recommendation) : null;
   if (rec?.section) pkg.recommendation = rec.section;
   if (!rec?.section || rec.screened) missingItems.push(missing("recommendation", "recommendation", MISSING_TEXT.recommendation));
 
@@ -394,6 +416,8 @@ export interface CitableFact extends Fact {
   metric?: ContextMetric;
   region?: ContextRegion;
   productName?: string;
+  /** Parts of an own-product fact that may be repeated on their own (TD-34). */
+  quotes?: string[];
 }
 
 /** Every citable fact in the package, with the bits the validator needs. Ids are unique (tested). */
@@ -404,7 +428,10 @@ export function packageFacts(pkg: ContextPackage): CitableFact[] {
       { ...fact(l), kind: "long" as const, metric: l.measured.metric, region: l.measured.region },
       ...(l.evidence === "pairwise" ? l.confounders.map((c) => ({ ...fact(c), kind: "confounder" as const })) : []),
     ]),
-    ...(pkg.recommendation?.items ?? []).map((i) => ({ ...fact(i), kind: "rec" as const, productName: i.productName })),
+    ...(pkg.recommendation?.items ?? []).map((i) => {
+      const own = listedProduct(i.productId);
+      return { ...fact(i), kind: "rec" as const, productName: i.productName, ...(own && own.name === i.productName ? { quotes: productQuotes(own) } : {}) };
+    }),
     ...(pkg.selfReported ?? []).map((s) => ({ ...fact(s), kind: "self" as const })),
     ...pkg.uncertainty.map((u) => ({ ...fact(u), kind: "uncert" as const })),
     ...pkg.missing.map((m) => ({ ...fact(m), kind: "missing" as const })),

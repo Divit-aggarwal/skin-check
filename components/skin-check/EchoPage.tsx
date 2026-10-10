@@ -12,11 +12,12 @@ import { PhotoCheckLine, ReadingRows } from "@/components/dashboard/CheckReading
 import { formatDate } from "@/components/dashboard/format";
 import { loadDashboard } from "@/components/dashboard/data";
 import { newestEchoSession } from "@/components/dashboard/echo-session";
-import { hasQuestionAnswers } from "@/lib/skin-check-validation";
+import { hasQuestionAnswers, safetyQuestionsAnswered } from "@/lib/skin-check-validation";
 import { QUESTIONS_COPY as Q } from "./questionsCopy";
 import { readingsOf, toDate } from "@/components/dashboard/state";
 import { AccountButton, btnPrimary, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
-import { getSkinCheckChatReply, ApiError } from "@/lib/api";
+import { getEchoOpening, getSkinCheckChatReply, ApiError, type ShownProduct } from "@/lib/api";
+import { ProductCards, splitDoctorLine } from "./ProductCards";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import { useAuth } from "@/lib/auth-context";
 import { AI_SHARE_CONSENT_COPY, AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
@@ -74,12 +75,23 @@ let messageSeq = 0;
 // scan success; if it's empty (fresh tab, or a refresh — session is
 // deliberately in-memory only, see Step 4b spec) there's nothing to ground
 // Echo in, so this shows a way back to /skin-check instead of a blind chat.
-export function EchoPage({ echoOn = true }: { echoOn?: boolean } = {}) {
+// TD-34: Echo's opening suggestion for the check, fetched once per check on
+// this page (the server keeps it, so a reload costs nothing). "none" covers
+// every refusal (switch off, limit, no answers): the plain greeting stays.
+// "error" is a failure worth one more try (timeout, network, a 5xx).
+const OPENING_NONE = new Set(["OPENING_UNAVAILABLE", "ECHO_PRODUCTS_OFF", "ECHO_OFF", "ECHO_DAILY_LIMIT", "CHAT_NOT_NEWEST", "UNDER_18", "ATTESTATION_REQUIRED", "CHAT_MISCONFIGURED", "CHAT_ANALYSIS_UNAVAILABLE"]);
+type Opening =
+  | { status: "loading" | "none" | "consent" | "error"; scanId: string }
+  | { status: "done"; scanId: string; reply: string; products: ShownProduct[] };
+
+export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolean; productsOn?: boolean } = {}) {
   const searchParams = useSearchParams();
   const { session, threads, setThread } = useSkinCheckSession();
 
   const regionParam = searchParams.get("region");
   const [activeRegion, setActiveRegion] = useState<EchoRegion>(isEchoRegion(regionParam) ? regionParam : "forehead");
+  const activeRegionRef = useRef(activeRegion);
+  activeRegionRef.current = activeRegion;
   const [draft, setDraft] = useState("");
   const [sendingRegion, setSendingRegion] = useState<EchoRegion | null>(null);
   // Transient, not part of `threads` — an error is UI state about a failed
@@ -137,13 +149,44 @@ export function EchoPage({ echoOn = true }: { echoOn?: boolean } = {}) {
     return () => abortControllerRef.current?.abort();
   }, []);
 
+  const [opening, setOpening] = useState<Opening | null>(null);
+  // The same "answered enough" rule as the server (F11), so a partly answered check asks for nothing.
+  const openingWanted = !!session && !!user && echoOn && productsOn && safetyQuestionsAnswered(session.answers);
+  const openingScanId = session?.scanId;
+  const loadOpening = useRef<(() => void) | null>(null);
+  useEffect(() => {
+    if (!openingWanted || !openingScanId) return;
+    const controller = new AbortController();
+    const load = () => {
+      setOpening({ status: "loading", scanId: openingScanId });
+      getEchoOpening(openingScanId, activeRegionRef.current, controller.signal).then(
+        (o) => setOpening({ status: "done", scanId: openingScanId, ...o }),
+        (err) => {
+          if (controller.signal.aborted) return;
+          const code = err instanceof ApiError ? err.code : undefined;
+          const status = code === "AI_CONSENT_REQUIRED" ? "consent" : code && OPENING_NONE.has(code) ? "none" : "error";
+          setOpening({ status, scanId: openingScanId });
+        }
+      );
+    };
+    loadOpening.current = load;
+    load();
+    return () => {
+      controller.abort();
+      loadOpening.current = null;
+    };
+  }, [openingWanted, openingScanId]);
+  const shownOpening = opening && opening.scanId === openingScanId ? opening : null;
+
   const messages = threads[activeRegion].messages;
   const isThinking = sendingRegion === activeRegion;
   const activeError = sendError?.region === activeRegion ? sendError : null;
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [messages, isThinking, activeError]);
+    // TD-34: before the first question, the opening is read from its first line, not its last card.
+    const top = messages.length === 0 && !isThinking && !activeError ? 0 : scrollRef.current?.scrollHeight ?? 0;
+    scrollRef.current?.scrollTo({ top, behavior: "smooth" });
+  }, [messages, isThinking, activeError, shownOpening]);
 
   if (!session) {
     return (
@@ -213,7 +256,7 @@ export function EchoPage({ echoOn = true }: { echoOn?: boolean } = {}) {
       // Only the scan's id and the thread go up — the server loads this
       // scan's scores and answers itself.
       const history = before.messages.map((m) => ({ role: m.role, text: m.text }));
-      const { reply, historyToken } = await getSkinCheckChatReply(
+      const { reply, historyToken, products } = await getSkinCheckChatReply(
         activeSession.scanId,
         region,
         history,
@@ -223,7 +266,7 @@ export function EchoPage({ echoOn = true }: { echoOn?: boolean } = {}) {
       );
       if (controller.signal.aborted) return; // unmounted mid-request — nothing left to update
       setThread(region, {
-        messages: [...before.messages, userMessage, { id: messageSeq++, role: "echo", text: reply }],
+        messages: [...before.messages, userMessage, { id: messageSeq++, role: "echo", text: reply, ...(products.length > 0 ? { products } : {}) }],
         historyToken,
       });
     } catch (err) {
@@ -263,7 +306,8 @@ export function EchoPage({ echoOn = true }: { echoOn?: boolean } = {}) {
   // user's yes, then resend the turn that was refused (version 1 copy,
   // TD-29 (4)).
   async function grantAiShare() {
-    if (!activeError || consentSaving) return;
+    const openingConsent = shownOpening?.status === "consent";
+    if ((!activeError && !openingConsent) || consentSaving) return;
     if (!user) {
       setConsentFailed(true);
       return;
@@ -276,8 +320,12 @@ export function EchoPage({ echoOn = true }: { echoOn?: boolean } = {}) {
         headers: { "content-type": "application/json", authorization: `Bearer ${await user.getIdToken()}` },
         body: JSON.stringify({ purpose: "ai_share", granted: true, version: AI_SHARE_CONSENT_VERSION }),
       });
-      if (res.ok) void sendToEcho(activeError.region, activeError.retryBefore, activeError.retryMessage);
-      else setConsentFailed(true);
+      if (!res.ok) setConsentFailed(true);
+      else {
+        // TD-34: the opening waited for this consent too (or read the ledger just before it).
+        if (shownOpening && shownOpening.status !== "done") loadOpening.current?.();
+        if (activeError) void sendToEcho(activeError.region, activeError.retryBefore, activeError.retryMessage);
+      }
     } catch (err) {
       console.error("AI-share consent not recorded:", err instanceof Error ? err.message : err);
       setConsentFailed(true);
@@ -349,11 +397,31 @@ export function EchoPage({ echoOn = true }: { echoOn?: boolean } = {}) {
         {echoOn && messages.length === 0 && (
           <p className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">{greetingFor(activeRegion)}</p>
         )}
+        {echoOn && shownOpening?.status === "done" && (
+          <div className="space-y-3">
+            <p className="max-w-[90%] whitespace-pre-line rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">{withPhoneLinks(splitDoctorLine(shownOpening.reply).text)}</p>
+            <ProductCards products={shownOpening.products} doctorLine={splitDoctorLine(shownOpening.reply).doctorLine} />
+          </div>
+        )}
+        {echoOn && shownOpening?.status === "error" && (
+          <div className="flex flex-wrap items-center gap-x-2 text-sm text-brand-muted">
+            <p>{E.openingFailed}</p>
+            <button type="button" onClick={() => loadOpening.current?.()} className="inline-flex min-h-11 items-center font-semibold text-brand-forest underline underline-offset-2">
+              {E.tryAgain}
+            </button>
+          </div>
+        )}
+        {echoOn && shownOpening?.status === "loading" && (
+          <TypingIndicator label={E.openingLoading} className="rounded-tl-sm bg-brand-paper text-brand-muted" />
+        )}
         {messages.map((m) =>
           m.role === "echo" ? (
-<p key={m.id} className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">
-              {withPhoneLinks(m.text)}
-            </p>
+            <div key={m.id} className="space-y-3">
+              <p className="max-w-[90%] whitespace-pre-line rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">
+                {withPhoneLinks(m.products ? splitDoctorLine(m.text).text : m.text)}
+              </p>
+              {m.products && <ProductCards products={m.products} doctorLine={splitDoctorLine(m.text).doctorLine} />}
+            </div>
           ) : (
             <div key={m.id} className="flex justify-end">
               <div className="max-w-[85%] rounded-2xl rounded-br-md bg-brand-action px-4 py-3">
@@ -367,7 +435,7 @@ export function EchoPage({ echoOn = true }: { echoOn?: boolean } = {}) {
             <TypingIndicator key="thinking" className="rounded-tl-sm bg-brand-paper text-brand-muted" />
           )}
         </AnimatePresence>
-        {activeError?.code === "AI_CONSENT_REQUIRED" && (
+        {(activeError?.code === "AI_CONSENT_REQUIRED" || (!activeError && echoOn && shownOpening?.status === "consent")) && (
           <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl border border-brand-line bg-brand-paper px-4 py-3">
             <p className="text-body text-text">{AI_SHARE_CONSENT_COPY}</p>
             <button

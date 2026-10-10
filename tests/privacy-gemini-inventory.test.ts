@@ -195,7 +195,7 @@ describe("one safety instruction for every user (TD-17, H19)", () => {
       generateContent.mockResolvedValue({ text: JSON.stringify({ claims: [{ claim_type: "smalltalk", text: "Try retinol.", fact_ids: [] }], needs_referral: false }) });
       const safety = evaluateSafety({ answers, confirmedThisScan: [] });
       const pkg = buildContextPackage({ regionFocus: "cheeks", message: "hi", skin: { scores: SCORES, regionScores: { cheeks: SCORES }, regionLowConfidence: {}, pipelineVersion: null }, answers, safety });
-      await answerFromPackage(pkg, "hi", [], { generate: generateContextAnswer, redFlag: safety.redFlag });
+      await answerFromPackage(pkg, "hi", [], { generate: generateContextAnswer });
       return JSON.stringify(generateContent.mock.calls.map((c) => c[0]));
     };
     const a = await run(withHidden);
@@ -222,7 +222,7 @@ describe("context-package path (lane:context)", () => {
       answers,
     });
     generateContent.mockResolvedValue({ text: "{}" });
-    await answerFromPackage(pkg, MESSAGE, [], { generate: generateContextAnswer, redFlag: false });
+    await answerFromPackage(pkg, MESSAGE, [], { generate: generateContextAnswer });
     const arg = generateContent.mock.calls[0]![0] as {
       contents: { role: string; parts: { text: string }[] }[];
       config: { systemInstruction: string; responseJsonSchema?: unknown; safetySettings?: unknown[]; tools?: unknown };
@@ -274,7 +274,7 @@ describe("context-package path with every internal input (lane:context)", () => 
     const { fullInput, withExtraKeys, SECRETS } = await import("./context-fixtures");
     const input = withExtraKeys(fullInput());
     generateContent.mockResolvedValue({ text: "{}" });
-    await answerFromPackage(buildContextPackage(input), input.message, [], { generate: generateContextAnswer, redFlag: false });
+    await answerFromPackage(buildContextPackage(input), input.message, [], { generate: generateContextAnswer });
     const all = JSON.stringify(generateContent.mock.calls[0]![0]);
     for (const secret of SECRETS) expect(all, secret).not.toContain(secret);
     expect(all).not.toMatch(/redFlag|raisedBy|ruleId|triggeredBy|inputSha256|ZZSECRET/);

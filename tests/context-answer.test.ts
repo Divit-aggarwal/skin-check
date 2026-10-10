@@ -21,8 +21,8 @@ function fake(...texts: string[]) {
   for (const t of texts) generate.mockResolvedValueOnce({ text: t, modelId: "model-x" });
   return generate;
 }
-const run = (generate: ReturnType<typeof fake>, opts: { redFlag?: boolean; message?: string } = {}) =>
-  answerFromPackage(pkg, opts.message ?? "tell me about my cheeks", [], { generate, redFlag: opts.redFlag ?? false });
+const run = (generate: ReturnType<typeof fake>, opts: { message?: string } = {}) =>
+  answerFromPackage(pkg, opts.message ?? "tell me about my cheeks", [], { generate });
 
 describe("answer path", () => {
   it("first answer passes: rendered claims, one call", async () => {
@@ -60,11 +60,14 @@ describe("answer path", () => {
     expect(await run(g2)).toMatchObject({ reply: REFERRAL_COPY, referral: true });
   });
 
-  it("a red flag in the safety state: no retry", async () => {
+  // F20 (owner decision 2026-10-10): changed. Was "a red flag in the safety state: no retry"; a red flag
+  // can come from a hidden answer, so the retry now depends on the answer only, for every user.
+  it("F20: the retry does not depend on the safety state (answerFromPackage takes none)", async () => {
     const g = fake(BAD, GOOD);
-    const out = await run(g, { redFlag: true });
-    expect(g).toHaveBeenCalledTimes(1);
-    expect(out.validator.fallback).toBe(true);
+    const out = await run(g);
+    expect(g).toHaveBeenCalledTimes(2);
+    expect(out.validator).toMatchObject({ passed: true, regenerated: true, fallback: false });
+    expect(answerFromPackage.length).toBe(4);
   });
 
   it("a failure from the user's own premise: no retry", async () => {
@@ -113,7 +116,7 @@ describe("answer path: a self-harm claim", () => {
     const p = buildContextPackage(fullInput({ answers: { breakout_pattern: ["deep_painful"] } }));
     const self = packageFacts(p).find((f) => f.id === "self.all.breakout_pattern")!;
     const ok = answer({ claims: [{ claim_type: "self_reported_echo", text: self.text, fact_ids: [self.id] }], needs_referral: false });
-    const out = await answerFromPackage(p, "tell me", [], { generate: fake(ok), redFlag: false });
+    const out = await answerFromPackage(p, "tell me", [], { generate: fake(ok) });
     expect(out.referral).toBe(false);
     expect(out.reply).toBe(self.text);
   });

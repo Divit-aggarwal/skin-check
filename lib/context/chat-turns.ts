@@ -2,7 +2,8 @@ import { Timestamp } from "firebase-admin/firestore";
 import { adminDb } from "@/lib/firebase/admin";
 import type { EchoChatMessage } from "@/lib/gemini";
 import type { EchoRegion } from "@/lib/echo-regions";
-import type { ValidatorRecord } from "./answer";
+import type { ProductGuard, ShownProduct, ValidatorRecord } from "./answer";
+import { OWN_PRODUCTS_VERSION } from "./products";
 
 // SERVER ONLY. D-15 (approved for local use): users/{uid}/chatTurns are the
 // only history source; client-sent turns are never fed to Gemini. Written
@@ -23,6 +24,15 @@ export interface EchoTurnRecord {
   prefilter: "red_flag" | "comparison" | "unsupported_script" | null;
   redFlag: boolean;
   latencyMs: number;
+  /** TD-34: checked product suggestions (ids and reasons), the reply without product claims, and the guard the user saw. */
+  products?: ShownProduct[];
+  withoutProducts?: string;
+  productContent?: boolean;
+  guard?: ProductGuard;
+  /** TD-34: the product list the answer was checked against (OWN_PRODUCTS_VERSION). */
+  listVersion?: string;
+  /** TD-34: Echo's opening suggestion. Never in Gemini's history or the split check; read back by loadOpening. */
+  opening?: boolean;
 }
 
 const turns = (uid: string) => adminDb().collection("users").doc(uid).collection("chatTurns");
@@ -41,8 +51,8 @@ export async function recordChatTurns(
   const expireAt = Timestamp.fromMillis(now + CHAT_TURN_TTL_DAYS * DAY_MS);
   // Left out of later Gemini history: pre-filter hits, referrals, and answers
   // that ended in the fallback, so a rejected injection is not replayed.
-  const historyExcluded = meta.prefilter !== null || meta.redFlag || meta.validator?.fallback === true;
-  const common = { scanId, region, expireAt, prefilter: meta.prefilter, redFlag: meta.redFlag, historyExcluded };
+  const historyExcluded = meta.prefilter !== null || meta.redFlag || meta.validator?.fallback === true || meta.opening === true;
+  const common = { scanId, region, expireAt, prefilter: meta.prefilter, redFlag: meta.redFlag, historyExcluded, opening: meta.opening === true };
   const batch = adminDb().batch();
   batch.create(col.doc(), {
     ...common,
@@ -82,8 +92,46 @@ export async function loadSplitCheckTurns(uid: string, scanId: string, region: E
   const snap = await turns(uid).where("scanId", "==", scanId).get();
   return snap.docs
     .map((d) => d.data())
-    .filter((t) => t.region === region && t.role === "user" && t.redFlag !== true && t.prefilter == null && typeof t.text === "string")
+    .filter((t) => t.region === region && t.role === "user" && t.redFlag !== true && t.prefilter == null && t.opening !== true && typeof t.text === "string")
     .sort((a, b) => (a.createdAt as Timestamp).toMillis() - (b.createdAt as Timestamp).toMillis())
     .slice(-HISTORY_TURNS)
     .map((t) => ({ role: "user" as const, text: t.text as string }));
+}
+
+/** TD-34 (safety review): any red-flag turn for this check, in any thread. Then no product is shown for the check. */
+export async function hadRedFlagTurn(uid: string, scanId: string): Promise<boolean> {
+  const snap = await turns(uid).where("scanId", "==", scanId).get();
+  return snap.docs.some((d) => d.data().redFlag === true);
+}
+
+export interface StoredOpening {
+  /** Gemini's checked text, unguarded (the guard is applied again on every read). */
+  reply: string;
+  withoutProducts: string;
+  products: ShownProduct[];
+  productContent: boolean;
+  /** The stored answer fell back: no suggestion to show, and none to generate again. */
+  fallback: boolean;
+}
+
+/**
+ * TD-34: the opening suggestion already made for this check, if any (the
+ * oldest), so a reload costs no Gemini call and no question from the day's limit.
+ */
+export async function loadOpening(uid: string, scanId: string): Promise<StoredOpening | null> {
+  const snap = await turns(uid).where("scanId", "==", scanId).get();
+  const found = snap.docs
+    .map((d) => d.data())
+    .filter((t) => t.opening === true && t.role === "echo" && typeof t.text === "string")
+    .sort((a, b) => (a.createdAt as Timestamp).toMillis() - (b.createdAt as Timestamp).toMillis())[0];
+  // An opening checked against another product list (stock or catalogue changed) is made again.
+  if (!found || found.listVersion !== OWN_PRODUCTS_VERSION) return null;
+  const products = Array.isArray(found.products)
+    ? found.products.flatMap((p: unknown) => {
+        const { productId, reason } = (p ?? {}) as Record<string, unknown>;
+        return typeof productId === "string" && typeof reason === "string" ? [{ productId, reason }] : [];
+      })
+    : [];
+  const fallback = (found.validator as { fallback?: unknown } | null)?.fallback === true;
+  return { reply: found.text as string, withoutProducts: typeof found.withoutProducts === "string" ? found.withoutProducts : "", products, productContent: found.productContent !== false, fallback };
 }

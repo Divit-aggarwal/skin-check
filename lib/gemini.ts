@@ -74,6 +74,14 @@ const isSentToGemini = (stepId: string) => GEMINI_FIELD_INVENTORY[stepId] === "s
 export const ECHO_SAFETY_INSTRUCTION = `Do not suggest any active ingredients or new products. Advise the user to ask
 a doctor before starting anything new.`;
 
+// TD-34 (owner, 2026-10-10) replaces the sentence above while product
+// suggestions are on: Gemini may suggest only products from the list it is
+// given. Still one sentence for every user. A doctor line for pregnancy,
+// breastfeeding or a prescription is added by our code after the answer
+// (lib/context/answer.ts productGuard), never by Gemini.
+export const ECHO_PRODUCTS_INSTRUCTION = `Suggest only products from the product list in the package (the rec facts). Do not
+suggest any other product, brand or active ingredient.`;
+
 // The answers that would turn extra caution on are still left out (e.g. "A
 // prescription product" under current_products), so two users who differ
 // only in such an answer send Gemini the same text. Matching is trimmed and

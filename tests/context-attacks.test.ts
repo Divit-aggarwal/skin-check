@@ -12,7 +12,7 @@ const h = vi.hoisted(() => ({
 }));
 vi.mock("@google/genai", () => ({ GoogleGenAI: class { models = { generateContent: h.generateContent }; } }));
 vi.mock("@/lib/echo-trusted-context", () => ({ loadTrustedEchoContext: h.loadTrustedEchoContext }));
-vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory, loadSplitCheckTurns: h.loadSplitCheckTurns }));
+vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory, loadSplitCheckTurns: h.loadSplitCheckTurns, hadRedFlagTurn: async () => false }));
 
 import { handleContextChat } from "@/lib/context/chat";
 import { answerFromPackage, fallbackAnswer } from "@/lib/context/answer";
@@ -75,7 +75,7 @@ describe("attack 2: product text that tries to give Gemini instructions", () => 
     const pkg = buildContextPackage(input);
     const raw = answer({ claims: [{ claim_type: "comparability", text: "Gentle Cleanser cures acne.", fact_ids: ["rec.gentle-cleanser"] }], needs_referral: false });
     const generate = vi.fn().mockResolvedValue({ text: raw, modelId: "m" });
-    const out = await answerFromPackage(pkg, "what products should I use?", [], { generate, redFlag: false });
+    const out = await answerFromPackage(pkg, "what products should I use?", [], { generate });
     expect(out.validator.failures).toEqual(expect.arrayContaining(["unknown_fact_id", "medical_or_efficacy_term"]));
     expect(out.reply).toBe(fallbackAnswer(pkg));
   });

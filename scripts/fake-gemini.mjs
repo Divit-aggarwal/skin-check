@@ -25,6 +25,31 @@ function nextReply() {
   return String(first);
 }
 
+// TD-34: with no scripted reply, a request that carries the own-product list
+// gets a valid structured suggestion built from that request's own package
+// (one product per step, each reason quoting what the user told us), so the
+// browser tests can see real cards. Everything else gets the plain sentence.
+function productReply(request) {
+  const instruction = request?.systemInstruction?.parts?.map((p) => p.text ?? "").join("") ?? "";
+  if (!request?.generationConfig?.responseJsonSchema?.properties?.products) return null;
+  const json = instruction.split("CONTEXT PACKAGE:\n")[1]?.split("\n\nYour previous answer")[0];
+  let pkg;
+  try {
+    pkg = JSON.parse(json);
+  } catch {
+    return null;
+  }
+  const items = pkg?.recommendation?.items ?? [];
+  const told = (pkg?.selfReported ?? []).find((s) => s.id === "self.all.skin_type") ?? pkg?.selfReported?.[0];
+  if (items.length === 0 || !told) return null;
+  return JSON.stringify({
+    claims: [{ claim_type: "product", text: "Here is a simple routine from Project Skin's products.", fact_ids: [items[0].id] }],
+    products: items.slice(0, 4).map((i) => ({ product_id: i.productId, reason: told.text, fact_ids: [told.id] })),
+    needs_referral: false,
+    distress: false,
+  });
+}
+
 createServer((req, res) => {
   let body = "";
   req.on("data", (c) => (body += c));
@@ -34,7 +59,8 @@ createServer((req, res) => {
       return;
     }
     appendFileSync(`${DIR}/requests.jsonl`, JSON.stringify({ at: new Date().toISOString(), path: req.url, body: JSON.parse(body || "{}") }) + "\n");
-    const text = nextReply();
+    const queued = nextReply();
+    const text = queued === DEFAULT_REPLY ? (productReply(JSON.parse(body || "{}")) ?? DEFAULT_REPLY) : queued;
     res.writeHead(200, { "content-type": "application/json" });
     res.end(JSON.stringify({ candidates: [{ content: { role: "model", parts: [{ text }] }, finishReason: "STOP", index: 0 }] }));
   });

@@ -10,6 +10,8 @@ export interface EchoThreadMessage {
   id: number;
   role: "user" | "echo";
   text: string;
+  /** TD-34: own products Echo suggested with this reply; drawn as cards, never sent back to the server. */
+  products?: { productId: string; reason: string }[];
 }
 
 export interface SkinCheckSession {

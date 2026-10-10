@@ -35,7 +35,7 @@ vi.mock("@/lib/rules/safety", async () => {
   h.evaluateSafety.mockImplementation(actual.evaluateSafety);
   return { ...actual, evaluateSafety: h.evaluateSafety };
 });
-vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory, loadSplitCheckTurns: h.loadSplitCheckTurns }));
+vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory, loadSplitCheckTurns: h.loadSplitCheckTurns, hadRedFlagTurn: async () => false }));
 vi.mock("@/lib/context/builder", async () => {
   const actual = await vi.importActual<typeof import("@/lib/context/builder")>("@/lib/context/builder");
   h.buildContextPackage.mockImplementation(actual.buildContextPackage);
@@ -181,8 +181,15 @@ describe("switch on: the new path", () => {
     expect(h.getSkinCheckChatReply).not.toHaveBeenCalled();
     expect(h.generateContent).toHaveBeenCalledTimes(1);
     const meta = h.recordChatTurns.mock.calls[0]![5];
-    expect(meta).toMatchObject({ packageVersion: "ctx-2", promptVersion: "ctx-prompt-4", modelId: expect.any(String), prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
+    // TD-34: product suggestions are on by default, so ctx-3 and ctx-prompt-5.
+    expect(meta).toMatchObject({ packageVersion: "ctx-3", promptVersion: "ctx-prompt-5", modelId: expect.any(String), prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
     expect(meta.packageSha256).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it("TD-34 off: with product suggestions off, the versions are the ones before TD-34 (ctx-2, ctx-prompt-4)", async () => {
+    vi.stubEnv("ECHO_PRODUCTS_SWITCH", "off");
+    await post();
+    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ packageVersion: "ctx-2", promptVersion: "ctx-prompt-4", prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
   });
 
   it("a red-flag message: referral, no package, no Gemini call, recorded as red flag", async () => {
@@ -205,6 +212,10 @@ describe("switch on: the new path", () => {
     const res = await post("is my redness better than last time?");
     expect((await res.json()).reply.startsWith(COMPARISON_LEAD)).toBe(true);
     expect(h.generateContent).not.toHaveBeenCalled();
+    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ prefilter: "comparison", packageVersion: "ctx-3" });
+    vi.stubEnv("ECHO_PRODUCTS_SWITCH", "off");
+    h.recordChatTurns.mockClear();
+    await post("is my redness better than last time?");
     expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ prefilter: "comparison", packageVersion: "ctx-2" });
   });
 
@@ -281,11 +292,20 @@ describe("context path: real longitudinal and safety inputs (wiring 2)", () => {
     h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers: { primary_concerns: ["redness"], current_products: ["actives", "prescription"] } });
     await post();
     expect(builtWith().safety).toMatchObject({ extraCaution: true, extraCautionRaisedBy: [{ field: "current_products", value: "prescription" }] });
-    expect(geminiCall()).toContain("Do not suggest any active ingredients or new products.");
+    // TD-34: while product suggestions are on, every user gets the products sentence instead.
+    expect(geminiCall()).toContain("Suggest only products from the product list in the package");
+    expect(geminiCall()).not.toContain("Do not suggest any active ingredients or new products.");
     expect(geminiCall()).not.toMatch(/A prescription product|extraCaution|caution/i);
+    vi.stubEnv("ECHO_PRODUCTS_SWITCH", "off");
+    h.generateContent.mockClear();
+    await post();
+    expect(geminiCall()).toContain("Do not suggest any active ingredients or new products.");
+    expect(geminiCall()).not.toMatch(/A prescription product|extraCaution|caution|product list/i);
   });
 
-  it("a quiz red flag reaches answerFromPackage: a rejected answer is not retried", async () => {
+  // F20 (owner decision 2026-10-10): changed. Was "a quiz red flag reaches answerFromPackage: a rejected
+  // answer is not retried". A quiz red flag can come from a hidden answer, so it no longer changes the calls.
+  it("F20: a quiz red flag does not change the Gemini calls: a rejected answer is retried for every user", async () => {
     const BAD = JSON.stringify({ claims: [{ claim_type: "uncertainty", text: "Your redness is 42.", fact_ids: [UNCERTAINTY.id] }], needs_referral: false });
     h.generateContent.mockResolvedValue({ text: BAD });
     await post();
@@ -293,7 +313,7 @@ describe("context path: real longitudinal and safety inputs (wiring 2)", () => {
     h.generateContent.mockClear();
     h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers: { primary_concerns: ["blemishes"], breakout_pattern: ["deep_painful"] } });
     await post();
-    expect(h.generateContent).toHaveBeenCalledTimes(1);
+    expect(h.generateContent).toHaveBeenCalledTimes(2);
     // The red flag itself never reaches Gemini.
     expect(geminiCall()).not.toMatch(/redFlag|deep_painful|red_flag\./);
   });
