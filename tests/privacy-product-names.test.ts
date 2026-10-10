@@ -51,7 +51,7 @@ vi.mock("@/app/api/account/_ledger", async () => ({
   ageStatus: async () => "over18",
   latestGrant: async () => true,
 }));
-vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: async () => undefined, loadChatHistory: async () => [], loadSplitCheckTurns: async () => [] }));
+vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: async () => undefined, loadChatHistory: async () => [], loadSplitCheckTurns: async () => [], hadRedFlagTurn: async () => false }));
 vi.mock("@/lib/skin-state-2-loader", () => ({ loadTrustedSkinState2Series: async () => [] }));
 
 import { NextRequest } from "next/server";

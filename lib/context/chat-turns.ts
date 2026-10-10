@@ -97,6 +97,12 @@ export async function loadSplitCheckTurns(uid: string, scanId: string, region: E
     .map((t) => ({ role: "user" as const, text: t.text as string }));
 }
 
+/** TD-34 (safety review): any red-flag turn for this check, in any thread. Then no product is shown for the check. */
+export async function hadRedFlagTurn(uid: string, scanId: string): Promise<boolean> {
+  const snap = await turns(uid).where("scanId", "==", scanId).get();
+  return snap.docs.some((d) => d.data().redFlag === true);
+}
+
 export interface StoredOpening {
   /** Gemini's checked text, unguarded (the guard is applied again on every read). */
   reply: string;

@@ -13,7 +13,7 @@ const h = vi.hoisted(() => ({
 vi.mock("@google/genai", () => ({ GoogleGenAI: class { models = { generateContent: h.generateContent }; } }));
 vi.mock("@/lib/echo-trusted-context", () => ({ loadTrustedEchoContext: h.loadTrustedEchoContext }));
 vi.mock("@/lib/skin-state-2-loader", () => ({ loadTrustedSkinState2Series: async () => [] }));
-vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: async () => [], loadSplitCheckTurns: async () => [] }));
+vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: async () => [], loadSplitCheckTurns: async () => [], hadRedFlagTurn: async () => false }));
 vi.mock("@/lib/rules/safety", async () => {
   const actual = await vi.importActual<typeof import("@/lib/rules/safety")>("@/lib/rules/safety");
   h.evaluateSafety.mockImplementation(actual.evaluateSafety);

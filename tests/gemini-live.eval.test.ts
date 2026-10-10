@@ -29,6 +29,7 @@ vi.mock("@/lib/context/chat-turns", () => ({
   recordChatTurns: async (_u: string, _s: string, _r: string, _m: string, _reply: string, meta: Record<string, unknown>) => void h.turns.push({ meta }),
   loadChatHistory: async () => [],
   loadSplitCheckTurns: async () => [],
+  hadRedFlagTurn: async () => false,
 }));
 vi.mock("@/lib/gemini", async () => {
   const actual = await vi.importActual<typeof import("@/lib/gemini")>("@/lib/gemini");

@@ -138,13 +138,14 @@ const DESCRIBE_FRAME = new Set(
 // TD-34: a "product" claim may frame its product's own words with these too (EN and Hinglish).
 const PRODUCT_FRAME = new Set(
   Array.from(FRAME).concat(
-    ("use using apply suggest suggested suggesting suggestion pick picked chose step steps routine own project skin's product products list from can could may " +
-      "one each morning night daily here's here then after next first is are simple s for you " +
+    ("use using apply suggest suggested suggesting suggestion pick picked chose step steps routine own project skin s product products list from can could may " +
+      "one each morning night daily here's here is are simple s " +
       "kar sakte sakti sakta hain karein kijiye lagayein lagaiye lagana istemal subah raat roz din wala").split(" ")
   )
 );
 // A product's reason repeats the user's facts; it may be framed like a description or a product claim.
-const REASON_FRAME = new Set(Array.from(DESCRIBE_FRAME).concat(Array.from(PRODUCT_FRAME)));
+// Not "so", "then" or "after": they would join a told answer to a result ("…, so a spot is invisible"). Safety review.
+const REASON_FRAME = new Set(Array.from(DESCRIBE_FRAME).concat(Array.from(PRODUCT_FRAME)).filter((w) => !["so", "then", "after", "for"].includes(w)));
 // A self-report echo must say it is what the user told us (security review, wave 2).
 const TOLD = new RegExp(String.raw`\b(?:told|said|mentioned|noted|shared|listed|picked|chose|selected|answered|bataya|batayi|bataye)\b`, "iu");
 // Uncited claims: no comparison, and smalltalk does not talk about the skin or point back at a reading.
@@ -181,7 +182,7 @@ const neutral = (text: string) => SAFE_PHRASES.reduce((t, re) => t.replace(re, "
 // prices or discount codes") offers nothing; blanked for the price and buying
 // checks only. Any other price or buying word still fails.
 const REFUSED_SALE = new RegExp(
-  String.raw`\b(?:cannot|can't|can not|unable to|not able to|do not|don't|won't|will not)\s+(?:\w+\s+){0,3}?(?:(?:prices?|pricing|costs?|discounts?|offers?|coupons?|deals?|codes?|buying|purchases?|shopping)(?:\s+(?:or|and)\s+|\s*,\s*|\s+)?)+`,
+  String.raw`\b(?:cannot|can't|can not|unable to|not able to|do not|don't)\s+(?:share|provide|give|discuss|talk about|tell you|know|help with|check|see)\s+(?:\w+\s+){0,2}?(?:(?:prices?|pricing|costs?|discounts?|offers?|coupons?|deals?|codes?|buying|purchases?|shopping)(?:\s+(?:or|and)\s+|\s*,\s*|\s+)?)+`,
   "giu"
 );
 const notSelling = (text: string) => text.replace(REFUSED_SALE, " ");
@@ -365,7 +366,7 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
 
     for (const [check, pattern] of productsOn ? WORD_CHECKS.concat(PRODUCT_WORD_CHECKS) : WORD_CHECKS) {
       // Numbers also on the raw text: NFKD folds "Ⅳ" to the letters "IV".
-      const term = firstMatch(pattern, check === "made_up_price" || check === "purchase_pressure" ? notSelling(neutral(stripped)) : neutral(stripped)) ?? (check === "made_up_number" ? firstMatch(pattern, stripQuotes(claim.text, cited)) : null);
+      const term = firstMatch(pattern, check === "made_up_price" ? notSelling(neutral(stripped)) : neutral(stripped)) ?? (check === "made_up_number" ? firstMatch(pattern, stripQuotes(claim.text, cited)) : null);
       if (term) fail(check, i, term);
     }
     // TD-34: another brand, a shop, our kit or one of our products not on the list, quoted or not.
@@ -450,12 +451,15 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
     }
     if (kinds.has("rec") && claim.claim_type !== "product_reason") {
       // Own words from the product facts only, so a reading cannot be pulled in ("…, for your Elevated redness").
-      const extra = extraWord(stripped, cited.filter((f) => f.kind === "rec"), claim.claim_type === "product" ? PRODUCT_FRAME : FRAME);
+      // A "product" claim may repeat its product's words only as verbatim quotes (stripped above), never
+      // rearranged ("Use Clear Seal, then the single spot is nearly invisible"; safety review).
+      const extra = claim.claim_type === "product" ? extraWord(stripped, [], PRODUCT_FRAME) : extraWord(stripped, cited.filter((f) => f.kind === "rec"));
       if (extra) fail("product_claim", i, extra);
     }
     // TD-34: a reason is the cited facts' own words in a frame, nothing about what the product does.
     if (claim.claim_type === "product_reason") {
-      const extra = extraWord(stripped, cited, REASON_FRAME, cited.flatMap((f) => (f.band ? [f.band.toLowerCase()] : [])));
+      // The user's own facts only: never the product's words (safety review).
+      const extra = extraWord(stripQuotes(text, cited.slice(1)), cited.slice(1), REASON_FRAME, cited.flatMap((f) => (f.band ? [f.band.toLowerCase()] : [])));
       if (extra) fail("product_claim", i, extra);
     }
   });
@@ -463,7 +467,7 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
   // The user reads the claims joined: a phrase split across two claims is checked too.
   const joined = answer.claims.map((c) => stripQuotes(normalizeForMatch(c.text), c.fact_ids.flatMap((id) => facts.get(id) ?? []))).join(" ");
   for (const [check, pattern] of productsOn ? WORD_CHECKS.concat(PRODUCT_WORD_CHECKS) : WORD_CHECKS) {
-    const term = firstMatch(pattern, check === "made_up_price" || check === "purchase_pressure" ? notSelling(neutral(joined)) : neutral(joined));
+    const term = firstMatch(pattern, check === "made_up_price" ? notSelling(neutral(joined)) : neutral(joined));
     if (term && !failures.some((f) => f.check === check)) fail(check, -1, term);
   }
 

@@ -13,7 +13,7 @@ import { answerFromPackage, comparisonAnswer, fallbackAnswer, FINISH_QUESTIONNAI
 import { echoProductsOn, listedProduct, OPENING_MESSAGE, OWN_PRODUCTS_VERSION } from "./products";
 import { RULE_INPUT_FIELDS } from "@/lib/rules/settings";
 import { buildContextPackage, packageSha256 } from "./builder";
-import { loadChatHistory, loadSplitCheckTurns, recordChatTurns, type EchoTurnRecord, type StoredOpening } from "./chat-turns";
+import { hadRedFlagTurn, loadChatHistory, loadSplitCheckTurns, recordChatTurns, type EchoTurnRecord, type StoredOpening } from "./chat-turns";
 import { comparisonHit, joinedUserTurns, redFlagHit, referralCopyFor, UNSUPPORTED_SCRIPT_COPY } from "./prefilter";
 import { promptVersionFor } from "./renderer";
 
@@ -164,7 +164,8 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
   const outcome = await answerFromPackage(pkg, message, history, { generate: generateContextAnswer, redFlag: safety.redFlag });
   // TD-34: the guards change only what the user sees. The stored text (Gemini's
   // later history) is the unguarded answer, the same for every user.
-  const guard = productGuard(safety);
+  // A red-flag message earlier on this check counts like a quiz red flag (safety review).
+  const guard = ownProducts && (await hadRedFlagTurn(uid, scanId)) ? "red_flag" : productGuard(safety);
   const shown = guardedReply(outcome, guard, opening);
   // Not best effort: an unrecorded reply would make the D-15 history diverge.
   await recordChatTurns(
@@ -189,7 +190,7 @@ export async function serveStoredOpening(uid: string, scanId: string, stored: St
   if (!trusted) return { ok: false, status: 409, code: "CHAT_ANALYSIS_UNAVAILABLE", error: "This scan's analysis isn't available yet." };
   let guard: ReturnType<typeof productGuard>;
   try {
-    guard = productGuard(evaluateSafety({ answers: trusted.answers, confirmedThisScan: [] }));
+    guard = (await hadRedFlagTurn(uid, scanId)) ? "red_flag" : productGuard(evaluateSafety({ answers: trusted.answers, confirmedThisScan: [] }));
   } catch {
     // Fails closed: no opening at all rather than products without their guard.
     return { ok: false, status: 409, code: "OPENING_UNAVAILABLE", error: "No suggestion for this check." };

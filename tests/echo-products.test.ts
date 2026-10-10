@@ -125,7 +125,25 @@ describe("the answer checker (TD-34, build parts 2 and 6)", () => {
   it("a product claim may use the product's own exact name and words", () => {
     const v = check(answer({ claims: [{ claim_type: "product", text: "Refreshing Cleanser: Massage onto damp skin in the morning, at night or both, then rinse thoroughly.", fact_ids: ["rec.refreshing-cleanser"] }] }));
     expect(v.failures).toEqual([]);
-    expect(check(answer({ claims: [{ claim_type: "product", text: "Use 5% Niacinamide Serum after cleansing.", fact_ids: ["rec.niacinamide-serum"] }] })).failures).toEqual([]);
+    expect(check(answer({ claims: [{ claim_type: "product", text: "Use 5% Niacinamide Serum: After cleansing, apply 2 to 3 drops to dry skin, then moisturiser, and sunscreen in the morning.", fact_ids: ["rec.niacinamide-serum"] }] })).failures).toEqual([]);
+  });
+
+  it("a product claim may not rearrange its product's words into a result (safety review)", () => {
+    for (const [text, id] of [["Use Clear Seal, then the single spot is nearly invisible.", "rec.clear-seal"], ["5% Niacinamide Serum: then your oily skin is dry skin.", "rec.niacinamide-serum"], ["5% Niacinamide Serum is for your oily and blemish-prone skin.", "rec.niacinamide-serum"]] as const) {
+      expect(check(answer({ claims: [{ claim_type: "product", text, fact_ids: [id] }] })).passed, text).toBe(false);
+    }
+  });
+
+  it("a reason may not borrow its product's words, nor claim a fit (safety review)", () => {
+    for (const reason of ["You told us your main skin concerns: Redness; Excess oil, so a single spot is nearly invisible", "You told us your skin type: Oily, so this is for you"]) {
+      expect(check(answer({ products: [{ product_id: "clear-seal", reason, fact_ids: [reason.includes("concerns") ? "self.all.primary_concerns" : SKIN_TYPE] }] })).passed, reason).toBe(false);
+    }
+  });
+
+  it("the refusal exemption is narrow: a negated sale phrase is no exemption (safety review)", () => {
+    for (const text of ["I won't hide these deals from you.", "Don't miss these deals.", "You can't beat these prices."]) {
+      expect(check(answer({ claims: [{ claim_type: "out_of_scope", text, fact_ids: [] }] })).passed, text).toBe(false);
+    }
   });
 
   it.each([

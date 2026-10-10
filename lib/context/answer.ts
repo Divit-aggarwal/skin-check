@@ -87,7 +87,8 @@ export async function answerFromPackage(
         modelId,
         validator: { passed: true, failures: names(...v), regenerated, fallback: false },
         products: (last.answer!.products ?? []).map((p) => ({ productId: p.product_id, reason: p.reason.trim() })),
-        withoutProducts: join(claims.filter((c) => !c.fact_ids.some((id) => id.startsWith("rec.")))),
+        // Under a red flag only claims that cite a fact and no product remain: no uncited sales lead-in (safety review).
+        withoutProducts: join(claims.filter((c) => c.fact_ids.length > 0 && !c.fact_ids.some((id) => id.startsWith("rec.")))),
       };
     }
     return plain(fallbackAnswer(pkg), false, { passed: false, failures: names(...v), regenerated, fallback: true });

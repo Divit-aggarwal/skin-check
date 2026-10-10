@@ -24,7 +24,7 @@ beforeEach(() => {
 describe("Echo chat client auth", () => {
   it("sends the Bearer token", async () => {
     const fetchMock = stubFetch(200, { ok: true, reply: "hi", historyToken: "tok" });
-    expect(await getSkinCheckChatReply(SCAN_ID, "cheeks", [], null, "hi")).toEqual({ reply: "hi", historyToken: "tok" });
+    expect(await getSkinCheckChatReply(SCAN_ID, "cheeks", [], null, "hi")).toEqual({ reply: "hi", historyToken: "tok", products: [] }); // TD-34: product suggestions come with the reply (none here)
     const headers = fetchMock.mock.calls[0]![1].headers as Record<string, string>;
     expect(headers.Authorization).toBe("Bearer fresh-id-token");
     // Gate 02: identity + thread only — no measurements or answers leave the client.

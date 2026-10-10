@@ -35,7 +35,7 @@ vi.mock("@/lib/rules/safety", async () => {
   h.evaluateSafety.mockImplementation(actual.evaluateSafety);
   return { ...actual, evaluateSafety: h.evaluateSafety };
 });
-vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory, loadSplitCheckTurns: h.loadSplitCheckTurns }));
+vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory, loadSplitCheckTurns: h.loadSplitCheckTurns, hadRedFlagTurn: async () => false }));
 vi.mock("@/lib/context/builder", async () => {
   const actual = await vi.importActual<typeof import("@/lib/context/builder")>("@/lib/context/builder");
   h.buildContextPackage.mockImplementation(actual.buildContextPackage);

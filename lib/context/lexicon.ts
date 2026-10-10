@@ -414,6 +414,9 @@ export const EFFICACY = re([
   "\\bspotless\\b",
   "\\bradian\\w*",
   "\\bsuit(?:s|ed|able)?\\b",
+  // a fit claim (safety review): "this is for you", "for your oily skin"
+  "\\bfor (?:you|your)\\b",
+  "\\b(?:is|are) for\\b",
   "\\b(?:perfect|ideal|best|great|good|right|safe) (?:for|choice|option|fit)\\b",
   "\\bafter using\\b",
   "\\bonce you (?:start|use|begin)\\b",

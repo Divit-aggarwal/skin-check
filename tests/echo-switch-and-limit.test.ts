@@ -20,7 +20,7 @@ const h = vi.hoisted(() => ({
 // The context path's stored user turns for the split check (lib/context/chat-turns.ts).
 vi.mock("@/lib/context/chat-turns", async () => {
   const actual = await vi.importActual<typeof import("@/lib/context/chat-turns")>("@/lib/context/chat-turns");
-  return { ...actual, loadSplitCheckTurns: async () => h.splitTurns };
+  return { ...actual, loadSplitCheckTurns: async () => h.splitTurns, hadRedFlagTurn: async () => false };
 });
 
 vi.mock("@/lib/echo-newest-scan", () => ({ checkEchoScan: async () => "ok" }));
@@ -126,12 +126,12 @@ describe("the Echo switch (ECHO_SWITCH)", () => {
 
   it("/echo reads the switch and, when off, shows the notice in place of the input", async () => {
     const { readFileSync } = await import("node:fs");
-    expect(readFileSync("app/(marketing)/echo/page.tsx", "utf8")).toContain("<EchoPage echoOn={echoOn()} />");
+    expect(readFileSync("app/(marketing)/echo/page.tsx", "utf8")).toContain("<EchoPage echoOn={echoOn()} productsOn={echoProductsOn()} />"); // TD-34: the product switch is passed beside it
     const page = readFileSync("components/skin-check/EchoPage.tsx", "utf8");
     // The notice, then the help line (safety review: a user who cannot write still sees it).
     expect(page).toMatch(/\{!echoOn \? \(\s*<div role="status"[^>]*>\s*<p>\{E\.off\}<\/p>\s*<p>\{withPhoneLinks\(REFERRAL_LINE\)\}<\/p>/);
     // Every other way into Echo is hidden while it is off, and the browser build reads the same value.
-    expect(readFileSync("next.config.js", "utf8")).toContain('env: { ECHO_SWITCH: process.env.ECHO_SWITCH ?? "" }');
+    expect(readFileSync("next.config.js", "utf8")).toContain('env: { ECHO_SWITCH: process.env.ECHO_SWITCH ?? "", ECHO_PRODUCTS_SWITCH: process.env.ECHO_PRODUCTS_SWITCH ?? "" }'); // TD-34: the product switch beside it
     expect(readFileSync("components/dashboard/DashboardPage.tsx", "utf8")).toContain("{echoOn() && <ChatSection");
     expect(readFileSync("components/checks/ChecksView.tsx", "utf8")).toMatch(/echoOn\(\) && \(\s*<Link href="\/echo"/);
     expect(readFileSync("components/skin-check/SkinCheckDashboard.tsx", "utf8")).toMatch(/\{echoOn\(\) && \(\s*<div className="sticky/);

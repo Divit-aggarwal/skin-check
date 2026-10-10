@@ -13,6 +13,7 @@ const h = vi.hoisted(() => ({
   loadChatHistory: vi.fn(),
   loadSplitCheckTurns: vi.fn(),
   loadOpening: vi.fn(),
+  hadRedFlagTurn: vi.fn(),
   checkEchoScan: vi.fn(),
 }));
 
@@ -24,7 +25,7 @@ vi.mock("@/lib/firebase/admin", async () => {
 });
 vi.mock("@/lib/echo-trusted-context", () => ({ loadTrustedEchoContext: h.loadTrustedEchoContext }));
 vi.mock("@/lib/skin-state-2-loader", () => ({ loadTrustedSkinState2Series: async () => [] }));
-vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory, loadSplitCheckTurns: h.loadSplitCheckTurns, loadOpening: h.loadOpening }));
+vi.mock("@/lib/context/chat-turns", () => ({ recordChatTurns: h.recordChatTurns, loadChatHistory: h.loadChatHistory, loadSplitCheckTurns: h.loadSplitCheckTurns, loadOpening: h.loadOpening, hadRedFlagTurn: h.hadRedFlagTurn }));
 vi.mock("@/lib/rate-limit", async () => ({ ...(await vi.importActual<typeof import("@/lib/rate-limit")>("@/lib/rate-limit")), checkRequestRate: () => null }));
 vi.mock("@/lib/echo-quota", () => ({ consumeEchoQuestion: h.consumeEchoQuestion }));
 vi.mock("@/app/api/account/_ledger", async () => {
@@ -68,6 +69,7 @@ beforeEach(() => {
   h.loadChatHistory.mockResolvedValue([]);
   h.loadSplitCheckTurns.mockResolvedValue([]);
   h.loadOpening.mockResolvedValue(null);
+  h.hadRedFlagTurn.mockResolvedValue(false);
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
 afterEach(() => vi.unstubAllEnvs());
@@ -213,6 +215,13 @@ describe("TD-34: the opening suggestion (route)", () => {
     const res = await openingPost();
     expect(res.status).toBe(200);
     expect(h.generateContent).toHaveBeenCalledTimes(1);
+  });
+
+  it("a red-flag message earlier on this check: the opening shows the dermatologist line and no product", async () => {
+    h.hadRedFlagTurn.mockResolvedValue(true);
+    expect(await (await openingPost()).json()).toEqual({ ok: true, reply: COPY.referral, products: [] });
+    h.loadOpening.mockResolvedValue({ reply: "Here is a simple routine from Project Skin's products.", withoutProducts: "", products: [{ productId: "refreshing-cleanser", reason: "r" }], fallback: false });
+    expect(await (await openingPost()).json()).toEqual({ ok: true, reply: COPY.referral, products: [] });
   });
 
   it("the request shape is strict: a message or history is refused", async () => {
