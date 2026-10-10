@@ -87,6 +87,15 @@ deterministic parts are the list, the checker, the guards and the cards.
   question spent. Only a new opening counts one of the 20 daily questions.
 - With no consent yet, /echo asks for it first, then loads the opening.
 
+## 5b. A question whether a product works (stricter guard, added after the live run)
+
+A card next to "Is niacinamide good for me?", "serum for my redness?" or
+"works fastest?" reads as "yes". For such a question (RESULT_QUESTION in
+lib/context/products.ts, English and Hinglish, on the user's own message;
+our product names are removed first), the app shows no card and no product
+line, only "Echo can't say what a product will do for your skin, so no
+product is shown for this question." Gemini's input is unchanged.
+
 ## 6. The cards (components/skin-check/ProductCards.tsx)
 
 - Drawn by our code from the list by id: step, name, key ingredient, how to

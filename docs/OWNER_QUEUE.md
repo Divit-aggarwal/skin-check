@@ -268,7 +268,7 @@ printf 'off' | vercel env add ECHO_PRODUCTS_SWITCH production --no-sensitive
 gh pr merge 10 --merge
 ```
 - Good output: `✓ Merged pull request #10`. Vercel builds `master` for production (about 2 minutes).
-- Check (agent): production deployment READY on the merge commit, region `bom1`; a chat request without a login answers 401; the `/echo` page source does not contain "These are Project Skin's own products" (switch off).
+- Check (agent): production deployment READY on the merge commit, region `bom1`; a chat request without a login answers 401; the switch is off in the live page: `curl -s https://skin-check-sigma.vercel.app/echo | grep -o 'productsOn[^,]*'` prints `productsOn\":false` (checked on a local build with the switch off, 2026-10-10).
 - Undo: `vercel rollback <previous production deployment id>` (fast), or `git revert -m 1 <merge commit>` in a new pull request.
 
 ## P3. Phone checks with suggestions off (made-up test accounts only)
@@ -283,7 +283,7 @@ vercel env rm ECHO_PRODUCTS_SWITCH production --yes
 vercel redeploy $(vercel api /v9/projects/skin-check | jq -r '.targets.production.id') --target production
 ```
 - Good output: `Removed Environment Variable`, then a new production deployment READY (about 2 minutes).
-- Check (agent): the new deployment is READY on the same commit; the `/echo` page bundle contains "These are Project Skin's own products". If the redeploy reused an old build, run `vercel deploy --prod --force` from an up-to-date `master` checkout.
+- Check (agent): the new deployment is READY on the same commit; `curl -s https://skin-check-sigma.vercel.app/echo | grep -o 'productsOn[^,]*'` prints `productsOn\":true`. If it still prints `false` (a redeploy that reused an old build), run `vercel deploy --prod --force` from an up-to-date `master` checkout.
 - Undo (turn suggestions off again, Echo stays on): `printf 'off' | vercel env add ECHO_PRODUCTS_SWITCH production --no-sensitive`, then the same redeploy command.
 
 ## P5. Phone checks with suggestions on (made-up test accounts only)

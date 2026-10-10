@@ -165,7 +165,7 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
   // TD-34: the guards change only what the user sees. The stored text (Gemini's
   // later history) is the unguarded answer, the same for every user.
   // A red-flag message earlier on this check counts like a quiz red flag (safety review).
-  const guard = ownProducts && (await hadRedFlagTurn(uid, scanId)) ? "red_flag" : productGuard(safety);
+  const guard = ownProducts && (await hadRedFlagTurn(uid, scanId)) ? "red_flag" : productGuard(safety, opening ? "" : message);
   const shown = guardedReply(outcome, guard, opening);
   // Not best effort: an unrecorded reply would make the D-15 history diverge.
   await recordChatTurns(

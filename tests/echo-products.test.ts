@@ -1,4 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import React, { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { ProductCards, splitDoctorLine } from "@/components/skin-check/ProductCards";
+import { bannedWordsIn as _b, stepLabelIsExcepted } from "@/lib/catalog/wording";
 import { buildContextPackage, packageJson, screenExternalText, type BuildInput } from "@/lib/context/builder";
 import { renderSystemInstruction, responseSchema } from "@/lib/context/renderer";
 import { validateAnswer } from "@/lib/context/validator";
@@ -16,7 +20,15 @@ import {
   PRODUCT_DOCTOR_LINE,
   PRODUCT_DOCTOR_LINE_ON,
   productFactText,
+  cardsFor,
+  RESULT_QUESTION_LINE,
+  STEP_LABEL,
 } from "@/lib/context/products";
+
+const escapeHtml = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+void _b;
+// The component uses the automatic JSX runtime under Next; vitest compiles it with the classic one.
+(globalThis as { React?: typeof React }).React = React;
 import { CHEEK_SCORES, SCORES } from "./context-fixtures";
 
 // TD-34 (owner, 2026-10-10): Echo may suggest Project Skin's own products, and
@@ -276,5 +288,61 @@ describe("narrow checker changes found in the live run (TD-34, named)", () => {
     const fact = pkg.recommendation!.items[0]!;
     expect(failed(answer({ claims: [{ claim_type: "product", text: fact.text, fact_ids: [fact.id] }] }))).toEqual([]);
     expect(failed(answer({ claims: [{ claim_type: "product", text: "Refreshing Cleanser has Salicylic Acid 2%.", fact_ids: [fact.id] }] }))).toContain("product_claim");
+  });
+});
+
+describe("the card drawing (TD-34, build part 3)", () => {
+  it("cardsFor: listed products only, once each, in step order whatever the input order", () => {
+    const cards = cardsFor([
+      { productId: "protecting-sunscreen", reason: "b" },
+      { productId: "made-up" },
+      { productId: "active-boba-cream", reason: "out of stock" },
+      { productId: "refreshing-cleanser", reason: "a" },
+      { productId: "refreshing-cleanser", reason: "again" },
+    ]);
+    expect(cards.map((c) => c.id)).toEqual(["refreshing-cleanser", "protecting-sunscreen"]);
+    expect(cards[0]!.reason).toBe("a");
+  });
+
+  it("the cards: name, step, key ingredient, how to use, Echo's note and a store link in a new tab; the own-products line; no price", () => {
+    const html = renderToStaticMarkup(createElement(ProductCards, { products: [{ productId: "niacinamide-serum", reason: "You told us your skin type: Oily" }, { productId: "refreshing-cleanser" }] }));
+    const serum = OWN_PRODUCTS.find((p) => p.id === "niacinamide-serum")!;
+    for (const part of [escapeHtml(OWN_PRODUCTS_LINE), serum.name, "Treat", "Cleanse", escapeHtml(serum.keyIngredient), escapeHtml(serum.usage), "Echo&#x27;s note", "You told us your skin type: Oily"]) expect(html, part).toContain(part);
+    expect(html.indexOf("Cleanse")).toBeLessThan(html.indexOf("Treat"));
+    expect(html).toContain(`href="${serum.url}"`);
+    expect(html).toContain('target="_blank"');
+    expect(html).toContain('rel="noopener noreferrer"');
+    expect(html).not.toMatch(/₹|\bRs\b|price|buy|cart/i);
+    expect(html).not.toContain(PRODUCT_DOCTOR_LINE);
+    expect(html.match(/Echo&#x27;s note/g)).toHaveLength(1); // no note for a card without a reason
+  });
+
+  it("the doctor line is its own panel only when the reply carries it; nothing is drawn for no listed product", () => {
+    expect(splitDoctorLine(`Here.\n${PRODUCT_DOCTOR_LINE}`)).toEqual({ text: "Here.", doctorLine: true });
+    expect(splitDoctorLine("Here.")).toEqual({ text: "Here.", doctorLine: false });
+    expect(renderToStaticMarkup(createElement(ProductCards, { products: [{ productId: "refreshing-cleanser" }], doctorLine: true }))).toContain(PRODUCT_DOCTOR_LINE);
+    expect(renderToStaticMarkup(createElement(ProductCards, { products: [{ productId: "active-boba-cream" }] }))).toBe("");
+  });
+
+  it("every key ingredient and step label on a card passes the D-12 word check ('Treat' is the owner's exact-label exception)", () => {
+    for (const p of OWN_PRODUCTS) expect(bannedWordsIn(p.keyIngredient), p.keyIngredient).toEqual([]);
+    for (const label of Object.values(STEP_LABEL)) expect(stepLabelIsExcepted(label) || bannedWordsIn(label).length === 0, label).toBe(true);
+  });
+});
+
+describe("a question whether a product works or is good for something gets no product (TD-34, stricter guard)", () => {
+  const none = evaluateSafety({ answers: { primary_concerns: ["blemishes"] }, confirmedThisScan: [] });
+  const withProducts = { reply: "Massage onto damp skin.", withoutProducts: "", products: [{ productId: "refreshing-cleanser", reason: "r" }], productContent: true };
+  it.each(["Which of your products works fastest on oily skin?", "Which serum should I buy for my redness?", "Is niacinamide good for me?", "Niacinamide serum mere liye theek hai kya?", "Kaunsi cream lagaun redness ke liye?", "Will the cleanser fix my blemishes?", "Kya yeh serum mere daag mita dega?"])("%s", (message) => {
+    const guard = productGuard(none, message);
+    expect(guard).toBe("result_question");
+    expect(guardedReply(withProducts, guard)).toEqual({ reply: RESULT_QUESTION_LINE, products: [] });
+  });
+  it.each(["Can you suggest a routine for me?", "What is Clear Seal for?", "How do I use the Refreshing Cleanser?", "Mere liye kaunsa routine sahi rahega?", "Oily skin ke liye kaunsa face wash lun?", "Which moisturiser do you have?"])("not for an ordinary product question: %s", (message) => {
+    expect(productGuard(none, message)).toBeNull();
+  });
+  it("a red flag still wins over it; the line passes the D-12 word check", () => {
+    expect(productGuard(evaluateSafety({ answers: { primary_concerns: ["blemishes"], breakout_pattern: ["deep_painful"] }, confirmedThisScan: [] }), "Is it good for me?")).toBe("red_flag");
+    expect(bannedWordsIn(RESULT_QUESTION_LINE)).toEqual([]);
   });
 });

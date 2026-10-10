@@ -103,6 +103,40 @@ export const OWN_PRODUCTS_VERSION = `own-products-1/${CATALOG_VERSION}`;
 
 export const listedProduct = (id: string): ListedProduct | undefined => OWN_PRODUCTS.find((p) => p.id === id);
 
+/** The cards to draw: listed products only (an unknown or out-of-stock id draws nothing), once each, in step order. */
+export function cardsFor<T extends { productId: string; reason?: string }>(products: readonly T[]): (ListedProduct & { reason?: string })[] {
+  const seen = new Set<string>();
+  return products
+    .flatMap((p) => {
+      const item = listedProduct(p.productId);
+      if (!item || seen.has(item.id)) return [];
+      seen.add(item.id);
+      return [{ ...item, ...(p.reason ? { reason: p.reason } : {}) }];
+    })
+    .sort((a, b) => STEP_ORDER.indexOf(a.step) - STEP_ORDER.indexOf(b.step));
+}
+
+/**
+ * TD-34 (advisor review of the live run): a question whether a product works,
+ * fixes, suits, is good or safe, or is for a concern. A card beside such a
+ * question reads as "yes", so the app shows no product for it (a stricter
+ * guard, in code; the user's own message, never a hidden answer).
+ */
+export const RESULT_QUESTION = new RegExp(
+  [
+    String.raw`\b(?:work|works|working|fix|fixes|helps|help (?:with|my|clear|reduce|control|fade)|cure|cures|heal|clear|clears|treat|treats|get rid|remove|reduce|reduces|fade|fades|good for|safe for|okay for|ok for|right for|best for|suit|suits|suitable|fastest|quickest|effective)\b`,
+    String.raw`\bfor (?:my|the|your) (?:\w+ )?(?:redness|red|oil\w*|acne|spots?|marks?|pigment\w*|blemish\w*|breakouts?|pimples?|texture|pores?|tan\w*|dark \w+)\b`,
+    String.raw`\b(?:redness|oil\w*|acne|daag|daane|pimples?|spots?|marks?|pigment\w*|blemish\w*|tan) ke liye\b`,
+    String.raw`\b(?:theek|thik|sahi|accha|achha) (?:hai|hoga|rahega) kya\b`,
+    String.raw`\bkaam (?:kar|karta|karti|karega|karegi)\b`,
+    String.raw`\b(?:mita|hata|saaf kar)\w*`,
+  ].join("|"),
+  "iu"
+);
+
+/** Shown instead of products for such a question. */
+export const RESULT_QUESTION_LINE = "Echo can't say what a product will do for your skin, so no product is shown for this question.";
+
 /** The text of one product fact in Gemini's list. Every part is ours. */
 export function productFactText(p: ListedProduct): string {
   return `${p.name}. Step: ${STEP_FOR_GEMINI[p.step]}. Key ingredient: ${p.keyIngredient}. How to use: ${p.usage} About: ${p.description}`;

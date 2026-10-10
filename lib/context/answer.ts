@@ -5,7 +5,8 @@ import { validateAnswer, type Validation } from "./validator";
 import { COMPARISON_LEAD, DOCTOR_REFERRAL_COPY, REFERRAL_COPY } from "./prefilter";
 import type { SafetyState } from "@/lib/contracts/safety-state";
 import { COPY } from "@/lib/rules/settings";
-import { PRODUCT_DOCTOR_LINE, PRODUCT_DOCTOR_LINE_ON } from "./products";
+import { OWN_PRODUCTS, PRODUCT_DOCTOR_LINE, PRODUCT_DOCTOR_LINE_ON, RESULT_QUESTION, RESULT_QUESTION_LINE } from "./products";
+const OWN_PRODUCT_NAMES = OWN_PRODUCTS.map((p) => p.name);
 
 // Reject, retry and fallback (docs/lanes/context-design.md §3.7).
 
@@ -111,11 +112,14 @@ export async function answerFromPackage(
 // stored turn (Gemini's later history) keeps the unguarded text, so two users
 // who differ only in a hidden answer still send Gemini the same requests.
 
-export type ProductGuard = "red_flag" | "doctor_line" | null;
+export type ProductGuard = "red_flag" | "doctor_line" | "result_question" | null;
 
 /** A red flag first; then a pregnancy, breastfeeding or prescription answer (the extra-caution list), while the doctor line is on. */
-export function productGuard(safety: SafetyState): ProductGuard {
+export function productGuard(safety: SafetyState, message = ""): ProductGuard {
   if (safety.redFlag) return "red_flag";
+  // Our own product names ("Clear Seal") are not a result word.
+  const asked = OWN_PRODUCT_NAMES.reduce((t, n) => t.replace(new RegExp(n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), " "), message);
+  if (RESULT_QUESTION.test(asked)) return "result_question";
   return safety.extraCaution && PRODUCT_DOCTOR_LINE_ON ? "doctor_line" : null;
 }
 
@@ -131,6 +135,7 @@ export function guardedReply(
 ): { reply: string; products: ShownProduct[] } {
   const productContent = outcome.productContent || outcome.products.length > 0;
   if (guard === "red_flag" && (productContent || opening)) return { reply: [COPY.referral, outcome.withoutProducts].filter((t) => t.trim()).join("\n"), products: [] };
+  if (guard === "result_question" && productContent) return { reply: [outcome.withoutProducts, RESULT_QUESTION_LINE].filter((t) => t.trim()).join("\n"), products: [] };
   if (guard === "doctor_line" && productContent) return { reply: `${outcome.reply}\n${PRODUCT_DOCTOR_LINE}`, products: outcome.products };
   return { reply: outcome.reply, products: outcome.products };
 }

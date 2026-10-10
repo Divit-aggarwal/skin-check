@@ -2,7 +2,7 @@ import { ExternalLink } from "lucide-react";
 import { useId } from "react";
 import { eyebrow, textLink } from "@/components/ui/page";
 import { PRODUCT_DOCTOR_LINE } from "@/lib/context/products";
-import { listedProduct, OWN_PRODUCTS_LINE, STEP_LABEL, STEP_ORDER } from "@/lib/context/products";
+import { cardsFor, OWN_PRODUCTS_LINE, STEP_LABEL } from "@/lib/context/products";
 import { ECHO_COPY as E } from "./echoCopy";
 
 // TD-34: the cards are drawn by our code from the catalogue, never from
@@ -20,12 +20,7 @@ export function splitDoctorLine(text: string): { text: string; doctorLine: boole
 
 export function ProductCards({ products, doctorLine = false }: { products: readonly { productId: string; reason?: string }[]; doctorLine?: boolean }) {
   const headingId = useId();
-  const shown = products
-    .flatMap((p) => {
-      const item = listedProduct(p.productId);
-      return item ? [{ ...item, reason: p.reason }] : [];
-    })
-    .sort((a, b) => STEP_ORDER.indexOf(a.step) - STEP_ORDER.indexOf(b.step));
+  const shown = cardsFor(products);
   if (shown.length === 0) return null;
 
   return (
