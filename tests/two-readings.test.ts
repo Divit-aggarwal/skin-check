@@ -1,18 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { buildScanAnalysisRecord, scanAnalysisDocId } from "@/lib/scan-analysis-record";
 import type { SkinScanResult } from "@/types/skin-scan";
-import { checkAnswers, deriveDashboard, pastCheck, readingsOf, type Doc } from "@/components/dashboard/state";
+import { existsSync, readFileSync } from "node:fs";
+import { deriveDashboard, pastCheck, readingsOf, type Doc } from "@/components/dashboard/state";
 import { DASHBOARD_COPY } from "@/components/dashboard/copy";
 import { bandScores } from "@/lib/skin-check-rules";
 import { summarizeConcerns } from "@/lib/skin-check-score";
 import { summarizeSkinScanScores } from "@/lib/skin-check-format";
 import { ANSWER_TOPICS, OVERLAY_CATEGORIES, PHOTO_METRICS } from "@/lib/skin-check-skus";
-import { toldTopics } from "@/lib/told-topics";
 import { bannedWordsIn } from "@/lib/catalog/wording";
 import { syntheticAnalysis, syntheticNative } from "./synthetic-scan";
 
 // TD-37 (owner, 2026-10-10): Redness and Oiliness are the only readings shown;
-// Breakouts, Texture and Dark marks are shown as the user's own answers.
+// TD-39 replaced the user's own answers under Breakouts, Texture and Dark marks:
+// those three are not shown at all.
 
 const UID = "SYNTH_UID";
 const day = (d: number) => new Date(Date.UTC(2026, 9, d, 10));
@@ -75,49 +76,48 @@ describe("TD-37: what is shown", () => {
   });
 });
 
-describe("TD-37 (3): the three topics from the user's own answers", () => {
-  it("answered: each topic quotes only its own questions, as option labels", () => {
-    const topics = toldTopics({
-      primary_concerns: ["blemishes", "redness"],
-      breakout_pattern: ["red_inflamed"],
-      acne_areas: ["chin_jawline"],
-      pih_scar_tendency: "dark_mark_lingers",
-      female_skin_context: ["period_related_breakouts"],
-    })!;
-    expect(topics.map((t) => t.label)).toEqual(["Breakouts", "Texture", "Dark marks"]);
-    const [breakouts, texture, marks] = topics;
-    expect(breakouts!.lines[0]).toBe("You chose breakouts as a main skin concern.");
-    expect(breakouts!.lines.join(" ")).toContain("Chin / jawline");
-    expect(breakouts!.lines.join(" ")).toContain("What your breakouts usually look like: Red or inflamed pimples");
-    expect(texture!.lines).toEqual([]);
-    expect(marks!.lines).toEqual(["When a breakout heals: Leaves a dark mark that lingers."]);
-    // A personal-context answer never shows under a topic.
-    expect(JSON.stringify(topics)).not.toMatch(/period/i);
+// TD-39 (owner, 2026-10-11): no chips and no "From what you told us" panels
+// anywhere. Nothing about Breakouts, Texture or Dark marks shows on a screen
+// that shows the photo readings, and nothing there can be chosen.
+const SCREENS = ["components/skin-check/SkinCheckDashboard.tsx", "components/dashboard/CheckReadings.tsx", "components/dashboard/DashboardPage.tsx", "components/dashboard/FaceDrawing.tsx", "components/checks/ChecksView.tsx", "components/skin-check/EchoPage.tsx", "components/mesh/FacePhoto.tsx", "components/mesh/MeshLayer.tsx"];
+
+describe("TD-39: one photo, both overlays, one table, nothing to choose", () => {
+  it("no screen with the readings names the three, or shows the user's answers about them as a panel", () => {
+    for (const f of SCREENS) {
+      const src = readFileSync(f, "utf8");
+      expect(src, f).not.toMatch(/Breakouts|Texture|Dark marks|From what you told us|told-topics|ToldTopics|ToldPanel|SourcesLine|ANSWER_TOPICS/);
+    }
+    expect(existsSync("lib/told-topics.ts")).toBe(false);
+    expect(JSON.stringify(DASHBOARD_COPY)).not.toMatch(/Breakouts|breakouts|Texture|texture|Dark marks|dark marks|told us/);
   });
 
-  it("answered, nothing on a topic: an empty list (the screen says they did not mention it)", () => {
-    expect(toldTopics({ skin_type: "oily" })!.every((t) => t.lines.length === 0)).toBe(true);
-    expect(DASHBOARD_COPY.told.nothing("texture")).toBe("You did not tell us anything about texture in the questions.");
+  it("no chips, no face-area choice, no toggle on any of those screens", () => {
+    // Echo's own area choice for the chat is unchanged (TD-39 (5)); its panel only lost the three topics.
+    for (const f of SCREENS.filter((f) => !f.endsWith("EchoPage.tsx"))) {
+      const src = readFileSync(f, "utf8");
+      expect(src, f).not.toMatch(/role="tab|tablist|aria-pressed|aria-selected|onSelect|onAreaChange|role="button"|onDragEnd|drag=/);
+    }
   });
 
-  it("skipped: null, so the screen invites the user to answer", () => {
-    expect(toldTopics({})).toBeNull();
-    expect(toldTopics({ name: "A", age: "25-34", gender: "male" })).toBeNull();
-    expect(toldTopics(null)).toBeNull();
+  it("the photo draws only the two photo readings' overlays, never another", () => {
+    const photo = readFileSync("components/mesh/FacePhoto.tsx", "utf8");
+    expect(photo).toMatch(/const KEYS = \["redness", "oiliness"\] as const;/);
+    expect(photo).not.toMatch(/overlays\?\.\[?["']?(texture|blemishes|pigment|pores|hydration)/);
   });
 
-  it("answers given later count for the check, and an unknown value is never echoed", () => {
-    const checks = [check("s1", 1, { answers: { name: "A" }, questionnaire: "skipped" })];
-    const later = [{ id: "s1", data: { answers: { primary_concerns: ["texture"], pih_scar_tendency: "made_up" } } }];
-    const topics = toldTopics(checkAnswers("s1", checks, later))!;
-    expect(topics[1]!.lines).toEqual(["You chose texture as a main skin concern."]);
-    expect(topics[2]!.lines).toEqual([]);
+  it("the table holds level words only: Low, Moderate, Elevated or no reading", () => {
+    const d = deriveDashboard(UID, [check("s1", 1)], [analysis("s1", 1)]);
+    if (d.current.kind !== "reading") throw new Error("no reading");
+    const cells = [d.current.view.bands, ...d.current.view.areas.map((a) => a.bands)].flatMap((b) => (b ?? []).map((x) => x.band));
+    expect(cells.length).toBeGreaterThan(0);
+    for (const c of cells) expect(["Low", "Moderate", "Elevated"]).toContain(c);
+    expect(DASHBOARD_COPY.current.noReading).toBe("No reading");
   });
 
-  it("the new copy passes the D-12 word checks and never claims a measurement", () => {
-    const C = DASHBOARD_COPY.told;
-    const texts = [C.sources, C.title, C.ownAnswer, C.listTitle, C.nothing("breakouts"), C.skipped("dark marks"), DASHBOARD_COPY.current.known, ...DASHBOARD_COPY.current.notKnown];
+  it("the new copy passes the D-12 word checks and never claims more than the photo", () => {
+    const P = DASHBOARD_COPY.photo;
+    const texts = [P.alt, P.failed, P.read, P.legend, P.legendNote, P.mapsOnResults, P.overlayAlt.redness, P.overlayAlt.oiliness, DASHBOARD_COPY.table.caption, DASHBOARD_COPY.table.area, DASHBOARD_COPY.current.known, ...DASHBOARD_COPY.current.notKnown];
     for (const t of texts) expect(bannedWordsIn(t), t).toEqual([]);
-    expect(C.sources).toMatch(/does not measure them/);
+    expect(P.legendNote).toMatch(/relative to the rest of your face/);
   });
 });

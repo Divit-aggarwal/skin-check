@@ -110,8 +110,8 @@ export const PHOTO_METRICS = ["redness", "oiliness"] as const satisfies readonly
 export type PhotoMetric = (typeof PHOTO_METRICS)[number];
 export const isPhotoMetric = (m: string): m is PhotoMetric => (PHOTO_METRICS as readonly string[]).includes(m);
 
-// TD-37 (3): shown only as what the user told us in the questions, never as a
-// reading (lib/told-topics.ts).
+// Not measured from the photo: never shown on a screen (TD-39), and Echo
+// treats them as not measured (lib/context/validator.ts).
 export const ANSWER_TOPICS = ["blemishes", "texture", "pigment"] as const satisfies readonly BandableMetric[];
 export type AnswerTopic = (typeof ANSWER_TOPICS)[number];
 

@@ -107,8 +107,7 @@ function bandsOf(scores: unknown): Bands | null {
   if (!parsed.success) return null;
   const { bands } = bandScores(parsed.data);
   // TD-37 (1): Redness and Oiliness only, on every screen and for old checks.
-  // No Dryness (D-23); Breakouts, Texture and Dark marks are shown from the
-  // user's answers instead (lib/told-topics.ts).
+  // No Dryness (D-23); no Breakouts, Texture or Dark marks (TD-39).
   return PHOTO_METRICS.map((metric) => ({ metric, label: METRIC_LABELS[metric], band: bands[metric] }));
 }
 
