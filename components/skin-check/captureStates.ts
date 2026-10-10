@@ -8,7 +8,7 @@ export const CAPTURE_COPY = {
   retake: "Retake photo",
   tryAgain: "Try again",
   // One short line under the button: what happens next, including the permission prompt.
-  nextLaptop: "Opens your camera to take one photo of your face. Your browser will ask to use the camera: choose Allow.",
+  nextLaptop: "Opens your camera to take one photo of your face. Your browser may ask to use the camera: choose Allow.",
   nextPhone: "Opens your phone's camera to take one photo of your face. If your browser asks to use the camera, choose Allow.",
   loading: "Starting your camera…",
   ready: "Your camera is on. Face it in good light, then take the photo.",

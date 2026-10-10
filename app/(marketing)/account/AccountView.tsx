@@ -10,7 +10,8 @@ import { card, h2, LoadingState, PageHeader } from "@/components/ui/page";
 import { DeleteAccount } from "./DeleteAccount";
 import { QuestionsCard } from "@/components/skin-check/QuestionsChoice";
 import { loadDashboard } from "@/components/dashboard/data";
-import { questionsTarget } from "@/components/dashboard/state";
+import { waitingQuestions } from "@/components/dashboard/state";
+import { formatDate } from "@/components/dashboard/format";
 import { ACCOUNT_COPY as A } from "./copy";
 
 // G03 3.7. Signed out: sign in (then Home, TD-24 (3)). Signed in: the sign-in,
@@ -24,12 +25,15 @@ export function AccountView() {
   // moves on screen when the user signs in.
   const wasSignedOut = useRef(false);
   // TD-33 (1): the way in from Account while questions wait. A failed read shows nothing extra.
-  const [questionsWaiting, setQuestionsWaiting] = useState(false);
+  const [questionsWaiting, setQuestionsWaiting] = useState<{ isEcho: boolean; date: string | null } | null>(null);
   useEffect(() => {
-    if (!user) return setQuestionsWaiting(false);
+    if (!user) return setQuestionsWaiting(null);
     let active = true;
     loadDashboard(user.uid).then(
-      (d) => active && setQuestionsWaiting(questionsTarget(user.uid, d.checks, d.analyses, d.laterAnswers) !== null),
+      (d) => {
+        const w = active ? waitingQuestions(user.uid, d.checks, d.analyses, d.laterAnswers) : null;
+        if (active) setQuestionsWaiting(w && { isEcho: w.isEcho, date: w.date ? formatDate(w.date) : null });
+      },
       () => undefined
     );
     return () => {
@@ -65,7 +69,7 @@ export function AccountView() {
                   {/* O-D3: the account page links to /dashboard. */}
                   <DashboardLink />
                 </section>
-                {questionsWaiting && <QuestionsCard />}
+                {questionsWaiting && <QuestionsCard isEcho={questionsWaiting.isEcho} date={questionsWaiting.date} />}
                 {/* H14: consent status and the AI-share withdrawal (also on Home). */}
                 <ConsentSection />
               </>

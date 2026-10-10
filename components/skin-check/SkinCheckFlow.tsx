@@ -15,6 +15,7 @@ import { StepAnswer } from "./StepAnswer";
 import { SkinCheckDashboard } from "./SkinCheckDashboard";
 import { DashboardLink } from "@/components/dashboard/DashboardLink";
 import { QuestionsChoice, SkippedNote } from "./QuestionsChoice";
+import { hasQuestionAnswers } from "@/lib/skin-check-validation";
 
 // Section-to-section only — individual questions within a section never
 // slide, they fade in and accumulate on the growing page.
@@ -57,7 +58,6 @@ export function SkinCheckFlow() {
     confirmUnder18,
     lastAnswerHints,
     choosingQuestions,
-    questionsChoice,
     chooseQuestions,
     productNames,
     setProductName,
@@ -234,7 +234,8 @@ export function SkinCheckFlow() {
               <SkinCheckDashboard scan={scan} scanId={scanId} onScanChange={setScan} onRetake={startNewScan} answers={answers} />
 
               {/* TD-33 (1): honest about what skipping means, with the way back in. */}
-              {questionsChoice === "skip" && <SkippedNote />}
+              {/* From the answers, so it survives a remount from Echo (flow review M2). */}
+              {!hasQuestionAnswers(answers) && <SkippedNote echoCheck={scan.status === "success"} />}
 
               {/* A new check starts here without a reload; every past check is on
                   /checks (one history list, TD-25 (6)); Home is one tap away. */}

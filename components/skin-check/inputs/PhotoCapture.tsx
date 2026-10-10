@@ -457,11 +457,13 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     <div className="flex flex-col gap-4">
       {/* The video stays mounted on the laptop from "start" to "ready": the
           stream attaches to it while the browser asks (useCameraStream). */}
-      <div className="relative aspect-[3/4] w-full max-w-[320px] overflow-hidden rounded-2xl bg-brand-ink">
+      {/* A phone has no live preview, so its start box is small: "Open camera" stays above the fold at 390px. */}
+      <div className={`relative w-full overflow-hidden rounded-2xl bg-brand-ink ${isMobile && !hasCaptured ? "aspect-square max-w-[200px]" : "aspect-[3/4] max-w-[320px]"}`}>
         {!isMobile && !hasCaptured && (
           <video
             ref={videoRef}
             aria-label={K.previewLabel}
+            aria-hidden={view !== "ready"}
             className="absolute inset-0 h-full w-full object-cover"
             playsInline
             muted
@@ -500,15 +502,20 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
 
       <p className="max-w-sm text-sm text-brand-muted">{step.note}</p>
 
-      {/* Camera state for screen readers: loading, ready and the refusal are announced. */}
-      <div aria-live="polite" className="max-w-sm text-sm">
-        {view === "loading" && <p role="status">{K.loading}</p>}
-        {view === "ready" && <p className="text-brand-ink">{K.ready}</p>}
+      {/* Loading is announced here; "ready" is heard through the focus move to Take photo (its description). */}
+      <div role="status" className="max-w-sm text-sm">
+        {view === "loading" && <p>{K.loading}</p>}
       </div>
+      {view === "ready" && (
+        <p id="camera-ready" className="max-w-sm text-sm text-brand-ink">
+          {K.ready}
+        </p>
+      )}
 
       {blocked && (
-        <div role="alert" className="flex max-w-md flex-col gap-3 rounded-2xl border border-brand-line bg-brand-paper p-4 text-brand-ink">
-          <p className="flex items-start gap-2 font-semibold">
+        <div className="flex max-w-md flex-col gap-3 rounded-2xl border border-brand-line bg-brand-paper p-4 text-brand-ink">
+          {/* Only the title is announced; the how-to is read on demand. */}
+          <p role="alert" className="flex items-start gap-2 font-semibold">
             <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-brand-error" />
             <span>{view === "refused" ? K.refusedTitle : view === "unavailable" ? K.unavailable : K.failed}</span>
           </p>
@@ -545,15 +552,8 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
         </div>
       )}
 
-      {view === "loading" && (
-        <button type="button" aria-disabled className={`${btnPrimary} w-full sm:w-fit`}>
-          <Camera aria-hidden className="h-5 w-5" />
-          {K.take}
-        </button>
-      )}
-
       {view === "ready" && (
-        <button ref={takeRef} type="button" onClick={handleCapture} className={`${btnPrimary} w-full sm:w-fit`}>
+        <button ref={takeRef} type="button" onClick={handleCapture} aria-describedby="camera-ready" className={`${btnPrimary} w-full sm:w-fit`}>
           <Camera aria-hidden className="h-5 w-5" />
           {K.take}
         </button>

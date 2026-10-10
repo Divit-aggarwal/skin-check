@@ -15,7 +15,7 @@ import { newestEchoSession } from "@/components/dashboard/echo-session";
 import { hasQuestionAnswers } from "@/lib/skin-check-validation";
 import { QUESTIONS_COPY as Q } from "./questionsCopy";
 import { readingsOf, toDate } from "@/components/dashboard/state";
-import { AccountButton, btnPrimary, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
+import { AccountButton, btnPrimary, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getSkinCheckChatReply, ApiError } from "@/lib/api";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import { useAuth } from "@/lib/auth-context";
@@ -316,7 +316,7 @@ export function EchoPage({ echoOn = true }: { echoOn?: boolean } = {}) {
         {!hasQuestionAnswers(session.answers) && (
           <div role="note" className="mt-4 flex shrink-0 flex-col items-start gap-1 rounded-2xl bg-brand-mist px-4 py-3 text-brand-ink">
             <p>{Q.echoNotice}</p>
-            <Link href="/questions" className="inline-flex min-h-11 items-center font-semibold text-brand-forest underline-offset-4 hover:underline">
+            <Link href="/questions" className={textLink}>
               {Q.answerLink}
             </Link>
           </div>

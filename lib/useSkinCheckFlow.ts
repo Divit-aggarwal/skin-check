@@ -369,8 +369,8 @@ export function useSkinCheckFlow() {
   // through the later sections carries on as they are.
   const { user } = useAuth();
   const reuseCheckedForRef = useRef<string | null>(null);
-  const flowRef = useRef({ answers, sectionIndex, complete });
-  flowRef.current = { answers, sectionIndex, complete };
+  const flowRef = useRef({ answers, sectionIndex, complete, questionsChoice });
+  flowRef.current = { answers, sectionIndex, complete, questionsChoice };
 
   useEffect(() => {
     const uid = user?.uid;
@@ -382,6 +382,9 @@ export function useSkinCheckFlow() {
       .then((previous) => {
         const now = flowRef.current;
         if (!previous || now.complete || now.sectionIndex > PHOTO_INDEX) return;
+        // TD-33 (flow review H1): a "Skip for now" made before signing in
+        // stands; the saved questionnaire must not bring the questions back.
+        if (now.questionsChoice === "skip") return;
         // Anything already answered in this visit wins over the saved copy.
         const reuse = reusableAnswers({ ...previous, ...now.answers });
         if (!reuse) {

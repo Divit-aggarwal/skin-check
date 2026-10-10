@@ -89,13 +89,29 @@ export function questionSteps(answers: SkinCheckAnswers): StepConfig[] {
 
 export const questionMinutes = (count: number) => Math.max(1, Math.ceil((count * SECONDS_PER_QUESTION) / 60));
 
-const QUESTION_STEP_IDS = new Set(
+export const QUESTION_STEP_IDS = new Set(
   SECTIONS.filter((s) => QUESTION_SECTION_IDS.has(s.id)).flatMap((s) => s.steps.map((step) => step.id))
 );
 
 /** Whether any optional question is answered (own keys only). Name, age and gender do not count. */
 export function hasQuestionAnswers(answers: Record<string, unknown>): boolean {
   return Object.keys(answers).some((id) => QUESTION_STEP_IDS.has(id) && Object.hasOwn(answers, id));
+}
+
+/**
+ * Safety review (TD-33, MED-1): the questions done "enough" for Echo. Every
+ * question the safety and red-flag rules read, of those this user is asked
+ * (the female branch only for female), has a valid answer. Anything less is
+ * no answers (F11), so missing answers never read as "no red flag".
+ */
+export const SAFETY_QUESTION_IDS = ["primary_concerns", "breakout_pattern", "pih_scar_tendency", "current_products", "female_skin_context"] as const;
+export function safetyQuestionsAnswered(answers: Record<string, unknown>): boolean {
+  return SAFETY_QUESTION_IDS.every((id) => {
+    const step = SECTIONS.flatMap((s) => s.steps).find((s) => s.id === id)!;
+    if (step.condition && !step.condition(answers as SkinCheckAnswers)) return true;
+    const v = Object.hasOwn(answers, id) ? answers[id] : undefined;
+    return (typeof v === "string" || (Array.isArray(v) && v.every((x) => typeof x === "string"))) && isStepAnswerValid(step, v as StepAnswerValue);
+  });
 }
 
 /** Only the optional questions' answers: what an answer-later record may hold. */

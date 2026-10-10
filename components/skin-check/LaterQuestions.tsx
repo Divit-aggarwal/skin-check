@@ -14,7 +14,8 @@ import {
   type ProductNames,
 } from "@/lib/skin-check-validation";
 import { formatPrompt } from "@/lib/skin-check-format";
-import { saveLaterAnswers } from "@/lib/firebase/skin-checks";
+import { laterAnswersSaved, saveLaterAnswers } from "@/lib/firebase/skin-checks";
+import { withTimeout } from "@/lib/useSkinCheckFlow";
 import { echoOn } from "@/lib/echo-limits";
 import { loadDashboard } from "@/components/dashboard/data";
 import { echoScanIdFrom, questionsTarget, toDate, type Doc } from "@/components/dashboard/state";
@@ -100,9 +101,18 @@ function QuestionsForm({ uid, target, isEcho, onSaved }: { uid: string; target: 
   const date = toDate(target.data.createdAt);
 
   // A new part: its heading takes focus, so a screen reader hears where it is.
+  // Not on first load (the page heading comes first), then on every part change, back included.
+  const firstPart = useRef(true);
   useEffect(() => {
-    if (part > 0) headingRef.current?.focus();
+    if (firstPart.current) firstPart.current = false;
+    else headingRef.current?.focus();
   }, [part]);
+  const savedRef = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    if (state === "saved") savedRef.current?.focus();
+  }, [state]);
+  const smooth = (): ScrollBehavior =>
+    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 
   function setAnswer(stepId: string, value: StepAnswerValue) {
     setAnswers((prev) => ({ ...prev, [stepId]: value }));
@@ -112,17 +122,25 @@ function QuestionsForm({ uid, target, isEcho, onSaved }: { uid: string; target: 
   function focusNextStep(stepId: string) {
     const i = section.steps.findIndex((s) => s.id === stepId);
     const next = section.steps[i + 1];
-    if (next) stepRefs.current.get(next.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (next) stepRefs.current.get(next.id)?.scrollIntoView({ behavior: smooth(), block: "center" });
   }
 
   async function save() {
     if (state === "saving") return;
     setState("saving");
     try {
-      await saveLaterAnswers(uid, target.id, answers, productNames);
+      // Capped like the check flow's save: offline, setDoc would wait for ever.
+      await withTimeout(saveLaterAnswers(uid, target.id, answers, productNames), 15_000);
       onSaved();
       setState("saved");
     } catch (error) {
+      // The record is create-only: a second tab, or a write that landed while
+      // the reply was lost, is refused but already saved (flow review M1).
+      if (await laterAnswersSaved(uid, target.id)) {
+        onSaved();
+        setState("saved");
+        return;
+      }
       // The code only: the message can carry the document path.
       console.error("[questions] save failed", (error as { code?: string })?.code ?? "unknown");
       setState("failed");
@@ -131,8 +149,8 @@ function QuestionsForm({ uid, target, isEcho, onSaved }: { uid: string; target: 
 
   if (state === "saved") {
     return (
-      <section aria-labelledby="saved-title" role="status" className={`${card} flex flex-col items-start gap-4`}>
-        <h2 id="saved-title" className={h2}>
+      <section aria-labelledby="saved-title" className={`${card} flex flex-col items-start gap-4`}>
+        <h2 id="saved-title" ref={savedRef} tabIndex={-1} className={`${h2} outline-none`}>
           {Q.saved}
         </h2>
         {isEcho && echoOn() && <p className="text-brand-muted">{Q.savedEcho}</p>}

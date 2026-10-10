@@ -3,7 +3,7 @@ import { adminDb } from "@/lib/firebase/admin";
 import { SkinScanRegionLowConfidenceSchema, SkinScanScoresSchema, type SkinScanScores } from "@/types/skin-scan";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import { toSkinState2 } from "@/lib/skin-state-2";
-import { hasQuestionAnswers } from "@/lib/skin-check-validation";
+import { hasQuestionAnswers, questionAnswersOnly, safetyQuestionsAnswered } from "@/lib/skin-check-validation";
 
 // SERVER ONLY (imports lib/firebase/admin.ts). Gate 02: client-provided
 // analysis measurements and analysis identity are never authoritative. Every
@@ -83,7 +83,11 @@ export async function loadTrustedEchoContext(uid: string, scanId: string): Promi
   // never loaded here, so no Echo path can carry it to Gemini.
   const answers = AnswersSchema.safeParse(skinCheck.exists ? skinCheck.data()?.answers : undefined);
   const laterAnswers = AnswersSchema.safeParse(later.exists ? later.data()?.answers : undefined);
-  const merged = { ...(answers.success ? answers.data : {}), ...(laterAnswers.success ? laterAnswers.data : {}) };
+  const own = answers.success ? answers.data : {};
+  // Later answers only fill a check that has none of its own (safety review
+  // MED-2): they never replace an answer the check already holds, so they
+  // cannot remove a caution answer. The rules refuse such a record too.
+  const merged = hasQuestionAnswers(own) ? own : { ...own, ...(laterAnswers.success ? questionAnswersOnly(laterAnswers.data) : {}) };
 
   return {
     scores: analysis.data.scores,
@@ -92,7 +96,9 @@ export async function loadTrustedEchoContext(uid: string, scanId: string): Promi
     // questions were skipped (and not answered later) reads as no answers, so
     // Echo gives the F11 fixed reply and makes no Gemini call, whatever the
     // client-written `questionnaire` flag says.
-    answers: hasQuestionAnswers(merged) ? merged : {},
+    // Partial answers count as none too (MED-1): every question the safety
+    // rules read must be answered before Gemini is ever called.
+    answers: safetyQuestionsAnswered(merged) ? merged : {},
     regionLowConfidence: analysis.data.region_low_confidence ?? {},
     pipelineVersion: analysis.data.pipeline_version ?? null,
     schemaVersion: analysis.data.schemaVersion ?? null,

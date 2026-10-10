@@ -8,6 +8,8 @@ import {
   productNameLabel,
   productNamesFrom,
   questionAnswersOnly,
+  QUESTION_STEP_IDS,
+  safetyQuestionsAnswered,
   questionMinutes,
   questionSteps,
   RECONFIRM_EACH_SCAN_IDS,
@@ -209,6 +211,24 @@ describe("TD-33 (2): product names", () => {
   });
 });
 
+describe("reviews (TD-33): partial answers and later records", () => {
+  it("the rules' question id list is exactly QUESTION_STEP_IDS", () => {
+    const rules = readFileSync("firestore.rules", "utf8");
+    const list = /function questionStepIds\(\) \{\s*return \[([^\]]*)\]/.exec(rules)![1]!;
+    expect(list.split(",").map((x) => x.trim().replace(/'/g, "")).sort()).toEqual(Array.from(QUESTION_STEP_IDS).sort());
+  });
+
+  it("safety questions must all be answered (not just one key) before Echo may call Gemini", () => {
+    const all = { gender: "female", primary_concerns: ["redness"], breakout_pattern: ["small_bumps"], pih_scar_tendency: "fades_no_trace", current_products: ["none"], female_skin_context: ["none_not_sure"] };
+    expect(safetyQuestionsAnswered(all)).toBe(true);
+    expect(safetyQuestionsAnswered({ ...all, gender: "male", female_skin_context: undefined } as Record<string, unknown>)).toBe(true);
+    expect(safetyQuestionsAnswered({ ...all, current_products: [] })).toBe(false);
+    expect(safetyQuestionsAnswered({ gender: "female", skin_factors: ["stress"] })).toBe(false);
+    const { female_skin_context: _, ...noFemale } = all;
+    expect(safetyQuestionsAnswered(noFemale)).toBe(false);
+  });
+});
+
 describe("G16 (TD-33 (3)): camera states", () => {
   it("laptop: before → loading → ready, and each refusal", () => {
     expect(cameraView(false, "idle", false)).toBe("start");
@@ -227,7 +247,7 @@ describe("G16 (TD-33 (3)): camera states", () => {
 
   it("the line under the button says what happens, including the permission prompt", () => {
     expect(CAPTURE_COPY.nextLaptop).toMatch(/photo of your face/);
-    expect(CAPTURE_COPY.nextLaptop).toMatch(/browser will ask to use the camera/);
+    expect(CAPTURE_COPY.nextLaptop).toMatch(/browser may ask to use the camera/);
     expect(CAPTURE_COPY.nextPhone).toMatch(/photo of your face/);
     expect(CAPTURE_COPY.nextPhone).toMatch(/asks to use the camera/);
     expect(CAPTURE_COPY.how.map((h) => h.device)).toEqual(["iPhone (Safari)", "Android (Chrome)", "Laptop"]);

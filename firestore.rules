@@ -72,14 +72,31 @@ service cloud.firestore {
                       && request.resource.data.scanId == scanId
                       && request.resource.data.createdAt == request.time
                       && request.resource.data.answers is map
+                      // Reviews (TD-33): only the optional questions, and at least the
+                      // ones the safety rules read, so a later record never replaces
+                      // name, age or gender and is never a partial, locked-in record.
+                      && request.resource.data.answers.keys().hasOnly(questionStepIds())
+                      && request.resource.data.answers.keys().hasAll(['primary_concerns', 'breakout_pattern', 'pih_scar_tendency', 'current_products'])
+                      && request.resource.data.questionnaireVersion is int
+                      && request.resource.data.questionnaireVersion <= 1000
+                      && !get(/databases/$(database)/documents/users/$(uid)/skinChecks/$(scanId)).data.answers.keys().hasAny(questionStepIds())
                       && get(/databases/$(database)/documents/users/$(uid)/skinChecks/$(scanId)).data.get('questionnaire', '') == 'skipped'
                       && productNamesOk(request.resource.data);
         allow update, delete: if false;
       }
 
-      // TD-33: a record from before the optional questionnaire has no field.
+      // TD-33: a record from before the optional questionnaire has no field. A
+      // "skipped" record holds no optional answer (privacy review MED-1).
       function questionnaireIsKnown() {
-        return request.resource.data.get('questionnaire', 'answered') in ['answered', 'skipped'];
+        let q = request.resource.data.get('questionnaire', 'answered');
+        return q == 'answered'
+               || (q == 'skipped' && !request.resource.data.get('answers', {}).keys().hasAny(questionStepIds()));
+      }
+
+      // The optional question step ids (lib/skin-check-validation.ts
+      // QUESTION_STEP_IDS; tests/optional-questionnaire.test.ts pins the match).
+      function questionStepIds() {
+        return ['primary_concerns', 'skin_type', 'breakout_pattern', 'acne_areas', 'pih_scar_tendency', 'skin_tone', 'current_products', 'female_skin_context', 'male_skin_context', 'skin_factors', 'diet', 'water_intake', 'sunscreen_habit'];
       }
 
       // TD-33 (2): the two product-name boxes. Absent, or a map with only these

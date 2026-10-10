@@ -290,7 +290,7 @@ export function questionsDone(check: Doc, laterAnswers: readonly Doc[]): boolean
   const later = laterAnswers.find((l) => l.id === check.id);
   const own = isObj(check.data.answers) ? check.data.answers : {};
   const added = later && isObj(later.data.answers) ? later.data.answers : {};
-  return hasQuestionAnswers({ ...own, ...added });
+  return hasQuestionAnswers(own) || hasQuestionAnswers(added);
 }
 
 /**
@@ -303,6 +303,12 @@ export function questionsTarget(uid: string, checks: readonly Doc[], analyses: r
   const echoId = echoScanIdFrom(uid, analyses);
   const newest = [...checks].sort((a, b) => newestFirst(toDate(a.data.createdAt), toDate(b.data.createdAt)))[0];
   return waiting(checks.find((c) => c.id === echoId)) ?? waiting(newest);
+}
+
+/** What the Home and Account card says about the waiting check: its date, and whether Echo talks about it. */
+export function waitingQuestions(uid: string, checks: readonly Doc[], analyses: readonly Doc[], laterAnswers: readonly Doc[]): { date: Date | null; isEcho: boolean } | null {
+  const target = questionsTarget(uid, checks, analyses, laterAnswers);
+  return target ? { date: toDate(target.data.createdAt), isEcho: echoScanIdFrom(uid, analyses) === target.id } : null;
 }
 
 /** The product names on a check (TD-33 (2)), from the check or its later answers. Shown only on that opened check. */

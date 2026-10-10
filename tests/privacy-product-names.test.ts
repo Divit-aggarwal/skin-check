@@ -211,6 +211,34 @@ describe("TD-33 (1): a skipped check keeps F11 until its questions are answered"
     expect(reply).not.toContain(FINISH_QUESTIONNAIRE_COPY);
   });
 
+  it("partial answers (one question) get the fixed reply too: no Gemini call (safety review MED-1)", async () => {
+    h.store.set(CHECK, { answers: { ...BASICS, skin_factors: ["stress"] }, questionnaire: "answered" });
+    const { reply } = (await (await post()).json()) as { reply: string };
+    expect(reply).toContain(FINISH_QUESTIONNAIRE_COPY);
+    expect(h.generateContent).not.toHaveBeenCalled();
+  });
+
+  it("a later record never replaces a check's own answers, nor name, age or gender (reviews MED-2)", async () => {
+    h.store.set(CHECK, { answers: { ...BASICS, ...QUESTIONS, female_skin_context: ["pregnant_or_breastfeeding"] }, questionnaire: "skipped" });
+    h.store.set(LATER, { scanId: SCAN_ID, answers: { ...QUESTIONS, female_skin_context: ["none_not_sure"], gender: "male", age: "45-plus" } });
+    const ctx = await loadTrustedEchoContext("user-a", SCAN_ID);
+    expect(ctx!.answers.female_skin_context).toEqual(["pregnant_or_breastfeeding"]);
+    expect(ctx!.answers.gender).toBe("female");
+    h.store.set(CHECK, { answers: BASICS, questionnaire: "skipped" });
+    const later = await loadTrustedEchoContext("user-a", SCAN_ID);
+    expect(later!.answers.gender).toBe("female");
+    expect(later!.answers.age).toBe("25-34");
+  });
+
+  it("today's Echo keeps F11 too: a skipped check, no Gemini call", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("ECHO_CONTEXT_PATH", "off");
+    h.store.set(CHECK, { answers: BASICS, questionnaire: "skipped" });
+    const { reply } = (await (await post()).json()) as { reply: string };
+    expect(reply.split("\n").at(-1)).toBe(FINISH_QUESTIONNAIRE_COPY);
+    expect(h.generateContent).not.toHaveBeenCalled();
+  });
+
   it("the later record is read for the same check only", async () => {
     h.store.set(CHECK, { answers: BASICS, questionnaire: "skipped" });
     await post();

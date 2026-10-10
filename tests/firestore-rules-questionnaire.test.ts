@@ -34,7 +34,7 @@ describe.skipIf(!EMULATOR)("firestore.rules — optional questionnaire and produ
   const writeCheck = (uid: string, id: string, extra: Record<string, unknown> = {}) => setDoc(doc(db(uid), "users", OWNER, "skinChecks", id), check(id, extra));
   const later = (id: string, extra: Record<string, unknown> = {}) => ({
     scanId: id,
-    answers: { skin_type: "oily", current_products: ["prescription"] },
+    answers: { skin_type: "oily", primary_concerns: ["redness"], breakout_pattern: ["small_bumps"], pih_scar_tendency: "fades_no_trace", current_products: ["prescription"] },
     questionnaireVersion: 2,
     createdAt: serverTimestamp(),
     ...extra,
@@ -141,6 +141,18 @@ describe.skipIf(!EMULATOR)("firestore.rules — optional questionnaire and produ
       await assertFails(writeLater(OWNER, id, { image: { stored: true } }));
       await assertFails(writeLater(OWNER, id, { createdAt: new Date(2020, 0, 1) }));
       await assertFails(writeLater(OWNER, id, { answers: "skin_type=oily" }));
+    });
+
+    it("only optional answers, at least the safety ones; never on a check that holds answers (reviews)", async () => {
+      const id = await skippedCheck();
+      await assertFails(writeLater(OWNER, id, { answers: { ...later(id).answers, gender: "male" } }));
+      await assertFails(writeLater(OWNER, id, { answers: { ...later(id).answers, age: "45-plus" } }));
+      await assertFails(writeLater(OWNER, id, { answers: { skin_type: "oily" } }));
+      await assertFails(writeLater(OWNER, id, { answers: {} }));
+      await assertFails(writeLater(OWNER, id, { questionnaireVersion: "2".repeat(5000) }));
+      // A "skipped" record that holds an optional answer is refused at create, so no later record can replace one.
+      await assertFails(writeCheck(OWNER, scanId(), { answers: { ...BASICS, current_products: ["prescription"] }, questionnaire: "skipped" }));
+      await assertSucceeds(writeLater(OWNER, id));
     });
 
     it("the same name rules as on the check", async () => {

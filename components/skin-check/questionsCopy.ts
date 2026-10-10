@@ -8,22 +8,29 @@ export const QUESTIONS_COPY = {
     `There are ${count} questions about your skin, the products you use and your habits. They take about ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`,
   whyTitle: "Why we ask",
   why: "A photo shows how your skin looks today. It cannot show what you use on it or what else is going on. With your answers, Echo can talk you through your readings.",
+  // TD-29 (5): when Echo is switched off, nothing on screen promises it.
+  whyNoEcho: "A photo shows how your skin looks today. It cannot show what you use on it or what else is going on. Your answers are kept with this check.",
   skipTitle: "If you skip for now",
   skip: [
     "You still get your photo check and your readings.",
     "Echo cannot answer questions about this check until the questions are done.",
     "You can answer them later from Home or Account.",
   ],
+  skipNoEcho: ["You still get your photo check and your readings.", "You can answer them later from Home or Account."],
   answerNow: "Answer the questions now",
   skipNow: "Skip for now",
 
   // Results screen, after a skip.
   skippedNote: "You skipped the questions. Echo can answer questions about this check once they are done.",
+  skippedNoteNoEcho: "You skipped the questions. You can answer them later from Home or Account.",
   answerLink: "Answer the questions",
 
   // Home card and Account.
   cardTitle: "Your Skin Check questions",
-  cardBody: "You skipped the questions for your newest check. Answer them so Echo can help with your questions.",
+  // Named by date, not "newest": the waiting check is Echo's check when that one waits (flow review M3).
+  cardFor: (date: string | null) => (date ? `You skipped the questions for your check from ${date}.` : "You skipped the questions for one of your checks."),
+  cardEcho: "Answer them so Echo can help with your questions.",
+  cardNoEcho: "You can answer them now.",
 
   // Echo, for a check with no answers.
   echoNotice: "Echo can answer questions about this check once its Skin Check questions are done.",
@@ -49,6 +56,7 @@ export const QUESTIONS_COPY = {
 
   // An opened check.
   checkSkipped: "The questions were skipped for this check.",
+  checkSkippedClosed: "Only the questions of your newest check can be answered later.",
   // The two headings under it are the options' own labels (productNameLabel).
   namedTitle: "Products you named",
 } as const;

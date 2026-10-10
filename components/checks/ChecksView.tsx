@@ -221,10 +221,12 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
       {skipped && (
         <div className="flex flex-col items-start gap-1 border-t border-brand-line pt-5">
           <p className="text-brand-muted">{Q.checkSkipped}</p>
-          {canAnswer && (
+          {canAnswer ? (
             <Link href="/questions" className={textLink}>
               {Q.answerLink}
             </Link>
+          ) : (
+            <p className="text-sm text-brand-muted">{Q.checkSkippedClosed}</p>
           )}
         </div>
       )}

@@ -8,7 +8,7 @@ import { PRODUCT_NAME_MAX } from "@/lib/skin-check-validation";
  * in the app (firestore.rules), no path to Gemini (tests/privacy-gemini-
  * inventory), and the account erase deletes users/{uid}.
  */
-export const PRODUCT_NAME_PRIVACY_LINE = "Only you can see this, in this check. It is never sent to Echo or any AI, and is deleted with your account.";
+export const PRODUCT_NAME_PRIVACY_LINE = "Only you can see this in the app, in this check. It is never sent to Echo or any AI, and is deleted with your account.";
 
 interface ProductNameBoxProps {
   label: string;
@@ -31,7 +31,7 @@ export function ProductNameBox({ label, value, onChange }: ProductNameBoxProps) 
         maxLength={PRODUCT_NAME_MAX}
         rows={2}
         onChange={(e) => onChange(e.target.value)}
-        aria-describedby={`${id}-line ${id}-count`}
+        aria-describedby={`${id}-line`}
         // Plain text only; nothing here is autocompleted, checked or sent anywhere while typing.
         autoComplete="off"
         spellCheck={false}
@@ -39,10 +39,13 @@ export function ProductNameBox({ label, value, onChange }: ProductNameBoxProps) 
       />
       <div className="flex items-start justify-between gap-3 text-sm text-brand-muted">
         <p id={`${id}-line`}>{PRODUCT_NAME_PRIVACY_LINE}</p>
-        {/* The count is read out only at the limit, not on every key. */}
-        <p id={`${id}-count`} aria-live={atLimit ? "polite" : "off"} className="shrink-0 tabular-nums">
+        <p aria-hidden className="shrink-0 tabular-nums">
           {value.length} / {PRODUCT_NAME_MAX}
         </p>
+        {/* Screen readers hear the count once, at the limit, not on every key. */}
+        <span role="status" className="sr-only">
+          {atLimit ? `${PRODUCT_NAME_MAX} of ${PRODUCT_NAME_MAX} characters, the limit.` : ""}
+        </span>
       </div>
     </div>
   );

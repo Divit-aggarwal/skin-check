@@ -238,9 +238,15 @@ export async function latestSkinCheckAnswers(uid: string): Promise<SkinCheckAnsw
   // TD-33: a skipped check answered later counts as answered (its answers only, never its names).
   const later = await getDoc(doc(db(), "users", uid, "laterAnswers", newest.id)).catch(() => null);
   const laterAnswers: unknown = later?.exists() ? later.data().answers : null;
-  return laterAnswers && typeof laterAnswers === "object"
-    ? { ...(answers as SkinCheckAnswers), ...(laterAnswers as SkinCheckAnswers) }
+  // Only question answers, and only for a check with none of its own (reviews, TD-33).
+  return laterAnswers && typeof laterAnswers === "object" && !hasQuestionAnswers(answers as SkinCheckAnswers)
+    ? { ...(answers as SkinCheckAnswers), ...questionAnswersOnly(laterAnswers as SkinCheckAnswers) }
     : (answers as SkinCheckAnswers);
+}
+
+/** Whether the answer-later record for this check exists (a refused duplicate is already saved). */
+export async function laterAnswersSaved(uid: string, scanId: string): Promise<boolean> {
+  return (await getDoc(doc(db(), "users", uid, "laterAnswers", scanId)).catch(() => null))?.exists() ?? false;
 }
 
 /**

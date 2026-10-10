@@ -25,15 +25,16 @@ const FEMALE_COUNT = questionSteps({ gender: "female" }).length;
 
 // The device decides the capture path (file input on phones and tablets, the
 // webcam on a laptop), so each width is its own device, not only a viewport.
+const device = (name: string) => {
+  // Per-describe use() may not change the browser type; the config's chromium stays.
+  const { defaultBrowserType: _, ...rest } = devices[name]!;
+  return rest;
+};
 const DEVICE: Record<Width, Parameters<typeof test.use>[0]> = {
-  "390": { ...devices["iPhone 13"], viewport: { width: 390, height: 844 } },
-  "768": { ...devices["iPad Mini"], viewport: { width: 768, height: 1024 } },
-  "1280": {
-    ...devices["Desktop Chrome"],
-    viewport: { width: 1280, height: 800 },
-    permissions: ["camera"],
-    launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] },
-  },
+  "390": { ...device("iPhone 13"), viewport: { width: 390, height: 844 } },
+  "768": { ...device("iPad Mini"), viewport: { width: 768, height: 1024 } },
+  // The fake camera flags are in playwright.config.ts (a launch option is per worker).
+  "1280": { ...device("Desktop Chrome"), viewport: { width: 1280, height: 800 }, permissions: ["camera"] },
 };
 
 async function aboutYou(page: Page) {
