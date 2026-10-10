@@ -15,8 +15,9 @@ import { summarizeConcerns } from "@/lib/skin-check-score";
 import { ageStatus, latestGrant, withLedgerTimeout, type AgeStatus } from "@/app/api/account/_ledger";
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
 import { contextChatEnabled, ECHO_OFF_COPY, echoOn } from "@/lib/context/switch";
-import { handleContextChat, recordReferral } from "@/lib/context/chat";
-import { loadSplitCheckTurns } from "@/lib/context/chat-turns";
+import { handleContextChat, recordReferral, serveStoredOpening } from "@/lib/context/chat";
+import { loadOpening, loadSplitCheckTurns } from "@/lib/context/chat-turns";
+import { echoProductsOn } from "@/lib/context/products";
 import { checkComparisonHit, comparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY, referralCopyFor, UNSUPPORTED_SCRIPT_COPY, unsupportedScript, withoutReferrals } from "@/lib/context/prefilter";
 import { buildContextPackage } from "@/lib/context/builder";
 import { comparisonAnswer, fallbackLines } from "@/lib/context/answer";
@@ -60,6 +61,16 @@ const RequestSchema = z
     // history must carry the historyToken the previous reply returned.
     history: z.array(ChatMessageSchema).max(100),
     historyToken: z.string().max(200).nullable().optional(),
+  })
+  .strict();
+
+// TD-34: Echo's opening suggestion for a check. No message and no history: the
+// server sends a fixed request. Behind every gate a question passes.
+const OpeningSchema = z
+  .object({
+    scanId: z.string().refine(isValidScanId),
+    region: z.enum(ECHO_REGIONS),
+    opening: z.literal(true),
   })
   .strict();
 
@@ -118,6 +129,8 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
+
+  if (body !== null && typeof body === "object" && Object.hasOwn(body, "opening")) return opening(uid, body);
 
   const parsed = RequestSchema.safeParse(body);
   if (!parsed.success) {
@@ -223,67 +236,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, reply, historyToken: signHistory(uid, scanId, region, turns) });
   }
 
-  // F13 (owner TD-20): only the newest measured check, after the referral
-  // (which always goes out) and before the ledger and the quota. Any read
-  // error refuses: it never lets an older check through.
-  let scanCheck: EchoScanCheck;
-  try {
-    scanCheck = await checkEchoScan(uid, scanId);
-  } catch (err) {
-    if (err instanceof AdminNotConfiguredError) return misconfigured(err);
-    console.error("skin-check chat: newest check unreadable:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
-    return NextResponse.json({ error: "Echo can't check your scans right now. Please try again.", code: "CHAT_CHECK_UNAVAILABLE" }, { status: 503 });
-  }
-  if (scanCheck === "not_newest") {
-    return NextResponse.json({ error: "Echo talks about your newest check only.", code: "CHAT_NOT_NEWEST" }, { status: 409 });
-  }
-  // The check just made whose reading has not landed (or an unreadable one):
-  // the same retryable answer as before, and nothing is spent.
-  if (scanCheck === "no_reading") {
-    return NextResponse.json({ error: "This scan's analysis isn't available yet.", code: "CHAT_ANALYSIS_UNAVAILABLE" }, { status: 409 });
-  }
-
-  // H02a (D-19): Gemini's terms require 18+. Chat may hard-reject (D-03a:
-  // the attestation UI ships with this lane). It fails closed: a ledger it
-  // can't read is a 503, never a pass. Before the quota, so a refusal
-  // doesn't spend it.
-  // H03c: and the user's AI-share consent at the current version (D-16,
-  // D-14). Same fail-closed read. LOCAL ONLY until decision 6 and final copy.
-  let age: AgeStatus;
-  let aiShare: boolean | null;
-  try {
-    [age, aiShare] = await withLedgerTimeout(Promise.all([ageStatus(uid), latestGrant(uid, "ai_share", AI_SHARE_CONSENT_VERSION)]));
-  } catch (err) {
-    // Name and code only: Firestore messages embed the doc path (the uid).
-    console.error("skin-check chat: consent ledger unavailable:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
-    return NextResponse.json(
-      { error: "Echo can't check your settings right now. Please try again.", code: "CONSENT_CHECK_UNAVAILABLE" },
-      { status: 503 }
-    );
-  }
-  if (age === "under18") {
-    return NextResponse.json({ error: "Echo is only available to people aged 18 or over.", code: "UNDER_18" }, { status: 403 });
-  }
-  if (age === "missing") {
-    return NextResponse.json({ error: "Please confirm your age to use Echo.", code: "ATTESTATION_REQUIRED" }, { status: 403 });
-  }
-  if (aiShare !== true) {
-    return NextResponse.json({ error: "Please agree to share your skin check with Echo.", code: "AI_CONSENT_REQUIRED" }, { status: 403 });
-  }
-
-  // After the 18+ and consent gates (R-4): a user they refuse is told why,
-  // whatever the key. Before the quota, so a misconfiguration spends nothing.
-  // Fails loudly rather than letting getClient() throw deep inside the try
-  // block below and get flattened into the same 502 as a real Gemini outage
-  // — same reasoning as /api/skin-scan's SCAN_MISCONFIGURED check. An unset
-  // key is a deploy misconfiguration (500), not a provider failure (502).
-  if (!geminiApiKey()) {
-    console.error("Gemini API key is not set (GEMINI_API_KEY, or GEMINI_DEV_API_KEY in development) — refusing to call Gemini.");
-    return NextResponse.json(
-      { error: "Echo isn't configured yet.", code: "CHAT_MISCONFIGURED" },
-      { status: 500 }
-    );
-  }
+  const refused = await echoGates(uid, scanId);
+  if (refused) return refused;
 
   // TD-29 (5): 20 questions per user per day (lib/echo-quota.ts), counted
   // here, after every gate, so a refused question spends nothing.
@@ -297,7 +251,7 @@ export async function POST(request: NextRequest) {
       const result = await handleContextChat({ uid, scanId, region, message });
       if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
       const turns = [...history, { role: "user" as const, text: message }, { role: "echo" as const, text: result.reply }];
-      return NextResponse.json({ ok: true, reply: result.reply, historyToken: signHistory(uid, scanId, region, turns) });
+      return NextResponse.json({ ok: true, reply: result.reply, products: result.products, historyToken: signHistory(uid, scanId, region, turns) });
     }
 
     const context = await loadTrustedEchoContext(uid, scanId);
@@ -366,5 +320,105 @@ export async function POST(request: NextRequest) {
       { error: "Couldn't reach Echo. Please try again.", code: "CHAT_SERVICE_ERROR" },
       { status: 502 }
     );
+  }
+}
+
+// F13, H02a, H03c and the key check, in this order, for a question and for the
+// opening alike (TD-34). A refusal response, or null when every gate passes.
+async function echoGates(uid: string, scanId: string): Promise<NextResponse | null> {
+  // F13 (owner TD-20): only the newest measured check, after the referral
+  // (which always goes out) and before the ledger and the quota. Any read
+  // error refuses: it never lets an older check through.
+  let scanCheck: EchoScanCheck;
+  try {
+    scanCheck = await checkEchoScan(uid, scanId);
+  } catch (err) {
+    if (err instanceof AdminNotConfiguredError) return misconfigured(err);
+    console.error("skin-check chat: newest check unreadable:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
+    return NextResponse.json({ error: "Echo can't check your scans right now. Please try again.", code: "CHAT_CHECK_UNAVAILABLE" }, { status: 503 });
+  }
+  if (scanCheck === "not_newest") {
+    return NextResponse.json({ error: "Echo talks about your newest check only.", code: "CHAT_NOT_NEWEST" }, { status: 409 });
+  }
+  // The check just made whose reading has not landed (or an unreadable one):
+  // the same retryable answer as before, and nothing is spent.
+  if (scanCheck === "no_reading") {
+    return NextResponse.json({ error: "This scan's analysis isn't available yet.", code: "CHAT_ANALYSIS_UNAVAILABLE" }, { status: 409 });
+  }
+
+  // H02a (D-19): Gemini's terms require 18+. Chat may hard-reject (D-03a:
+  // the attestation UI ships with this lane). It fails closed: a ledger it
+  // can't read is a 503, never a pass. Before the quota, so a refusal
+  // doesn't spend it.
+  // H03c: and the user's AI-share consent at the current version (D-16,
+  // D-14). Same fail-closed read. LOCAL ONLY until decision 6 and final copy.
+  let age: AgeStatus;
+  let aiShare: boolean | null;
+  try {
+    [age, aiShare] = await withLedgerTimeout(Promise.all([ageStatus(uid), latestGrant(uid, "ai_share", AI_SHARE_CONSENT_VERSION)]));
+  } catch (err) {
+    // Name and code only: Firestore messages embed the doc path (the uid).
+    console.error("skin-check chat: consent ledger unavailable:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "");
+    return NextResponse.json(
+      { error: "Echo can't check your settings right now. Please try again.", code: "CONSENT_CHECK_UNAVAILABLE" },
+      { status: 503 }
+    );
+  }
+  if (age === "under18") {
+    return NextResponse.json({ error: "Echo is only available to people aged 18 or over.", code: "UNDER_18" }, { status: 403 });
+  }
+  if (age === "missing") {
+    return NextResponse.json({ error: "Please confirm your age to use Echo.", code: "ATTESTATION_REQUIRED" }, { status: 403 });
+  }
+  if (aiShare !== true) {
+    return NextResponse.json({ error: "Please agree to share your skin check with Echo.", code: "AI_CONSENT_REQUIRED" }, { status: 403 });
+  }
+
+  // After the 18+ and consent gates (R-4): a user they refuse is told why,
+  // whatever the key. Before the quota, so a misconfiguration spends nothing.
+  // Fails loudly rather than letting getClient() throw deep inside the try
+  // block below and get flattened into the same 502 as a real Gemini outage
+  // — same reasoning as /api/skin-scan's SCAN_MISCONFIGURED check. An unset
+  // key is a deploy misconfiguration (500), not a provider failure (502).
+  if (!geminiApiKey()) {
+    console.error("Gemini API key is not set (GEMINI_API_KEY, or GEMINI_DEV_API_KEY in development) — refusing to call Gemini.");
+    return NextResponse.json(
+      { error: "Echo isn't configured yet.", code: "CHAT_MISCONFIGURED" },
+      { status: 500 }
+    );
+  }
+  return null;
+}
+
+/**
+ * TD-34: the opening suggestion. Off with Echo, off with product suggestions
+ * (and on the older Echo path). After the same gates as a question; a stored
+ * opening for this check is shown again without a Gemini call or a question
+ * from the day's limit. Nothing here carries the user's own text.
+ */
+async function opening(uid: string, body: unknown): Promise<NextResponse> {
+  const parsed = OpeningSchema.safeParse(body);
+  if (!parsed.success) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  const { scanId, region } = parsed.data;
+  if (!echoOn()) return NextResponse.json({ error: ECHO_OFF_COPY, code: "ECHO_OFF" }, { status: 503 });
+  if (!echoProductsOn() || !contextChatEnabled()) return NextResponse.json({ error: "No suggestion here.", code: "ECHO_PRODUCTS_OFF" }, { status: 404 });
+
+  const refused = await echoGates(uid, scanId);
+  if (refused) return refused;
+
+  try {
+    const stored = await loadOpening(uid, scanId);
+    if (!stored) {
+      const quotaLimited = await consumeEchoQuestion(uid);
+      if (quotaLimited) return quotaLimited;
+    }
+    const result = stored ? await serveStoredOpening(uid, scanId, stored) : await handleContextChat({ uid, scanId, region, message: "", opening: true });
+    if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
+    return NextResponse.json({ ok: true, reply: result.reply, products: result.products });
+  } catch (err) {
+    if (err instanceof AdminNotConfiguredError) return misconfigured(err);
+    console.error("skin-check Echo opening failed:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "", ...geminiErrorDetail(err));
+    if (isGeminiTimeout(err)) return NextResponse.json({ error: "Echo took too long to answer. Please try again.", code: "CHAT_TIMEOUT" }, { status: 504 });
+    return NextResponse.json({ error: "Couldn't reach Echo. Please try again.", code: "CHAT_SERVICE_ERROR" }, { status: 502 });
   }
 }

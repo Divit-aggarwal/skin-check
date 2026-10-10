@@ -1,0 +1,237 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { buildContextPackage, packageJson, screenExternalText, type BuildInput } from "@/lib/context/builder";
+import { renderSystemInstruction, responseSchema } from "@/lib/context/renderer";
+import { validateAnswer } from "@/lib/context/validator";
+import { guardedReply, productGuard, type ShownProduct } from "@/lib/context/answer";
+import { CATALOGUE } from "@/lib/catalog/catalogue";
+import { bannedWordsIn } from "@/lib/catalog/wording";
+import { evaluateSafety } from "@/lib/rules/safety";
+import { COPY } from "@/lib/rules/settings";
+import { ECHO_PRODUCTS_INSTRUCTION, ECHO_SAFETY_INSTRUCTION } from "@/lib/gemini";
+import {
+  echoProductsOn,
+  OWN_PRODUCT_INFO,
+  OWN_PRODUCTS,
+  OWN_PRODUCTS_LINE,
+  PRODUCT_DOCTOR_LINE,
+  PRODUCT_DOCTOR_LINE_ON,
+  productFactText,
+} from "@/lib/context/products";
+import { CHEEK_SCORES, SCORES } from "./context-fixtures";
+
+// TD-34 (owner, 2026-10-10): Echo may suggest Project Skin's own products, and
+// Gemini picks which. The list, the checker and the guards are code.
+
+const SKIN = { scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", schemaVersion: 1 };
+const ANSWERS = { skin_type: "oily", primary_concerns: ["redness", "oiliness"], current_products: ["cleanser_moisturizer"] };
+const input = (over: Partial<BuildInput> = {}): BuildInput => ({ regionFocus: "cheeks", message: "Which products should I use?", skin: SKIN, answers: ANSWERS, ownProducts: true, ...over });
+const pkg = buildContextPackage(input());
+
+const answer = (a: { claims?: unknown[]; products?: unknown[]; needs_referral?: boolean; distress?: boolean }) =>
+  JSON.stringify({ claims: [{ claim_type: "product", text: "Here is a simple routine from Project Skin's products.", fact_ids: ["rec.refreshing-cleanser"] }], needs_referral: false, distress: false, ...a });
+const check = (raw: string, message = "Which products should I use?", p = pkg) => validateAnswer(raw, p, message);
+const failed = (raw: string, message?: string, p = pkg) => check(raw, message, p).failures.map((f) => f.check);
+
+const SKIN_TYPE = "self.all.skin_type";
+const GOOD_PRODUCTS = [
+  { product_id: "refreshing-cleanser", reason: "You told us your skin type: Oily", fact_ids: [SKIN_TYPE] },
+  { product_id: "protecting-sunscreen", reason: "Oiliness, photo-based estimate for the whole face: Elevated", fact_ids: ["state.all.oiliness"] },
+];
+
+describe("the product list Gemini receives (TD-34, build part 1)", () => {
+  it("covers all six catalogue products, and lists the in-stock ones only (Active Boba is out of stock)", () => {
+    expect(Object.keys(OWN_PRODUCT_INFO).sort()).toEqual(CATALOGUE.products.map((p) => p.id).sort());
+    const inStock = CATALOGUE.products.filter((p) => p.availability === "available").map((p) => p.id);
+    expect(OWN_PRODUCTS.map((p) => p.id).sort()).toEqual(inStock.sort());
+    expect(OWN_PRODUCTS.map((p) => p.id)).not.toContain("active-boba-cream");
+    expect(pkg.recommendation?.items.map((i) => i.productId).sort()).toEqual(inStock.sort());
+  });
+
+  it("each product has an id, name, step, key ingredient, how to use and description, and a store link", () => {
+    for (const p of OWN_PRODUCTS) {
+      const text = productFactText(p);
+      for (const part of [p.name, p.keyIngredient, p.usage, p.description]) expect(text).toContain(part);
+      expect(p.url).toMatch(/^https:\/\/theprojectskin\.com\/products\/[a-z0-9-]+$/);
+    }
+  });
+
+  it("every description passes the D-12 word check and the outside-text screen; no result or cure word", () => {
+    for (const { description } of Object.values(OWN_PRODUCT_INFO)) {
+      expect(bannedWordsIn(description), description).toEqual([]);
+      expect(screenExternalText(description), description).toBe(true);
+      expect(description).not.toMatch(/\b(?:help|helps|control|target|prevent|sooth|purif|refine|repair|results?|clearer|healthier|acne)\b/i);
+    }
+  });
+
+  it("is the same for every user: answers, readings and safety never change it", () => {
+    const pregnant = { ...ANSWERS, gender: "female", female_skin_context: ["pregnant_or_breastfeeding"] };
+    const other = buildContextPackage(input({ answers: pregnant, safety: evaluateSafety({ answers: pregnant, confirmedThisScan: [] }), skin: { ...SKIN, scores: CHEEK_SCORES } }));
+    expect(JSON.stringify(other.recommendation)).toBe(JSON.stringify(pkg.recommendation));
+  });
+
+  it("goes with a product question or the opening, not with every question", () => {
+    expect(buildContextPackage(input({ message: "what does my cheek reading mean?" })).recommendation).toBeUndefined();
+    expect(buildContextPackage(input({ message: "what does my cheek reading mean?", opening: true })).recommendation).toBeDefined();
+    for (const m of ["Mere liye kaunsa face wash sahi hai?", "which one should i get", "how often should I apply it", "SPF kitna lagana chahiye"]) {
+      expect(buildContextPackage(input({ message: m })).recommendation, m).toBeDefined();
+    }
+  });
+});
+
+describe("the product switch (TD-34, build part 7)", () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("is on unless ECHO_PRODUCTS_SWITCH is exactly 'off'", () => {
+    expect(echoProductsOn()).toBe(true);
+    vi.stubEnv("ECHO_PRODUCTS_SWITCH", "Off");
+    expect(echoProductsOn()).toBe(true);
+    vi.stubEnv("ECHO_PRODUCTS_SWITCH", "off");
+    expect(echoProductsOn()).toBe(false);
+  });
+
+  it("off: Gemini receives exactly what it received before TD-34 (package, instruction and format)", () => {
+    for (const message of ["Which products should I use?", "what does my cheek reading mean?"]) {
+      const off = buildContextPackage(input({ message, ownProducts: false }));
+      const before = buildContextPackage({ regionFocus: "cheeks", message, skin: SKIN, answers: ANSWERS });
+      expect(packageJson(off)).toBe(packageJson(before));
+      expect(off.packageVersion).toBe("ctx-2");
+      expect(renderSystemInstruction(off)).toBe(renderSystemInstruction(before));
+      expect(renderSystemInstruction(off)).toContain(ECHO_SAFETY_INSTRUCTION);
+      expect(renderSystemInstruction(off)).not.toContain(ECHO_PRODUCTS_INSTRUCTION);
+      expect(JSON.stringify(responseSchema(off))).not.toContain("products");
+    }
+  });
+
+  it("off: an answer that suggests a product is rejected", () => {
+    const off = buildContextPackage(input({ ownProducts: false }));
+    expect(failed(answer({ products: GOOD_PRODUCTS }), undefined, off)).toContain("product_not_in_list");
+  });
+
+  it("on: one instruction for every user, and the product rules; the old 'no products' sentence is gone", () => {
+    const text = renderSystemInstruction(pkg);
+    expect(text.split(ECHO_PRODUCTS_INSTRUCTION)).toHaveLength(2);
+    expect(text).not.toContain(ECHO_SAFETY_INSTRUCTION);
+    expect(ECHO_PRODUCTS_INSTRUCTION).not.toMatch(/pregnan|breastfeed|prescri|caution|doctor/i);
+  });
+});
+
+describe("the answer checker (TD-34, build parts 2 and 6)", () => {
+  it("a good suggestion passes: listed ids, reasons that repeat the user's facts, an uncertainty claim with a reading", () => {
+    const v = check(answer({ claims: [{ claim_type: "uncertainty", text: "These readings compare areas within one photo. They are not a measurement scale.", fact_ids: ["uncert.all.within_photo"] }], products: GOOD_PRODUCTS }));
+    expect(v.failures).toEqual([]);
+    expect(v.passed).toBe(true);
+  });
+
+  it("a product claim may use the product's own exact name and words", () => {
+    const v = check(answer({ claims: [{ claim_type: "product", text: "Refreshing Cleanser: Massage onto damp skin in the morning, at night or both, then rinse thoroughly.", fact_ids: ["rec.refreshing-cleanser"] }] }));
+    expect(v.failures).toEqual([]);
+    expect(check(answer({ claims: [{ claim_type: "product", text: "Use 5% Niacinamide Serum after cleansing.", fact_ids: ["rec.niacinamide-serum"] }] })).failures).toEqual([]);
+  });
+
+  it.each([
+    ["an id not on the list", [{ product_id: "cerave-cleanser", reason: "You told us your skin type: Oily", fact_ids: [SKIN_TYPE] }]],
+    ["an out-of-stock product", [{ product_id: "active-boba-cream", reason: "You told us your skin type: Oily", fact_ids: [SKIN_TYPE] }]],
+    ["the same product twice", [GOOD_PRODUCTS[0], GOOD_PRODUCTS[0]]],
+  ])("rejects %s (product_not_in_list)", (_, products) => {
+    expect(failed(answer({ products }))).toContain("product_not_in_list");
+  });
+
+  it.each([
+    ["another brand", "I can only talk about our products, not CeraVe.", "product_not_in_list"],
+    ["a shop", "You can find similar ones on Nykaa.", "product_not_in_list"],
+    ["our out-of-stock product", "Active Boba Encapsulated Cream is another option.", "product_not_in_list"],
+    ["our kit", "The routine kit has all four.", "product_not_in_list"],
+    ["a result claim", "This routine helps control oil.", "efficacy_claim"],
+    ["a cure claim", "These products cure acne.", "medical_or_efficacy_term"],
+    ["a product-caused change", "After using it your redness went down.", "comparative_or_change"],
+    ["a made-up price", "Each one costs very little.", "made_up_price"],
+    ["a made-up discount", "There is a discount on these right now.", "made_up_price"],
+    ["a number price", "It is only Rs 399.", "made_up_number"],
+    ["pressure to buy", "Buy them now before they sell out.", "purchase_pressure"],
+    ["an ingredient", "Look for niacinamide.", "product_claim"],
+    ["a Hinglish result claim", "Isse aapki skin saaf ho jayegi.", "efficacy_claim"],
+  ])("rejects %s in a claim", (_, text, check) => {
+    expect(failed(answer({ claims: [{ claim_type: "out_of_scope", text, fact_ids: [] }] }))).toContain(check);
+  });
+
+  it.each([
+    ["says what the product does", "You told us your skin type: Oily, and this keeps oil away", "product_claim"],
+    ["a result claim", "It works well for oily skin you told us about", "efficacy_claim"],
+    ["a reason with no fact of the user's", "A simple daily step", "citation_rule"],
+    ["an answer presented as measured", "Your skin type: Oily", "self_report_as_measurement"],
+    ["a band the reading does not hold", "Oiliness, photo-based estimate for the whole face: Low", "band_mismatch"],
+    ["an opinion about the reading", "Oiliness, photo-based estimate for the whole face: Elevated, which is a lot", "product_claim"],
+    ["a reason citing another product", "You told us your skin type: Oily", "citation_rule"],
+  ])("rejects a reason that %s", (name, reason, check) => {
+    const fact_ids = name === "a reason with no fact of the user's" ? [] : name.includes("band") || name.includes("opinion") ? ["state.all.oiliness"] : name.includes("another product") ? ["rec.clear-seal"] : [SKIN_TYPE];
+    expect(failed(answer({ products: [{ product_id: "refreshing-cleanser", reason, fact_ids }] }))).toContain(check);
+  });
+
+  it("a reason that quotes a reading needs an uncertainty claim, like any description", () => {
+    expect(failed(answer({ products: [GOOD_PRODUCTS[1]] }))).toContain("missing_uncertainty");
+  });
+
+  it("the new checks run only while products are on, so an off package is checked exactly as before", () => {
+    const off = buildContextPackage(input({ ownProducts: false }));
+    const raw = answer({ claims: [{ claim_type: "out_of_scope", text: "I cannot say what works for you.", fact_ids: [] }] });
+    expect(check(raw, "what works?", off).passed).toBe(true);
+  });
+});
+
+describe("the guards, in code (TD-34, build part 5)", () => {
+  const products: ShownProduct[] = [{ productId: "refreshing-cleanser", reason: "You told us your skin type: Oily" }];
+  const withProducts = { reply: "Here is a simple routine. Refreshing Cleanser: rinse well.", withoutProducts: "Here is a simple routine.", products };
+  const safety = (answers: Record<string, unknown>) => evaluateSafety({ answers: { primary_concerns: ["blemishes"], ...answers }, confirmedThisScan: [] });
+
+  it("red flag: the dermatologist line comes first and no product at all", () => {
+    const guard = productGuard(safety({ breakout_pattern: ["deep_painful"] }));
+    expect(guard).toBe("red_flag");
+    const shown = guardedReply(withProducts, guard);
+    expect(shown.products).toEqual([]);
+    expect(shown.reply.split("\n")[0]).toBe(COPY.referral);
+    expect(shown.reply).not.toContain("Refreshing Cleanser");
+  });
+
+  it("red flag from a hidden answer (irregular periods with blemishes) is a red flag too", () => {
+    expect(productGuard(safety({ gender: "female", female_skin_context: ["irregular_periods"] }))).toBe("red_flag");
+  });
+
+  it("red flag on the opening: the line first even when Gemini suggested nothing", () => {
+    const shown = guardedReply({ reply: "Here is a simple routine.", withoutProducts: "Here is a simple routine.", products: [] }, "red_flag", true);
+    expect(shown.reply.split("\n")[0]).toBe(COPY.referral);
+  });
+
+  it.each([
+    ["pregnancy or breastfeeding", { gender: "female", female_skin_context: ["pregnant_or_breastfeeding"] }],
+    ["a prescription", { current_products: ["prescription"] }],
+  ])("%s: products shown, with the fixed doctor line", (_, answers) => {
+    const guard = productGuard(safety(answers));
+    expect(guard).toBe("doctor_line");
+    const shown = guardedReply(withProducts, guard);
+    expect(shown.products).toEqual(products);
+    expect(shown.reply.split("\n").at(-1)).toBe(PRODUCT_DOCTOR_LINE);
+  });
+
+  it("the doctor line is a named setting, on, and passes the D-12 word check", () => {
+    expect(PRODUCT_DOCTOR_LINE_ON).toBe(true);
+    expect(bannedWordsIn(PRODUCT_DOCTOR_LINE)).toEqual([]);
+    expect(bannedWordsIn(OWN_PRODUCTS_LINE)).toEqual([]);
+  });
+
+  it("no guard, or no product in the answer: the reply is unchanged", () => {
+    expect(guardedReply(withProducts, null)).toEqual({ reply: withProducts.reply, products });
+    const plain = { reply: "Hello.", withoutProducts: "Hello.", products: [] };
+    expect(guardedReply(plain, "doctor_line")).toEqual({ reply: "Hello.", products: [] });
+    expect(guardedReply(plain, "red_flag")).toEqual({ reply: "Hello.", products: [] });
+  });
+});
+
+describe("the answer format stays fixed in size with products on (F19)", () => {
+  it("the schema does not depend on the package's facts or list, and stays small", () => {
+    const minimal = buildContextPackage({ regionFocus: null, message: "hi", skin: null, answers: {}, ownProducts: true });
+    const schema = JSON.stringify(responseSchema(pkg));
+    expect(schema).toBe(JSON.stringify(responseSchema(minimal)));
+    for (const item of pkg.recommendation!.items) expect(schema).not.toContain(item.productId);
+    expect(schema.length).toBeLessThanOrEqual(900);
+  });
+});

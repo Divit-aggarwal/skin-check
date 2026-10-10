@@ -109,7 +109,11 @@ export interface ContextRoutine {
   decision: "R-1 A";
 }
 
-/** Gemini may mention only these products, with only this whitelisted claim text (RECOMMENDATION_MODEL §7). */
+/**
+ * Gemini may mention only these products, with only this whitelisted claim text (RECOMMENDATION_MODEL §7).
+ * TD-34: also the own-product list (lib/context/products.ts), the same for every user; then
+ * rulesetVersion is the list's version label and each item's text is our product text.
+ */
 export interface ContextRecommendation {
   rulesetVersion: string;
   /** Each item is a fact ("rec.{productId}"); its text is the whitelisted claim text. */
@@ -150,8 +154,14 @@ export interface MissingItem extends Fact {
   about: ContextSection | "hydration" | "pores" | "trend";
 }
 
-/** GEMINI_BOUNDARY §5 claim_type. routine_as_directed is removed (TD-16 (3), TD-17 (3); tracker F10). */
+/**
+ * GEMINI_BOUNDARY §5 claim_type. routine_as_directed is removed (TD-16 (3), TD-17 (3); tracker F10).
+ * "product" (TD-34, main session 2026-10-10): a claim about a product on the
+ * own-product list; it cites that product's rec fact. Allowed only while
+ * product suggestions are on.
+ */
 export type AllowedClaim =
+  | "product"
   | "descriptive"
   | "self_reported_echo"
   | "uncertainty"
@@ -177,7 +187,12 @@ export type ForbiddenClaim =
   | "self_report_as_measurement"
   | "diagnosis"
   | "forecast"
-  | "self_assigned_confidence";
+  | "self_assigned_confidence"
+  // TD-34 (main session 2026-10-10): own-product suggestions
+  | "product_not_in_list"
+  | "efficacy_claim"
+  | "made_up_price"
+  | "purchase_pressure";
 
 export interface ContextPackage {
   packageVersion: string;

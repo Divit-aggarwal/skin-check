@@ -9,19 +9,23 @@ import { evaluateSafety } from "@/lib/rules/safety";
 import type { SkinStateRegionKey } from "@/lib/skin-state";
 import { loadTrustedSkinState2Series } from "@/lib/skin-state-2-loader";
 import type { SkinState2Result } from "@/lib/skin-state-2";
-import { answerFromPackage, comparisonAnswer, fallbackAnswer, FINISH_QUESTIONNAIRE_COPY } from "./answer";
+import { answerFromPackage, comparisonAnswer, fallbackAnswer, FINISH_QUESTIONNAIRE_COPY, guardedReply, productGuard, type ShownProduct } from "./answer";
+import { echoProductsOn, listedProduct, OPENING_MESSAGE } from "./products";
 import { RULE_INPUT_FIELDS } from "@/lib/rules/settings";
-import { buildContextPackage, PACKAGE_VERSION, packageSha256 } from "./builder";
-import { loadChatHistory, loadSplitCheckTurns, recordChatTurns, type EchoTurnRecord } from "./chat-turns";
+import { buildContextPackage, packageSha256 } from "./builder";
+import { loadChatHistory, loadSplitCheckTurns, recordChatTurns, type EchoTurnRecord, type StoredOpening } from "./chat-turns";
 import { comparisonHit, joinedUserTurns, redFlagHit, referralCopyFor, UNSUPPORTED_SCRIPT_COPY } from "./prefilter";
-import { PROMPT_VERSION } from "./renderer";
+import { promptVersionFor } from "./renderer";
 
 // The chat route's context-package branch (docs/lanes/context-design.md §3.2).
 // Runs only after auth, the history token, the 18+ and AI-share gates and the
 // quota, and only while contextChatEnabled(). Throws on a Gemini or Firestore
 // failure; the route turns that into its existing 502.
 
-export type ContextChatResult = { ok: true; reply: string } | { ok: false; status: number; code: string; error: string };
+/** `products`: checked own-product suggestions after the guards (TD-34); the app draws their cards. */
+export type ContextChatResult = { ok: true; reply: string; products: ShownProduct[] } | { ok: false; status: number; code: string; error: string };
+
+const onlyListed = (products: ShownProduct[]) => products.filter((p) => listedProduct(p.productId));
 
 const NO_CALL = { promptVersion: null, modelId: null, validator: null } as const;
 
@@ -77,8 +81,12 @@ export async function recordReferral(uid: string, scanId: string, region: EchoRe
   await recordBestEffort(uid, scanId, region, message, reply, { ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: kind, redFlag: kind === "red_flag", latencyMs: 0 });
 }
 
-export async function handleContextChat(input: { uid: string; scanId: string; region: EchoRegion; message: string }): Promise<ContextChatResult> {
-  const { uid, scanId, region, message } = input;
+export async function handleContextChat(input: { uid: string; scanId: string; region: EchoRegion; message: string; opening?: boolean }): Promise<ContextChatResult> {
+  const { uid, scanId, region } = input;
+  // TD-34: the opening is a fixed request about the whole face, outside any thread.
+  const opening = input.opening === true;
+  const message = opening ? OPENING_MESSAGE : input.message;
+  const ownProducts = echoProductsOn();
   const started = Date.now();
   const meta = (m: Omit<EchoTurnRecord, "latencyMs">): EchoTurnRecord => ({ ...m, latencyMs: Date.now() - started });
 
@@ -86,19 +94,19 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
   if (redFlagHit(message)) {
     const reply = referralCopyFor(message);
     await recordBestEffort(uid, scanId, region, message, reply, meta({ ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: "red_flag", redFlag: true }));
-    return { ok: true, reply };
+    return { ok: true, reply, products: [] };
   }
 
   // A message split over turns ("i want to" then "die") is checked joined with
   // the last stored user turns, still before anything is built (security
   // review, wave 2). Stored turns hold no pre-filter or referral turns.
-  const history = await loadChatHistory(uid, scanId, region);
+  const history = opening ? [] : await loadChatHistory(uid, scanId, region);
   // Every stored user turn, including ones whose answer fell back (red team pass 2, I02 P2-3).
   const joined = joinedUserTurns(await loadSplitCheckTurns(uid, scanId, region), message);
   if (redFlagHit(joined)) {
     const reply = referralCopyFor(joined);
     await recordBestEffort(uid, scanId, region, message, reply, meta({ ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: "red_flag", redFlag: true }));
-    return { ok: true, reply };
+    return { ok: true, reply, products: [] };
   }
 
   const trusted = await loadTrustedEchoContext(uid, scanId);
@@ -119,40 +127,69 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
     // text and one uncertainty line, no Gemini call, no products. Never "no
     // red flag". The builder still applies the caution matcher to the answers.
     console.error("context chat: safety unavailable, fixed fallback:", (err as Error)?.name ?? "unknown");
-    const pkg = buildContextPackage({ regionFocus: region, message, skin, answers: trusted.answers });
+    // TD-34: no opening for a check without answers (the screen does not ask for one); nothing is stored.
+    if (opening) return { ok: false, status: 409, code: "OPENING_UNAVAILABLE", error: "No suggestion for this check." };
+    const pkg = buildContextPackage({ regionFocus: opening ? null : region, message, skin, answers: trusted.answers, ownProducts, opening });
     // F11: a check with no questionnaire answers gets the same fixed reply plus
     // a line asking the user to finish the questionnaire, so Echo can help.
     const noAnswers = !RULE_INPUT_FIELDS.some((f) => Object.hasOwn(trusted.answers, f));
     const reply = noAnswers ? `${fallbackAnswer(pkg)}\n${FINISH_QUESTIONNAIRE_COPY}` : fallbackAnswer(pkg);
     await recordChatTurns(
       uid, scanId, region, message, reply,
-      meta({ ...NO_CALL, packageVersion: PACKAGE_VERSION, packageSha256: packageSha256(pkg), validator: { passed: false, failures: [noAnswers ? "no_answers" : "safety_unavailable"], regenerated: false, fallback: true }, prefilter: null, redFlag: false })
+      meta({ ...NO_CALL, opening, packageVersion: pkg.packageVersion, packageSha256: packageSha256(pkg), validator: { passed: false, failures: [noAnswers ? "no_answers" : "safety_unavailable"], regenerated: false, fallback: true }, prefilter: null, redFlag: false })
     );
-    return { ok: true, reply };
+    return { ok: true, reply, products: [] };
   }
   const longitudinal = await longitudinalFor(uid, scanId);
   const pkg = buildContextPackage({
-    regionFocus: region,
+    regionFocus: opening ? null : region,
     message,
     skin,
     answers: trusted.answers,
     longitudinal,
     safety,
+    ownProducts,
+    opening,
   });
-  const versions = { packageVersion: PACKAGE_VERSION, packageSha256: packageSha256(pkg) };
+  const versions = { packageVersion: pkg.packageVersion, packageSha256: packageSha256(pkg) };
 
   // §6b: a comparison question gets the fixed template, no Gemini call.
-  if (comparisonHit(message)) {
+  if (!opening && comparisonHit(message)) {
     const reply = comparisonAnswer(pkg);
     await recordBestEffort(uid, scanId, region, message, reply, meta({ ...NO_CALL, ...versions, prefilter: "comparison", redFlag: false }));
-    return { ok: true, reply };
+    return { ok: true, reply, products: [] };
   }
 
   const outcome = await answerFromPackage(pkg, message, history, { generate: generateContextAnswer, redFlag: safety.redFlag });
+  // TD-34: the guards change only what the user sees. The stored text (Gemini's
+  // later history) is the unguarded answer, the same for every user.
+  const guard = productGuard(safety);
+  const shown = guardedReply(outcome, guard, opening);
   // Not best effort: an unrecorded reply would make the D-15 history diverge.
   await recordChatTurns(
     uid, scanId, region, message, outcome.reply,
-    meta({ ...versions, promptVersion: PROMPT_VERSION, modelId: outcome.modelId, validator: outcome.validator, prefilter: null, redFlag: outcome.referral })
+    meta({
+      ...versions, promptVersion: promptVersionFor(pkg), modelId: outcome.modelId, validator: outcome.validator, prefilter: null, redFlag: outcome.referral,
+      ...(ownProducts ? { products: outcome.products, withoutProducts: outcome.withoutProducts, guard, opening } : {}),
+    })
   );
-  return { ok: true, reply: outcome.reply };
+  return { ok: true, reply: shown.reply, products: onlyListed(shown.products) };
+}
+
+/**
+ * TD-34: an opening already made for this check, shown again with today's
+ * guards and today's list. No Gemini call. Any safety failure shows no product.
+ */
+export async function serveStoredOpening(uid: string, scanId: string, stored: StoredOpening): Promise<ContextChatResult> {
+  const trusted = await loadTrustedEchoContext(uid, scanId);
+  if (!trusted) return { ok: false, status: 409, code: "CHAT_ANALYSIS_UNAVAILABLE", error: "This scan's analysis isn't available yet." };
+  let guard: ReturnType<typeof productGuard>;
+  try {
+    guard = productGuard(evaluateSafety({ answers: trusted.answers, confirmedThisScan: [] }));
+  } catch {
+    // Fails closed: no opening at all rather than products without their guard.
+    return { ok: false, status: 409, code: "OPENING_UNAVAILABLE", error: "No suggestion for this check." };
+  }
+  const shown = guardedReply(stored, guard, true);
+  return { ok: true, reply: shown.reply, products: onlyListed(shown.products) };
 }
