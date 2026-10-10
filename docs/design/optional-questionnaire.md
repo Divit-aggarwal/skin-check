@@ -123,8 +123,7 @@ The laptop no longer asks for the camera the moment the step appears: it asks on
 - Shown under the option when it is picked; unpicking it (or picking "Nothing right now") hides the
   box and clears its text.
 - Plain `<textarea>`, `maxLength=200`, visible counter "n / 200" (`aria-live="polite"` at the limit).
-- One line under the box (legal review: tracker row): "Only you can see this, in this check. It is
-  never sent to Echo or any AI, and is deleted with your account."
+- One line under the box (owner wording 2026-10-10; legal review: tracker H31): "Saved to your account for this check. It is never sent to Echo or any AI, and is deleted with your account."
 - Kept **out of `answers`** in the flow state, the draft and the record, so nothing that reads
   answers (Gemini, the rules, the hints, the hashes) can reach it.
 - Never sent to Gemini (inventory pin tests), never logged, never read by safety or rules
@@ -161,3 +160,5 @@ The laptop no longer asks for the camera the moment the step appears: it asks on
 - Accepted, not changed: today's Echo path (`ECHO_CONTEXT_PATH=off`) has no F11 step of its own.
   It runs only in development and test builds (lib/context/switch.ts), never in production, and it
   never receives product names (tested).
+
+- Owner 2026-10-10: the photo prompt is "Next, a quick photo of your face, so we can read your skin." (the old "One last thing … not just your answers" was wrong after a skip, and before the questions).

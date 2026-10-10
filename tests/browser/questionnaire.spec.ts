@@ -79,7 +79,7 @@ for (const width of WIDTHS) {
       await skip.focus();
       await page.keyboard.press("Enter");
       // Skip: on to the photo step (verify passes for a signed-in user).
-      await expect(page.getByText(/a quick photo helps us read your skin/)).toBeVisible();
+      await expect(page.getByText(/a quick photo of your face, so we can read your skin/)).toBeVisible();
       await expect(page.getByRole("button", { name: K.open })).toBeVisible();
     });
 

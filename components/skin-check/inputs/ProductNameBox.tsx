@@ -4,11 +4,11 @@ import { useId } from "react";
 import { PRODUCT_NAME_MAX } from "@/lib/skin-check-validation";
 
 /**
- * TD-33 (2): legal review pending (tracker H31). True today: owner-only reads
- * in the app (firestore.rules), no path to Gemini (tests/privacy-gemini-
+ * TD-33 (2): owner wording 2026-10-10; legal review pending (tracker H31).
+ * True today: saved under users/{uid}, owner-only reads in the app (firestore.rules), no path to Gemini (tests/privacy-gemini-
  * inventory), and the account erase deletes users/{uid}.
  */
-export const PRODUCT_NAME_PRIVACY_LINE = "Only you can see this in the app, in this check. It is never sent to Echo or any AI, and is deleted with your account.";
+export const PRODUCT_NAME_PRIVACY_LINE = "Saved to your account for this check. It is never sent to Echo or any AI, and is deleted with your account.";
 
 interface ProductNameBoxProps {
   label: string;
