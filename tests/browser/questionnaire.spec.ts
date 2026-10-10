@@ -98,6 +98,12 @@ for (const width of WIDTHS) {
         // Asked only now, from the button: the fake camera answers and the preview starts.
         await open.click();
         const take = page.getByRole("button", { name: K.take });
+        // Chrome's fake webcam sometimes fails to start the first time (seen
+        // 2026-10-10). The page then shows "Your camera didn't start" with Try
+        // again, and that recovery path is what a user would take.
+        const retry = page.getByRole("button", { name: K.tryAgain });
+        await expect(take.or(retry)).toBeVisible({ timeout: 30_000 });
+        if (await retry.isVisible()) await retry.click();
         await expect(take).toBeFocused({ timeout: 30_000 });
         await expect(page.getByText(K.ready)).toBeVisible();
         await shot(page, "capture-ready", width);
