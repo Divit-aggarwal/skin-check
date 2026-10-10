@@ -33,6 +33,8 @@ export interface AnswerOutcome {
   products: ShownProduct[];
   /** The reply without the claims that cite a product: what a red-flag user may see. */
   withoutProducts: string;
+  /** Any suggested product or any claim citing one: the guards apply. */
+  productContent: boolean;
 }
 
 /** The reading texts for the focus region (or the whole face), then one uncertainty text. Package text only, one per line. */
@@ -71,7 +73,7 @@ export async function answerFromPackage(
     // F16: the model's own medical words in a refusal ("I cannot recommend any medicines") are no crisis
     // when it also said "no distress"; the user's turns already passed the full pre-filter.
     const doctorOnly = !v.some((x) => x.crisis) && v.every((x) => x.answer?.distress === false);
-    const plain = (reply: string, referral: boolean, validator: ValidatorRecord): AnswerOutcome => ({ reply, referral, modelId, validator, products: [], withoutProducts: reply });
+    const plain = (reply: string, referral: boolean, validator: ValidatorRecord): AnswerOutcome => ({ reply, referral, modelId, validator, products: [], withoutProducts: reply, productContent: false });
     if (flagged) return plain(doctorOnly ? DOCTOR_REFERRAL_COPY : REFERRAL_COPY, true, { passed: false, failures: names(...v), regenerated, fallback: false });
     // F16: the crisis line goes with any distress, and with any referral that does not say "no distress" explicitly.
     if (last.answer?.needs_referral || last.answer?.distress === true) {
@@ -89,6 +91,7 @@ export async function answerFromPackage(
         products: (last.answer!.products ?? []).map((p) => ({ productId: p.product_id, reason: p.reason.trim() })),
         // Under a red flag only claims that cite a fact and no product remain: no uncited sales lead-in (safety review).
         withoutProducts: join(claims.filter((c) => c.fact_ids.length > 0 && !c.fact_ids.some((id) => id.startsWith("rec.")))),
+        productContent: (last.answer!.products ?? []).length > 0 || claims.some((c) => c.fact_ids.some((id) => id.startsWith("rec."))),
       };
     }
     return plain(fallbackAnswer(pkg), false, { passed: false, failures: names(...v), regenerated, fallback: true });
@@ -122,11 +125,11 @@ export function productGuard(safety: SafetyState): ProductGuard {
  * any product content. The opening is always product content.
  */
 export function guardedReply(
-  outcome: Pick<AnswerOutcome, "reply" | "products" | "withoutProducts">,
+  outcome: Pick<AnswerOutcome, "reply" | "products" | "withoutProducts" | "productContent">,
   guard: ProductGuard,
   opening = false
 ): { reply: string; products: ShownProduct[] } {
-  const productContent = outcome.products.length > 0 || outcome.withoutProducts !== outcome.reply;
+  const productContent = outcome.productContent || outcome.products.length > 0;
   if (guard === "red_flag" && (productContent || opening)) return { reply: [COPY.referral, outcome.withoutProducts].filter((t) => t.trim()).join("\n"), products: [] };
   if (guard === "doctor_line" && productContent) return { reply: `${outcome.reply}\n${PRODUCT_DOCTOR_LINE}`, products: outcome.products };
   return { reply: outcome.reply, products: outcome.products };

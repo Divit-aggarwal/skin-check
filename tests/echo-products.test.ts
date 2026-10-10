@@ -128,6 +128,10 @@ describe("the answer checker (TD-34, build parts 2 and 6)", () => {
     expect(check(answer({ claims: [{ claim_type: "product", text: "Use 5% Niacinamide Serum: After cleansing, apply 2 to 3 drops to dry skin, then moisturiser, and sunscreen in the morning.", fact_ids: ["rec.niacinamide-serum"] }] })).failures).toEqual([]);
   });
 
+  it("one sentence of a product's how-to-use, quoted as it is, passes (live run n07, a03)", () => {
+    expect(check(answer({ claims: [{ claim_type: "product", text: "Clear Seal: Apply a thin layer on a clean, dry spot and let it dry to a film.", fact_ids: ["rec.clear-seal"] }] })).failures).toEqual([]);
+  });
+
   it("a product claim may not rearrange its product's words into a result (safety review)", () => {
     for (const [text, id] of [["Use Clear Seal, then the single spot is nearly invisible.", "rec.clear-seal"], ["5% Niacinamide Serum: then your oily skin is dry skin.", "rec.niacinamide-serum"], ["5% Niacinamide Serum is for your oily and blemish-prone skin.", "rec.niacinamide-serum"]] as const) {
       expect(check(answer({ claims: [{ claim_type: "product", text, fact_ids: [id] }] })).passed, text).toBe(false);
@@ -198,7 +202,7 @@ describe("the answer checker (TD-34, build parts 2 and 6)", () => {
 
 describe("the guards, in code (TD-34, build part 5)", () => {
   const products: ShownProduct[] = [{ productId: "refreshing-cleanser", reason: "You told us your skin type: Oily" }];
-  const withProducts = { reply: "Here is a simple routine. Refreshing Cleanser: rinse well.", withoutProducts: "Here is a simple routine.", products };
+  const withProducts = { reply: "Here is a simple routine. Refreshing Cleanser: rinse well.", withoutProducts: "Here is a simple routine.", products, productContent: true };
   const safety = (answers: Record<string, unknown>) => evaluateSafety({ answers: { primary_concerns: ["blemishes"], ...answers }, confirmedThisScan: [] });
 
   it("red flag: the dermatologist line comes first and no product at all", () => {
@@ -215,7 +219,7 @@ describe("the guards, in code (TD-34, build part 5)", () => {
   });
 
   it("red flag on the opening: the line first even when Gemini suggested nothing", () => {
-    const shown = guardedReply({ reply: "Here is a simple routine.", withoutProducts: "Here is a simple routine.", products: [] }, "red_flag", true);
+    const shown = guardedReply({ reply: "Here is a simple routine.", withoutProducts: "Here is a simple routine.", products: [], productContent: false }, "red_flag", true);
     expect(shown.reply.split("\n")[0]).toBe(COPY.referral);
   });
 
@@ -238,9 +242,11 @@ describe("the guards, in code (TD-34, build part 5)", () => {
 
   it("no guard, or no product in the answer: the reply is unchanged", () => {
     expect(guardedReply(withProducts, null)).toEqual({ reply: withProducts.reply, products });
-    const plain = { reply: "Hello.", withoutProducts: "Hello.", products: [] };
+    const plain = { reply: "Hello.", withoutProducts: "Hello.", products: [], productContent: false };
     expect(guardedReply(plain, "doctor_line")).toEqual({ reply: "Hello.", products: [] });
     expect(guardedReply(plain, "red_flag")).toEqual({ reply: "Hello.", products: [] });
+    // Live run p16: a refusal with no product, whose uncited lines are left out under a red flag, gets no doctor line.
+    expect(guardedReply({ reply: "I can only talk about Project Skin's products.", withoutProducts: "", products: [], productContent: false }, "doctor_line").reply).not.toContain(PRODUCT_DOCTOR_LINE);
   });
 });
 

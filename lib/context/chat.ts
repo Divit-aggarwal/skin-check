@@ -172,7 +172,7 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
     uid, scanId, region, message, outcome.reply,
     meta({
       ...versions, promptVersion: promptVersionFor(pkg), modelId: outcome.modelId, validator: outcome.validator, prefilter: null, redFlag: outcome.referral,
-      ...(ownProducts ? { products: outcome.products, withoutProducts: outcome.withoutProducts, guard, opening, listVersion: OWN_PRODUCTS_VERSION } : {}),
+      ...(ownProducts ? { products: outcome.products, withoutProducts: outcome.withoutProducts, productContent: outcome.productContent, guard, opening, listVersion: OWN_PRODUCTS_VERSION } : {}),
     })
   );
   // TD-34: an opening that fell back is kept (so a reload spends nothing) but is no suggestion.

@@ -110,7 +110,9 @@ export function productFactText(p: ListedProduct): string {
 
 /** Parts of a product fact Gemini may repeat on their own (the validator strips them before its word checks). Not the key ingredient. */
 export function productQuotes(p: ListedProduct): string[] {
-  return [p.name, STEP_FOR_GEMINI[p.step], p.usage, p.description];
+  // Each sentence of the usage and description on its own too: a sentence of ours adds no claim (live run).
+  const sentences = (t: string) => t.split(/(?<=[.;])\s+/).map((x) => x.replace(/[.;]$/, "")).filter((x) => x.length > 0);
+  return [p.name, STEP_FOR_GEMINI[p.step], p.usage, p.description, ...sentences(p.usage), ...sentences(p.description)];
 }
 
 // ─── Settings ───────────────────────────────────────────────────────────────

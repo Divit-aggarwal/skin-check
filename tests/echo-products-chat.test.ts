@@ -157,7 +157,7 @@ describe("TD-34: the opening suggestion (route)", () => {
   });
 
   it("a stored opening is shown again with no Gemini call and no question spent, under today's guards", async () => {
-    h.loadOpening.mockResolvedValue({ reply: "Here is a simple routine from Project Skin's products.", withoutProducts: "", products: [{ productId: "refreshing-cleanser", reason: "You told us your skin type: Oily" }, { productId: "active-boba-cream", reason: "x" }] });
+    h.loadOpening.mockResolvedValue({ reply: "Here is a simple routine from Project Skin's products.", withoutProducts: "", productContent: true, products: [{ productId: "refreshing-cleanser", reason: "You told us your skin type: Oily" }, { productId: "active-boba-cream", reason: "x" }] });
     const body = await (await openingPost()).json();
     expect(body.products).toEqual([{ productId: "refreshing-cleanser", reason: "You told us your skin type: Oily" }]); // out of stock now: dropped
     expect(h.generateContent).not.toHaveBeenCalled();
@@ -204,7 +204,7 @@ describe("TD-34: the opening suggestion (route)", () => {
     expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ opening: true, validator: { fallback: true } });
     h.generateContent.mockClear();
     h.consumeEchoQuestion.mockClear();
-    h.loadOpening.mockResolvedValue({ reply: "x", withoutProducts: "x", products: [], fallback: true });
+    h.loadOpening.mockResolvedValue({ reply: "x", withoutProducts: "x", products: [], productContent: false, fallback: true });
     expect((await openingPost()).status).toBe(409);
     expect(h.generateContent).not.toHaveBeenCalled();
     expect(h.consumeEchoQuestion).not.toHaveBeenCalled();
@@ -220,7 +220,7 @@ describe("TD-34: the opening suggestion (route)", () => {
   it("a red-flag message earlier on this check: the opening shows the dermatologist line and no product", async () => {
     h.hadRedFlagTurn.mockResolvedValue(true);
     expect(await (await openingPost()).json()).toEqual({ ok: true, reply: COPY.referral, products: [] });
-    h.loadOpening.mockResolvedValue({ reply: "Here is a simple routine from Project Skin's products.", withoutProducts: "", products: [{ productId: "refreshing-cleanser", reason: "r" }], fallback: false });
+    h.loadOpening.mockResolvedValue({ reply: "Here is a simple routine from Project Skin's products.", withoutProducts: "", products: [{ productId: "refreshing-cleanser", reason: "r" }], productContent: true, fallback: false });
     expect(await (await openingPost()).json()).toEqual({ ok: true, reply: COPY.referral, products: [] });
   });
 

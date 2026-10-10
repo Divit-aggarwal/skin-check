@@ -27,6 +27,7 @@ export interface EchoTurnRecord {
   /** TD-34: checked product suggestions (ids and reasons), the reply without product claims, and the guard the user saw. */
   products?: ShownProduct[];
   withoutProducts?: string;
+  productContent?: boolean;
   guard?: ProductGuard;
   /** TD-34: the product list the answer was checked against (OWN_PRODUCTS_VERSION). */
   listVersion?: string;
@@ -108,6 +109,7 @@ export interface StoredOpening {
   reply: string;
   withoutProducts: string;
   products: ShownProduct[];
+  productContent: boolean;
   /** The stored answer fell back: no suggestion to show, and none to generate again. */
   fallback: boolean;
 }
@@ -131,5 +133,5 @@ export async function loadOpening(uid: string, scanId: string): Promise<StoredOp
       })
     : [];
   const fallback = (found.validator as { fallback?: unknown } | null)?.fallback === true;
-  return { reply: found.text as string, withoutProducts: typeof found.withoutProducts === "string" ? found.withoutProducts : "", products, fallback };
+  return { reply: found.text as string, withoutProducts: typeof found.withoutProducts === "string" ? found.withoutProducts : "", products, productContent: found.productContent !== false, fallback };
 }
