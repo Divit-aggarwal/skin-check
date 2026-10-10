@@ -31,7 +31,7 @@ export const DASHBOARD_COPY = {
     unreadable: "The readings of this check could not be shown.",
     hardToRead: (areas: string) => `Hard to read in this photo: ${areas}. Those readings are uncertain.`,
     knownTitle: "What this tells you",
-    known: "How each area of your face showed up in this one photo, as Low, Moderate or Elevated.",
+    known: "How redness and oiliness showed up in each area of your face in this one photo, as Low, Moderate or Elevated.",
     notKnownTitle: "What this does not tell you",
     notKnown: [
       "It is not a medical opinion.",
@@ -39,6 +39,20 @@ export const DASHBOARD_COPY = {
       "It does not set you against other people.",
       "Light, camera angle and distance shape every photo.",
     ],
+  },
+
+  // TD-37 (3): Breakouts, Texture and Dark marks, from the user's own answers only.
+  told: {
+    sources: "Redness and oiliness are read from your photo. Breakouts, texture and dark marks show what you told us in the questions. The photo does not measure them.",
+    title: "From what you told us",
+    ownAnswer: "Your own answer, not a reading of your photo.",
+    nothing: (topic: string) => `You did not tell us anything about ${topic} in the questions.`,
+    // Texture has no question of its own, only the main-concerns choice (flow review).
+    textureOnly: "The questions ask about texture only as a main concern.",
+    skipped: (topic: string) => `You skipped the questions, so there is nothing here about ${topic} yet.`,
+    // A list on Home, an opened check or Echo, whose page already has its own way to the questions.
+    none: "There are no answers about these on this check.",
+    listTitle: "Breakouts, texture and dark marks",
   },
 
   photoCheck: {

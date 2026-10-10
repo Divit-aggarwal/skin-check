@@ -22,6 +22,7 @@ import { listedProduct, OWN_PRODUCTS, OWN_PRODUCTS_VERSION, productFactText, pro
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { describeStepAnswerParts } from "@/lib/skin-check-format";
 import { bandScores, SCORING_VERSION } from "@/lib/skin-check-rules";
+import { PHOTO_METRICS } from "@/lib/skin-check-skus";
 import type { EchoRegion } from "@/lib/echo-regions";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import type { SkinScanScores } from "@/types/skin-scan";
@@ -36,11 +37,14 @@ import {
 // serializePackage() then copies only allowlisted keys.
 
 // ctx-2: no safety section (TD-17 (1), tracker H19).
-export const PACKAGE_VERSION = "ctx-2";
-/** ctx-3 (TD-34): product suggestions on; the "product" claim type and the own-product list. */
-export const PACKAGE_VERSION_PRODUCTS = "ctx-3";
+// ctx-4 (TD-37 (1)): ctx-2 with readings for redness and oiliness only; the
+// other three are in `missing`.
+export const PACKAGE_VERSION = "ctx-4";
+/** ctx-3 (TD-34): product suggestions on; the "product" claim type and the own-product list. ctx-5: ctx-3 under TD-37 (1). */
+export const PACKAGE_VERSION_PRODUCTS = "ctx-5";
 
-const METRICS: ContextMetric[] = ["redness", "oiliness", "texture", "blemishes", "pigment"];
+/** TD-37 (1): the only metrics sent as measured, now and across checks. */
+const METRICS: ContextMetric[] = [...PHOTO_METRICS];
 
 const METRIC_LABELS: Record<ContextMetric, string> = {
   redness: "Redness",
@@ -135,6 +139,8 @@ export const UNCERTAINTY_BANDS: UncertaintyStatement = {
 export const MISSING_TEXT = {
   hydration: "Photos cannot measure skin hydration.",
   pores: "Pore visibility has no reliable photo reading.",
+  // TD-37 (1): what the user said about these is still in selfReported.
+  unmeasured: "Photos do not measure breakouts, texture or dark marks yet.",
   trend: "Readings from different checks cannot be lined up yet.",
   routine: "Your routine is not shared with Echo.",
   skin: "There is no photo reading for this check.",
@@ -230,7 +236,8 @@ function longitudinalFacts(results: LongitudinalResult[]): { facts: ContextLongi
     }
     const metric = QUANTITY_METRIC[r.measured.quantity];
     const region = REGION_OF[r.measured.region];
-    if (!metric || !region) continue;
+    // TD-37 (1): texture and pigment quantities are not sent as measured either.
+    if (!metric || !region || !METRICS.includes(metric)) continue;
     const key = `${region}.${metric}`;
     const g = groups.get(key) ?? { metric, region, comparable: true, codes: new Set() };
     g.comparable &&= r.comparability.verdict === "comparable";
@@ -302,6 +309,7 @@ export function buildContextPackage(input: BuildInput): ContextPackage {
   const missingItems: MissingItem[] = [
     missing("hydration", "hydration", MISSING_TEXT.hydration),
     missing("pores", "pores", MISSING_TEXT.pores),
+    missing("unmeasured", "unmeasured", MISSING_TEXT.unmeasured),
     missing("routine", "routine", MISSING_TEXT.routine),
   ];
 

@@ -10,6 +10,7 @@ import type { ProductNames } from "@/lib/skin-check-validation";
 import { useAuth } from "@/lib/auth-context";
 import { canSaveScan, completeSave, withTimeout } from "@/lib/useSkinCheckFlow";
 import { Button } from "@/components/ui/button";
+import { ScanningPhoto } from "@/components/mesh/ScanningPhoto";
 import { attestedAgeBucket, postAgeAttestation } from "@/lib/consent";
 import { PHONE_VERIFIED } from "@/lib/skin-check-validation";
 
@@ -183,6 +184,15 @@ export function PhoneAuthStep({
     const blocked = Boolean(step.savesScan) && !canSaveScan(scan, answers);
     return (
       <div className="flex flex-col gap-3">
+        {/* TD-37 (2): where the user waits for the reading, the mesh sweeps over their photo. */}
+        {analyzing && scan.status === "loading" && scan.photo && (
+          <>
+            <ScanningPhoto photo={scan.photo} />
+            <p role="status" className="self-center text-center text-sm text-brand-muted">
+              Reading your photo. This takes a few seconds.
+            </p>
+          </>
+        )}
         <p className="text-body text-text/70">
           You&rsquo;re signed in as <span className="whitespace-nowrap text-text">{activeUser.phoneNumber}</span>.
         </p>

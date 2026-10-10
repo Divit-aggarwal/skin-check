@@ -60,7 +60,9 @@ describe("readings as every screen shows them", () => {
   const s = { redness: 0.9, oiliness: 0.5, texture: 0.4, pores: 0, blemishes: 0.2, hydration: 0.9, pigment: 0.5 };
   it("whole face and each face area: band words, no Dryness row, areas in a fixed order", () => {
     const r = readingsOf({ scores: s, region_scores: { chin: s, forehead: s }, region_low_confidence: { chin: true } });
-    expect(r.bands!.map((b) => b.label)).toEqual(["Redness", "Oiliness", "Texture", "Breakouts", "Dark marks"]);
+    // TD-37 (1): Redness and Oiliness only (was five).
+    expect(r.bands!.map((b) => b.label)).toEqual(["Redness", "Oiliness"]);
+    for (const a of r.areas) expect(a.bands?.map((b) => b.label) ?? []).not.toContain("Breakouts");
     expect(r.areas.map((a) => a.region)).toEqual(["forehead", "chin"]);
     for (const a of r.areas) expect(a.bands!.every((b) => ["Low", "Moderate", "Elevated"].includes(b.band))).toBe(true);
     expect(r.hardToRead).toEqual(["Chin"]);

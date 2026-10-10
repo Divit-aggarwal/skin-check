@@ -130,7 +130,8 @@ test("empty", async ({ page }) => {
 
 test("one reading: bands, a hard-to-read area, 0 of 3", async ({ page }) => {
   await dashboardAs(page, U.one!.phoneNumber);
-  await expect(page.getByText("Redness")).toBeVisible();
+  // exact: the TD-37 sources line also says "Redness and oiliness…".
+  await expect(page.getByText("Redness", { exact: true })).toBeVisible();
   await expect(page.getByText(C.current.hardToRead("Forehead"))).toBeVisible();
   await expect(page.getByText(C.trend.count(0, 3))).toBeVisible();
   await expect(page.getByText(C.current.notKnown[0]!)).toBeVisible();
@@ -177,7 +178,7 @@ test("one opened check: its own readings with the fixed line; unknown id is not 
   const opened = page.locator("section", { has: page.getByRole("heading", { name: /Check from/ }) });
   await expect(opened.getByText(C.history.pastLine)).toBeVisible();
   await expect(opened.getByText(C.photoCheck.override)).toBeVisible();
-  await expect(opened.getByText("Redness")).toBeVisible();
+  await expect(opened.getByText("Redness", { exact: true })).toBeVisible();
   await expect(opened).not.toContainText(/\/100|%|Dryness/);
   // One check only: the newest reading's card is not on this page.
   await expect(page.getByRole("heading", { name: C.current.title })).toHaveCount(0);

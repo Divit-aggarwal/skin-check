@@ -6,6 +6,7 @@ import { CAUSE, CHANGE, CONFIDENCE, DIAGNOSIS, FORECAST, MEASUREMENT, MEDICAL, N
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { GEMINI_FIELD_INVENTORY } from "@/lib/gemini";
 import { answer, fullInput, nee } from "./context-fixtures";
+import { OWN_PRODUCTS, productQuotes } from "@/lib/context/products";
 
 // F03 (docs/lanes/context-design.md §3.6). One passing and one failing answer per check.
 
@@ -161,7 +162,9 @@ describe("our own text passes our own validator", () => {
 
 // ── wave-2 security review: answers that passed the validator before ────────
 describe("validator: wave-2 security review bypasses are caught", () => {
-  const BLEM = reading("state.all.blemishes");
+  // TD-37 (1): the package holds no Breakouts reading any more. These two now
+  // cite the old id (unknown_fact_id) and, below, a reading that does exist.
+  const BLEM = { id: "state.all.blemishes" };
   const desc = (text: string, id = RED.id) => ok([{ claim_type: "descriptive", text, fact_ids: [id] }, UNC]);
   it.each([
     ["a change verb", desc(`Redness for the whole face has dropped to ${RED.band}.`)],
@@ -170,6 +173,7 @@ describe("validator: wave-2 security review bypasses are caught", () => {
     ["an amount word that is not a band", desc("The photo shows plenty of redness across the whole face.")],
     ["a user answer shown as measured (shaving bumps)", desc("The photo shows shaving bumps on the chin.", BLEM.id)],
     ["a user answer shown as measured (breakouts)", desc("The photo shows breakouts across the whole face.", BLEM.id)],
+    ["a user answer shown as measured (breakouts), citing a reading that exists", desc("The photo shows breakouts across the whole face.")],
     ["an echo with no 'you told us'", ok([{ claim_type: "self_reported_echo", text: "Your skin is shiny by mid-day.", fact_ids: ["self.all.skin_type"] }])],
     ["an uncited change pointing back at a reading", ok([{ claim_type: "descriptive", text: `Your redness reads ${RED.band} for the whole face.`, fact_ids: [RED.id] }, UNC, { claim_type: "smalltalk", text: "That is down from where it was.", fact_ids: [] }])],
     ["smalltalk with a past event and a comparative", ok([UNC, { claim_type: "smalltalk", text: "Last Tuesday your skin was redder.", fact_ids: [] }])],
@@ -477,5 +481,77 @@ describe("Hinglish replies (ctx-prompt-4)", () => {
     expect(sys).toMatch(/simple Hinglish in Latin letters if they write Hinglish/);
     expect(sys).toMatch(/Never say you can only answer in English/);
     expect(sys).not.toMatch(/Answer in English, in at most/);
+  });
+});
+
+// TD-37 (1): Breakouts, Texture and Dark marks are not measured readings any
+// more. Gemini gets them only as a missing item and as what the user said.
+describe("TD-37: the three hidden readings never come back as measured", () => {
+  const told = buildContextPackage(
+    fullInput({ answers: { primary_concerns: ["blemishes", "pigment", "texture"], breakout_pattern: ["red_inflamed"], pih_scar_tendency: "dark_mark_lingers" } })
+  );
+  const red = told.skin!.readings.find((r) => r.id === "state.all.redness")!;
+  const UNMEASURED = told.missing.find((m) => m.about === "unmeasured")!;
+  const desc = (text: string) => ok([{ claim_type: "descriptive", text, fact_ids: [red.id] }, UNC]);
+  const fails = (raw: string) => validateAnswer(raw, told, "tell me about my breakouts").passed;
+
+  it("the package has no reading or across-check fact for them, and says the photo does not measure them", () => {
+    const metrics = new Set(packageFacts(told).flatMap((f) => (f.metric ? [f.metric] : [])));
+    expect(Array.from(metrics).sort()).toEqual(["oiliness", "redness"]);
+    expect(UNMEASURED.text).toBe(MISSING_TEXT.unmeasured);
+  });
+
+  it.each([
+    ["a band for breakouts", desc(`Your breakouts read ${red.band} for the whole face.`)],
+    ["a band for texture", desc(`Texture reads ${red.band} on your cheeks.`)],
+    ["a band for dark marks", desc(`Dark marks read ${red.band} for the whole face.`)],
+    ["an unbanded description of breakouts", desc("Breakouts showed up on your chin.")],
+    ["an unbanded description of dark marks", desc("Your photo shows some dark marks.")],
+    ["an uncited remark about texture", ok([UNC, { claim_type: "smalltalk", text: "Your texture looks smooth.", fact_ids: [] }])],
+    // Safety review 2026-10-11: these passed before the fix (own words borrowed from the missing item or a told answer).
+    ["uncertainty reusing the missing item's words", ok([{ claim_type: "uncertainty", text: "This photo reading shows texture and dark marks across the whole face.", fact_ids: [UNMEASURED.id, red.id] }])],
+    ["uncertainty dropping the missing item's 'not'", ok([{ claim_type: "uncertainty", text: "Photos measure breakouts, texture and dark marks.", fact_ids: [UNMEASURED.id] }])],
+    ["uncertainty: your skin shows them", ok([{ claim_type: "uncertainty", text: "Your skin shows breakouts and dark marks.", fact_ids: [UNMEASURED.id] }])],
+    ["comparability: your skin shows them", ok([{ claim_type: "comparability", text: "Your skin shows breakouts and dark marks.", fact_ids: [UNMEASURED.id] }])],
+    ["uncertainty: your skin reads them", ok([{ claim_type: "uncertainty", text: "Your skin reads breakouts, texture and dark marks.", fact_ids: [UNMEASURED.id] }])],
+  ])("%s fails", (_name, raw) => {
+    expect(fails(raw)).toBe(false);
+  });
+
+  it("what the user told us about them still passes: a told echo, the missing item, a product reason", () => {
+    const concerns = told.selfReported!.find((s) => s.field === "primary_concerns")!;
+    expect(concerns.text).toContain("Breakouts");
+    expect(validateAnswer(ok([{ claim_type: "self_reported_echo", text: concerns.text, fact_ids: [concerns.id] }]), told, "x").failures).toEqual([]);
+    expect(validateAnswer(ok([{ claim_type: "uncertainty", text: UNMEASURED.text, fact_ids: [UNMEASURED.id] }]), told, "x").failures).toEqual([]);
+    const withProducts = buildContextPackage(fullInput({ answers: { primary_concerns: ["blemishes"] }, ownProducts: true, message: "Which products should I use?" }));
+    const own = withProducts.selfReported!.find((s) => s.field === "primary_concerns")!;
+    const raw = JSON.stringify({
+      claims: [{ claim_type: "product", text: "Here is a simple routine from Project Skin's products.", fact_ids: ["rec.refreshing-cleanser"] }],
+      products: [{ product_id: "refreshing-cleanser", reason: own.text, fact_ids: [own.id] }],
+      needs_referral: false,
+      distress: false,
+    });
+    expect(validateAnswer(raw, withProducts, "Which products should I use?").failures).toEqual([]);
+    // A reason may not frame the told answer as something the photo shows.
+    const shows = JSON.parse(raw);
+    shows.products[0].reason = "You told us your skin shows breakouts and dark marks.";
+    expect(validateAnswer(JSON.stringify(shows), withProducts, "Which products should I use?").passed).toBe(false);
+  });
+});
+
+// TD-37 review: some own-product texts name a topic ("breakout-prone",
+// "blemish-prone", "a single spot"). A product claim that repeats them word for
+// word still passes; only Gemini's own words are refused.
+describe("TD-37: verbatim product quotes still pass with products on", () => {
+  const pkg = buildContextPackage(fullInput({ ownProducts: true, message: "Which products should I use?" }));
+  const recs = packageFacts(pkg).filter((f) => f.kind === "rec");
+  it.each(OWN_PRODUCTS.map((p) => [p.id, p] as const))("%s", (id, p) => {
+    const fact = recs.find((f) => f.id === `rec.${id}`)!;
+    expect(fact).toBeTruthy();
+    for (const quote of productQuotes(p)) {
+      const raw = JSON.stringify({ claims: [{ claim_type: "product", text: quote, fact_ids: [fact.id] }], needs_referral: false, distress: false });
+      const checks = validateAnswer(raw, pkg, "Which products should I use?").failures.map((f) => f.check);
+      expect(checks, quote).not.toContain("contradicts_package");
+    }
   });
 });

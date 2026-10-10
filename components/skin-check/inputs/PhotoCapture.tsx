@@ -7,6 +7,7 @@ import { useCameraStream } from "@/hooks/useCameraStream";
 import { useAuth } from "@/lib/auth-context";
 import { isAuthError, isUploadError, isUploadTooLarge, runSkinScan, UPLOAD_TOO_LARGE_MESSAGE } from "@/lib/api";
 import { OVERLAY_CATEGORIES } from "@/lib/skin-check-skus";
+import { preloadFaceMesh } from "@/components/mesh/landmarks";
 import {
   IMAGE_RETENTION_CONSENT_COPY,
   IMAGE_RETENTION_CONSENT_VERSION,
@@ -292,7 +293,9 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     onChange("done");
     onCommit();
 
-    onScanChange({ status: "loading" });
+    onScanChange({ status: "loading", photo: blob });
+    // TD-37 (2): the mesh files start loading now, so the scanning view can draw it.
+    preloadFaceMesh();
     // Into the draft before the analysis starts, so a refresh mid-scan
     // restores this photo as a retryable scan instead of losing it. Written
     // under-claiming: the upload hasn't happened yet, so originalStored is

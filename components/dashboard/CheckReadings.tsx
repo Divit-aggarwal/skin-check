@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
+import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
+import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
+import type { ToldTopic } from "@/lib/told-topics";
 import { ECHO_REGION_LABELS, ECHO_REGIONS, type EchoRegion } from "@/lib/echo-regions";
 import { DASHBOARD_COPY as C } from "./copy";
 import { FaceDrawing } from "./FaceDrawing";
+import { MeshPicker } from "@/components/mesh/MeshPicker";
 import type { Bands, CheckView } from "./state";
 
 export { formatDate } from "./format";
@@ -38,8 +42,26 @@ export function ReadingRows({ bands }: { bands: Bands | null }) {
 // drawing (the same drawing on Home, an opened check and the results screen).
 // Band words only, all in the same neutral style, so no band reads as good or
 // bad news. No score, no overlay, no other check.
-export function CheckReadings({ view, stack = false }: { view: CheckView; stack?: boolean }) {
-  const [area, setArea] = useState<EchoRegion | null>(null);
+// TD-37 (2): with the user's photo (`photo`), the areas are chosen on the face
+// mesh over it; without one, or until the mesh is ready, on the face drawing.
+// `area` and `onAreaChange` let a parent own the choice (the results screen
+// marks the same area on its photo).
+export function CheckReadings({
+  view,
+  stack = false,
+  photo = null,
+  area: shownArea,
+  onAreaChange,
+}: {
+  view: CheckView;
+  stack?: boolean;
+  photo?: Blob | null;
+  area?: EchoRegion | null;
+  onAreaChange?: (region: EchoRegion | null) => void;
+}) {
+  const [ownArea, setOwnArea] = useState<EchoRegion | null>(null);
+  const area = shownArea !== undefined ? shownArea : ownArea;
+  const setArea = onAreaChange ?? setOwnArea;
   // No drawing of areas when there are no readings to go with it.
   const showFace = view.areas.length > 0 && view.bands !== null;
   const shown = area ? view.areas.find((a) => a.region === area)?.bands ?? null : view.bands;
@@ -49,7 +71,11 @@ export function CheckReadings({ view, stack = false }: { view: CheckView; stack?
       <div className={showFace && !stack ? "grid items-start gap-6 md:grid-cols-[minmax(0,300px)_1fr]" : "flex flex-col gap-6"}>
         {showFace && (
           <div role="group" aria-label={C.current.areaPicker} className="flex flex-col items-center gap-3 rounded-2xl bg-brand-linen p-4">
-            <FaceDrawing selected={area} labels={ECHO_REGION_LABELS} available={view.areas.map((a) => a.region)} onSelect={setArea} />
+            {(() => {
+              const choice = { selected: area, labels: ECHO_REGION_LABELS, available: view.areas.map((a) => a.region), onSelect: setArea };
+              const drawing = <FaceDrawing {...choice} />;
+              return photo ? <MeshPicker photo={photo} areas={choice} fallback={drawing} /> : drawing;
+            })()}
             <button
               type="button"
               aria-pressed={area === null}
@@ -95,5 +121,82 @@ export function KnownAndNotKnown() {
         </ul>
       </div>
     </div>
+  );
+}
+
+/** The line near the chips and readings saying where each one comes from (TD-37 (3)). */
+export function SourcesLine() {
+  return <p className="text-sm text-brand-muted">{C.told.sources}</p>;
+}
+
+/** What the user told us on one topic. Never a band or level. */
+function ToldLines({ told }: { told: ToldTopic }) {
+  if (told.lines.length === 0) {
+    return (
+      <>
+        <p>{C.told.nothing(told.label.toLowerCase())}</p>
+        {told.topic === "texture" && <p className="text-sm text-brand-muted">{C.told.textureOnly}</p>}
+      </>
+    );
+  }
+  return (
+    <ul className="flex flex-col gap-1">
+      {told.lines.map((line) => (
+        <li key={line}>{line}</li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * The results chip for one topic the photo does not measure (TD-37 (3)),
+ * labelled as the user's own answer. Skipped (`told` null): the invitation,
+ * with the way to the questions (the results check is the newest, so it can
+ * still be answered).
+ */
+export function ToldPanel({ label, told }: { label: string; told: ToldTopic | null }) {
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <p className="text-sm text-brand-muted">{C.told.title}</p>
+      {told === null ? (
+        <>
+          <p>{C.told.skipped(label.toLowerCase())}</p>
+          <Link href="/questions" className="inline-flex min-h-11 items-center font-medium text-brand-forest underline underline-offset-4">
+            {Q.answerLink}
+          </Link>
+        </>
+      ) : (
+        <ToldLines told={told} />
+      )}
+      <p className="text-sm text-brand-muted">{C.told.ownAnswer}</p>
+    </div>
+  );
+}
+
+/**
+ * Home, an opened check and Echo's panel: where each reading comes from, then
+ * the three topics from the check's answers. No link here: each of those pages
+ * already has its own way to the questions when they wait.
+ */
+export function ToldTopics({ topics }: { topics: ToldTopic[] | null }) {
+  const titleId = useId();
+  return (
+    <section aria-labelledby={titleId} className="flex flex-col gap-3 border-t border-brand-line pt-5">
+      <SourcesLine />
+      <div>
+        <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">{C.told.title}</p>
+        <h3 id={titleId} className="font-display text-base font-semibold tracking-[-0.01em]">{C.told.listTitle}</h3>
+      </div>
+      {topics === null ? (
+        <p>{C.told.none}</p>
+      ) : (
+        topics.map((t) => (
+          <div key={t.topic} className="flex flex-col gap-1">
+            <h4 className="font-semibold">{t.label}</h4>
+            <ToldLines told={t} />
+          </div>
+        ))
+      )}
+    </section>
   );
 }

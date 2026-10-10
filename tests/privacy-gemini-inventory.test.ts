@@ -118,9 +118,9 @@ describe("H03 Gemini field inventory", () => {
         .map((line) => /^([A-Za-z ]+): (Low|Moderate|Elevated)$/.exec(line)?.[1])
         .filter(Boolean)
     );
-    expect(Array.from(categories).sort()).toEqual(
-      ["Blemishes", "Oiliness", "Pigmentation", "Redness", "Texture irregularity"].sort()
-    );
+    // TD-37 (1): narrowed from five to two; the other three are never sent as a reading.
+    expect(Array.from(categories).sort()).toEqual(["Oiliness", "Redness"]);
+    expect(instruction).not.toMatch(/^(Blemishes|Pigmentation|Texture irregularity): /m);
   });
 
   it("name, age, gender, female context and Dryness never reach Gemini", async () => {
@@ -252,7 +252,16 @@ describe("context-package path (lane:context)", () => {
     const quoted = [...pkg.missing, ...(pkg.selfReported ?? [])].map((f) => JSON.stringify(f.text));
     const withoutMissing = quoted.reduce((t, q) => t.split(q).join(""), instruction).replace(/"about":"(hydration|pores)"|"missing\.all\.(hydration|pores)"/g, "");
     expect(withoutMissing).not.toMatch(/hydrat|\bpores?\b|Pore visibility/i);
-    expect(pkg.skin!.readings.map((r) => r.metric).sort()).toEqual(["blemishes", "blemishes", "oiliness", "oiliness", "pigment", "pigment", "redness", "redness", "texture", "texture"]);
+    // TD-37 (1): narrowed from five metrics to two.
+    expect(pkg.skin!.readings.map((r) => r.metric).sort()).toEqual(["oiliness", "oiliness", "redness", "redness"]);
+  });
+
+  it("TD-37 (1): breakouts, texture and dark marks appear only as the missing item or the user's own quiz labels, never as a reading", async () => {
+    const { pkg, instruction } = await captureContextCall();
+    const quoted = [...pkg.missing, ...(pkg.selfReported ?? [])].map((f) => JSON.stringify(f.text));
+    const rest = quoted.reduce((t, q) => t.split(q).join(""), instruction);
+    expect(rest).not.toMatch(/"metric":"(texture|blemishes|pigment)"|state\.\w+\.(texture|blemishes|pigment)|long\.\w+\.(texture|blemishes|pigment)|Texture irregularity|Pigmentation|Blemishes/);
+    expect(pkg.missing.map((m) => m.about)).toContain("unmeasured");
   });
 
   it("the user's message goes only in contents; structured output, explicit safety settings, no tools", async () => {

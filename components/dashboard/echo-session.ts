@@ -1,11 +1,9 @@
 import { bandScores } from "@/lib/skin-check-rules";
 import { summarizeConcerns } from "@/lib/skin-check-score";
 import type { SkinCheckSession } from "@/lib/skin-check-session-context";
-import type { SkinCheckAnswers } from "@/types/skin-check";
-import { questionAnswersOnly } from "@/lib/skin-check-validation";
 import type { CaptureMethod, SkinScanResult } from "@/types/skin-scan";
 import type { DashboardData } from "./data";
-import { deriveDashboard, echoRecord } from "./state";
+import { checkAnswers, deriveDashboard, echoRecord } from "./state";
 
 /**
  * The Echo session for the user's newest reading, built from the data the
@@ -24,10 +22,7 @@ export function newestEchoSession(uid: string, data: DashboardData): SkinCheckSe
   return {
     scanId,
     // TD-33 (1): with any answers given later (never the product names).
-    answers: {
-      ...((data.checks.find((c) => c.id === scanId)?.data.answers ?? {}) as SkinCheckAnswers),
-      ...questionAnswersOnly((data.laterAnswers.find((l) => l.id === scanId)?.data.answers ?? {}) as SkinCheckAnswers),
-    },
+    answers: checkAnswers(scanId, data.checks, data.laterAnswers),
     result,
     composite: summarizeConcerns(result.scores, bands),
     // ponytail: no photo is held here; Echo never reads it. Load the stored original if Echo ever shows it.

@@ -3,17 +3,22 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { motion, AnimatePresence, type PanInfo, type Variants } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { METRIC_LABELS } from "@/lib/skin-check-skus";
+import { METRIC_LABELS, type AnswerTopic, type PhotoMetric } from "@/lib/skin-check-skus";
+import { SourcesLine, ToldPanel } from "@/components/dashboard/CheckReadings";
+import { MeshLayer, useFaceMesh } from "@/components/mesh/MeshLayer";
+import type { ToldTopic } from "@/lib/told-topics";
+import type { EchoRegion } from "@/lib/echo-regions";
 import type { Band, BandableMetric } from "@/lib/skin-check-rules";
 import type { SkinScanOverlays, SkinScanScores } from "@/types/skin-scan";
 
 // TD-25 (3): the results screen follows the dashboard rule. Band words only,
 // all in ink: no score out of 100, no Dryness, no band colour.
-export interface AnalysisCategory {
-  key: BandableMetric;
-  label: string;
-  band: Band;
-}
+// TD-37: a "photo" chip is a reading with its overlay (Redness, Oiliness); a
+// "told" chip (Breakouts, Texture, Dark marks) has no band, no overlay and no
+// level, only what the user told us (null: the questions were skipped).
+export type AnalysisCategory =
+  | { kind: "photo"; key: PhotoMetric; label: string; band: Band }
+  | { kind: "told"; key: AnswerTopic; label: string; told: ToldTopic | null };
 
 interface EchoTwinProps {
   /** The user's captured photo — the hero's base layer. */
@@ -31,6 +36,8 @@ interface EchoTwinProps {
   onSelect: (key: BandableMetric) => void;
   /** True only for an actual completed scan — never true on the error path. */
   analyzed: boolean;
+  /** TD-37 (2): the face area chosen beside the photo, marked on the mesh. */
+  highlight?: EchoRegion | null;
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -90,6 +97,7 @@ export function EchoTwin({
   selected,
   onSelect,
   analyzed,
+  highlight = null,
 }: EchoTwinProps) {
   // Object URL creation and revocation must live in the SAME effect, not a
   // useMemo + separate useEffect pair — under React 18 StrictMode's
@@ -109,6 +117,8 @@ export function EchoTwin({
     return () => URL.revokeObjectURL(url);
   }, [photo]);
 
+  // Only over a photo that was read: a failed check gets no mesh.
+  const { mesh } = useFaceMesh(analyzed ? photo : null);
   const [overlayFailed, setOverlayFailed] = useState(false);
   const [photoFailed, setPhotoFailed] = useState(false);
   // Overlay decode failures are per-image — reset when the selected category
@@ -179,12 +189,13 @@ export function EchoTwin({
   );
 
   const selectedCategory = categories.find((c) => c.key === selected) ?? null;
-  const overlaySrc = selected ? overlays?.[selected] : undefined;
+  // TD-37 (1): an overlay only ever for a photo reading, whatever the response holds.
+  const overlaySrc = selectedCategory?.kind === "photo" ? overlays?.[selectedCategory.key] : undefined;
   const showOverlay = Boolean(overlaySrc) && !overlayFailed;
   // Only a real "unavailable" claim once the scan has actually completed and
   // this specific category's overlay genuinely isn't in the response —
   // never shown while still analyzing.
-  const overlayUnavailable = analyzed && Boolean(selected) && !overlaySrc;
+  const overlayUnavailable = analyzed && selectedCategory?.kind === "photo" && !overlaySrc;
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -229,7 +240,10 @@ export function EchoTwin({
             onError={() => setOverlayFailed(true)}
           />
         )}
-        {analyzed && (
+        {/* TD-37 (2): the face mesh, a map of the face, over the photo and any overlay. */}
+        {/* Not over a "told" chip: those are the user's answers, not a reading of this photo (safety review). */}
+        {mesh && photoUrl && !photoFailed && selectedCategory?.kind === "photo" && <MeshLayer mesh={mesh} highlight={highlight} />}
+        {analyzed && selectedCategory?.kind !== "told" && (
           <div className="absolute left-2 top-2 rounded-full bg-brand-paper/90 px-3 py-1 text-xs font-semibold text-brand-ink">
             Photo read
           </div>
@@ -264,7 +278,7 @@ export function EchoTwin({
       {categories.length > 0 && (
         <div
           role="tablist"
-          aria-label="Analysis categories"
+          aria-label="Photo readings and your answers"
           // Edge fade, not a second indicator row — a dot strip duplicating
           // these same labels read as clutter (caught in review). The real
           // problem it was covering for is that a horizontally-clipped tab
@@ -295,6 +309,11 @@ export function EchoTwin({
           })}
         </div>
       )}
+      {categories.length > 0 && (
+        <div className="w-full max-w-[420px] text-center">
+          <SourcesLine />
+        </div>
+      )}
 
       {selectedCategory && (
         <div className="relative w-full max-w-[420px] overflow-hidden">
@@ -309,11 +328,21 @@ export function EchoTwin({
               transition={{ duration: 0.2, ease: [0.19, 1, 0.22, 1] }}
               className="flex flex-col items-center gap-1 text-center"
             >
+              {selectedCategory.kind === "told" ? (
+                <>
+                  {/* Same order as a photo chip: the label, then the user's own answer in place of a level. */}
+                  <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">{selectedCategory.label}</h2>
+                  <ToldPanel label={selectedCategory.label} told={selectedCategory.told} />
+                </>
+              ) : (
+                <>
               <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">{selectedCategory.label}</h2>
               <p className="font-display text-2xl font-semibold text-brand-ink">{selectedCategory.band}</p>
               <p className="max-w-[85%] text-brand-muted">
                 {interpretationFor(selectedCategory.band, METRIC_LABELS[selectedCategory.key].toLowerCase())}
               </p>
+                </>
+              )}
               {overlayUnavailable && (
                 <p className="max-w-[85%] text-label text-muted-foreground">
                   Spatial visualization unavailable for this category.

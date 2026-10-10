@@ -113,3 +113,19 @@
     -webkit-tap-highlight-color: transparent;
   }
 }
+
+/* TD-37 (2): the scanning band over the face mesh. Transform only, so a
+   low-cost phone moves one layer and never redraws the mesh. Off under
+   reduced motion (the mesh stays, still). */
+@keyframes mesh-scan {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(400%); }
+}
+.mesh-scan {
+  top: 0;
+  animation: mesh-scan 2.4s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .mesh-scan { animation: none; display: none; }
+}

@@ -160,6 +160,7 @@ export type CaptureMethod = "native" | "canvas";
 // is not draft-persisted, so a restored scan's retry is not recorded (fails closed).
 export type SkinScanState =
   | { status: "idle" }
-  | { status: "loading" }
+  // `photo` (TD-37 (2)): the photo being read, so the scanning view can draw the mesh over it. Not draft-persisted.
+  | { status: "loading"; photo?: Blob | undefined }
   | { status: "success"; result: SkinScanResult; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined; processingConsentVersion?: string | undefined }
   | { status: "error"; message: string; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined; retakeReason?: RetakeReason | undefined; processingConsentVersion?: string | undefined };

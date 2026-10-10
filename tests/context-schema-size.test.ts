@@ -16,11 +16,13 @@ const minimal = buildContextPackage({ regionFocus: null, message: "hi", skin: nu
 const AREAS = [...ECHO_REGIONS, null] as const;
 
 describe("the answer format sent to Gemini does not grow with the facts (F19)", () => {
-  it("the full-answers user really is the long case: a one-check series and more facts than the 2026-10-09 failure (44)", () => {
+  // TD-37 (1) took the three hidden readings out of the package (13 fewer facts:
+  // 44 before, 31 now). The schema checks below do not depend on the count.
+  it("the full-answers user really is the long case: a one-check series and the most facts a package holds today (31)", () => {
     expect(fullSeries().every((r) => r.kind === "skinstate")).toBe(true);
     const forehead = buildContextPackage(fullAnswersInput("forehead", safety));
     expect(packageFacts(forehead).length).toBeGreaterThan(packageFacts(minimal).length);
-    expect(packageFacts(forehead).length).toBeGreaterThanOrEqual(44);
+    expect(packageFacts(forehead).length).toBeGreaterThanOrEqual(31);
   });
 
   it.each(AREAS)("area %s: the schema equals the schema of a package with no facts at all", (area) => {
