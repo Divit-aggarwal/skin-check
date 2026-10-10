@@ -9,7 +9,7 @@
 import { AI_SHARE_CONSENT_VERSION, IMAGE_RETENTION_CONSENT_VERSIONS } from "@/lib/consent";
 import { startingCheckCount, startingChecks, usableForEveryQuantity } from "@/lib/longitudinal/baseline";
 import { BASELINE_RULE } from "@/lib/longitudinal/settings";
-import { bandScores, type Band, type BandableMetric } from "@/lib/skin-check-rules";
+import { bandScores, type Band } from "@/lib/skin-check-rules";
 import { METRIC_LABELS, PHOTO_METRICS, type PhotoMetric } from "@/lib/skin-check-skus";
 import { toSkinState2, type SkinState2 } from "@/lib/skin-state-2";
 import { SkinScanScoresSchema } from "@/types/skin-scan";
