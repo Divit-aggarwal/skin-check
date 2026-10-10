@@ -226,9 +226,9 @@ git fetch origin && git worktree add /tmp/skin-check-td33 origin/feat/optional-q
 ## Q2. Merge the pull request (this is the production deploy)
 
 ```bash
-gh pr merge <PR number> --merge
+gh pr merge 9 --merge
 ```
-- Good output: `✓ Merged pull request #<n>`; Vercel builds `master` for production.
+- Good output: `✓ Merged pull request #9`; Vercel builds `master` for production.
 - Check (agent): production deployment READY on the merge commit, region `bom1`; `/questions` answers 200; a chat request without a login answers 401.
 - Undo: `vercel rollback <previous production deployment id>` (fast; the Q1 rules suit both versions), or `git revert -m 1 <merge commit>` in a new pull request.
 - Note: a tab left open from before the merge runs the old page; reloading fixes it. A draft saved by the old page is discarded once (draft version 3).
