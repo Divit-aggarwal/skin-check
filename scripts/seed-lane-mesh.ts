@@ -13,22 +13,20 @@ import { buildScanAnalysisRecord, scanAnalysisDocId } from "@/lib/scan-analysis-
 import { scanImageKey } from "@/lib/s3-key";
 import type { SkinScanResult } from "@/types/skin-scan";
 import { syntheticAnalysis, syntheticNative } from "../tests/synthetic-scan";
-import { allMeshUsers, MESH_ANSWERS } from "../tests/browser/seed-mesh";
+import { allMeshUsers, FACE_DARK, FACE_LIGHT, MESH_ANSWERS } from "../tests/browser/seed-mesh";
 
 const PROJECT = process.env.FIREBASE_PROJECT_ID ?? "";
 if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST || !PROJECT.startsWith("demo-")) {
   console.error("seed-lane-mesh: refusing to run outside the emulators with a demo- project.");
   process.exit(1);
 }
-// The engine's own test face, as the other browser tests use (LOCAL_STACK_FACE).
-const FACE = process.env.LOCAL_STACK_FACE ?? "../skin-scan/fixtures/input_face.png";
-
-async function putKeptPhoto(key: string) {
+async function putKeptPhoto(key: string, face: "dark" | "light") {
+  const FACE = face === "light" ? FACE_LIGHT : FACE_DARK;
   const endpoint = process.env.S3_SKIN_IMAGES_ENDPOINT;
   if (!endpoint || !/^http:\/\/127\.0\.0\.1:/.test(endpoint)) throw new Error("seed-lane-mesh: kept photos go to the local S3 stand-in only.");
   if (!existsSync(FACE)) throw new Error(`seed-lane-mesh: no test face at ${FACE}`);
   const s3 = new S3Client({ region: "ap-south-1", endpoint, forcePathStyle: true, credentials: { accessKeyId: "local-dev", secretAccessKey: "local-dev" } });
-  await s3.send(new PutObjectCommand({ Bucket: process.env.S3_SKIN_IMAGES_BUCKET ?? "skin-originals-dev", Key: key, Body: readFileSync(FACE), ContentType: "image/png" }));
+  await s3.send(new PutObjectCommand({ Bucket: process.env.S3_SKIN_IMAGES_BUCKET ?? "skin-originals-dev", Key: key, Body: readFileSync(FACE), ContentType: face === "light" ? "image/jpeg" : "image/png" }));
 }
 
 const ledgerEntry = (purpose: string, version: string, copy: string, source: string) => ({
@@ -63,7 +61,7 @@ async function main() {
       result: null,
       createdAt,
     });
-    if (user.kept) await putKeptPhoto(scanImageKey(user.uid, scanId));
+    if (user.kept) await putKeptPhoto(scanImageKey(user.uid, scanId), user.face ?? "dark");
     // The three hidden scores are high on purpose: a leak would show as Elevated.
     const result = {
       ...syntheticAnalysis(),

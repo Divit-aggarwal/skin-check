@@ -61,33 +61,20 @@ test("sign in as a seeded user and see the dashboard", async ({ page }) => {
   await shot(page, "building");
 });
 
-test("readings by face area: the face drawing switches the area, every band in the same style, no score", async ({ page }) => {
+// TD-39: one table for the whole face and each area; the face drawing is a picture, nothing to choose.
+test("readings by face area: one table, every level in the same style, nothing to choose, no score", async ({ page }) => {
   await dashboardAs(page, U.set!.phoneNumber);
   const current = page.locator("section", { has: page.getByRole("heading", { name: C.current.title }) });
-  await expect(current.getByRole("button", { name: C.current.wholeFace })).toHaveAttribute("aria-pressed", "true");
-  await current.getByRole("button", { name: "Forehead" }).click();
-  await expect(current.getByRole("heading", { name: "Forehead" })).toBeVisible();
-  await expect(current.getByRole("button", { name: "Forehead" })).toHaveAttribute("aria-pressed", "true");
-  await expect(current.getByRole("button", { name: C.current.wholeFace })).toHaveAttribute("aria-pressed", "false");
-  await expect(current.getByText(C.current.areaNote)).toBeVisible();
-  await shot(page, "home-area-chosen");
-  // Choosing the chosen area again goes back to the whole face.
-  await current.getByRole("button", { name: "Forehead" }).click();
-  await expect(current.getByRole("button", { name: C.current.wholeFace })).toHaveAttribute("aria-pressed", "true");
-  await expect(current.getByRole("heading", { name: C.current.wholeFace })).toBeVisible();
-  // Keyboard: Enter and Space choose an area; "Whole face" goes back.
-  await current.getByRole("button", { name: "Nose" }).focus();
-  await page.keyboard.press("Enter");
-  await expect(current.getByRole("heading", { name: "Nose" })).toBeVisible();
-  await current.getByRole("button", { name: "Cheeks" }).focus();
-  await page.keyboard.press(" ");
-  await expect(current.getByRole("button", { name: "Cheeks" })).toHaveAttribute("aria-pressed", "true");
-  await current.getByRole("button", { name: C.current.wholeFace }).click();
-  await expect(current.getByRole("heading", { name: C.current.wholeFace })).toBeVisible();
-  await current.getByRole("button", { name: "Forehead" }).click();
-  // Every reading row has one style, whatever its band; no Dryness row.
-  const classes = await current.locator("dd").evaluateAll((els) => Array.from(new Set(els.map((e) => e.className))));
+  const table = current.getByRole("table", { name: C.table.caption });
+  await expect(table.getByRole("columnheader")).toHaveText([C.table.area, "Redness", "Oiliness"]);
+  await expect(table.getByRole("rowheader").first()).toHaveText(C.current.wholeFace);
+  await expect(table.getByRole("rowheader", { name: "Forehead" })).toBeVisible();
+  for (const c of await table.getByRole("cell").allTextContents()) expect(c).toMatch(/^(Low|Moderate|Elevated|No reading)$/);
+  // Every level cell has one style, whatever its band; no Dryness.
+  const classes = await table.getByRole("cell").evaluateAll((els) => Array.from(new Set(els.map((e) => e.className))));
   expect(classes).toHaveLength(1);
+  await expect(current.getByRole("button", { name: "Forehead" })).toHaveCount(0);
+  await expect(current.getByText(C.current.areaNote)).toBeVisible();
   await expect(current.getByText("Dryness")).toHaveCount(0);
   await expect(current).not.toContainText(/\/100|%/);
   // The Recently list shows dates and kinds only: no reading next to it.
@@ -130,7 +117,6 @@ test("empty", async ({ page }) => {
 
 test("one reading: bands, a hard-to-read area, 0 of 3", async ({ page }) => {
   await dashboardAs(page, U.one!.phoneNumber);
-  // exact: the TD-37 sources line also says "Redness and oiliness…".
   await expect(page.getByText("Redness", { exact: true })).toBeVisible();
   await expect(page.getByText(C.current.hardToRead("Forehead"))).toBeVisible();
   await expect(page.getByText(C.trend.count(0, 3))).toBeVisible();

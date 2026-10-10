@@ -1,18 +1,22 @@
 import { mkdirSync, readFileSync } from "node:fs";
-import { devices, expect, test, type Page, type Route } from "@playwright/test";
+import { devices, expect, test, type Locator, type Page, type Route } from "@playwright/test";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
 import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
 import { WIDTHS, type Width } from "./seed-questionnaire";
-import { MESH_SEED } from "./seed-mesh";
+import { FACE_DARK, FACE_LIGHT, MESH_SEED } from "./seed-mesh";
 import { signIn } from "./helpers";
 
-// TD-37 (docs/design/face-mesh.md): the face mesh while the photo is read and
-// on the results, Home and an opened check; Redness and Oiliness as the only
-// readings; Breakouts, Texture and Dark marks from the user's answers. At 390,
-// 768 and 1280. AFTER_SHOTS=1 writes the screenshots to docs/design/after-mesh/.
+// TD-37 (docs/design/face-mesh.md): the face mesh while the photo is read.
+// TD-39: the results show the photo once with the mesh and both overlays, a
+// legend and one readings table; Home and an opened check the photo with the
+// mesh (or the face drawing) and the same table. No chips, nothing to choose,
+// nothing about Breakouts, Texture or Dark marks. At 390, 768 and 1280, on a
+// darker and a lighter skin tone. AFTER_SHOTS=1 writes the screenshots to
+// docs/design/after-one-photo/.
 
-const FACE = process.env.LOCAL_STACK_FACE ?? "../skin-scan/fixtures/input_face.png";
-const DIR = process.env.AFTER_SHOTS ? "docs/design/after-mesh" : ".local-stack/browser-shots";
+const FACES = { dark: FACE_DARK, light: FACE_LIGHT } as const;
+type Tone = keyof typeof FACES;
+const DIR = process.env.AFTER_SHOTS ? "docs/design/after-one-photo" : ".local-stack/browser-shots";
 mkdirSync(DIR, { recursive: true });
 const shot = async (page: Page, name: string, width: Width) => {
   await page.waitForTimeout(400); // entrance animations
@@ -50,27 +54,28 @@ function watchHosts(page: Page): string[] {
   return outside;
 }
 
-/** The engine's real answer, fetched once and replayed after, so only the first test waits for the engine. */
-let engineAnswer: { status: number; body: Buffer; headers: Record<string, string> } | null = null;
-async function holdScan(page: Page) {
+/** The engine's real answer for each photo, fetched once and replayed after, so only the first test per photo waits for the engine. */
+const engineAnswers = new Map<Tone, { status: number; body: Buffer; headers: Record<string, string> }>();
+async function holdScan(page: Page, tone: Tone = "dark") {
   let release!: () => void;
   const gate = new Promise<void>((r) => (release = r));
   await page.route(
     (url) => url.pathname === "/api/skin-scan",
     async (route: Route) => {
       await gate;
-      if (!engineAnswer) {
+      if (!engineAnswers.has(tone)) {
         const res = await route.fetch({ timeout: 300_000 });
-        engineAnswer = { status: res.status(), body: await res.body(), headers: res.headers() };
+        engineAnswers.set(tone, { status: res.status(), body: await res.body(), headers: res.headers() });
       }
-      await route.fulfill(engineAnswer);
+      await route.fulfill(engineAnswers.get(tone)!);
     }
   );
   return release;
 }
 
-async function photoAndAnalyze(page: Page) {
-  await page.locator('input[type="file"]').setInputFiles({ name: "face.png", mimeType: "image/png", buffer: readFileSync(FACE) });
+async function photoAndAnalyze(page: Page, tone: Tone = "dark") {
+  const light = tone === "light";
+  await page.locator('input[type="file"]').setInputFiles({ name: light ? "face.jpg" : "face.png", mimeType: light ? "image/jpeg" : "image/png", buffer: readFileSync(FACES[tone]) });
   await page.getByRole("checkbox").first().check();
   await page.getByRole("button", { name: "Analyze my skin" }).click();
 }
@@ -83,8 +88,6 @@ async function expectScanning(page: Page) {
   await expect(page.getByRole("status").filter({ hasText: "Reading your photo" })).toBeVisible();
 }
 
-const chip = (page: Page, name: string) => page.getByRole("tablist", { name: "Photo readings and your answers" }).getByRole("tab", { name, exact: true });
-
 async function toResults(page: Page) {
   const results = page.getByRole("button", { name: "Get my results" });
   await expect(results).toBeEnabled({ timeout: 300_000 });
@@ -92,74 +95,74 @@ async function toResults(page: Page) {
   await expect(page.getByRole("heading", { name: "Your photo reading" })).toBeVisible({ timeout: 60_000 });
 }
 
-/** The readings rows on screen: Redness and Oiliness only, never one of the three. */
-async function expectTwoRows(page: Page) {
-  const rows = page.locator("dl dt");
-  await expect(rows.first()).toBeVisible();
-  const labels = await rows.allTextContents();
-  expect(labels.length).toBeGreaterThan(0);
-  for (const l of labels) expect(l).not.toMatch(HIDDEN_ROW);
-  expect(labels).toContain("Redness");
-  expect(labels).toContain("Oiliness");
+const LEVEL = /^(Low|Moderate|Elevated|No reading)$/;
+const HIDDEN = /Breakouts|Texture|Dark marks|From what you told us|breakouts, texture and dark marks/i;
+
+/** One readings table: Area, Redness, Oiliness; whole face first; level words only. Never one of the three. */
+async function expectTable(scope: Page | Locator) {
+  const table = scope.getByRole("table", { name: C.table.caption });
+  await expect(table).toHaveCount(1);
+  await expect(table.getByRole("columnheader")).toHaveText([C.table.area, "Redness", "Oiliness"]);
+  await expect(table.getByRole("rowheader").first()).toHaveText(C.current.wholeFace);
+  expect(await table.getByRole("rowheader").count()).toBeGreaterThan(1);
+  const cells = await table.getByRole("cell").allTextContents();
+  expect(cells.length).toBeGreaterThan(0);
+  for (const c of cells) expect(c).toMatch(LEVEL);
+}
+
+/** Nothing to choose and nothing about the three removed readings anywhere on the page. */
+async function expectNothingElse(page: Page) {
+  await expect(page.getByRole("tab")).toHaveCount(0);
+  await expect(page.getByRole("tablist")).toHaveCount(0);
+  for (const area of ["Forehead", "Nose", "Cheeks", "Chin", C.current.wholeFace]) await expect(page.getByRole("button", { name: area, exact: true })).toHaveCount(0);
+  await expect(page.locator("main")).not.toContainText(HIDDEN);
+}
+
+/** The one photo with the mesh drawn and both overlays, and the legend naming each. */
+async function expectPhotoWithOverlays(page: Page) {
+  const photo = page.getByTestId("face-photo");
+  await expect(photo).toHaveCount(1);
+  await expect(photo.getByRole("img", { name: C.photo.overlayAlt.redness })).toBeAttached();
+  await expect(photo.getByRole("img", { name: C.photo.overlayAlt.oiliness })).toBeAttached();
+  await expect(photo.locator("svg path")).toHaveCount(1, { timeout: 90_000 }); // the mesh
+  const legend = page.getByRole("list", { name: C.photo.legend });
+  await expect(legend.getByRole("listitem")).toHaveText(["Redness", "Oiliness"]);
+  // The two overlays look different: one striped, one solid.
+  const styles = await photo.locator('[role="img"][aria-label^="Where"]').evaluateAll((els) => els.map((e) => getComputedStyle(e).backgroundImage !== "none"));
+  expect(styles).toEqual([true, false]);
 }
 
 for (const width of WIDTHS) {
-  test.describe(`TD-37 at ${width}px`, () => {
+  test.describe(`TD-39 at ${width}px`, () => {
     test.use(DEVICE[width]);
 
-    test("answered: the mesh sweeps while the photo is read, then each chip on the results", async ({ page }) => {
-      test.setTimeout(480_000);
-      const outside = watchHosts(page);
-      const release = await holdScan(page);
-      await signIn(page, MESH_SEED.answered[width].phoneNumber);
-      await page.goto("/skin-check");
-      await photoAndAnalyze(page);
-      // The one question asked again on every check, then the last step, where the user waits.
-      await expect(page.getByText("What are you currently using on your skin?")).toBeVisible({ timeout: 60_000 });
-      await page.getByRole("button", { name: /Nothing right now/ }).click();
-      await page.getByRole("button", { name: "Confirm selection" }).last().click();
-      await expectScanning(page);
-      await expect(page.getByRole("button", { name: "Analyzing your photo…" })).toBeDisabled();
-      await shot(page, "scanning", width);
-      release();
+    for (const tone of ["dark", "light"] as const) {
+      test(`${tone} skin: the mesh sweeps while the photo is read, then one photo with the mesh and both overlays and one table`, async ({ page }) => {
+        test.setTimeout(480_000);
+        const outside = watchHosts(page);
+        const release = await holdScan(page, tone);
+        await signIn(page, (tone === "dark" ? MESH_SEED.answered : MESH_SEED.answeredLight)[width].phoneNumber);
+        await page.goto("/skin-check");
+        await photoAndAnalyze(page, tone);
+        // The one question asked again on every check, then the last step, where the user waits.
+        await expect(page.getByText("What are you currently using on your skin?")).toBeVisible({ timeout: 60_000 });
+        await page.getByRole("button", { name: /Nothing right now/ }).click();
+        await page.getByRole("button", { name: "Confirm selection" }).last().click();
+        await expectScanning(page);
+        await expect(page.getByRole("button", { name: "Analyzing your photo…" })).toBeDisabled();
+        if (tone === "dark") await shot(page, "scanning", width);
+        release();
 
-      await toResults(page);
-      await expect(page.getByText(C.told.sources)).toBeVisible();
-      await expectTwoRows(page);
-      // The chips: the photo readings first, in a fixed order; no band on the three.
-      const names = await page.getByRole("tablist", { name: "Photo readings and your answers" }).getByRole("tab").allTextContents();
-      expect(names).toEqual(["Redness", "Oiliness", "Breakouts", "Texture", "Dark marks"]);
-      for (const name of names) {
-        await chip(page, name).click();
-        await expect(chip(page, name)).toHaveAttribute("aria-selected", "true");
-        const panel = page.locator("h2", { hasText: new RegExp(`^${name}$`, "i") }).locator("..");
-        if (name === "Redness" || name === "Oiliness") {
-          await expect(page.getByRole("img", { name: `${name} heatmap over your photo` })).toBeAttached();
-          await expect(panel).toContainText(BAND);
-        } else {
-          await expect(panel).toContainText(C.told.title);
-          await expect(panel).toContainText(C.told.ownAnswer);
-          await expect(panel).not.toContainText(BAND);
-          await expect(page.getByRole("img", { name: /heatmap/ })).toHaveCount(0);
-          if (name === "Breakouts") await expect(panel).toContainText("You chose breakouts as a main skin concern.");
-          if (name === "Dark marks") await expect(panel).toContainText("Leaves a dark mark that lingers");
-          if (name === "Texture") await expect(panel).toContainText(C.told.nothing("texture"));
-        }
-        await shot(page, `results-${name.toLowerCase().replace(" ", "-")}`, width);
-      }
-      // One photo on this screen: the area is chosen on the drawing and marked on the mesh over the photo.
-      await expect(page.getByTestId("mesh-picker")).toHaveCount(0);
-      await chip(page, "Redness").click();
-      await page.getByRole("button", { name: "Forehead" }).click();
-      await expect(page.getByRole("button", { name: "Forehead" })).toHaveAttribute("aria-pressed", "true");
-      await expect(page.locator('svg path[class*="fill-brand-mist/60"]')).toHaveCount(1);
-      await expect(page.getByRole("heading", { name: "Forehead", level: 3 })).toBeVisible();
-      await expectTwoRows(page);
-      await shot(page, "results-area-forehead", width);
-      expect(outside).toEqual([]);
-    });
+        await toResults(page);
+        await expectPhotoWithOverlays(page);
+        await expectTable(page);
+        await expectNothingElse(page);
+        await shot(page, `results-${tone}`, width);
+        expect(outside).toEqual([]);
+      });
+    }
 
-    test("skipped the questions: the three chips invite the user to answer them", async ({ page }) => {
+    test("skipped the questions: the same one photo and table, no invitation about the three", async ({ page }) => {
       test.setTimeout(480_000);
       const release = await holdScan(page);
       await signIn(page, MESH_SEED.skipped[width].phoneNumber);
@@ -170,55 +173,54 @@ for (const width of WIDTHS) {
       await expectScanning(page);
       release();
       await toResults(page);
-      await expectTwoRows(page);
-      for (const name of ["Breakouts", "Texture", "Dark marks"]) {
-        await chip(page, name).click();
-        const panel = page.locator("h2", { hasText: new RegExp(`^${name}$`, "i") }).locator("..");
-        await expect(panel).toContainText(C.told.skipped(name.toLowerCase()));
-        await expect(panel.getByRole("link", { name: Q.answerLink })).toBeVisible();
-        await expect(panel).not.toContainText(BAND);
-      }
-      await shot(page, "results-skipped-breakouts", width);
+      await expectPhotoWithOverlays(page);
+      await expectTable(page);
+      await expectNothingElse(page);
     });
 
-    test("an opened check with no kept photo: the face drawing, two readings, the user's answers", async ({ page }) => {
+    test("an opened check with no kept photo: the face drawing and the table", async ({ page }) => {
       await signIn(page, MESH_SEED.noPhoto.phoneNumber);
       await page.goto(`/checks/${MESH_SEED.noPhoto.uid}-1`);
       await expect(page.getByText(C.history.pastLine)).toBeVisible({ timeout: 60_000 });
-      await expect(page.getByTestId("mesh-picker")).toHaveCount(0);
-      await expect(page.getByRole("button", { name: "Forehead" })).toBeVisible();
-      await expectTwoRows(page);
-      await expect(page.getByRole("heading", { name: C.told.listTitle })).toBeVisible();
-      await expect(page.getByText("You chose breakouts as a main skin concern.")).toBeVisible();
+      await expect(page.getByTestId("face-photo")).toHaveCount(0);
+      await expect(page.getByRole("img", { name: /A drawing of a face/ })).toBeVisible();
+      await expect(page.getByText(C.photo.mapsOnResults)).toBeVisible();
+      await expectTable(page);
+      await expectNothingElse(page);
       await shot(page, "check-no-photo", width);
     });
 
-    test("a kept photo: the mesh on Home and the opened check, with the chosen area", async ({ page }) => {
-      const outside = watchHosts(page);
-      await signIn(page, MESH_SEED.kept.phoneNumber);
-      const home = page.getByTestId("mesh-picker");
-      await expect(home).toBeVisible({ timeout: 90_000 });
-      await expectTwoRows(page);
-      // Keyboard: the middle of the cheeks' outline is the nose, so a pointer click there picks the nose, as it should.
-      await home.getByRole("button", { name: "Cheeks" }).focus();
-      await page.keyboard.press("Enter");
-      await expect(home.getByRole("button", { name: "Cheeks" })).toHaveAttribute("aria-pressed", "true");
-      await shot(page, "home-kept-photo", width);
-      await page.goto(`/checks/${MESH_SEED.kept.uid}-1`);
-      await expect(page.getByTestId("mesh-picker")).toBeVisible({ timeout: 90_000 });
-      await expectTwoRows(page);
-      await shot(page, "check-kept-photo", width);
-      expect(outside).toEqual([]);
-    });
+    for (const tone of ["dark", "light"] as const) {
+      test(`${tone} skin, a kept photo: Home and the opened check show the photo with the mesh and the table`, async ({ page }) => {
+        const outside = watchHosts(page);
+        const user = tone === "dark" ? MESH_SEED.kept : MESH_SEED.keptLight;
+        await signIn(page, user.phoneNumber);
+        const home = page.getByTestId("face-photo");
+        await expect(home).toBeVisible({ timeout: 90_000 });
+        await expect(home.locator("svg path")).toHaveCount(1);
+        // The overlays are not kept, so they come only with a new check (TD-39 (6)).
+        await expect(home.getByRole("img", { name: /^Where/ })).toHaveCount(0);
+        await expect(page.getByText(C.photo.mapsOnResults)).toBeVisible();
+        await expectTable(page);
+        await expectNothingElse(page);
+        await shot(page, `home-kept-${tone}`, width);
+        await page.goto(`/checks/${user.uid}-1`);
+        await expect(page.getByTestId("face-photo")).toBeVisible({ timeout: 90_000 });
+        await expectTable(page);
+        await expectNothingElse(page);
+        await shot(page, `check-kept-${tone}`, width);
+        expect(outside).toEqual([]);
+      });
+    }
   });
 }
 
-test("skipped questions on an opened check: no topic list, the existing invitation", async ({ page }) => {
+test("skipped questions on an opened check: the existing invitation, nothing about the three", async ({ page }) => {
   await signIn(page, MESH_SEED.noPhotoSkipped.phoneNumber);
   await page.goto(`/checks/${MESH_SEED.noPhotoSkipped.uid}-1`);
   await expect(page.getByText(Q.checkSkipped)).toBeVisible({ timeout: 60_000 });
-  await expectTwoRows(page);
-  await expect(page.getByText(C.told.sources)).toBeVisible();
+  await expectTable(page);
+  await expectNothingElse(page);
   await shot(page, "check-skipped", "390");
 });
 
@@ -226,10 +228,10 @@ test("the bucket refuses a read from our site (today's production CORS): the fac
   await page.route((url) => url.hostname === "127.0.0.1" && url.pathname.includes("/original.jpg"), (route) => route.abort("accessdenied"));
   await signIn(page, MESH_SEED.kept.phoneNumber);
   await expect(page.getByRole("heading", { name: C.current.title })).toBeVisible();
-  await expectTwoRows(page);
+  await expectTable(page);
   await page.waitForTimeout(3_000);
-  await expect(page.getByTestId("mesh-picker")).toHaveCount(0);
-  await expect(page.getByRole("button", { name: "Forehead" })).toBeVisible();
+  await expect(page.getByTestId("face-photo")).toHaveCount(0);
+  await expect(page.getByRole("img", { name: /A drawing of a face/ })).toBeVisible();
 });
 
 test("reduced motion: the mesh stays still, no sweeping band", async ({ page }) => {
@@ -262,6 +264,10 @@ test("the mesh files cannot load: the photo and the plain progress state, and th
   await shot(page, "scanning-no-mesh", "390");
   release();
   await toResults(page);
-  await expectTwoRows(page);
-  await expect(page.getByTestId("mesh-picker")).toHaveCount(0);
+  // The photo and both overlays still show; only the mesh is missing.
+  const photo = page.getByTestId("face-photo");
+  await expect(photo.getByRole("img", { name: C.photo.overlayAlt.redness })).toBeAttached();
+  await page.waitForTimeout(2_000);
+  await expect(photo.locator("svg")).toHaveCount(0);
+  await expectTable(page);
 });
