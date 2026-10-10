@@ -303,7 +303,7 @@ The P4 undo: `printf 'off' | vercel env add ECHO_PRODUCTS_SWITCH production --no
 
 # TD-37 release: face mesh, and two photo readings (prepared 2026-10-11)
 
-Pull request: branch `feat/mesh-two-readings` (pull request: see M3). **Nothing below has been run.** Same rules as above: in order, one step at a time, and tell the agent after each step. Run this after the TD-34 queue (P1–P3), or tell the agent if you want it first. The two releases touch different files.
+Pull request: branch `feat/mesh-two-readings` (pull request #11: https://github.com/Divit-aggarwal/skin-check/pull/11). **Nothing below has been run.** Same rules as above: in order, one step at a time, and tell the agent after each step. Run this after the TD-34 queue (P1–P3), or tell the agent if you want it first. The two releases touch different files.
 
 **Why this order is safe.** There is no database rules, index or expiry change, and no setting to add. The engine's five values are saved exactly as today (TD-37 (4)). The bucket rule (M2) goes first. It only lets our own site read a photo through a signed link the server already issues for the owner of that photo. Before the merge, nothing in the live app uses it. Without it, after the merge Home and an opened check show the face drawing instead of the mesh. Nothing breaks.
 
@@ -328,9 +328,9 @@ jq '.CORSRules += [{"AllowedOrigins":["https://skin-check-sigma.vercel.app","htt
 ## M3. Merge the pull request (this is the production deploy)
 
 ```bash
-gh pr merge <PR number> --merge
+gh pr merge 11 --merge
 ```
-- Good output: `✓ Merged pull request #<n>`. Vercel builds `master` for production (about 2 minutes). The build copies the mesh library's files into the site (`next.config.js`).
+- Good output: `✓ Merged pull request #11`. Vercel builds `master` for production (about 2 minutes). The build copies the mesh library's files into the site (`next.config.js`).
 - Check (agent):
   - The production deployment is READY on the merge commit, region `bom1`.
   - `curl -sI https://skin-check-sigma.vercel.app/mediapipe/0.10.35/wasm/vision_wasm_internal.wasm` gives 200 and `content-type: application/wasm`.
