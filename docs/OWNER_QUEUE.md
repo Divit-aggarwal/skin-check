@@ -202,3 +202,43 @@ The old key (ID starting `5ab9a1f241`) is still Active so that rollbacks to depl
 - Check (agent): `aws iam list-mfa-devices --user-name theagihustler@gmail.com` lists one device.
 - After this, `aws login` asks for the code too.
 - The other console user, `TeleGlobal-user` (never signed in, read-only policies), was left untouched as asked.
+
+---
+
+# TD-33 release: optional questionnaire, product-name boxes, capture button (prepared 2026-10-10)
+
+Pull request: branch `feat/optional-questionnaire`. **Nothing below has been run.** Same rules as above: in order, one step at a time, tell the agent after each step.
+
+**Why this order is safe.** The only rules change adds two things: checks for the new `questionnaire` and `productNames` fields on `skinChecks`, and the new `laterAnswers` collection.
+- New rules with the old (live) code: the live code never writes `questionnaire`, `productNames` or `laterAnswers`, so every live write still passes (a record without those fields is accepted; tested in tests/firestore-rules-questionnaire.test.ts, "a record with none (old bundles too)").
+- Old rules with the new code: "Answer the questions later" would be refused (old rules deny any path they do not match), so the merge must come **after** the rules.
+So: rules first (Q1), then merge (Q2). No index, TTL or other setting changes.
+
+## Q1. Deploy the new database rules (before the merge)
+
+```bash
+git fetch origin && git worktree add /tmp/skin-check-td33 origin/feat/optional-questionnaire && cd /tmp/skin-check-td33 && npx -y firebase-tools@latest deploy --only firestore:rules --project projectskin-a202c; cd -; git worktree remove /tmp/skin-check-td33
+```
+- Good output: `✔ firestore: released rules firestore.rules to cloud.firestore` and `✔ Deploy complete!`.
+- Check (agent): the live rules equal `firestore.rules` on the branch (they contain `match /laterAnswers/{scanId}` and `function productNamesOk`); a check on the live site (old code) still saves (phone check: one check with no photo kept).
+- Undo: the same command with `origin/master` in place of `origin/feat/optional-questionnaire` (only before Q2).
+
+## Q2. Merge the pull request (this is the production deploy)
+
+```bash
+gh pr merge <PR number> --merge
+```
+- Good output: `✓ Merged pull request #<n>`; Vercel builds `master` for production.
+- Check (agent): production deployment READY on the merge commit, region `bom1`; `/questions` answers 200; a chat request without a login answers 401.
+- Undo: `vercel rollback <previous production deployment id>` (fast; the Q1 rules suit both versions), or `git revert -m 1 <merge commit>` in a new pull request.
+- Note: a tab left open from before the merge runs the old page; reloading fixes it. A draft saved by the old page is discarded once (draft version 3).
+
+## Q3. Phone checks after the merge (made-up test accounts only)
+
+1. New check: after About you, "About the questions" shows the number of questions and the minutes; **Skip for now** → sign in, photo, results with readings and the line "You skipped the questions…".
+2. Home shows "Your Skin Check questions"; Echo shows the notice and answers with the fixed reply plus "Finish the Skin Check questions…" (no AI answer).
+3. Answer the questions from Home; type a prescription name; Echo now answers normally; the opened check shows "Products you named"; Home and Echo never show the name.
+4. Capture on a phone: "Open camera" opens the camera; on a laptop the browser asks for the camera only after "Open camera".
+5. Delete that test account; the agent checks that no `skinChecks` or `laterAnswers` document is left for it.
+
+Legal review of the line under the boxes (tracker H31) is separate and does not block the merge unless you decide it does.
