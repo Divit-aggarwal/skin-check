@@ -230,15 +230,6 @@ describe("TD-33 (1): a skipped check keeps F11 until its questions are answered"
     expect(later!.answers.age).toBe("25-34");
   });
 
-  it("today's Echo keeps F11 too: a skipped check, no Gemini call", async () => {
-    vi.stubEnv("NODE_ENV", "test");
-    vi.stubEnv("ECHO_CONTEXT_PATH", "off");
-    h.store.set(CHECK, { answers: BASICS, questionnaire: "skipped" });
-    const { reply } = (await (await post()).json()) as { reply: string };
-    expect(reply.split("\n").at(-1)).toBe(FINISH_QUESTIONNAIRE_COPY);
-    expect(h.generateContent).not.toHaveBeenCalled();
-  });
-
   it("the later record is read for the same check only", async () => {
     h.store.set(CHECK, { answers: BASICS, questionnaire: "skipped" });
     await post();

@@ -17,6 +17,7 @@ import { formatPrompt } from "@/lib/skin-check-format";
 import { laterAnswersSaved, saveLaterAnswers } from "@/lib/firebase/skin-checks";
 import { withTimeout } from "@/lib/useSkinCheckFlow";
 import { echoOn } from "@/lib/echo-limits";
+import { scrollBehavior } from "@/lib/utils";
 import { loadDashboard } from "@/components/dashboard/data";
 import { echoScanIdFrom, questionsTarget, toDate, type Doc } from "@/components/dashboard/state";
 import { formatDate } from "@/components/dashboard/format";
@@ -111,8 +112,6 @@ function QuestionsForm({ uid, target, isEcho, onSaved }: { uid: string; target: 
   useEffect(() => {
     if (state === "saved") savedRef.current?.focus();
   }, [state]);
-  const smooth = (): ScrollBehavior =>
-    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
 
   function setAnswer(stepId: string, value: StepAnswerValue) {
     setAnswers((prev) => ({ ...prev, [stepId]: value }));
@@ -122,7 +121,7 @@ function QuestionsForm({ uid, target, isEcho, onSaved }: { uid: string; target: 
   function focusNextStep(stepId: string) {
     const i = section.steps.findIndex((s) => s.id === stepId);
     const next = section.steps[i + 1];
-    if (next) stepRefs.current.get(next.id)?.scrollIntoView({ behavior: smooth(), block: "center" });
+    if (next) stepRefs.current.get(next.id)?.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
   }
 
   async function save() {

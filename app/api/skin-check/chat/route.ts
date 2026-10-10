@@ -19,7 +19,7 @@ import { handleContextChat, recordReferral } from "@/lib/context/chat";
 import { loadSplitCheckTurns } from "@/lib/context/chat-turns";
 import { checkComparisonHit, comparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY, referralCopyFor, UNSUPPORTED_SCRIPT_COPY, unsupportedScript, withoutReferrals } from "@/lib/context/prefilter";
 import { buildContextPackage } from "@/lib/context/builder";
-import { comparisonAnswer, fallbackLines, FINISH_QUESTIONNAIRE_COPY } from "@/lib/context/answer";
+import { comparisonAnswer, fallbackLines } from "@/lib/context/answer";
 import { ECHO_FALLBACK_LEAD, screenEchoReply } from "@/lib/echo-reply-screen";
 
 // firebase-admin needs Node APIs and hard-fails on the Edge runtime — same
@@ -311,13 +311,6 @@ export async function POST(request: NextRequest) {
     }
 
     const { scores, regionScores, answers } = context;
-    // TD-33: today's Echo (development and test only) keeps F11 as well: no
-    // answers, no Gemini call (the loader already returns {} for partial ones).
-    if (Object.keys(answers).length === 0) {
-      const lines = fallbackLines(buildContextPackage({ regionFocus: region, message, skin: { scores, regionScores, regionLowConfidence: context.regionLowConfidence, pipelineVersion: context.pipelineVersion, schemaVersion: context.schemaVersion }, answers }));
-      const reply = [...lines, FINISH_QUESTIONNAIRE_COPY].join("\n");
-      return NextResponse.json({ ok: true, reply, historyToken: signHistory(uid, scanId, region, [...history, { role: "user", text: message }, { role: "echo", text: reply }]) });
-    }
     const composite = summarizeConcerns(scores, bandScores(scores).bands);
     const focusScores = regionScores[region];
     const userTurn = { role: "user" as const, text: message };

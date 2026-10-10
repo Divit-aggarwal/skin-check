@@ -82,7 +82,16 @@ function seedAnalysis(uid: string, docId: string, fields: Record<string, unknown
   store.set(`users/${uid}/scanAnalyses/${docId}`, { ...record, createdAt, ...rest });
 }
 
-const ANSWERS = { skin_type: "oily", concerns: ["redness", "texture"] };
+// TD-33: complete enough for Echo (every safety question answered); a
+// partial set now reads as no answers, by the owner's rule.
+const ANSWERS = {
+  gender: "male",
+  skin_type: "oily",
+  primary_concerns: ["redness", "texture"],
+  breakout_pattern: ["small_bumps"],
+  pih_scar_tendency: "fades_no_trace",
+  current_products: ["cleanser_moisturizer"],
+};
 const BODY = { scanId: SCAN_ID, region: "cheeks", history: [], message: "why is it red?" };
 
 function post(body: unknown) {

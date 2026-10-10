@@ -149,3 +149,15 @@ The laptop no longer asks for the camera the moment the step appears: it asks on
 - Answer later on a check whose analysis failed: allowed; Echo only ever talks about the newest reading.
 - Old bundle writing a record without `questionnaire`: read as answered (today's behaviour).
 - A tampered client marking a check "answered" with only basic details still gets the F11 reply.
+
+## 5. After the four reviews (2026-10-10)
+
+- Echo needs **every safety question** answered (primary_concerns, breakout_pattern,
+  pih_scar_tendency, current_products, and female_skin_context for women); anything less is
+  the F11 fixed reply with no Gemini call (`safetyQuestionsAnswered`).
+- A later-answers record only fills a check that has no answers of its own, and only with
+  question ids; the rules refuse a `"skipped"` check that holds answers and a later record that
+  is partial or touches name, age or gender.
+- Accepted, not changed: today's Echo path (`ECHO_CONTEXT_PATH=off`) has no F11 step of its own.
+  It runs only in development and test builds (lib/context/switch.ts), never in production, and it
+  never receives product names (tested).
