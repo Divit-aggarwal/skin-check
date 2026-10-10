@@ -247,7 +247,7 @@ Legal review of the line under the boxes (tracker H31) is separate and does not 
 
 # TD-34 release: Echo suggests Project Skin's own products (prepared 2026-10-10)
 
-Pull request: branch `feat/echo-own-products` (PR number: see the pull request; written below as `<PR>`). **Nothing below has been run.** Same rules as above: in order, one step at a time, and tell the agent after each step. Start only after the TD-33 queue above is done.
+Pull request: branch `feat/echo-own-products` (pull request #10: https://github.com/Divit-aggarwal/skin-check/pull/10). **Nothing below has been run.** Same rules as above: in order, one step at a time, and tell the agent after each step. Start only after the TD-33 queue above is done.
 
 **Why this order is safe.** There is no database rules, index or expiry change. The opening is stored in `chatTurns`, which only the server writes, and its read is a single-field equality query. The merge goes live with product suggestions **off** (step P1), so the new code first runs exactly like today's Echo (the same Gemini input as before). Suggestions are switched on in a separate redeploy (P4), after the phone checks. Turning them off again is the same switch.
 
@@ -265,9 +265,9 @@ printf 'off' | vercel env add ECHO_PRODUCTS_SWITCH production --no-sensitive
 ## P2. Merge the pull request (this is the production deploy)
 
 ```bash
-gh pr merge <PR> --merge
+gh pr merge 10 --merge
 ```
-- Good output: `✓ Merged pull request #<PR>`. Vercel builds `master` for production (about 2 minutes).
+- Good output: `✓ Merged pull request #10`. Vercel builds `master` for production (about 2 minutes).
 - Check (agent): production deployment READY on the merge commit, region `bom1`; a chat request without a login answers 401; the `/echo` page source does not contain "These are Project Skin's own products" (switch off).
 - Undo: `vercel rollback <previous production deployment id>` (fast), or `git revert -m 1 <merge commit>` in a new pull request.
 
