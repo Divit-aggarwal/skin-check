@@ -6,6 +6,7 @@ import { CAUSE, CHANGE, CONFIDENCE, DIAGNOSIS, FORECAST, MEASUREMENT, MEDICAL, N
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { GEMINI_FIELD_INVENTORY } from "@/lib/gemini";
 import { answer, fullInput, nee } from "./context-fixtures";
+import { OWN_PRODUCTS, productQuotes } from "@/lib/context/products";
 
 // F03 (docs/lanes/context-design.md §3.6). One passing and one failing answer per check.
 
@@ -535,5 +536,22 @@ describe("TD-37: the three hidden readings never come back as measured", () => {
     const shows = JSON.parse(raw);
     shows.products[0].reason = "You told us your skin shows breakouts and dark marks.";
     expect(validateAnswer(JSON.stringify(shows), withProducts, "Which products should I use?").passed).toBe(false);
+  });
+});
+
+// TD-37 review: some own-product texts name a topic ("breakout-prone",
+// "blemish-prone", "a single spot"). A product claim that repeats them word for
+// word still passes; only Gemini's own words are refused.
+describe("TD-37: verbatim product quotes still pass with products on", () => {
+  const pkg = buildContextPackage(fullInput({ ownProducts: true, message: "Which products should I use?" }));
+  const recs = packageFacts(pkg).filter((f) => f.kind === "rec");
+  it.each(OWN_PRODUCTS.map((p) => [p.id, p] as const))("%s", (id, p) => {
+    const fact = recs.find((f) => f.id === `rec.${id}`)!;
+    expect(fact).toBeTruthy();
+    for (const quote of productQuotes(p)) {
+      const raw = JSON.stringify({ claims: [{ claim_type: "product", text: quote, fact_ids: [fact.id] }], needs_referral: false, distress: false });
+      const checks = validateAnswer(raw, pkg, "Which products should I use?").failures.map((f) => f.check);
+      expect(checks, quote).not.toContain("contradicts_package");
+    }
   });
 });
