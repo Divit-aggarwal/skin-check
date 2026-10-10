@@ -1,5 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { PHOTO_METRICS } from "@/lib/skin-check-skus";
 import { describe, expect, it } from "vitest";
 import { CHECKS_COPY } from "@/components/checks/copy";
 import { bannedWordsIn } from "@/lib/catalog/wording";
@@ -90,7 +91,12 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
       expect(src, f).not.toMatch(/\/100|toConcern|BAND_STYLE|scorePct|tabular-nums/);
     }
     const results = readFileSync("components/skin-check/SkinCheckDashboard.tsx", "utf8");
-    expect(results).toMatch(/\.filter\(\(key\) => key !== "hydration"\)/);
+    // TD-37: the chips come from the fixed photo list (no Dryness in it) and the
+    // three answer topics, in a fixed order: never sorted by a band.
+    expect(results).toMatch(/PHOTO_METRICS\.map\(\(key\) => \(\{ kind: "photo"/);
+    expect(results).toMatch(/ANSWER_TOPICS\.map\(\(key\) => \(\{ kind: "told"/);
+    expect(results).not.toMatch(/\.sort\(/);
+    expect(PHOTO_METRICS).toEqual(["redness", "oiliness"]);
     expect(results).toMatch(/readingsOf\(/);
     expect(results).toMatch(/<CheckReadings view=\{view\}/);
   });

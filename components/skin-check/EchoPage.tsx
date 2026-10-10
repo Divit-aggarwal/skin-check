@@ -8,7 +8,8 @@ import { ChevronDown, ChevronLeft, ChevronRight, MessageCircle, SendHorizontal }
 import { TypingIndicator } from "@/components/primitives/TypingIndicator";
 import { ECHO_COPY as E } from "./echoCopy";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
-import { PhotoCheckLine, ReadingRows } from "@/components/dashboard/CheckReadings";
+import { PhotoCheckLine, ReadingRows, SourcesLine, ToldTopics } from "@/components/dashboard/CheckReadings";
+import { toldTopics } from "@/lib/told-topics";
 import { formatDate } from "@/components/dashboard/format";
 import { loadDashboard } from "@/components/dashboard/data";
 import { newestEchoSession } from "@/components/dashboard/echo-session";
@@ -233,6 +234,9 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
           <ReadingRows bands={area.bands} />
         </div>
       )}
+      <SourcesLine />
+      {/* TD-37 (3). Echo's check is the one /questions fills in when its questions wait. */}
+      <ToldTopics topics={toldTopics(session.answers)} canAnswer />
       <Link href={`/checks/${encodeURIComponent(session.scanId)}`} className="inline-flex min-h-11 items-center gap-1 font-medium text-brand-forest underline-offset-4 hover:underline">
         {E.openCheck}
         <ChevronRight aria-hidden size={16} />

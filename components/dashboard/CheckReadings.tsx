@@ -1,7 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
+import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
+import type { ToldTopic } from "@/lib/told-topics";
 import { ECHO_REGION_LABELS, ECHO_REGIONS, type EchoRegion } from "@/lib/echo-regions";
 import { DASHBOARD_COPY as C } from "./copy";
 import { FaceDrawing } from "./FaceDrawing";
@@ -95,5 +98,74 @@ export function KnownAndNotKnown() {
         </ul>
       </div>
     </div>
+  );
+}
+
+/** The line near the chips and readings saying where each one comes from (TD-37 (3)). */
+export function SourcesLine() {
+  return <p className="text-sm text-brand-muted">{C.told.sources}</p>;
+}
+
+/** What the user told us on one topic, or the invitation when the questions were skipped. Never a band or level. */
+function ToldBody({ noun, told, canAnswer }: { noun: string; told: ToldTopic | null; canAnswer: boolean }) {
+  if (told === null) {
+    return (
+      <>
+        <p>{C.told.skipped(noun)}</p>
+        {canAnswer ? (
+          <Link href="/questions" className="inline-flex min-h-11 items-center font-medium text-brand-forest underline underline-offset-4">
+            {Q.answerLink}
+          </Link>
+        ) : (
+          <p className="text-sm text-brand-muted">{Q.checkSkippedClosed}</p>
+        )}
+      </>
+    );
+  }
+  if (told.lines.length === 0) return <p>{C.told.nothing(noun)}</p>;
+  return (
+    <ul className="flex flex-col gap-1">
+      {told.lines.map((line) => (
+        <li key={line}>{line}</li>
+      ))}
+    </ul>
+  );
+}
+
+/**
+ * One topic the photo does not measure (TD-37 (3)), for the results chip:
+ * labelled as the user's own answer. `canAnswer`: this check's questions can
+ * still be answered (questionsTarget), so the link goes to /questions.
+ */
+export function ToldPanel({ label, told, canAnswer }: { label: string; told: ToldTopic | null; canAnswer: boolean }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">{C.told.title}</p>
+      <ToldBody noun={label.toLowerCase()} told={told} canAnswer={canAnswer} />
+      <p className="text-sm text-brand-muted">{C.told.ownAnswer}</p>
+    </div>
+  );
+}
+
+/** Home, an opened check and Echo's panel: the three topics under the readings, from the check's answers. */
+export function ToldTopics({ topics, canAnswer }: { topics: ToldTopic[] | null; canAnswer: boolean }) {
+  return (
+    <section aria-labelledby="told-title" className="flex flex-col gap-3 border-t border-brand-line pt-5">
+      <div>
+        <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">{C.told.title}</p>
+        <h3 id="told-title" className="font-display text-base font-semibold tracking-[-0.01em]">{C.told.listTitle}</h3>
+      </div>
+      {topics === null ? (
+        <ToldBody noun={C.told.listTitle.toLowerCase()} told={null} canAnswer={canAnswer} />
+      ) : (
+        topics.map((t) => (
+          <div key={t.topic} className="flex flex-col gap-1">
+            <h4 className="font-semibold">{t.label}</h4>
+            <ToldBody noun={t.label.toLowerCase()} told={t} canAnswer={canAnswer} />
+          </div>
+        ))
+      )}
+      <p className="text-sm text-brand-muted">{C.told.ownAnswer}</p>
+    </section>
   );
 }

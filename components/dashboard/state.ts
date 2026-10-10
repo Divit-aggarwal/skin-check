@@ -10,11 +10,12 @@ import { AI_SHARE_CONSENT_VERSION, IMAGE_RETENTION_CONSENT_VERSIONS } from "@/li
 import { startingCheckCount, startingChecks, usableForEveryQuantity } from "@/lib/longitudinal/baseline";
 import { BASELINE_RULE } from "@/lib/longitudinal/settings";
 import { bandScores, type Band, type BandableMetric } from "@/lib/skin-check-rules";
-import { METRIC_LABELS } from "@/lib/skin-check-skus";
+import { METRIC_LABELS, PHOTO_METRICS, type PhotoMetric } from "@/lib/skin-check-skus";
 import { toSkinState2, type SkinState2 } from "@/lib/skin-state-2";
 import { SkinScanScoresSchema } from "@/types/skin-scan";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, type EchoRegion } from "@/lib/echo-regions";
-import { hasQuestionAnswers, productNamesFrom, type ProductNames } from "@/lib/skin-check-validation";
+import { hasQuestionAnswers, productNamesFrom, questionAnswersOnly, type ProductNames } from "@/lib/skin-check-validation";
+import type { SkinCheckAnswers } from "@/types/skin-check";
 
 /** One Firestore document: its id and its data, as read. */
 export interface Doc {
@@ -25,7 +26,7 @@ export interface Doc {
 export type PhotoCheck = "pass" | "override" | "unchecked" | "not_recorded";
 export type HistoryKind = "reading" | "legacy" | "failed" | "questions";
 
-export type Bands = { metric: BandableMetric; label: string; band: Band }[];
+export type Bands = { metric: PhotoMetric; label: string; band: Band }[];
 
 /** One face area's readings from the same photo; bands null when that area's scores could not be read. */
 export interface AreaReadings {
@@ -105,10 +106,10 @@ function bandsOf(scores: unknown): Bands | null {
   const parsed = SkinScanScoresSchema.safeParse(scores);
   if (!parsed.success) return null;
   const { bands } = bandScores(parsed.data);
-  // No hydration ("Dryness") row: a photo cannot measure it (D-23, LONGITUDINAL_METHOD, GEMINI_BOUNDARY §4).
-  return (Object.keys(METRIC_LABELS) as BandableMetric[])
-    .filter((metric) => metric !== "hydration")
-    .map((metric) => ({ metric, label: METRIC_LABELS[metric], band: bands[metric] }));
+  // TD-37 (1): Redness and Oiliness only, on every screen and for old checks.
+  // No Dryness (D-23); Breakouts, Texture and Dark marks are shown from the
+  // user's answers instead (lib/told-topics.ts).
+  return PHOTO_METRICS.map((metric) => ({ metric, label: METRIC_LABELS[metric], band: bands[metric] }));
 }
 
 /** Readings by face area, in the fixed Echo order; only areas the record has. */
@@ -309,6 +310,14 @@ export function questionsTarget(uid: string, checks: readonly Doc[], analyses: r
 export function waitingQuestions(uid: string, checks: readonly Doc[], analyses: readonly Doc[], laterAnswers: readonly Doc[]): { date: Date | null; isEcho: boolean } | null {
   const target = questionsTarget(uid, checks, analyses, laterAnswers);
   return target ? { date: toDate(target.data.createdAt), isEcho: echoScanIdFrom(uid, analyses) === target.id } : null;
+}
+
+/** One check's answers: its own, plus any given later (TD-33 (1); never the product names). */
+export function checkAnswers(scanId: string, checks: readonly Doc[], laterAnswers: readonly Doc[]): SkinCheckAnswers {
+  return {
+    ...((checks.find((c) => c.id === scanId)?.data.answers ?? {}) as SkinCheckAnswers),
+    ...questionAnswersOnly((laterAnswers.find((l) => l.id === scanId)?.data.answers ?? {}) as SkinCheckAnswers),
+  };
 }
 
 /** The product names on a check (TD-33 (2)), from the check or its later answers. Shown only on that opened check. */

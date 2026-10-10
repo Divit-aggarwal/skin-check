@@ -213,7 +213,9 @@ const SKIN_CHECK_SCORE_SCALE_NOTE = `Band scale: Low, Moderate, or Elevated per 
 already sees on their dashboard. These are not percentages or scores — do
 not invent or imply a number behind them. Elevated always means MORE of the
 named concern (e.g. Redness: Elevated means more redness detected).
-Pores and skin moisture have no reading here — do not comment on them.`;
+Pores and skin moisture have no reading here — do not comment on them.
+Breakouts, texture and dark marks have no photo reading either — never describe
+them as seen in the photo; only repeat what the user said about them.`;
 
 // /echo (Step 4b) — the region a thread is scoped to, and that region's own
 // slice of region_scores (Step 4a). Grounds the reply in "your forehead"

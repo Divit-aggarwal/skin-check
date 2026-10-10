@@ -3,17 +3,20 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { motion, AnimatePresence, type PanInfo, type Variants } from "framer-motion";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { METRIC_LABELS } from "@/lib/skin-check-skus";
+import { METRIC_LABELS, type AnswerTopic, type PhotoMetric } from "@/lib/skin-check-skus";
+import { SourcesLine, ToldPanel } from "@/components/dashboard/CheckReadings";
+import type { ToldTopic } from "@/lib/told-topics";
 import type { Band, BandableMetric } from "@/lib/skin-check-rules";
 import type { SkinScanOverlays, SkinScanScores } from "@/types/skin-scan";
 
 // TD-25 (3): the results screen follows the dashboard rule. Band words only,
 // all in ink: no score out of 100, no Dryness, no band colour.
-export interface AnalysisCategory {
-  key: BandableMetric;
-  label: string;
-  band: Band;
-}
+// TD-37: a "photo" chip is a reading with its overlay (Redness, Oiliness); a
+// "told" chip (Breakouts, Texture, Dark marks) has no band, no overlay and no
+// level, only what the user told us (null: the questions were skipped).
+export type AnalysisCategory =
+  | { kind: "photo"; key: PhotoMetric; label: string; band: Band }
+  | { kind: "told"; key: AnswerTopic; label: string; told: ToldTopic | null };
 
 interface EchoTwinProps {
   /** The user's captured photo — the hero's base layer. */
@@ -179,12 +182,13 @@ export function EchoTwin({
   );
 
   const selectedCategory = categories.find((c) => c.key === selected) ?? null;
-  const overlaySrc = selected ? overlays?.[selected] : undefined;
+  // TD-37 (1): an overlay only ever for a photo reading, whatever the response holds.
+  const overlaySrc = selectedCategory?.kind === "photo" ? overlays?.[selectedCategory.key] : undefined;
   const showOverlay = Boolean(overlaySrc) && !overlayFailed;
   // Only a real "unavailable" claim once the scan has actually completed and
   // this specific category's overlay genuinely isn't in the response —
   // never shown while still analyzing.
-  const overlayUnavailable = analyzed && Boolean(selected) && !overlaySrc;
+  const overlayUnavailable = analyzed && selectedCategory?.kind === "photo" && !overlaySrc;
 
   return (
     <div className="flex flex-col items-center gap-4">
@@ -295,6 +299,11 @@ export function EchoTwin({
           })}
         </div>
       )}
+      {categories.length > 0 && (
+        <div className="w-full max-w-[420px] text-center">
+          <SourcesLine />
+        </div>
+      )}
 
       {selectedCategory && (
         <div className="relative w-full max-w-[420px] overflow-hidden">
@@ -309,11 +318,21 @@ export function EchoTwin({
               transition={{ duration: 0.2, ease: [0.19, 1, 0.22, 1] }}
               className="flex flex-col items-center gap-1 text-center"
             >
+              {selectedCategory.kind === "told" ? (
+                <div className="flex w-full flex-col gap-1 text-left">
+                  <h2 className="font-display text-xl font-semibold text-brand-ink">{selectedCategory.label}</h2>
+                  {/* Results screen: the check is the newest, so its questions can be answered (SkippedNote links there too). */}
+                  <ToldPanel label={selectedCategory.label} told={selectedCategory.told} canAnswer />
+                </div>
+              ) : (
+                <>
               <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">{selectedCategory.label}</h2>
               <p className="font-display text-2xl font-semibold text-brand-ink">{selectedCategory.band}</p>
               <p className="max-w-[85%] text-brand-muted">
                 {interpretationFor(selectedCategory.band, METRIC_LABELS[selectedCategory.key].toLowerCase())}
               </p>
+                </>
+              )}
               {overlayUnavailable && (
                 <p className="max-w-[85%] text-label text-muted-foreground">
                   Spatial visualization unavailable for this category.

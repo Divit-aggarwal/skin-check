@@ -151,7 +151,8 @@ export type ContextSection = "skin" | "longitudinal" | "routine" | "recommendati
 
 /** A section left out, something the photo cannot measure, or "trend" when no change can be stated. Citable. */
 export interface MissingItem extends Fact {
-  about: ContextSection | "hydration" | "pores" | "trend";
+  /** "unmeasured" (TD-37 (1)): breakouts, texture and dark marks, which the photo does not measure yet. */
+  about: ContextSection | "hydration" | "pores" | "trend" | "unmeasured";
 }
 
 /**

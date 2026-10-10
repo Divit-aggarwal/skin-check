@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { canRetrySamePhoto, retrySkinScan } from "@/lib/scan-retry";
 import { summarizeConcerns } from "@/lib/skin-check-score";
 import { runSkinCheckRules, type Band, type BandableMetric } from "@/lib/skin-check-rules";
-import { METRIC_LABELS, OVERLAY_CATEGORIES, resolveStatedConcern } from "@/lib/skin-check-skus";
+import { ANSWER_TOPICS, METRIC_LABELS, PHOTO_METRICS, resolveStatedConcern } from "@/lib/skin-check-skus";
+import { toldTopics } from "@/lib/told-topics";
 import { CheckReadings, KnownAndNotKnown } from "@/components/dashboard/CheckReadings";
 import { readingsOf } from "@/components/dashboard/state";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
@@ -16,21 +17,18 @@ import type { SkinCheckAnswers } from "@/types/skin-check";
 import { EchoTwin, type AnalysisCategory } from "./EchoTwin";
 import { echoOn } from "@/lib/echo-limits";
 
-// The category the results screen shows FIRST — the user's own stated
-// primary concern from the quiz if they gave one, else whichever metric
-// banded highest. Every category's overlay already exists in scan.result
-// (PhotoCapture requests all of OVERLAY_CATEGORIES in the one scan call), so
-// this only picks the initial tab, not what gets fetched. `pores` is
-// excluded from BandableMetric entirely (it returns exactly 0.0 on every
-// real photo), so it never reaches this function.
-function resolveFocus(
-  answers: SkinCheckAnswers,
-  bands: Record<BandableMetric, Band>
-): BandableMetric | null {
+// TD-37: the chips in a fixed order, photo readings first. Never sorted by
+// band: an order by band would tell the hidden readings' levels.
+const CHIP_ORDER: BandableMetric[] = [...PHOTO_METRICS, ...ANSWER_TOPICS];
+
+// The chip the results screen shows FIRST — the user's own stated primary
+// concern from the quiz if it is a chip, else a photo reading that banded
+// Elevated (never a hidden one, TD-37 (1)), else Redness. Only picks the
+// initial chip, not what gets fetched.
+function resolveFocus(answers: SkinCheckAnswers, bands: Record<BandableMetric, Band>): BandableMetric {
   const stated = resolveStatedConcern(answers);
-  if (stated) return stated;
-  const elevated = (Object.keys(bands) as BandableMetric[]).find((m) => bands[m] === "Elevated");
-  return elevated ?? null;
+  if (stated && CHIP_ORDER.includes(stated)) return stated;
+  return PHOTO_METRICS.find((m) => bands[m] === "Elevated") ?? PHOTO_METRICS[0];
 }
 
 interface SkinCheckDashboardProps {
@@ -78,7 +76,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
     setSelectedCategory((prev) => {
       if (prev) return prev;
       const { bands } = runSkinCheckRules(scan.result);
-      return resolveFocus(answers, bands) ?? OVERLAY_CATEGORIES[0]!;
+      return resolveFocus(answers, bands);
     });
   }, [scan, answers]);
 
@@ -148,16 +146,12 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
   const readings = readingsOf(scan.result as unknown as Record<string, unknown>);
   const view = { scanId, date: null, source: "measured" as const, bands: readings.bands, areas: readings.areas, hardToRead: readings.hardToRead, photoCheck: null };
 
-  // Concern-ranked (Elevated first), so the tabs open on what stood out most.
-  const ranked = (Object.keys(METRIC_LABELS) as BandableMetric[])
-    .filter((key) => key !== "hydration")
-    .sort((a, b) => {
-      const order: Record<Band, number> = { Elevated: 0, Moderate: 1, Low: 2 };
-      return order[bands[a]] - order[bands[b]];
-    });
-
-  const categories: AnalysisCategory[] = ranked.map((key) => ({ key, label: METRIC_LABELS[key], band: bands[key] }));
-  const shown = selectedCategory && selectedCategory !== "hydration" ? selectedCategory : ranked[0] ?? null;
+  const told = toldTopics(answers);
+  const categories: AnalysisCategory[] = [
+    ...PHOTO_METRICS.map((key) => ({ kind: "photo" as const, key, label: METRIC_LABELS[key], band: bands[key] })),
+    ...ANSWER_TOPICS.map((key) => ({ kind: "told" as const, key, label: METRIC_LABELS[key], told: told?.find((t) => t.topic === key) ?? null })),
+  ];
+  const shown = selectedCategory && CHIP_ORDER.includes(selectedCategory) ? selectedCategory : PHOTO_METRICS[0];
 
   return (
     <div className="flex flex-col gap-10">

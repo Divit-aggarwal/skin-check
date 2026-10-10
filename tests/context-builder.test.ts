@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildContextPackage, packageFacts, packageJson, QUANTITY_METRIC, REASON_TEXT, screenExternalText, serializePackage } from "@/lib/context/builder";
+import { buildContextPackage, MISSING_TEXT, packageFacts, packageJson, QUANTITY_METRIC, REASON_TEXT, screenExternalText, serializePackage } from "@/lib/context/builder";
 import type { ContextPackage } from "@/lib/contracts/context-package";
 import type { SafetyState } from "@/lib/contracts/safety-state";
 import { SKINSTATE_FIELD_PATHS } from "@/lib/comparability";
@@ -27,12 +27,12 @@ describe("context package builder", () => {
   const json = packageJson(pkg);
 
   it("builds the expected sections from fixtures of every shape", () => {
-    expect(pkg.packageVersion).toBe("ctx-2");
+    // TD-37 (1): redness and oiliness only (ctx-4); the other three are a missing item.
+    expect(pkg.packageVersion).toBe("ctx-4");
     expect(pkg.regionFocus).toBe("cheeks");
-    expect(pkg.skin!.readings.map((r) => r.id)).toEqual([
-      "state.all.redness", "state.all.oiliness", "state.all.texture", "state.all.blemishes", "state.all.pigment",
-      "state.cheeks.redness", "state.cheeks.oiliness", "state.cheeks.texture", "state.cheeks.blemishes", "state.cheeks.pigment",
-    ]);
+    expect(pkg.skin!.readings.map((r) => r.id)).toEqual(["state.all.redness", "state.all.oiliness", "state.cheeks.redness", "state.cheeks.oiliness"]);
+    expect(json).not.toMatch(/state\.\w+\.(texture|blemishes|pigment)|Texture irregularity|Blemishes|Pigmentation/);
+    expect(pkg.missing.find((m) => m.about === "unmeasured")?.text).toBe(MISSING_TEXT.unmeasured);
     expect(pkg.skin!.readings[0]!.text).toMatch(/^Redness, photo-based estimate for the whole face: (Low|Moderate|Elevated)$/);
     expect(pkg.skin!.readings.filter((r) => r.region === "cheeks").every((r) => r.lowConfidence && r.text.endsWith("(limited skin area visible)"))).toBe(true);
     expect(pkg.routine).toEqual({ status: "not_shared", decision: "R-1 A" });
@@ -58,7 +58,7 @@ describe("context package builder", () => {
     expect(json).not.toContain("PRODUCER TEXT");
     // Only version labels carry digits.
     const digits = json.match(/"[^"]*\d[^"]*"/g) ?? [];
-    expect(digits.every((d) => ['"ctx-2"', '"scan-analysis-1"', '"v0-provisional"', '"scan-0.1.6-provisional"', '"r-1"', '"R-1 A"'].includes(d) || /You told us your daily water/.test(d))).toBe(true);
+    expect(digits.every((d) => ['"ctx-4"', '"scan-analysis-1"', '"v0-provisional"', '"scan-0.1.6-provisional"', '"r-1"', '"R-1 A"'].includes(d) || /You told us your daily water/.test(d))).toBe(true);
   });
 
   it("routine is always not_shared (R-1 A)", () => {
@@ -69,7 +69,8 @@ describe("context package builder", () => {
 
   it("longitudinal: one fact per (metric, region), not enough evidence only, our own reason text", () => {
     const ids = pkg.longitudinal!.map((l) => l.id);
-    expect(ids).toEqual(["long.cheeks.redness", "long.forehead.texture"]);
+    // TD-37 (1): the forehead texture input is dropped, never sent as measured.
+    expect(ids).toEqual(["long.cheeks.redness"]);
     const cheeks = pkg.longitudinal![0]!;
     expect(cheeks.evidence).toBe("not_enough_evidence");
     expect(cheeks.comparable).toBe(false); // one of the two merged inputs is not comparable

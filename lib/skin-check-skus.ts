@@ -103,16 +103,22 @@ export const METRIC_LABELS: Record<BandableMetric, string> = {
   pigment: "Dark marks",
 };
 
-// Every category the results screen lets the user traverse — the 6
-// non-pores metrics, in the same fixed order as METRIC_LABELS. Shared by
-// PhotoCapture (requests every one of these overlays in the single scan
-// call, as one comma-separated `overlays` list — the skin-scan service
-// genuinely supports that, main.py:281 splits on ",") and the dashboard
-// (default category order, retry path). "pores" is excluded: it returns
-// exactly 0.0 on every real photo (lib/skin-check-rules.ts), so an overlay
-// for it would highlight nothing and a band would always read "no concern"
-// on a metric that never measured anything.
-export const OVERLAY_CATEGORIES: BandableMetric[] = Object.keys(METRIC_LABELS) as BandableMetric[];
+// TD-37 (1): the only readings the app shows as measured, with an overlay,
+// anywhere (results, Home, Checks, Echo's panel and what Echo receives). The
+// engine still returns and the server still stores all of them (TD-37 (4)).
+export const PHOTO_METRICS = ["redness", "oiliness"] as const satisfies readonly BandableMetric[];
+export type PhotoMetric = (typeof PHOTO_METRICS)[number];
+export const isPhotoMetric = (m: string): m is PhotoMetric => (PHOTO_METRICS as readonly string[]).includes(m);
+
+// TD-37 (3): shown only as what the user told us in the questions, never as a
+// reading (lib/told-topics.ts).
+export const ANSWER_TOPICS = ["blemishes", "texture", "pigment"] as const satisfies readonly BandableMetric[];
+export type AnswerTopic = (typeof ANSWER_TOPICS)[number];
+
+// The overlays PhotoCapture and the retry request in the one scan call (the
+// skin-scan service takes a comma-separated `overlays` list). Overlays are
+// never stored, so asking for fewer changes no saved value.
+export const OVERLAY_CATEGORIES: BandableMetric[] = [...PHOTO_METRICS];
 
 // The user's own stated primary concern(s) from the quiz — used only to pick
 // which category the results screen shows FIRST (SkinCheckDashboard's
