@@ -79,7 +79,7 @@ describe("TD-37 (3): the three topics from the user's own answers", () => {
   it("answered: each topic quotes only its own questions, as option labels", () => {
     const topics = toldTopics({
       primary_concerns: ["blemishes", "redness"],
-      breakout_pattern: "papules_pustules",
+      breakout_pattern: ["red_inflamed"],
       acne_areas: ["chin_jawline"],
       pih_scar_tendency: "dark_mark_lingers",
       female_skin_context: ["period_related_breakouts"],
@@ -88,6 +88,7 @@ describe("TD-37 (3): the three topics from the user's own answers", () => {
     const [breakouts, texture, marks] = topics;
     expect(breakouts!.lines[0]).toBe("You chose breakouts as a main skin concern.");
     expect(breakouts!.lines.join(" ")).toContain("Chin / jawline");
+    expect(breakouts!.lines.join(" ")).toContain("What your breakouts usually look like: Red or inflamed pimples");
     expect(texture!.lines).toEqual([]);
     expect(marks!.lines).toEqual(["When a breakout heals: Leaves a dark mark that lingers."]);
     // A personal-context answer never shows under a topic.

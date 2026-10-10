@@ -69,9 +69,14 @@ export function areaOutlines(pts: readonly Pt[]): Record<EchoRegion, AreaOutline
   const chin = hull(at([...OVAL.filter((i) => pts[i]![1] > lipMinY), ...LIPS]));
   const band = OVAL.filter((i) => pts[i]![1] >= browMaxY && pts[i]![1] <= lipMinY);
   // Image-left is the subject's right (the engine's note on mirrored naming).
-  const cheek = (side: number[], brow: number[], eye: number[]) => ({ shape: hull(at([...side, ...brow, ...NOSE, ...LIPS])), eye: hull(at([...brow, ...eye])) });
-  const left = cheek(band.filter((i) => pts[i]![0] < noseX), RIGHT_EYEBROW, RIGHT_EYE);
-  const right = cheek(band.filter((i) => pts[i]![0] >= noseX), LEFT_EYEBROW, LEFT_EYE);
+  // The engine's hull takes the whole nose and mouth; for drawing, each cheek
+  // takes only its own side of them, so its outline never crosses the other cheek.
+  const cheek = (side: number[], brow: number[], eye: number[], onSide: (i: number) => boolean) => ({
+    shape: hull(at([...side, ...brow, ...[...NOSE, ...LIPS].filter(onSide)])),
+    eye: hull(at([...brow, ...eye])),
+  });
+  const left = cheek(band.filter((i) => pts[i]![0] < noseX), RIGHT_EYEBROW, RIGHT_EYE, (i) => pts[i]![0] <= noseX);
+  const right = cheek(band.filter((i) => pts[i]![0] >= noseX), LEFT_EYEBROW, LEFT_EYE, (i) => pts[i]![0] >= noseX);
   const leftOval = at(band.filter((i) => pts[i]![0] < noseX));
   const rightOval = at(band.filter((i) => pts[i]![0] >= noseX));
   // Cheek labels halfway between the side of the face and the nose, at mid-band height.

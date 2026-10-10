@@ -487,7 +487,7 @@ describe("Hinglish replies (ctx-prompt-4)", () => {
 // more. Gemini gets them only as a missing item and as what the user said.
 describe("TD-37: the three hidden readings never come back as measured", () => {
   const told = buildContextPackage(
-    fullInput({ answers: { primary_concerns: ["blemishes", "pigment", "texture"], breakout_pattern: "papules_pustules", pih_scar_tendency: "dark_mark_lingers" } })
+    fullInput({ answers: { primary_concerns: ["blemishes", "pigment", "texture"], breakout_pattern: ["red_inflamed"], pih_scar_tendency: "dark_mark_lingers" } })
   );
   const red = told.skin!.readings.find((r) => r.id === "state.all.redness")!;
   const UNMEASURED = told.missing.find((m) => m.about === "unmeasured")!;
