@@ -29,12 +29,17 @@ band: an order by band would give away the hidden readings' levels.
 ## 2. Where the mesh points come from
 
 The engine (skin-scan 0.1.6, `ScanResponse`) returns no landmark points. The
-browser finds them with `@mediapipe/tasks-vision`, pinned at exactly `1.0.1`
+browser finds them with `@mediapipe/tasks-vision`, pinned at exactly `0.10.35`
 (package.json, `MEDIAPIPE_VERSION`, lockfile; `tests/face-mesh.test.ts`).
 This is the same 468-point face topology the engine uses, so the area outlines
 use the engine's own landmark groups (`lib/face-mesh/regions.ts`, copied from
 mediapipe 0.10.21 `FACEMESH_*` as used in skin-scan `face_mesh.py`).
 
+- Why 0.10.35 and not the newer 1.0.x: the privacy review (2026-10-11) found
+  that 1.0.0 and 1.0.1 POST usage logs (device class, library version, task,
+  timings) to `odml.pa.googleapis.com` every 60 seconds, with no off switch.
+  0.10.35 has no such code. `tests/face-mesh.test.ts` fails if a version
+  change brings it back.
 - Loaded by `import()` only, from `components/mesh/landmarks.ts`. It starts
   when a photo is confirmed (capture), and on screens that show a check's
   results with a photo (results, Home, an opened check). No other page loads it.
@@ -42,8 +47,8 @@ mediapipe 0.10.21 `FACEMESH_*` as used in skin-scan `face_mesh.py`).
 
 | File | Source | Licence | sha256 |
 |---|---|---|---|
-| `public/mediapipe/face_landmarker.task` (3.6 MB, committed) | https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task, downloaded 2026-10-11 | Apache-2.0 | `64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff` |
-| `/mediapipe/1.0.1/wasm/*` (11 MB with SIMD, 10.5 MB without) | Copied from `node_modules/@mediapipe/tasks-vision/wasm` by next.config.js on every dev start and build; not committed | Apache-2.0 | npm lockfile integrity |
+| `public/mediapipe/face_landmarker-64184e22.task` (3.6 MB, committed) | https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task, downloaded 2026-10-11 | Apache-2.0 | `64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff` |
+| `/mediapipe/0.10.35/wasm/*` (11 MB with SIMD, 10.5 MB without) | Copied from `node_modules/@mediapipe/tasks-vision/wasm` by next.config.js on every dev start and build; not committed | Apache-2.0 | npm lockfile integrity |
 
 - The photo never leaves the device for the mesh, and the points are never
   stored or sent. The kept photo on Home and an opened check is read from

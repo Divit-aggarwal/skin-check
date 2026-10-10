@@ -12,9 +12,10 @@ import { MIN_POINTS } from "@/lib/face-mesh/regions";
 //   anywhere else, and the photo never leaves the device for this.
 // - Points are never stored or sent anywhere.
 
-export const MEDIAPIPE_VERSION = "1.0.1";
+export const MEDIAPIPE_VERSION = "0.10.35";
 export const WASM_PATH = `/mediapipe/${MEDIAPIPE_VERSION}/wasm`;
-export const MODEL_PATH = "/mediapipe/face_landmarker.task";
+/** Named by the first 8 hex of its sha256, so it can be cached for good (next.config.js headers). */
+export const MODEL_PATH = "/mediapipe/face_landmarker-64184e22.task";
 /** The photo is scaled down to this width before the search: enough for a mesh, light on a low-cost phone. */
 const MAX_WIDTH = 1024;
 
@@ -39,9 +40,18 @@ async function load() {
   return { lm, edges: FaceLandmarker.FACE_LANDMARKS_TESSELATION.map(({ start, end }) => ({ start, end })) };
 }
 
+/**
+ * No mesh on a data-saver or 2G connection: about 15 MB of files is too much
+ * there. The screens then show the photo alone or the face drawing.
+ */
+export function meshAllowed(): boolean {
+  const c = (navigator as Navigator & { connection?: { saveData?: boolean; effectiveType?: string } }).connection;
+  return !(c?.saveData || c?.effectiveType === "2g" || c?.effectiveType === "slow-2g");
+}
+
 /** Starts the download early (after capture), so the mesh is ready for the scanning view. Never throws. */
 export function preloadFaceMesh(): void {
-  void getLandmarker().catch(() => {});
+  if (meshAllowed()) void getLandmarker().catch(() => {});
 }
 
 function getLandmarker() {
@@ -53,8 +63,9 @@ function getLandmarker() {
 }
 
 async function bitmapOf(photo: Blob): Promise<ImageBitmap> {
-  // from-image: the same orientation an <img> shows, so the mesh lines up.
-  const full = await createImageBitmap(photo, { imageOrientation: "from-image" }).catch(() => createImageBitmap(photo));
+  // from-image: the same orientation an <img> shows, so the mesh lines up. A
+  // browser that cannot apply it gets no mesh rather than one off the face.
+  const full = await createImageBitmap(photo, { imageOrientation: "from-image" });
   if (full.width <= MAX_WIDTH) return full;
   const small = await createImageBitmap(full, { resizeWidth: MAX_WIDTH, resizeHeight: Math.round((full.height * MAX_WIDTH) / full.width), resizeQuality: "medium" });
   full.close();
@@ -68,6 +79,7 @@ export function faceMeshOf(photo: Blob): Promise<FaceMesh | null> {
   let found = cache.get(photo);
   if (!found) {
     found = (async () => {
+      if (!meshAllowed()) return null;
       try {
         const [{ lm, edges }, bmp] = await Promise.all([getLandmarker(), bitmapOf(photo)]);
         try {

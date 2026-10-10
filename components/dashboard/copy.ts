@@ -35,7 +35,7 @@ export const DASHBOARD_COPY = {
     notKnownTitle: "What this does not tell you",
     notKnown: [
       "It is not a medical opinion.",
-      "It does not measure breakouts, texture, dark marks, pores or how dry your skin is.",
+      "It does not measure pores or how dry your skin is.",
       "It does not set you against other people.",
       "Light, camera angle and distance shape every photo.",
     ],
@@ -47,7 +47,11 @@ export const DASHBOARD_COPY = {
     title: "From what you told us",
     ownAnswer: "Your own answer, not a reading of your photo.",
     nothing: (topic: string) => `You did not tell us anything about ${topic} in the questions.`,
+    // Texture has no question of its own, only the main-concerns choice (flow review).
+    textureOnly: "The questions ask about texture only as a main concern.",
     skipped: (topic: string) => `You skipped the questions, so there is nothing here about ${topic} yet.`,
+    // A list on Home, an opened check or Echo, whose page already has its own way to the questions.
+    none: "There are no answers about these on this check.",
     listTitle: "Breakouts, texture and dark marks",
   },
 

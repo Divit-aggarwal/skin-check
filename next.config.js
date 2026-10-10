@@ -56,6 +56,11 @@ const nextConfig = {
   async headers() {
     return [
       {
+        // TD-37: the mesh files never change under their name (version or hash in the path).
+        source: "/mediapipe/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+      {
         source: "/:path*",
         headers: [
           { key: "X-Content-Type-Options", value: "nosniff" },

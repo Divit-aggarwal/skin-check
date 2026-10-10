@@ -507,6 +507,12 @@ describe("TD-37: the three hidden readings never come back as measured", () => {
     ["an unbanded description of breakouts", desc("Breakouts showed up on your chin.")],
     ["an unbanded description of dark marks", desc("Your photo shows some dark marks.")],
     ["an uncited remark about texture", ok([UNC, { claim_type: "smalltalk", text: "Your texture looks smooth.", fact_ids: [] }])],
+    // Safety review 2026-10-11: these passed before the fix (own words borrowed from the missing item or a told answer).
+    ["uncertainty reusing the missing item's words", ok([{ claim_type: "uncertainty", text: "This photo reading shows texture and dark marks across the whole face.", fact_ids: [UNMEASURED.id, red.id] }])],
+    ["uncertainty dropping the missing item's 'not'", ok([{ claim_type: "uncertainty", text: "Photos measure breakouts, texture and dark marks.", fact_ids: [UNMEASURED.id] }])],
+    ["uncertainty: your skin shows them", ok([{ claim_type: "uncertainty", text: "Your skin shows breakouts and dark marks.", fact_ids: [UNMEASURED.id] }])],
+    ["comparability: your skin shows them", ok([{ claim_type: "comparability", text: "Your skin shows breakouts and dark marks.", fact_ids: [UNMEASURED.id] }])],
+    ["uncertainty: your skin reads them", ok([{ claim_type: "uncertainty", text: "Your skin reads breakouts, texture and dark marks.", fact_ids: [UNMEASURED.id] }])],
   ])("%s fails", (_name, raw) => {
     expect(fails(raw)).toBe(false);
   });
@@ -525,5 +531,9 @@ describe("TD-37: the three hidden readings never come back as measured", () => {
       distress: false,
     });
     expect(validateAnswer(raw, withProducts, "Which products should I use?").failures).toEqual([]);
+    // A reason may not frame the told answer as something the photo shows.
+    const shows = JSON.parse(raw);
+    shows.products[0].reason = "You told us your skin shows breakouts and dark marks.";
+    expect(validateAnswer(JSON.stringify(shows), withProducts, "Which products should I use?").passed).toBe(false);
   });
 });

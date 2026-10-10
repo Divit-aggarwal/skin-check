@@ -7,6 +7,7 @@ import { METRIC_LABELS, type AnswerTopic, type PhotoMetric } from "@/lib/skin-ch
 import { SourcesLine, ToldPanel } from "@/components/dashboard/CheckReadings";
 import { MeshLayer, useFaceMesh } from "@/components/mesh/MeshLayer";
 import type { ToldTopic } from "@/lib/told-topics";
+import type { EchoRegion } from "@/lib/echo-regions";
 import type { Band, BandableMetric } from "@/lib/skin-check-rules";
 import type { SkinScanOverlays, SkinScanScores } from "@/types/skin-scan";
 
@@ -35,6 +36,8 @@ interface EchoTwinProps {
   onSelect: (key: BandableMetric) => void;
   /** True only for an actual completed scan — never true on the error path. */
   analyzed: boolean;
+  /** TD-37 (2): the face area chosen beside the photo, marked on the mesh. */
+  highlight?: EchoRegion | null;
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -94,6 +97,7 @@ export function EchoTwin({
   selected,
   onSelect,
   analyzed,
+  highlight = null,
 }: EchoTwinProps) {
   // Object URL creation and revocation must live in the SAME effect, not a
   // useMemo + separate useEffect pair — under React 18 StrictMode's
@@ -237,8 +241,9 @@ export function EchoTwin({
           />
         )}
         {/* TD-37 (2): the face mesh, a map of the face, over the photo and any overlay. */}
-        {mesh && photoUrl && !photoFailed && <MeshLayer mesh={mesh} />}
-        {analyzed && (
+        {/* Not over a "told" chip: those are the user's answers, not a reading of this photo (safety review). */}
+        {mesh && photoUrl && !photoFailed && selectedCategory?.kind === "photo" && <MeshLayer mesh={mesh} highlight={highlight} />}
+        {analyzed && selectedCategory?.kind !== "told" && (
           <div className="absolute left-2 top-2 rounded-full bg-brand-paper/90 px-3 py-1 text-xs font-semibold text-brand-ink">
             Photo read
           </div>
@@ -273,7 +278,7 @@ export function EchoTwin({
       {categories.length > 0 && (
         <div
           role="tablist"
-          aria-label="Analysis categories"
+          aria-label="Photo readings and your answers"
           // Edge fade, not a second indicator row — a dot strip duplicating
           // these same labels read as clutter (caught in review). The real
           // problem it was covering for is that a horizontally-clipped tab
@@ -324,11 +329,11 @@ export function EchoTwin({
               className="flex flex-col items-center gap-1 text-center"
             >
               {selectedCategory.kind === "told" ? (
-                <div className="flex w-full flex-col gap-1 text-left">
-                  <h2 className="font-display text-xl font-semibold text-brand-ink">{selectedCategory.label}</h2>
-                  {/* Results screen: the check is the newest, so its questions can be answered (SkippedNote links there too). */}
-                  <ToldPanel label={selectedCategory.label} told={selectedCategory.told} canAnswer />
-                </div>
+                <>
+                  {/* Same order as a photo chip: the label, then the user's own answer in place of a level. */}
+                  <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">{selectedCategory.label}</h2>
+                  <ToldPanel label={selectedCategory.label} told={selectedCategory.told} />
+                </>
               ) : (
                 <>
               <h2 className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">{selectedCategory.label}</h2>

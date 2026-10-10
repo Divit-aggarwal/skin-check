@@ -32,7 +32,8 @@ const DEVICE: Record<Width, Parameters<typeof test.use>[0]> = {
   "1280": { ...device("iPad Mini"), viewport: { width: 1280, height: 800 } },
 };
 
-const BAND = /\b(Low|Moderate|Elevated)\b/;
+// No word boundary: a panel's text runs together ("RednessModerate").
+const BAND = /(Low|Moderate|Elevated)/;
 const HIDDEN_ROW = /^(Breakouts|Texture|Dark marks)$/;
 
 // Firebase Auth's phone sign-in loads its own helper from Google (before TD-37, unchanged).
@@ -82,7 +83,7 @@ async function expectScanning(page: Page) {
   await expect(page.getByRole("status").filter({ hasText: "Reading your photo" })).toBeVisible();
 }
 
-const chip = (page: Page, name: string) => page.getByRole("tablist", { name: "Analysis categories" }).getByRole("tab", { name, exact: true });
+const chip = (page: Page, name: string) => page.getByRole("tablist", { name: "Photo readings and your answers" }).getByRole("tab", { name, exact: true });
 
 async function toResults(page: Page) {
   const results = page.getByRole("button", { name: "Get my results" });
@@ -126,7 +127,7 @@ for (const width of WIDTHS) {
       await expect(page.getByText(C.told.sources)).toBeVisible();
       await expectTwoRows(page);
       // The chips: the photo readings first, in a fixed order; no band on the three.
-      const names = await page.getByRole("tablist", { name: "Analysis categories" }).getByRole("tab").allTextContents();
+      const names = await page.getByRole("tablist", { name: "Photo readings and your answers" }).getByRole("tab").allTextContents();
       expect(names).toEqual(["Redness", "Oiliness", "Breakouts", "Texture", "Dark marks"]);
       for (const name of names) {
         await chip(page, name).click();
@@ -146,11 +147,12 @@ for (const width of WIDTHS) {
         }
         await shot(page, `results-${name.toLowerCase().replace(" ", "-")}`, width);
       }
-      // The area picker is the mesh over the photo; choosing an area highlights it.
-      const picker = page.getByTestId("mesh-picker");
-      await expect(picker).toBeVisible({ timeout: 60_000 });
-      await picker.getByRole("button", { name: "Forehead" }).click({ force: true });
-      await expect(picker.getByRole("button", { name: "Forehead" })).toHaveAttribute("aria-pressed", "true");
+      // One photo on this screen: the area is chosen on the drawing and marked on the mesh over the photo.
+      await expect(page.getByTestId("mesh-picker")).toHaveCount(0);
+      await chip(page, "Redness").click();
+      await page.getByRole("button", { name: "Forehead" }).click();
+      await expect(page.getByRole("button", { name: "Forehead" })).toHaveAttribute("aria-pressed", "true");
+      await expect(page.locator('svg path[class*="fill-brand-mist/60"]')).toHaveCount(1);
       await expect(page.getByRole("heading", { name: "Forehead", level: 3 })).toBeVisible();
       await expectTwoRows(page);
       await shot(page, "results-area-forehead", width);

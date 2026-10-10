@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { ANSWER_TOPICS } from "@/lib/skin-check-skus";
 import type { AllowedClaim, ContextPackage, ForbiddenClaim } from "@/lib/contracts/context-package";
 import { packageFacts, type CitableFact, type FactKind } from "./builder";
 import { nonMedicalRedFlagHit, redFlagHit } from "./prefilter";
@@ -145,7 +146,12 @@ const PRODUCT_FRAME = new Set(
 );
 // A product's reason repeats the user's facts; it may be framed like a description or a product claim.
 // Not "so", "then" or "after": they would join a told answer to a result ("…, so a spot is invisible"). Safety review.
-const REASON_FRAME = new Set(Array.from(DESCRIBE_FRAME).concat(Array.from(PRODUCT_FRAME)).filter((w) => !["so", "then", "after", "for"].includes(w)));
+// TD-37 safety review: nor the photo words, so a told answer cannot become "your skin shows …".
+const REASON_FRAME = new Set(
+  Array.from(DESCRIBE_FRAME)
+    .concat(Array.from(PRODUCT_FRAME))
+    .filter((w) => !["so", "then", "after", "for", "show", "shows", "shown", "read", "reads", "reading", "readings", "photo", "photos", "scan", "scans"].includes(w))
+);
 // A self-report echo must say it is what the user told us (security review, wave 2).
 const TOLD = new RegExp(String.raw`\b(?:told|said|mentioned|noted|shared|listed|picked|chose|selected|answered|bataya|batayi|bataye)\b`, "iu");
 // Uncited claims: no comparison, and smalltalk does not talk about the skin or point back at a reading.
@@ -411,6 +417,17 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
           const held = readings.filter((r) => r.metric === metric && (regions.length === 0 || regions.includes(r.region)));
           if (!held.some((r) => r.band.toLowerCase() === band.word)) fail("contradicts_package", i, band.word);
         }
+      }
+    }
+
+    // TD-37 (1): breakouts, texture and dark marks have no reading. Outside a
+    // told echo, they may appear only inside a verbatim quote of a cited fact
+    // (the missing item, or a told answer in a product reason), never in
+    // Gemini's own words: "Your skin shows breakouts" (safety review 2026-10-11).
+    if (claim.claim_type !== "self_reported_echo") {
+      for (const m of ANSWER_TOPICS) {
+        const hit = firstMatch(METRIC_WORDS[m], stripped);
+        if (hit) fail("contradicts_package", i, hit);
       }
     }
 

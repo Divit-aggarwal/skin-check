@@ -12,8 +12,10 @@ import { useAuth } from "@/lib/auth-context";
  */
 export function useKeptPhoto(scanId: string | null, claimed: boolean): Blob | null {
   const { user } = useAuth();
-  const [photo, setPhoto] = useState<{ scanId: string; blob: Blob } | null>(null);
+  const [photo, setPhoto] = useState<{ uid: string; scanId: string; blob: Blob } | null>(null);
   useEffect(() => {
+    // Dropped on any change of user or check, so no bytes outlive a sign-out (privacy review).
+    setPhoto(null);
     if (!user || !scanId || !claimed) return;
     let live = true;
     (async () => {
@@ -22,7 +24,7 @@ export function useKeptPhoto(scanId: string | null, claimed: boolean): Blob | nu
         const body = res.ok ? ((await res.json()) as { url?: unknown }) : null;
         if (typeof body?.url !== "string") return;
         const img = await fetch(body.url, { cache: "no-store", referrerPolicy: "no-referrer", credentials: "omit" });
-        if (img.ok && live) setPhoto({ scanId, blob: await img.blob() });
+        if (img.ok && live) setPhoto({ uid: user.uid, scanId, blob: await img.blob() });
       } catch {
         // No CORS rule yet, offline, or expired: the face drawing stays.
       }
@@ -32,5 +34,5 @@ export function useKeptPhoto(scanId: string | null, claimed: boolean): Blob | nu
     };
   }, [user, scanId, claimed]);
   // Never a photo from another check or another user (security review G03, L1).
-  return user && photo?.scanId === scanId ? photo.blob : null;
+  return user && photo?.uid === user.uid && photo.scanId === scanId ? photo.blob : null;
 }

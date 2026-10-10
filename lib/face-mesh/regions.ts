@@ -82,7 +82,8 @@ export function areaOutlines(pts: readonly Pt[]): Record<EchoRegion, AreaOutline
   // Cheek labels halfway between the side of the face and the nose, at mid-band height.
   const cheekLabel = (side: Pt[]): Pt => {
     const x = side.length ? centre(side)[0] : noseX;
-    return [(x + noseX) / 2, (browMaxY + lipMinY) / 2 + (lipMinY - browMaxY) * 0.15];
+    // Nearer the side than the nose, so the label never runs into the nose label.
+    return [x * 0.65 + noseX * 0.35, (browMaxY + lipMinY) / 2 + (lipMinY - browMaxY) * 0.15];
   };
 
   return {

@@ -13,13 +13,13 @@ import { TIMELINE_COPY } from "@/components/timeline/copy";
 import { dayOf, mergeTimeline } from "@/components/timeline/timeline";
 import { TimelineList } from "@/components/timeline/TimelineList";
 import { ROUTINE_COPY } from "@/lib/routine/copy";
-import { CheckReadings, formatDate, KnownAndNotKnown, SourcesLine, ToldTopics } from "./CheckReadings";
+import { CheckReadings, formatDate, KnownAndNotKnown, ToldTopics } from "./CheckReadings";
 import { toldTopics } from "@/lib/told-topics";
 import { useKeptPhoto } from "@/components/mesh/useKeptPhoto";
 import { ConsentSection } from "./ConsentSection";
 import { DASHBOARD_COPY as C } from "./copy";
 import { loadDashboard, type DashboardData } from "./data";
-import { checkAnswers, deriveDashboard, isEmpty, questionsTarget, waitingQuestions, type Dashboard } from "./state";
+import { checkAnswers, deriveDashboard, isEmpty, waitingQuestions, type Dashboard } from "./state";
 import { QuestionsCard } from "@/components/skin-check/QuestionsChoice";
 import { newestEchoSession } from "./echo-session";
 import { echoOn } from "@/lib/echo-limits";
@@ -124,7 +124,7 @@ export function DashboardPage() {
                 }
               />
             ) : (
-              <CurrentSection dashboard={dashboard} uid={user.uid} data={load.data} />
+              <CurrentSection dashboard={dashboard} data={load.data} />
             )}
             {/* TD-33 (1): right under the newest reading, while its questions wait. */}
             {waiting && (
@@ -180,12 +180,11 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CurrentSection({ dashboard, uid, data }: { dashboard: Dashboard; uid: string; data: DashboardData }) {
+function CurrentSection({ dashboard, data }: { dashboard: Dashboard; data: DashboardData }) {
   const { current } = dashboard;
   const scanId = current.kind === "reading" ? current.view.scanId : null;
   // TD-37 (3): Breakouts, Texture and Dark marks from this check's answers.
   const told = scanId ? toldTopics(checkAnswers(scanId, data.checks, data.laterAnswers)) : null;
-  const canAnswer = scanId !== null && questionsTarget(uid, data.checks, data.analyses, data.laterAnswers)?.id === scanId;
   // TD-37 (2): the mesh over this check's kept photo (extends the TD-25 (2) own-photo exception to Home).
   const photo = useKeptPhoto(scanId, dashboard.history.some((h) => h.scanId === scanId && h.photoClaimed));
   return (
@@ -216,8 +215,7 @@ function CurrentSection({ dashboard, uid, data }: { dashboard: Dashboard; uid: s
         <>
           {dashboard.newerCheckNotShown && <p className="rounded-xl bg-brand-linen px-4 py-3 text-sm">{C.current.newerNotShown}</p>}
           <CheckReadings view={current.view} photo={photo} />
-          <SourcesLine />
-          <ToldTopics topics={told} canAnswer={canAnswer} />
+          <ToldTopics topics={told} />
           {/* Only next to readings that are on screen. */}
           {current.view.bands && (
             <div className="border-t border-brand-line pt-5">

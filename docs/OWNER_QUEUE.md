@@ -318,11 +318,11 @@ aws s3api get-bucket-cors --bucket projectskin-skin-originals-prod > ~/skin-orig
 ## M2. Let our own site read a kept photo through its signed link (CORS GET)
 
 ```bash
-jq '.CORSRules += [{"AllowedOrigins":["https://theprojectskin.com","https://www.theprojectskin.com","https://skin-check-sigma.vercel.app","https://scan.theprojectskin.com"],"AllowedMethods":["GET"],"AllowedHeaders":[],"MaxAgeSeconds":600}]' ~/skin-originals-cors-backup-2026-10-11.json > ~/skin-originals-cors-td37.json && aws s3api put-bucket-cors --bucket projectskin-skin-originals-prod --cors-configuration file://$HOME/skin-originals-cors-td37.json && aws s3api get-bucket-cors --bucket projectskin-skin-originals-prod --query 'CORSRules[].AllowedMethods'
+jq '.CORSRules += [{"AllowedOrigins":["https://skin-check-sigma.vercel.app","https://scan.theprojectskin.com"],"AllowedMethods":["GET"],"AllowedHeaders":[],"MaxAgeSeconds":600}]' ~/skin-originals-cors-backup-2026-10-11.json > ~/skin-originals-cors-td37.json && aws s3api put-bucket-cors --bucket projectskin-skin-originals-prod --cors-configuration file://$HOME/skin-originals-cors-td37.json && aws s3api get-bucket-cors --bucket projectskin-skin-originals-prod --query 'CORSRules[].AllowedMethods'
 ```
-- Good output: `[["PUT"], ["GET"]]` (the PUT rule unchanged, one GET rule added). No localhost origin in the new rule.
+- Good output: `[["PUT"], ["GET"]]` (the PUT rule unchanged, one GET rule added). The GET rule names only the two addresses that serve this app (the store at theprojectskin.com does not), no localhost and no `*.vercel.app` wildcard.
 - What it does not change: the bucket stays private, and every read still needs a signed link from `/api/checks/photo`. That link lasts 60 seconds and is only for the photo's owner. CORS only lets the browser hand the bytes to our page.
-- Check (agent): `curl -s -o /dev/null -D - -X OPTIONS -H 'Origin: https://skin-check-sigma.vercel.app' -H 'Access-Control-Request-Method: GET' https://projectskin-skin-originals-prod.s3.ap-south-1.amazonaws.com/x` shows `Access-Control-Allow-Origin: https://skin-check-sigma.vercel.app`. The same request with `Origin: https://example.com` shows no allow header.
+- Check (agent): `curl -s -o /dev/null -D - -X OPTIONS -H 'Origin: https://skin-check-sigma.vercel.app' -H 'Access-Control-Request-Method: GET' https://projectskin-skin-originals-prod.s3.<bucket region>.amazonaws.com/x` (region from `aws s3api get-bucket-location`) shows `Access-Control-Allow-Origin: https://skin-check-sigma.vercel.app`. The same request with `Origin: https://example.com` shows no allow header.
 - Undo: `aws s3api put-bucket-cors --bucket projectskin-skin-originals-prod --cors-configuration file://$HOME/skin-originals-cors-backup-2026-10-11.json`.
 
 ## M3. Merge the pull request (this is the production deploy)
@@ -333,8 +333,8 @@ gh pr merge <PR number> --merge
 - Good output: `✓ Merged pull request #<n>`. Vercel builds `master` for production (about 2 minutes). The build copies the mesh library's files into the site (`next.config.js`).
 - Check (agent):
   - The production deployment is READY on the merge commit, region `bom1`.
-  - `curl -sI https://skin-check-sigma.vercel.app/mediapipe/1.0.1/wasm/vision_wasm_internal.wasm` gives 200 and `content-type: application/wasm`.
-  - `curl -s https://skin-check-sigma.vercel.app/mediapipe/face_landmarker.task | shasum -a 256` prints `64184e22…0bc9ff`.
+  - `curl -sI https://skin-check-sigma.vercel.app/mediapipe/0.10.35/wasm/vision_wasm_internal.wasm` gives 200 and `content-type: application/wasm`.
+  - `curl -s https://skin-check-sigma.vercel.app/mediapipe/face_landmarker-64184e22.task | shasum -a 256` prints `64184e22…0bc9ff`.
   - A chat request without a login answers 401.
 - Undo: `vercel rollback <previous production deployment id>` (fast), or `git revert -m 1 <merge commit>` in a new pull request. M2 can stay; it is harmless without the new code.
 

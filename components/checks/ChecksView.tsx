@@ -213,9 +213,8 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
           {/* TD-24 (1): on every opened check with readings, never behind a toggle. */}
           <p className="rounded-2xl bg-brand-mist px-5 py-4 text-brand-ink">{C.history.pastLine}</p>
           <CheckReadings view={{ ...check.view, photoCheck: null }} stack photo={photo} />
-          <SourcesLine />
-          {/* A skipped check already has its invitation below. */}
-          {!skipped && <ToldTopics topics={toldTopics(checkAnswers(check.scanId, data.checks, data.laterAnswers))} canAnswer={canAnswer} />}
+          {/* A skipped check has its invitation below instead. */}
+          {skipped ? <SourcesLine /> : <ToldTopics topics={toldTopics(checkAnswers(check.scanId, data.checks, data.laterAnswers))} />}
           {check.view.bands && (
             <div className="border-t border-brand-line pt-5">
               <KnownAndNotKnown />

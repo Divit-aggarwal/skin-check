@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
+import { PHOTO_METRICS } from "@/lib/skin-check-skus";
 import { NextResponse, type NextRequest } from "next/server";
 import { FieldValue } from "firebase-admin/firestore";
 import { checkRequestRate, consumeDailyQuota, SKIN_SCAN_ROUTE_LIMITS } from "@/lib/rate-limit";
@@ -30,9 +31,8 @@ const PERSIST_TIMEOUT_MS = 3_000;
 // Matches SkinScanScoresSchema's 7 categories (types/skin-scan.ts). Allowlist,
 // not passthrough — the value lands in an upstream query string, and
 // validating against the known 7 keeps a malformed client from shaping it.
-const VALID_OVERLAYS = new Set([
-  "redness", "oiliness", "texture", "pores", "blemishes", "hydration", "pigment",
-]);
+// TD-37 (1): only the photo readings' overlays, so no heatmap of a hidden reading is ever made or returned.
+const VALID_OVERLAYS = new Set<string>(PHOTO_METRICS);
 
 // PHASE 2: authenticated. Every request must carry a Firebase ID token that
 // this server verifies itself (see lib/firebase/admin.ts) — the browser's own

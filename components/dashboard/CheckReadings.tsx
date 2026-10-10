@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
 import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
@@ -44,8 +44,24 @@ export function ReadingRows({ bands }: { bands: Bands | null }) {
 // bad news. No score, no overlay, no other check.
 // TD-37 (2): with the user's photo (`photo`), the areas are chosen on the face
 // mesh over it; without one, or until the mesh is ready, on the face drawing.
-export function CheckReadings({ view, stack = false, photo = null }: { view: CheckView; stack?: boolean; photo?: Blob | null }) {
-  const [area, setArea] = useState<EchoRegion | null>(null);
+// `area` and `onAreaChange` let a parent own the choice (the results screen
+// marks the same area on its photo).
+export function CheckReadings({
+  view,
+  stack = false,
+  photo = null,
+  area: shownArea,
+  onAreaChange,
+}: {
+  view: CheckView;
+  stack?: boolean;
+  photo?: Blob | null;
+  area?: EchoRegion | null;
+  onAreaChange?: (region: EchoRegion | null) => void;
+}) {
+  const [ownArea, setOwnArea] = useState<EchoRegion | null>(null);
+  const area = shownArea !== undefined ? shownArea : ownArea;
+  const setArea = onAreaChange ?? setOwnArea;
   // No drawing of areas when there are no readings to go with it.
   const showFace = view.areas.length > 0 && view.bands !== null;
   const shown = area ? view.areas.find((a) => a.region === area)?.bands ?? null : view.bands;
@@ -113,23 +129,16 @@ export function SourcesLine() {
   return <p className="text-sm text-brand-muted">{C.told.sources}</p>;
 }
 
-/** What the user told us on one topic, or the invitation when the questions were skipped. Never a band or level. */
-function ToldBody({ noun, told, canAnswer }: { noun: string; told: ToldTopic | null; canAnswer: boolean }) {
-  if (told === null) {
+/** What the user told us on one topic. Never a band or level. */
+function ToldLines({ told }: { told: ToldTopic }) {
+  if (told.lines.length === 0) {
     return (
       <>
-        <p>{C.told.skipped(noun)}</p>
-        {canAnswer ? (
-          <Link href="/questions" className="inline-flex min-h-11 items-center font-medium text-brand-forest underline underline-offset-4">
-            {Q.answerLink}
-          </Link>
-        ) : (
-          <p className="text-sm text-brand-muted">{Q.checkSkippedClosed}</p>
-        )}
+        <p>{C.told.nothing(told.label.toLowerCase())}</p>
+        {told.topic === "texture" && <p className="text-sm text-brand-muted">{C.told.textureOnly}</p>}
       </>
     );
   }
-  if (told.lines.length === 0) return <p>{C.told.nothing(noun)}</p>;
   return (
     <ul className="flex flex-col gap-1">
       {told.lines.map((line) => (
@@ -140,39 +149,54 @@ function ToldBody({ noun, told, canAnswer }: { noun: string; told: ToldTopic | n
 }
 
 /**
- * One topic the photo does not measure (TD-37 (3)), for the results chip:
- * labelled as the user's own answer. `canAnswer`: this check's questions can
- * still be answered (questionsTarget), so the link goes to /questions.
+ * The results chip for one topic the photo does not measure (TD-37 (3)),
+ * labelled as the user's own answer. Skipped (`told` null): the invitation,
+ * with the way to the questions (the results check is the newest, so it can
+ * still be answered).
  */
-export function ToldPanel({ label, told, canAnswer }: { label: string; told: ToldTopic | null; canAnswer: boolean }) {
+export function ToldPanel({ label, told }: { label: string; told: ToldTopic | null }) {
   return (
-    <div className="flex flex-col gap-2">
-      <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">{C.told.title}</p>
-      <ToldBody noun={label.toLowerCase()} told={told} canAnswer={canAnswer} />
+    <div className="flex flex-col items-center gap-2">
+      <p className="text-sm text-brand-muted">{C.told.title}</p>
+      {told === null ? (
+        <>
+          <p>{C.told.skipped(label.toLowerCase())}</p>
+          <Link href="/questions" className="inline-flex min-h-11 items-center font-medium text-brand-forest underline underline-offset-4">
+            {Q.answerLink}
+          </Link>
+        </>
+      ) : (
+        <ToldLines told={told} />
+      )}
       <p className="text-sm text-brand-muted">{C.told.ownAnswer}</p>
     </div>
   );
 }
 
-/** Home, an opened check and Echo's panel: the three topics under the readings, from the check's answers. */
-export function ToldTopics({ topics, canAnswer }: { topics: ToldTopic[] | null; canAnswer: boolean }) {
+/**
+ * Home, an opened check and Echo's panel: where each reading comes from, then
+ * the three topics from the check's answers. No link here: each of those pages
+ * already has its own way to the questions when they wait.
+ */
+export function ToldTopics({ topics }: { topics: ToldTopic[] | null }) {
+  const titleId = useId();
   return (
-    <section aria-labelledby="told-title" className="flex flex-col gap-3 border-t border-brand-line pt-5">
+    <section aria-labelledby={titleId} className="flex flex-col gap-3 border-t border-brand-line pt-5">
+      <SourcesLine />
       <div>
         <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">{C.told.title}</p>
-        <h3 id="told-title" className="font-display text-base font-semibold tracking-[-0.01em]">{C.told.listTitle}</h3>
+        <h3 id={titleId} className="font-display text-base font-semibold tracking-[-0.01em]">{C.told.listTitle}</h3>
       </div>
       {topics === null ? (
-        <ToldBody noun={C.told.listTitle.toLowerCase()} told={null} canAnswer={canAnswer} />
+        <p>{C.told.none}</p>
       ) : (
         topics.map((t) => (
           <div key={t.topic} className="flex flex-col gap-1">
             <h4 className="font-semibold">{t.label}</h4>
-            <ToldBody noun={t.label.toLowerCase()} told={t} canAnswer={canAnswer} />
+            <ToldLines told={t} />
           </div>
         ))
       )}
-      <p className="text-sm text-brand-muted">{C.told.ownAnswer}</p>
     </section>
   );
 }

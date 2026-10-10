@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/button";
 import { canRetrySamePhoto, retrySkinScan } from "@/lib/scan-retry";
 import { summarizeConcerns } from "@/lib/skin-check-score";
 import { runSkinCheckRules, type Band, type BandableMetric } from "@/lib/skin-check-rules";
-import { ANSWER_TOPICS, METRIC_LABELS, PHOTO_METRICS, resolveStatedConcern } from "@/lib/skin-check-skus";
+import { ANSWER_TOPICS, METRIC_LABELS, PHOTO_METRICS } from "@/lib/skin-check-skus";
 import { toldTopics } from "@/lib/told-topics";
+import type { EchoRegion } from "@/lib/echo-regions";
 import { CheckReadings, KnownAndNotKnown } from "@/components/dashboard/CheckReadings";
 import { readingsOf } from "@/components/dashboard/state";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
@@ -27,8 +28,10 @@ const CHIP_ORDER: BandableMetric[] = [...PHOTO_METRICS, ...ANSWER_TOPICS];
 // Elevated (never a hidden one, TD-37 (1)), else Redness. Only picks the
 // initial chip, not what gets fetched.
 function resolveFocus(answers: SkinCheckAnswers, bands: Record<BandableMetric, Band>): BandableMetric {
-  const stated = resolveStatedConcern(answers);
-  if (stated && CHIP_ORDER.includes(stated)) return stated;
+  // The first of the user's concerns that is a chip (Dryness and Pores are not).
+  const concerns = Array.isArray(answers.primary_concerns) ? answers.primary_concerns : [];
+  const stated = concerns.find((c): c is BandableMetric => (CHIP_ORDER as string[]).includes(c));
+  if (stated) return stated;
   return PHOTO_METRICS.find((m) => bands[m] === "Elevated") ?? PHOTO_METRICS[0];
 }
 
@@ -49,6 +52,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
   // derives the overlay, score, band, and explanation from this same value,
   // so they can never disagree with each other or with the tab strip.
   const [selectedCategory, setSelectedCategory] = useState<BandableMetric | null>(null);
+  const [area, setArea] = useState<EchoRegion | null>(null);
 
   useEffect(() => {
     if (scan.status !== "success") return;
@@ -159,13 +163,14 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
   return (
     <div className="flex flex-col gap-10">
       <div className="grid items-start gap-8 lg:grid-cols-2">
-        <EchoTwin photo={scan.photo} categories={categories} overlays={overlays} selected={shown} onSelect={setSelectedCategory} analyzed />
+        <EchoTwin photo={scan.photo} categories={categories} overlays={overlays} selected={shown} onSelect={setSelectedCategory} analyzed highlight={area} />
 
         <section aria-labelledby="readings-title" className="flex flex-col gap-5 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
           <h2 id="readings-title" className="font-display text-xl font-semibold uppercase leading-tight tracking-[0.04em] text-brand-title sm:text-[22px]">
             What this photo shows
           </h2>
-          {view.bands ? <CheckReadings view={view} stack photo={scan.photo} /> : <p>The readings of this check could not be shown.</p>}
+          {/* TD-37 (2): one photo on this screen. The area is chosen on the drawing and marked on the mesh above. */}
+          {view.bands ? <CheckReadings view={view} stack area={area} onAreaChange={setArea} /> : <p>The readings of this check could not be shown.</p>}
           <p className="text-sm text-brand-muted">
             Each reading is relative to this one photo. It is not a medical opinion and does not set you against other people or other checks.
           </p>

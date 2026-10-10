@@ -12,22 +12,32 @@ describe("mesh files: pinned and served from our own site", () => {
   const loader = readFileSync("components/mesh/landmarks.ts", "utf8");
 
   it("one exact library version, the same in package.json, the loader and the lockfile", () => {
-    expect(pkg.dependencies["@mediapipe/tasks-vision"]).toBe("1.0.1");
-    expect(loader).toMatch(/MEDIAPIPE_VERSION = "1\.0\.1"/);
+    expect(pkg.dependencies["@mediapipe/tasks-vision"]).toBe("0.10.35");
+    expect(loader).toMatch(/MEDIAPIPE_VERSION = "0\.10\.35"/);
     const lock = JSON.parse(readFileSync("package-lock.json", "utf8"));
-    expect(lock.packages["node_modules/@mediapipe/tasks-vision"].version).toBe("1.0.1");
+    expect(lock.packages["node_modules/@mediapipe/tasks-vision"].version).toBe("0.10.35");
+  });
+
+  // Privacy review 2026-10-11: @mediapipe/tasks-vision 1.0.0 and 1.0.1 POST usage
+  // logs to odml.pa.googleapis.com every 60 seconds, with no off switch. 0.10.35
+  // has no such code. This fails if a version change brings it back.
+  it("the shipped library code sends nothing to Google (no usage logging)", () => {
+    for (const f of ["vision_bundle.mjs", "wasm/vision_wasm_internal.js", "wasm/vision_wasm_nosimd_internal.js"]) {
+      const src = readFileSync(join("node_modules/@mediapipe/tasks-vision", f), "utf8");
+      expect(src, f).not.toMatch(/odml\.pa\.googleapis|googleapis\.com\/v1\/log|x-goog-api-key/);
+    }
   });
 
   it("the model file is the one recorded, by sha256", () => {
     const readme = readFileSync("docs/design/face-mesh.md", "utf8");
-    const sha = createHash("sha256").update(readFileSync("public/mediapipe/face_landmarker.task")).digest("hex");
+    const sha = createHash("sha256").update(readFileSync("public/mediapipe/face_landmarker-64184e22.task")).digest("hex");
     expect(sha).toBe("64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff");
     expect(readme).toContain(sha);
   });
 
   it("wasm and model paths are on our own origin; the mesh code names no outside address", () => {
     expect(loader).toMatch(/WASM_PATH = `\/mediapipe\//);
-    expect(loader).toMatch(/MODEL_PATH = "\/mediapipe\/face_landmarker\.task"/);
+    expect(loader).toMatch(/MODEL_PATH = "\/mediapipe\/face_landmarker-64184e22\.task"/);
     for (const f of readdirSync("components/mesh")) {
       const src = readFileSync(join("components/mesh", f), "utf8");
       expect(src, f).not.toMatch(/https?:\/\/|storage\.googleapis|cdn\.jsdelivr|unpkg/);
@@ -63,8 +73,10 @@ describe("mesh drawing: a map, never a finding", () => {
   });
 
   it("only the area the user chose is filled", () => {
-    expect(layer).toMatch(/on\s*\?\s*"fill-brand-mist\/60 stroke-brand-forest/);
-    expect(layer).toMatch(/: "fill-white\/0 /);
+    // One filled path, for the chosen area only; every other area is transparent.
+    expect(layer.match(/fill-brand-mist\/60/g)).toHaveLength(1);
+    expect(layer).toMatch(/outlines && chosen && \(/);
+    expect(layer).toMatch(/className="fill-white\/0 /);
   });
 
   it("the sweep moves by transform and stops under reduced motion", () => {
