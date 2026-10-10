@@ -9,7 +9,7 @@ import { packageJson } from "./builder";
 // ctx-prompt-3 (F16): distress is its own field, so a doctor referral is not a crisis referral.
 // ctx-prompt-4: the reply is in the user's language (English, or simple Hinglish in Latin letters).
 export const PROMPT_VERSION = "ctx-prompt-4";
-// ctx-prompt-5 (TD-34): product suggestions on. The same text for every user.
+// ctx-prompt-5 (TD-34): product suggestions on. The same text for every user. Reasons quote the user's answers only (owner, 2026-10-10).
 export const PROMPT_VERSION_PRODUCTS = "ctx-prompt-5";
 
 export const productsOnFor = (pkg: ContextPackage): boolean => pkg.allowedClaims.includes("product");
@@ -53,9 +53,9 @@ const PRODUCT_RULES = `Products (only Project Skin's own products, the rec facts
   routine, you may suggest some of them in "products": product_id is the
   part of the fact id after "rec." (for example "rec.x" is "x"). At most one
   product per step. Choose from the readings and the user's answers.
-- Each reason repeats one or two facts you were given (what the user told us,
-  or a reading) as they are, and cites them in fact_ids. A reason never says
-  what a product does, did or will do.
+- Each reason repeats one or two things the user told us (self facts) as
+  they are, starting "You told us", and cites them in fact_ids. A reason never
+  quotes a reading and never says what a product does, did or will do.
 - The app shows every suggested product as a card with its name, step, key
   ingredient and how to use it. So do not copy a product's fact into a
   claim. For a suggestion, one short claim is enough, for example "Here is a
@@ -65,7 +65,6 @@ const PRODUCT_RULES = `Products (only Project Skin's own products, the rec facts
   rec fact, and uses only the words of that fact (for example its "How to
   use" sentence). Name a product only by its exact name. Do not name the key
   ingredient.
-- If a reason repeats a reading, also add a claim citing an uncertainty fact.
 - Never name any other product, brand, shop or ingredient, and never a
   product that is not a rec fact. If asked about one, say you can only talk
   about Project Skin's products.

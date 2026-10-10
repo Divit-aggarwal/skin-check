@@ -59,7 +59,7 @@ export async function answerFromPackage(
   pkg: ContextPackage,
   message: string,
   history: EchoChatMessage[],
-  opts: { generate: Generate; redFlag: boolean }
+  opts: { generate: Generate }
 ): Promise<AnswerOutcome> {
   const contents = [...history, { role: "user" as const, text: message }];
   const schema = responseSchema(pkg);
@@ -99,7 +99,9 @@ export async function answerFromPackage(
   };
 
   if (v1.passed || v1.answer?.needs_referral || v1.answer?.distress === true) return done([v1], false, first.modelId);
-  const unsafeToRetry = opts.redFlag || v1.userPremise || v1.failures.some((f) => NO_RETRY_CHECKS.has(f.check));
+  // F20 (owner, 2026-10-10): the retry depends on the answer only, never on the safety state, which can
+  // come from a hidden answer: every user gets the same calls. The guards are applied after (productGuard).
+  const unsafeToRetry = v1.userPremise || v1.failures.some((f) => NO_RETRY_CHECKS.has(f.check));
   if (unsafeToRetry) return done([v1], false, first.modelId);
 
   const second = await opts.generate(renderSystemInstruction(pkg, names(v1)), contents, schema);

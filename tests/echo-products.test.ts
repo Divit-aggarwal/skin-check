@@ -47,7 +47,7 @@ const failed = (raw: string, message?: string, p = pkg) => check(raw, message, p
 const SKIN_TYPE = "self.all.skin_type";
 const GOOD_PRODUCTS = [
   { product_id: "refreshing-cleanser", reason: "You told us your skin type: Oily", fact_ids: [SKIN_TYPE] },
-  { product_id: "protecting-sunscreen", reason: "Oiliness, photo-based estimate for the whole face: Elevated", fact_ids: ["state.all.oiliness"] },
+  { product_id: "protecting-sunscreen", reason: "You told us your main skin concerns: Redness; Excess oil", fact_ids: ["self.all.primary_concerns"] },
 ];
 
 describe("the product list Gemini receives (TD-34, build part 1)", () => {
@@ -193,16 +193,17 @@ describe("the answer checker (TD-34, build parts 2 and 6)", () => {
     ["a result claim", "It works well for oily skin you told us about", "efficacy_claim"],
     ["a reason with no fact of the user's", "A simple daily step", "citation_rule"],
     ["an answer presented as measured", "Your skin type: Oily", "self_report_as_measurement"],
-    ["a band the reading does not hold", "Oiliness, photo-based estimate for the whole face: Low", "band_mismatch"],
-    ["an opinion about the reading", "Oiliness, photo-based estimate for the whole face: Elevated, which is a lot", "product_claim"],
+    // Owner decision 2026-10-10: a reason quotes the user's answers only, never a reading.
+    ["a reading, even quoted exactly", "Oiliness, photo-based estimate for the whole face: Elevated", "citation_rule"],
+    ["a band the reading does not hold", "Oiliness, photo-based estimate for the whole face: Low", "citation_rule"],
     ["a reason citing another product", "You told us your skin type: Oily", "citation_rule"],
   ])("rejects a reason that %s", (name, reason, check) => {
-    const fact_ids = name === "a reason with no fact of the user's" ? [] : name.includes("band") || name.includes("opinion") ? ["state.all.oiliness"] : name.includes("another product") ? ["rec.clear-seal"] : [SKIN_TYPE];
+    const fact_ids = name === "a reason with no fact of the user's" ? [] : name.includes("band") || name.includes("reading") ? ["state.all.oiliness"] : name.includes("another product") ? ["rec.clear-seal"] : [SKIN_TYPE];
     expect(failed(answer({ products: [{ product_id: "refreshing-cleanser", reason, fact_ids }] }))).toContain(check);
   });
 
-  it("a reason that quotes a reading needs an uncertainty claim, like any description", () => {
-    expect(failed(answer({ products: [GOOD_PRODUCTS[1]] }))).toContain("missing_uncertainty");
+  it("a reason that quotes the user's answer and a reading together is rejected (owner decision 2026-10-10)", () => {
+    expect(failed(answer({ products: [{ product_id: "refreshing-cleanser", reason: "You told us your skin type: Oily", fact_ids: [SKIN_TYPE, "state.all.oiliness"] }] }))).toContain("citation_rule");
   });
 
   it("the new checks run only while products are on, so an off package is checked exactly as before", () => {

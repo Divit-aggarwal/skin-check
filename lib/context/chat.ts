@@ -161,7 +161,7 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
     return { ok: true, reply, products: [] };
   }
 
-  const outcome = await answerFromPackage(pkg, message, history, { generate: generateContextAnswer, redFlag: safety.redFlag });
+  const outcome = await answerFromPackage(pkg, message, history, { generate: generateContextAnswer });
   // TD-34: the guards change only what the user sees. The stored text (Gemini's
   // later history) is the unguarded answer, the same for every user.
   // A red-flag message earlier on this check counts like a quiz red flag (safety review).

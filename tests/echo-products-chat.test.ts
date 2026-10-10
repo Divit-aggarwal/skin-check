@@ -106,6 +106,20 @@ describe("TD-34: the guards never change what Gemini receives, over two turns", 
     expect(a.first).not.toEqual(b.first);
   });
 
+  it.each(PAIRS)("F20: %s, a first answer that fails: both users get the retry, with the same calls", async (_, withHidden, without) => {
+    const BAD = JSON.stringify({ claims: [{ claim_type: "out_of_scope", text: "These products cure acne.", fact_ids: [] }], products: [], needs_referral: false, distress: false });
+    const run = async (answers: Record<string, unknown>) => {
+      h.generateContent.mockReset();
+      h.generateContent.mockResolvedValueOnce({ text: BAD }).mockResolvedValue({ text: SUGGESTION });
+      h.loadTrustedEchoContext.mockResolvedValue(trusted(answers));
+      await handleContextChat({ uid: "uid-p", scanId: SCAN_ID, region: "cheeks", message: "Which products should I use?" });
+      return calls();
+    };
+    const a = await run(withHidden);
+    expect(h.generateContent).toHaveBeenCalledTimes(2);
+    expect(a).toBe(await run(without));
+  });
+
   it("the guarded user sees the guard: red flag gets the dermatologist line first and no product", async () => {
     h.loadTrustedEchoContext.mockResolvedValue(trusted({ ...BASE, breakout_pattern: ["deep_painful"] }));
     const r = await handleContextChat({ uid: "uid-p", scanId: SCAN_ID, region: "cheeks", message: "Which products should I use?" });

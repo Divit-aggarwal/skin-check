@@ -43,9 +43,9 @@ deterministic parts are the list, the checker, the guards and the cards.
 - Rejected:
   - any id not on this package's list, or the same id twice;
   - any product id at all while suggestions are off.
-- Each reason is checked as its own claim. It must cite the user's own facts
-  (an answer or a reading) and use only their words. A reason that quotes a
-  reading needs an uncertainty claim.
+- Each reason is checked as its own claim. It must cite only what the user
+  told us (owner decision TD-35, 2026-10-10: readings may inform the choice
+  but never stand beside a product) and use only those words.
 - New claim type `product`: cites rec facts only, and uses the words of those
   facts.
 - New checks, run only while suggestions are on, on claims, reasons and the

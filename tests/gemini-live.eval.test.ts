@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 import { QUESTIONS, type PersonaName } from "./gemini-live/questions";
 
@@ -69,6 +69,8 @@ const NAMED: Record<PersonaName, Persona> = {
 
 describe.skipIf(!LIVE)("context path against the real Gemini model (F07)", () => {
   it("answers the fixed question set and records every outcome", async () => {
+    // A result file is evidence: never overwritten (owner, 2026-10-10). Pick a new name.
+    if (process.env.GEMINI_LIVE_OUT && existsSync(process.env.GEMINI_LIVE_OUT)) throw new Error(`${process.env.GEMINI_LIVE_OUT} exists; choose a new GEMINI_LIVE_OUT`);
     const key = /^GEMINI_DEV_API_KEY=(.*)$/m.exec(readFileSync(".env.development.local", "utf8"))?.[1]?.trim();
     expect(key, "GEMINI_DEV_API_KEY is empty").toBeTruthy();
     vi.stubEnv("GEMINI_API_KEY", key!); // NODE_ENV is test here, which reads GEMINI_API_KEY
@@ -148,7 +150,7 @@ describe.skipIf(!LIVE)("context path against the real Gemini model (F07)", () =>
         try {
           if (area === "whole_face") {
             const safety = evaluateSafety({ answers: full.FULL_ANSWERS, confirmedThisScan: [] });
-            const o = await answerFromPackage(buildContextPackage(full.fullAnswersInput(null, safety)), message, [], { generate: generateContextAnswer, redFlag: safety.redFlag });
+            const o = await answerFromPackage(buildContextPackage(full.fullAnswersInput(null, safety)), message, [], { generate: generateContextAnswer });
             reply = o.reply;
             validator = o.validator;
           } else {

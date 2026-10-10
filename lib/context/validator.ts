@@ -317,12 +317,13 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
 
     // §5 rule 2. A claim type the package does not allow is a citation failure too.
     if (claim.claim_type !== "product_reason" && !pkg.allowedClaims.includes(claim.claim_type)) fail("citation_rule", i, claim.claim_type);
-    // TD-34: a product claim cites products only; a reason cites the user's own facts (answers or readings) besides its product.
+    // TD-34: a product claim cites products only. A reason cites only what the user told us besides its
+    // product (owner decision 2026-10-10: readings may inform the choice, never stand beside a product).
     if (claim.claim_type === "product" && (!kinds.has("rec") || cited.some((f) => f.kind !== "rec"))) fail("citation_rule", i);
     if (claim.claim_type === "product_reason") {
       const own = cited.slice(1);
-      if (cited[0]?.kind !== "rec" || own.length === 0 || own.some((f) => f.kind !== "self" && f.kind !== "state")) fail("citation_rule", i);
-      if (own.some((f) => f.kind === "self") && !TOLD.test(text)) fail("self_report_as_measurement", i);
+      if (cited[0]?.kind !== "rec" || own.length === 0 || own.some((f) => f.kind !== "self")) fail("citation_rule", i);
+      if (!TOLD.test(text)) fail("self_report_as_measurement", i);
     }
     if (MUST_CITE.has(claim.claim_type) && claim.fact_ids.length === 0) fail("citation_rule", i);
     // An uncited type may cite only a missing fact it repeats as is ("Product suggestions were not included here.").
@@ -474,9 +475,7 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
   // An answer that describes a reading also says what the reading cannot tell.
   // F07 live run: a descriptive claim that cites only what is missing ("Product
   // suggestions were not included here.") describes no reading.
-  const describes =
-    answer.claims.some((c) => c.claim_type === "descriptive" && c.fact_ids.some((id) => facts.get(id)?.kind === "state")) ||
-    reasons.some((c) => c.fact_ids.some((id) => facts.get(id)?.kind === "state"));
+  const describes = answer.claims.some((c) => c.claim_type === "descriptive" && c.fact_ids.some((id) => facts.get(id)?.kind === "state"));
   const uncertain = answer.claims.some((c) => c.fact_ids.some((id) => facts.get(id)?.kind === "uncert"));
   if (describes && !uncertain) fail("missing_uncertainty", -1);
 

@@ -303,7 +303,9 @@ describe("context path: real longitudinal and safety inputs (wiring 2)", () => {
     expect(geminiCall()).not.toMatch(/A prescription product|extraCaution|caution|product list/i);
   });
 
-  it("a quiz red flag reaches answerFromPackage: a rejected answer is not retried", async () => {
+  // F20 (owner decision 2026-10-10): changed. Was "a quiz red flag reaches answerFromPackage: a rejected
+  // answer is not retried". A quiz red flag can come from a hidden answer, so it no longer changes the calls.
+  it("F20: a quiz red flag does not change the Gemini calls: a rejected answer is retried for every user", async () => {
     const BAD = JSON.stringify({ claims: [{ claim_type: "uncertainty", text: "Your redness is 42.", fact_ids: [UNCERTAINTY.id] }], needs_referral: false });
     h.generateContent.mockResolvedValue({ text: BAD });
     await post();
@@ -311,7 +313,7 @@ describe("context path: real longitudinal and safety inputs (wiring 2)", () => {
     h.generateContent.mockClear();
     h.loadTrustedEchoContext.mockResolvedValue({ scores: SCORES, regionScores: { cheeks: CHEEK_SCORES }, regionLowConfidence: {}, pipelineVersion: "scan-0.1.6-provisional", answers: { primary_concerns: ["blemishes"], breakout_pattern: ["deep_painful"] } });
     await post();
-    expect(h.generateContent).toHaveBeenCalledTimes(1);
+    expect(h.generateContent).toHaveBeenCalledTimes(2);
     // The red flag itself never reaches Gemini.
     expect(geminiCall()).not.toMatch(/redFlag|deep_painful|red_flag\./);
   });
