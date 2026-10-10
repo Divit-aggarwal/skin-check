@@ -276,7 +276,7 @@ gh pr merge 10 --merge
 1. Echo answers an ordinary question and a Hinglish one, exactly as before. No product cards, no suggested routine.
 2. "Which products should I use?" gets the same kind of answer as today, with no products.
 
-## P4. Turn product suggestions on (only after P3 passes and the descriptions are approved)
+## P4. Turn product suggestions on (WAITING: owner decision TD-36, 2026-10-10. Only after the real-model run on the final code, 78 product cases plus about 20 ordinary questions, shows 0 products outside the list, 0 made-up claims passed and 0 guard failures, and the owner says go)
 
 ```bash
 vercel env rm ECHO_PRODUCTS_SWITCH production --yes
