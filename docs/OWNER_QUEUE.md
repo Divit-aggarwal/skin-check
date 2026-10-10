@@ -298,3 +298,50 @@ vercel redeploy $(vercel api /v9/projects/skin-check | jq -r '.targets.productio
 
 ### How to turn product suggestions off quickly (only if needed)
 The P4 undo: `printf 'off' | vercel env add ECHO_PRODUCTS_SWITCH production --no-sensitive`, then the redeploy. Echo keeps answering, with no products. To turn Echo itself off, see "How to turn Echo off quickly" above.
+
+---
+
+# TD-37 release: face mesh, and two photo readings (prepared 2026-10-11)
+
+Pull request: branch `feat/mesh-two-readings` (pull request: see M3). **Nothing below has been run.** Same rules as above: in order, one step at a time, and tell the agent after each step. Run this after the TD-34 queue (P1–P3), or tell the agent if you want it first. The two releases touch different files.
+
+**Why this order is safe.** There is no database rules, index or expiry change, and no setting to add. The engine's five values are saved exactly as today (TD-37 (4)). The bucket rule (M2) goes first. It only lets our own site read a photo through a signed link the server already issues for the owner of that photo. Before the merge, nothing in the live app uses it. Without it, after the merge Home and an opened check show the face drawing instead of the mesh. Nothing breaks.
+
+## M1. Save the photo bucket's current CORS settings (read only)
+
+```bash
+aws s3api get-bucket-cors --bucket projectskin-skin-originals-prod > ~/skin-originals-cors-backup-2026-10-11.json && jq '.CORSRules[] | {AllowedMethods, AllowedOrigins}' ~/skin-originals-cors-backup-2026-10-11.json
+```
+- Good output: one or more rules with `"AllowedMethods": ["PUT"]` and our site addresses. The file holds today's settings exactly; it is the undo for M2.
+- Check (agent): you paste the jq output (no secret in it); the agent confirms there is no GET rule yet and writes the exact M2 origins from it.
+
+## M2. Let our own site read a kept photo through its signed link (CORS GET)
+
+```bash
+jq '.CORSRules += [{"AllowedOrigins":["https://theprojectskin.com","https://www.theprojectskin.com","https://skin-check-sigma.vercel.app","https://scan.theprojectskin.com"],"AllowedMethods":["GET"],"AllowedHeaders":[],"MaxAgeSeconds":600}]' ~/skin-originals-cors-backup-2026-10-11.json > ~/skin-originals-cors-td37.json && aws s3api put-bucket-cors --bucket projectskin-skin-originals-prod --cors-configuration file://$HOME/skin-originals-cors-td37.json && aws s3api get-bucket-cors --bucket projectskin-skin-originals-prod --query 'CORSRules[].AllowedMethods'
+```
+- Good output: `[["PUT"], ["GET"]]` (the PUT rule unchanged, one GET rule added). No localhost origin in the new rule.
+- What it does not change: the bucket stays private, and every read still needs a signed link from `/api/checks/photo`. That link lasts 60 seconds and is only for the photo's owner. CORS only lets the browser hand the bytes to our page.
+- Check (agent): `curl -s -o /dev/null -D - -X OPTIONS -H 'Origin: https://skin-check-sigma.vercel.app' -H 'Access-Control-Request-Method: GET' https://projectskin-skin-originals-prod.s3.ap-south-1.amazonaws.com/x` shows `Access-Control-Allow-Origin: https://skin-check-sigma.vercel.app`. The same request with `Origin: https://example.com` shows no allow header.
+- Undo: `aws s3api put-bucket-cors --bucket projectskin-skin-originals-prod --cors-configuration file://$HOME/skin-originals-cors-backup-2026-10-11.json`.
+
+## M3. Merge the pull request (this is the production deploy)
+
+```bash
+gh pr merge <PR number> --merge
+```
+- Good output: `✓ Merged pull request #<n>`. Vercel builds `master` for production (about 2 minutes). The build copies the mesh library's files into the site (`next.config.js`).
+- Check (agent):
+  - The production deployment is READY on the merge commit, region `bom1`.
+  - `curl -sI https://skin-check-sigma.vercel.app/mediapipe/1.0.1/wasm/vision_wasm_internal.wasm` gives 200 and `content-type: application/wasm`.
+  - `curl -s https://skin-check-sigma.vercel.app/mediapipe/face_landmarker.task | shasum -a 256` prints `64184e22…0bc9ff`.
+  - A chat request without a login answers 401.
+- Undo: `vercel rollback <previous production deployment id>` (fast), or `git revert -m 1 <merge commit>` in a new pull request. M2 can stay; it is harmless without the new code.
+
+## M4. Phone checks after the merge (made-up test accounts only)
+
+1. New check on a low-cost Android phone, questions skipped. On the last step, while "Analyzing your photo…" shows, the photo shows with a thin white face mesh and a band moving down. With the phone's "Remove animations" setting on, the mesh is still and there is no band.
+2. Results: five chips, Redness, Oiliness, Breakouts, Texture, Dark marks, in that order. Redness and Oiliness show a level and the coloured overlay. The other three show "From what you told us" and an invitation to answer the questions, never a level. The line under the chips says which readings come from the photo.
+3. Home and the opened check of a check with "keep my photo" ticked: the mesh over the photo, and tapping an area highlights it. A check without a kept photo shows the face drawing.
+4. Echo: "How are my breakouts?" gets no level for breakouts. Echo may repeat what you said in the questions.
+5. Only once the development key has credit, and you say go: the agent runs the real-model question set (tracker F23).
