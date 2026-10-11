@@ -304,8 +304,12 @@ test("weather: no city explains why, Type my city finds and saves a place", asyn
 test("weather: Use my location keeps only the city and a rounded position; only that reaches the source", async ({ page, context }) => {
   await context.grantPermissions(["geolocation"]);
   await context.setGeolocation({ latitude: 12.97194, longitude: 77.59369 });
-  // Start from no city, whatever an earlier run on this stack saved.
-  await fetch(`http://${FS}/v1/projects/demo-skin-check/databases/(default)/documents/users/${U.homeToday!.uid}/settings/home`, { method: "DELETE", headers: { authorization: "Bearer owner" } });
+  // Start from no city, whatever an earlier run on this stack saved (the choices and askedAt stay).
+  await fetch(`http://${FS}/v1/projects/demo-skin-check/databases/(default)/documents/users/${U.homeToday!.uid}/settings/home?updateMask.fieldPaths=city`, {
+    method: "PATCH",
+    headers: { authorization: "Bearer owner", "content-type": "application/json" },
+    body: JSON.stringify({ fields: { city: { nullValue: null } } }),
+  });
   await homeAs(page, U.homeToday!.phoneNumber);
   const before = weatherRequests().length;
   const sent: string[] = [];
