@@ -1,4 +1,8 @@
-# Face mesh and the two photo readings (TD-37)
+# Face mesh and the two photo readings (TD-37, TD-39)
+
+TD-39 (owner, 2026-10-11) replaced the chips: the results show one photo with
+the mesh and both overlays and one readings table; Breakouts, Texture and Dark
+marks are not shown anywhere. See docs/design/system.md §5.
 
 Owner brief 2026-10-10, decisions TD-37 (1)–(5) in the tracker. Built on
 `feat/mesh-two-readings` (G18, G19, F22).
@@ -8,7 +12,7 @@ Owner brief 2026-10-10, decisions TD-37 (1)–(5) in the tracker. Built on
 | Reading | Shown as | Overlay | Where the value lives |
 |---|---|---|---|
 | Redness, Oiliness | Low / Moderate / Elevated from the photo | Yes, with the mesh | Server record, unchanged |
-| Breakouts, Texture, Dark marks | "From what you told us": the user's own answers | Never | Server record, unchanged (TD-37 (4)), never shown |
+| Breakouts, Texture, Dark marks | Not shown (TD-39). Echo still uses the user's answers about them as things the user said, never as measured | Never | Server record, unchanged (TD-37 (4)), never shown |
 | Dryness, Pores | Not shown (unchanged) | Never | Server record |
 
 One list in code decides this: `PHOTO_METRICS` and `ANSWER_TOPICS` in
@@ -19,21 +23,17 @@ and top concerns (`summarizeConcerns`), the overlays asked for
 (`OVERLAY_CATEGORIES`), the legacy prompt (`summarizeSkinScanScores`) and the
 context package (`lib/context/builder.ts`, ctx-4 / ctx-5) read the same list.
 
-The answers per topic (`lib/told-topics.ts`) come from fixed questions only:
-main concerns, breakout look and areas, and what a healed breakout leaves.
-The personal-context questions are never shown under a topic.
-
-Chips are in a fixed order, photo readings first. They are never sorted by
-band: an order by band would give away the hidden readings' levels.
+The readings table has fixed columns (Redness, Oiliness) and fixed rows (whole
+face, then the areas in Echo's order). Nothing is ever sorted by band.
 
 ## 2. Where the mesh points come from
 
 The engine (skin-scan 0.1.6, `ScanResponse`) returns no landmark points. The
 browser finds them with `@mediapipe/tasks-vision`, pinned at exactly `0.10.35`
 (package.json, `MEDIAPIPE_VERSION`, lockfile; `tests/face-mesh.test.ts`).
-This is the same 468-point face topology the engine uses, so the area outlines
-use the engine's own landmark groups (`lib/face-mesh/regions.ts`, copied from
-mediapipe 0.10.21 `FACEMESH_*` as used in skin-scan `face_mesh.py`).
+This is the same 468-point face topology the engine uses. TD-39 removed the
+area outlines on the photo, so only the mesh lines are drawn
+(`lib/face-mesh/regions.ts`).
 
 - Why 0.10.35 and not the newer 1.0.x: the privacy review (2026-10-11) found
   that 1.0.0 and 1.0.1 POST usage logs (device class, library version, task,
@@ -60,9 +60,8 @@ mediapipe 0.10.21 `FACEMESH_*` as used in skin-scan `face_mesh.py`).
 ## 3. How the mesh is drawn
 
 - A map, never a finding. One thin, even, white line per edge, in a single
-  SVG path. No points, no dots, no colour by place or by reading. The only
-  filled area is the one the user chose: the brand tint and a solid green
-  outline, as on the face drawing (system.md §2).
+  SVG path. No points, no dots, no colour by place or by reading, nothing filled and
+  nothing to choose (TD-39). On the results it sits over the two overlays.
 - Scanning: while the photo is read, one soft white band sweeps down. It
   moves by CSS transform only, so the mesh is never redrawn per frame. Under
   reduced motion the band is gone and the mesh stays still.

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { areaOutlines, hull, LEFT_EYE, LEFT_EYEBROW, LIPS, meshPath, MIN_POINTS, NOSE, OVAL, RIGHT_EYE, RIGHT_EYEBROW, type Pt } from "@/lib/face-mesh/regions";
+import { meshPath, type Pt } from "@/lib/face-mesh/regions";
 
 // TD-37 (2), (5): the face mesh. Files from our own site, one pinned version,
 // a map of the face that is never drawn as a finding.
@@ -57,7 +57,7 @@ describe("mesh files: pinned and served from our own site", () => {
   });
 
   it("the points are never stored or sent: no write, no fetch, no storage in the mesh code", () => {
-    for (const f of ["landmarks.ts", "MeshLayer.tsx", "MeshPicker.tsx", "ScanningPhoto.tsx"]) {
+    for (const f of ["landmarks.ts", "MeshLayer.tsx", "FacePhoto.tsx", "ScanningPhoto.tsx"]) {
       const src = readFileSync(join("components/mesh", f), "utf8");
       expect(src, f).not.toMatch(/fetch\(|setDoc|addDoc|updateDoc|localStorage|indexedDB|sendBeacon|XMLHttpRequest/);
     }
@@ -72,11 +72,10 @@ describe("mesh drawing: a map, never a finding", () => {
     expect(layer.match(/stroke="#FFFFFF" strokeOpacity/g)).toHaveLength(1);
   });
 
-  it("only the area the user chose is filled", () => {
-    // One filled path, for the chosen area only; every other area is transparent.
-    expect(layer.match(/fill-brand-mist\/60/g)).toHaveLength(1);
-    expect(layer).toMatch(/outlines && chosen && \(/);
-    expect(layer).toMatch(/className="fill-white\/0 /);
+  it("TD-39: nothing on the mesh is filled or can be chosen", () => {
+    expect(layer).not.toMatch(/fill-brand-mist|role="button"|tabIndex|onClick|aria-pressed/);
+    expect(layer).toMatch(/fill="none"/);
+    expect(layer).toMatch(/aria-hidden\n/);
   });
 
   it("the sweep moves by transform and stops under reduced motion", () => {
@@ -87,48 +86,8 @@ describe("mesh drawing: a map, never a finding", () => {
   });
 });
 
-// A synthetic face: every index of each group placed where that part of a
-// face sits (x right, y down). Not anyone's face.
-function syntheticFace(): Pt[] {
-  const pts: Pt[] = Array.from({ length: 478 }, () => [500, 500] as Pt);
-  const ring = (ids: number[], cx: number, cy: number, rx: number, ry: number) =>
-    ids.forEach((id, k) => (pts[id] = [cx + rx * Math.cos((2 * Math.PI * k) / ids.length), cy + ry * Math.sin((2 * Math.PI * k) / ids.length)]));
-  ring(OVAL, 500, 520, 300, 400);
-  ring(RIGHT_EYEBROW, 380, 380, 70, 12); // image-left
-  ring(LEFT_EYEBROW, 620, 380, 70, 12);
-  ring(RIGHT_EYE, 380, 430, 50, 18);
-  ring(LEFT_EYE, 620, 430, 50, 18);
-  ring(NOSE, 500, 520, 40, 90);
-  ring(LIPS, 500, 700, 90, 30);
-  return pts;
-}
-
-describe("area outlines from the engine's own landmark groups", () => {
-  const areas = areaOutlines(syntheticFace())!;
-  const ys = (poly: Pt[]) => poly.map((p) => p[1]);
-
-  it("four areas; too few points gives none", () => {
-    expect(Object.keys(areas).sort()).toEqual(["cheeks", "chin", "forehead", "nose"]);
-    expect(areaOutlines(syntheticFace().slice(0, MIN_POINTS - 1))).toBeNull();
-  });
-
-  it("forehead ends at the brows, chin starts at the lips, cheeks are two shapes either side of the nose", () => {
-    expect(Math.max(...ys(areas.forehead.fill[0]!))).toBeLessThanOrEqual(392 + 1e-6);
-    expect(Math.min(...ys(areas.chin.fill[0]!))).toBeGreaterThanOrEqual(670 - 1e-6);
-    expect(areas.cheeks.fill).toHaveLength(2);
-    expect(areas.cheeks.label[0]![0]).toBeLessThan(500);
-    expect(areas.cheeks.label[1]![0]).toBeGreaterThan(500);
-    // The mouth is cut out of the chin, and eyes, nose and mouth out of the cheeks.
-    expect(areas.chin.holes).toHaveLength(1);
-    expect(areas.cheeks.holes.length).toBeGreaterThanOrEqual(4);
-  });
-
-  it("hull: a square with a point inside is the square", () => {
-    const h = hull([[0, 0], [10, 0], [10, 10], [0, 10], [5, 5]]);
-    expect(h).toHaveLength(4);
-    expect(h).not.toContainEqual([5, 5]);
-  });
-
+describe("mesh path", () => {
+  const syntheticFace = (): Pt[] => Array.from({ length: 478 }, (_, i) => [i, i] as Pt);
   it("the mesh path is one move-and-line per edge, nothing else", () => {
     const d = meshPath(syntheticFace(), [{ start: 0, end: 1 }, { start: 1, end: 2 }, { start: 999, end: 1 }]);
     expect(d.match(/M/g)).toHaveLength(2);

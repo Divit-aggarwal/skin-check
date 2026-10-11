@@ -10,7 +10,7 @@ import { AI_SHARE_CONSENT_VERSION, IMAGE_RETENTION_CONSENT_VERSIONS } from "@/li
 import { startingCheckCount, startingChecks, usableForEveryQuantity } from "@/lib/longitudinal/baseline";
 import { BASELINE_RULE } from "@/lib/longitudinal/settings";
 import { bandScores, type Band } from "@/lib/skin-check-rules";
-import { METRIC_LABELS, PHOTO_METRICS, type PhotoMetric } from "@/lib/skin-check-skus";
+import { METRIC_LABELS, SHOWN_METRICS, type ShownMetric } from "@/lib/skin-check-skus";
 import { toSkinState2, type SkinState2 } from "@/lib/skin-state-2";
 import { SkinScanScoresSchema } from "@/types/skin-scan";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, type EchoRegion } from "@/lib/echo-regions";
@@ -26,7 +26,7 @@ export interface Doc {
 export type PhotoCheck = "pass" | "override" | "unchecked" | "not_recorded";
 export type HistoryKind = "reading" | "legacy" | "failed" | "questions";
 
-export type Bands = { metric: PhotoMetric; label: string; band: Band }[];
+export type Bands = { metric: ShownMetric; label: string; band: Band }[];
 
 /** One face area's readings from the same photo; bands null when that area's scores could not be read. */
 export interface AreaReadings {
@@ -106,10 +106,8 @@ function bandsOf(scores: unknown): Bands | null {
   const parsed = SkinScanScoresSchema.safeParse(scores);
   if (!parsed.success) return null;
   const { bands } = bandScores(parsed.data);
-  // TD-37 (1): Redness and Oiliness only, on every screen and for old checks.
-  // No Dryness (D-23); Breakouts, Texture and Dark marks are shown from the
-  // user's answers instead (lib/told-topics.ts).
-  return PHOTO_METRICS.map((metric) => ({ metric, label: METRIC_LABELS[metric], band: bands[metric] }));
+  // TD-40: the five readings, on every screen and for old checks. No Dryness (D-23).
+  return SHOWN_METRICS.map((metric) => ({ metric, label: METRIC_LABELS[metric], band: bands[metric] }));
 }
 
 /** Readings by face area, in the fixed Echo order; only areas the record has. */

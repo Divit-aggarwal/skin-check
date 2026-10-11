@@ -1,15 +1,12 @@
 "use client";
 
-import { useId, useState } from "react";
-import Link from "next/link";
 import { ShieldCheck } from "lucide-react";
-import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
-import type { ToldTopic } from "@/lib/told-topics";
-import { ECHO_REGION_LABELS, ECHO_REGIONS, type EchoRegion } from "@/lib/echo-regions";
+import { ECHO_REGION_LABELS, ECHO_REGIONS } from "@/lib/echo-regions";
+import { isEarlyEstimate } from "@/lib/skin-check-skus";
 import { DASHBOARD_COPY as C } from "./copy";
 import { FaceDrawing } from "./FaceDrawing";
-import { MeshPicker } from "@/components/mesh/MeshPicker";
-import type { Bands, CheckView } from "./state";
+import { FacePhoto } from "@/components/mesh/FacePhoto";
+import type { CheckView } from "./state";
 
 export { formatDate } from "./format";
 
@@ -23,81 +20,72 @@ export function PhotoCheckLine({ text }: { text: string }) {
   );
 }
 
-/** Metric on the left, band word on the right, both in ink. Every band looks the same: no colour, no score, no bar. */
-export function ReadingRows({ bands }: { bands: Bands | null }) {
-  if (!bands) return <p>{C.current.unreadable}</p>;
+/**
+ * One table (TD-39 (3), TD-40): the five levels for the whole face and each
+ * face area. Levels only, all in ink: no number, no colour, no bar. On a phone
+ * the table scrolls inside its own box with the Area column pinned and a hint
+ * below it; the page itself never scrolls sideways.
+ */
+export function ReadingsTable({ view }: { view: Pick<CheckView, "bands" | "areas"> }) {
+  if (!view.bands) return <p>{C.current.unreadable}</p>;
+  const rows = [{ key: "whole", label: C.current.wholeFace, bands: view.bands }, ...view.areas.map((a) => ({ key: a.region, label: a.label, bands: a.bands }))];
   return (
-    <dl className="divide-y divide-brand-line">
-      {bands.map((b) => (
-        <div key={b.metric} className="flex min-h-12 items-center justify-between gap-4 py-2">
-          <dt className="text-brand-ink">{b.label}</dt>
-          <dd className="font-medium text-brand-ink">{b.band}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className="flex flex-col gap-2">
+      <h3 aria-hidden className="font-display text-base font-semibold tracking-[-0.01em] text-brand-title">{C.table.caption}</h3>
+      <div className="max-w-full overflow-x-auto">
+        <table className="w-full text-left text-xs sm:text-sm">
+          <caption className="sr-only">{C.table.caption}</caption>
+          <thead>
+            <tr className="border-b border-brand-line align-bottom text-brand-muted">
+              <th scope="col" className="sticky left-0 bg-brand-paper py-2 pr-1 font-semibold sm:pr-2">{C.table.area}</th>
+              {view.bands.map((b) => (
+                <th key={b.metric} scope="col" className="px-1 py-2 font-semibold sm:px-2">
+                  {b.label}
+                  {isEarlyEstimate(b.metric) && <span className="block text-[11px] font-normal leading-tight sm:text-xs">{C.table.earlyEstimate}</span>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-brand-line">
+            {rows.map((r) => (
+              <tr key={r.key} className="h-12">
+                <th scope="row" className={`sticky left-0 bg-brand-paper pr-1 text-brand-ink sm:pr-2 ${r.key === "whole" ? "font-semibold" : "font-medium"}`}>{r.label}</th>
+                {view.bands!.map((b) => (
+                  <td key={b.metric} className="px-1 text-brand-ink sm:px-2">{r.bands?.find((x) => x.metric === b.metric)?.band ?? C.current.noReading}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-xs text-brand-muted sm:hidden">{C.table.swipe}</p>
+    </div>
   );
 }
 
-// One check's readings: whole face, or one face area, chosen on the face
-// drawing (the same drawing on Home, an opened check and the results screen).
-// Band words only, all in the same neutral style, so no band reads as good or
-// bad news. No score, no overlay, no other check.
-// TD-37 (2): with the user's photo (`photo`), the areas are chosen on the face
-// mesh over it; without one, or until the mesh is ready, on the face drawing.
-// `area` and `onAreaChange` let a parent own the choice (the results screen
-// marks the same area on its photo).
-export function CheckReadings({
-  view,
-  stack = false,
-  photo = null,
-  area: shownArea,
-  onAreaChange,
-}: {
-  view: CheckView;
-  stack?: boolean;
-  photo?: Blob | null;
-  area?: EchoRegion | null;
-  onAreaChange?: (region: EchoRegion | null) => void;
-}) {
-  const [ownArea, setOwnArea] = useState<EchoRegion | null>(null);
-  const area = shownArea !== undefined ? shownArea : ownArea;
-  const setArea = onAreaChange ?? setOwnArea;
+// One check: its picture, then the readings table below it (TD-39). The
+// picture is the kept photo with the face mesh (`photo`), or the face drawing
+// without one or until the mesh is ready. The results screen passes its own
+// picture (the photo with both overlays). Nothing on it can be chosen.
+export function CheckReadings({ view, photo = null, picture }: { view: CheckView; photo?: Blob | null; picture?: JSX.Element }) {
   // No drawing of areas when there are no readings to go with it.
-  const showFace = view.areas.length > 0 && view.bands !== null;
-  const shown = area ? view.areas.find((a) => a.region === area)?.bands ?? null : view.bands;
-
+  const drawing = view.areas.length > 0 && view.bands !== null ? <FaceDrawing labels={ECHO_REGION_LABELS} available={view.areas.map((a) => a.region)} /> : undefined;
+  const own = picture ?? (photo ? <FacePhoto photo={photo} fallback={drawing} /> : drawing);
   return (
     <div className="flex flex-col gap-5">
-      <div className={showFace && !stack ? "grid items-start gap-6 md:grid-cols-[minmax(0,300px)_1fr]" : "flex flex-col gap-6"}>
-        {showFace && (
-          <div role="group" aria-label={C.current.areaPicker} className="flex flex-col items-center gap-3 rounded-2xl bg-brand-linen p-4">
-            {(() => {
-              const choice = { selected: area, labels: ECHO_REGION_LABELS, available: view.areas.map((a) => a.region), onSelect: setArea };
-              const drawing = <FaceDrawing {...choice} />;
-              return photo ? <MeshPicker photo={photo} areas={choice} fallback={drawing} /> : drawing;
-            })()}
-            <button
-              type="button"
-              aria-pressed={area === null}
-              onClick={() => setArea(null)}
-              className="min-h-11 rounded-full border border-brand-line bg-brand-paper px-5 text-sm font-semibold aria-pressed:border-brand-forest aria-pressed:bg-brand-mist aria-pressed:text-brand-forest"
-            >
-              {C.current.wholeFace}
-            </button>
-            <p className="text-center text-sm text-brand-muted">{C.current.areaHint}</p>
-            {ECHO_REGIONS.filter((r) => !view.areas.some((a) => a.region === r)).map((r) => (
-              <p key={r} className="text-center text-sm text-brand-muted">
-                {C.current.noAreaReading(ECHO_REGION_LABELS[r])}
-              </p>
-            ))}
-          </div>
-        )}
-        <div className="min-w-0">
-          <h3 aria-live="polite" className="mb-1 text-base font-semibold">{area ? ECHO_REGION_LABELS[area] : C.current.wholeFace}</h3>
-          <ReadingRows bands={shown} />
+      {own && (
+        <div className="flex flex-col items-center gap-3 rounded-2xl bg-brand-linen p-4">
+          {own}
+          {!picture && photo && view.bands && <p className="text-center text-sm text-brand-muted">{C.photo.mapsOnResults}</p>}
         </div>
-      </div>
-      {showFace && <p className="text-sm text-brand-muted">{C.current.areaNote}</p>}
+      )}
+      <ReadingsTable view={view} />
+      {ECHO_REGIONS.filter((r) => view.bands && view.areas.length > 0 && !view.areas.some((a) => a.region === r)).map((r) => (
+        <p key={r} className="text-sm text-brand-muted">
+          {C.current.noAreaReading(ECHO_REGION_LABELS[r])}
+        </p>
+      ))}
+      {view.areas.length > 0 && <p className="text-sm text-brand-muted">{C.current.areaNote}</p>}
       {view.hardToRead.length > 0 && <p className="text-sm">{C.current.hardToRead(view.hardToRead.join(", "))}</p>}
       {view.photoCheck && <PhotoCheckLine text={C.photoCheck[view.photoCheck]} />}
       {view.source === "legacy" && view.bands && <p className="text-sm text-brand-muted">{C.legacyNote}</p>}
@@ -121,82 +109,5 @@ export function KnownAndNotKnown() {
         </ul>
       </div>
     </div>
-  );
-}
-
-/** The line near the chips and readings saying where each one comes from (TD-37 (3)). */
-export function SourcesLine() {
-  return <p className="text-sm text-brand-muted">{C.told.sources}</p>;
-}
-
-/** What the user told us on one topic. Never a band or level. */
-function ToldLines({ told }: { told: ToldTopic }) {
-  if (told.lines.length === 0) {
-    return (
-      <>
-        <p>{C.told.nothing(told.label.toLowerCase())}</p>
-        {told.topic === "texture" && <p className="text-sm text-brand-muted">{C.told.textureOnly}</p>}
-      </>
-    );
-  }
-  return (
-    <ul className="flex flex-col gap-1">
-      {told.lines.map((line) => (
-        <li key={line}>{line}</li>
-      ))}
-    </ul>
-  );
-}
-
-/**
- * The results chip for one topic the photo does not measure (TD-37 (3)),
- * labelled as the user's own answer. Skipped (`told` null): the invitation,
- * with the way to the questions (the results check is the newest, so it can
- * still be answered).
- */
-export function ToldPanel({ label, told }: { label: string; told: ToldTopic | null }) {
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <p className="text-sm text-brand-muted">{C.told.title}</p>
-      {told === null ? (
-        <>
-          <p>{C.told.skipped(label.toLowerCase())}</p>
-          <Link href="/questions" className="inline-flex min-h-11 items-center font-medium text-brand-forest underline underline-offset-4">
-            {Q.answerLink}
-          </Link>
-        </>
-      ) : (
-        <ToldLines told={told} />
-      )}
-      <p className="text-sm text-brand-muted">{C.told.ownAnswer}</p>
-    </div>
-  );
-}
-
-/**
- * Home, an opened check and Echo's panel: where each reading comes from, then
- * the three topics from the check's answers. No link here: each of those pages
- * already has its own way to the questions when they wait.
- */
-export function ToldTopics({ topics }: { topics: ToldTopic[] | null }) {
-  const titleId = useId();
-  return (
-    <section aria-labelledby={titleId} className="flex flex-col gap-3 border-t border-brand-line pt-5">
-      <SourcesLine />
-      <div>
-        <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">{C.told.title}</p>
-        <h3 id={titleId} className="font-display text-base font-semibold tracking-[-0.01em]">{C.told.listTitle}</h3>
-      </div>
-      {topics === null ? (
-        <p>{C.told.none}</p>
-      ) : (
-        topics.map((t) => (
-          <div key={t.topic} className="flex flex-col gap-1">
-            <h4 className="font-semibold">{t.label}</h4>
-            <ToldLines told={t} />
-          </div>
-        ))
-      )}
-    </section>
   );
 }

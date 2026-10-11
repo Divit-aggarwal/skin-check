@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PHOTO_METRICS } from "@/lib/skin-check-skus";
+import { SHOWN_METRICS } from "@/lib/skin-check-skus";
 import { describe, expect, it } from "vitest";
 import { CHECKS_COPY } from "@/components/checks/copy";
 import { bannedWordsIn } from "@/lib/catalog/wording";
@@ -10,7 +10,7 @@ import { CAUSE, CHANGE, DIAGNOSIS, FORECAST, MEDICAL } from "@/lib/context/lexic
 // tests/dashboard-copy.test.ts covers) pass the same D-12 checks, and TD-25 (6):
 // the word "check" on screen, never "scan".
 
-const DIRS = ["components/checks", "components/timeline", "components/shell", "components/ui/page.tsx", "app/(marketing)/checks", "components/skin-check/echoCopy.ts", "app/(marketing)/account/AccountView.tsx", "app/(marketing)/account/copy.ts", "app/not-found.tsx", "app/(marketing)/error.tsx", "app/(marketing)/page.tsx", "app/(marketing)/echo/page.tsx", "components/skin-check/SkinCheckDashboard.tsx", "components/skin-check/EchoTwin.tsx", "components/routine", "components/dashboard/FaceDrawing.tsx", "components/skin-check/questionsCopy.ts", "components/skin-check/QuestionsChoice.tsx", "components/skin-check/LaterQuestions.tsx", "components/skin-check/captureStates.ts", "components/skin-check/inputs/ProductNameBox.tsx", "app/(marketing)/questions", "components/skin-check/ProductCards.tsx"];
+const DIRS = ["components/checks", "components/timeline", "components/shell", "components/ui/page.tsx", "app/(marketing)/checks", "components/skin-check/echoCopy.ts", "app/(marketing)/account/AccountView.tsx", "app/(marketing)/account/copy.ts", "app/not-found.tsx", "app/(marketing)/error.tsx", "app/(marketing)/page.tsx", "app/(marketing)/echo/page.tsx", "components/skin-check/SkinCheckDashboard.tsx", "components/mesh", "components/routine", "components/dashboard/FaceDrawing.tsx", "components/skin-check/questionsCopy.ts", "components/skin-check/QuestionsChoice.tsx", "components/skin-check/LaterQuestions.tsx", "components/skin-check/captureStates.ts", "components/skin-check/inputs/ProductNameBox.tsx", "app/(marketing)/questions", "components/skin-check/ProductCards.tsx"];
 
 function sourceText(src: string): string[] {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
@@ -70,7 +70,7 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
   });
 
   it("TD-25 (6): the restyled Echo and check-flow screens never say scan (their lane wording keeps its own tests)", () => {
-    for (const f of ["components/skin-check/EchoPage.tsx", "components/skin-check/SkinCheckFlow.tsx", "components/skin-check/SkinCheckDashboard.tsx", "components/skin-check/EchoTwin.tsx", "components/skin-check/inputs/PhotoCapture.tsx"]) {
+    for (const f of uiFiles(["components/skin-check/EchoPage.tsx", "components/skin-check/SkinCheckFlow.tsx", "components/skin-check/SkinCheckDashboard.tsx", "components/mesh", "components/skin-check/inputs/PhotoCapture.tsx"])) {
       // Log lines never reach the screen.
       const shown = readFileSync(f, "utf8").replace(/console\.\w+\([^;]*\);/g, "");
       for (const s of sourceText(shown)) expect(saysScan(s), `${f}: ${s}`).toBe(false);
@@ -86,19 +86,18 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
   });
 
   it("TD-25 (3): the results screen follows the dashboard rule: band words only, no score, no Dryness, no band colour", () => {
-    for (const f of ["components/skin-check/SkinCheckDashboard.tsx", "components/skin-check/EchoTwin.tsx"]) {
+    for (const f of ["components/skin-check/SkinCheckDashboard.tsx", "components/mesh/FacePhoto.tsx", "components/dashboard/CheckReadings.tsx"]) {
       const src = readFileSync(f, "utf8");
       expect(src, f).not.toMatch(/\/100|toConcern|BAND_STYLE|scorePct|tabular-nums/);
     }
     const results = readFileSync("components/skin-check/SkinCheckDashboard.tsx", "utf8");
-    // TD-37: the chips come from the fixed photo list (no Dryness in it) and the
-    // three answer topics, in a fixed order: never sorted by a band.
-    expect(results).toMatch(/PHOTO_METRICS\.map\(\(key\) => \(\{ kind: "photo"/);
-    expect(results).toMatch(/ANSWER_TOPICS\.map\(\(key\) => \(\{ kind: "told"/);
-    expect(results).not.toMatch(/\.sort\(/);
-    expect(PHOTO_METRICS).toEqual(["redness", "oiliness"]);
+    // TD-39: no chips; the table's columns come from the fixed list (no
+    // Dryness in it, TD-40), in a fixed order: never sorted by a band.
+    expect(results).not.toMatch(/\.sort\(|role="tab|ANSWER_TOPICS/);
+    expect(readFileSync("components/dashboard/CheckReadings.tsx", "utf8")).not.toMatch(/\.sort\(/);
+    expect(SHOWN_METRICS).toEqual(["redness", "oiliness", "blemishes", "texture", "pigment"]);
     expect(results).toMatch(/readingsOf\(/);
-    expect(results).toMatch(/<CheckReadings view=\{view\}/);
+    expect(results).toMatch(/<CheckReadings view=\{view\} picture=\{<FacePhoto photo=\{scan\.photo\} overlays=\{overlays\} read \/>\} \/>/);
   });
 
   it("G03 3.9: every page has a designed loading state, an unknown address and a failed page get a designed screen with ways on", () => {
@@ -133,5 +132,14 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
     // check with no photo reading has no photos to compare, so no line.
     expect(detail).toMatch(/\{check\.view \? \(\s*<>\s*\{\/\*[^*]*\*\/\}\s*<p[^>]*>\{C\.history\.pastLine\}/);
     expect(detail).not.toMatch(/useState|<details|aria-expanded/);
+  });
+});
+
+// G23: the check flow shows only the last 4 digits of the phone number, as the account button does.
+describe("G23: phone number on the check flow", () => {
+  it("never renders the full number", () => {
+    const src = readFileSync("components/skin-check/inputs/PhoneAuthStep.tsx", "utf8");
+    expect(src).not.toMatch(/\{activeUser\.phoneNumber\}/);
+    expect(src).toMatch(/phone ending <span[^>]*>\{activeUser\.phoneNumber\?\.slice\(-4\)\}<\/span>/);
   });
 });

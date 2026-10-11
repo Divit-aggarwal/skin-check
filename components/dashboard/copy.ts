@@ -23,15 +23,14 @@ export const DASHBOARD_COPY = {
     noneTitle: "Your photo readings",
     openCheck: "Open this check",
     wholeFace: "Whole face",
-    areaPicker: "Show readings for",
     noAreaReading: (area: string) => `No reading for ${area} in this photo.`,
-    areaHint: "Choose an area to see its readings. Choose it again for the whole face.",
+    noReading: "No reading",
     areaNote: "Every area is read from this one photo. Each reading belongs to this photo only.",
     newerNotShown: "Your newest check has no photo reading from our server. The reading below is from an earlier check.",
     unreadable: "The readings of this check could not be shown.",
     hardToRead: (areas: string) => `Hard to read in this photo: ${areas}. Those readings are uncertain.`,
     knownTitle: "What this tells you",
-    known: "How redness and oiliness showed up in each area of your face in this one photo, as Low, Moderate or Elevated.",
+    known: "How redness, oiliness, breakouts, texture and dark marks showed up in each area of your face in this one photo, as Low, Moderate or Elevated. Breakouts, texture and dark marks are early estimates.",
     notKnownTitle: "What this does not tell you",
     notKnown: [
       "It is not a medical opinion.",
@@ -41,18 +40,25 @@ export const DASHBOARD_COPY = {
     ],
   },
 
-  // TD-37 (3): Breakouts, Texture and Dark marks, from the user's own answers only.
-  told: {
-    sources: "Redness and oiliness are read from your photo. Breakouts, texture and dark marks show what you told us in the questions. The photo does not measure them.",
-    title: "From what you told us",
-    ownAnswer: "Your own answer, not a reading of your photo.",
-    nothing: (topic: string) => `You did not tell us anything about ${topic} in the questions.`,
-    // Texture has no question of its own, only the main-concerns choice (flow review).
-    textureOnly: "The questions ask about texture only as a main concern.",
-    skipped: (topic: string) => `You skipped the questions, so there is nothing here about ${topic} yet.`,
-    // A list on Home, an opened check or Echo, whose page already has its own way to the questions.
-    none: "There are no answers about these on this check.",
-    listTitle: "Breakouts, texture and dark marks",
+  // TD-39: the photo once, with the mesh and, on the results, both overlays.
+  photo: {
+    alt: "Your photo with a map of your face",
+    failed: "Your photo could not be shown.",
+    read: "Photo read",
+    labels: { redness: "Redness", oiliness: "Oiliness" },
+    overlayAlt: { redness: "Where redness showed up, over your photo", oiliness: "Where oiliness showed up, over your photo" },
+    legend: "Colours on your photo",
+    legendNote: "Where each one showed up in this photo, relative to the rest of your face.",
+    // Home and an opened check: the overlays come only with a new check (they are not kept).
+    mapsOnResults: "The colours for redness and oiliness are shown only right after a new check.",
+  },
+
+  table: {
+    caption: "Readings in this photo",
+    area: "Area",
+    // TD-40: on Breakouts, Texture and Dark marks.
+    earlyEstimate: "early estimate",
+    swipe: "Swipe the table sideways to see all five readings.",
   },
 
   photoCheck: {

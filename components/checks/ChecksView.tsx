@@ -6,12 +6,11 @@ import { useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
-import { CheckReadings, KnownAndNotKnown, PhotoCheckLine, SourcesLine, ToldTopics } from "@/components/dashboard/CheckReadings";
-import { toldTopics } from "@/lib/told-topics";
+import { CheckReadings, KnownAndNotKnown, PhotoCheckLine } from "@/components/dashboard/CheckReadings";
 import { useKeptPhoto } from "@/components/mesh/useKeptPhoto";
 import { formatDate } from "@/components/dashboard/format";
 import { loadDashboard, type DashboardData } from "@/components/dashboard/data";
-import { checkAnswers, deriveDashboard, pastCheck, productNamesOf, questionsDone, questionsTarget, type Dashboard } from "@/components/dashboard/state";
+import { deriveDashboard, pastCheck, productNamesOf, questionsDone, questionsTarget, type Dashboard } from "@/components/dashboard/state";
 import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
 import { productNameLabel, type ProductNameKey } from "@/lib/skin-check-validation";
 import { useRoutine } from "@/components/routine/useRoutine";
@@ -205,16 +204,15 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
           </h2>
           <p className="mt-1 text-brand-muted">{C.history.kind[check.kind]}</p>
         </div>
-        {check.photoClaimed && <Thumb key={check.scanId} scanId={check.scanId} date={date} size={112} />}
+        {/* TD-39: one photo. The thumbnail only until the large photo below can be shown. */}
+        {check.photoClaimed && !photo && <Thumb key={check.scanId} scanId={check.scanId} date={date} size={112} />}
       </div>
       {check.photoCheck && <PhotoCheckLine text={C.photoCheck[check.photoCheck]} />}
       {check.view ? (
         <>
           {/* TD-24 (1): on every opened check with readings, never behind a toggle. */}
           <p className="rounded-2xl bg-brand-mist px-5 py-4 text-brand-ink">{C.history.pastLine}</p>
-          <CheckReadings view={{ ...check.view, photoCheck: null }} stack photo={photo} />
-          {/* A skipped check has its invitation below instead. */}
-          {skipped ? <SourcesLine /> : <ToldTopics topics={toldTopics(checkAnswers(check.scanId, data.checks, data.laterAnswers))} />}
+          <CheckReadings view={{ ...check.view, photoCheck: null }} photo={photo} />
           {check.view.bands && (
             <div className="border-t border-brand-line pt-5">
               <KnownAndNotKnown />
