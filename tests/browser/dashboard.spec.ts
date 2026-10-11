@@ -173,7 +173,7 @@ test("legacy record: shown as saved, not counted", async ({ page }) => {
   await expect(page.getByText(C.chat.needsReading)).toBeVisible();
   await shot(page, "legacy");
   await page.goto("/checks");
-  await expect(page.getByText(C.history.kind.legacy)).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open the check from/ }).getByText(C.history.kind.legacy)).toBeVisible();
 });
 
 test("no reading: questions-only and failed checks", async ({ page }) => {
@@ -181,8 +181,8 @@ test("no reading: questions-only and failed checks", async ({ page }) => {
   await expect(page.getByText(H.latest.noReading)).toBeVisible();
   await shot(page, "no-reading");
   await page.goto("/checks");
-  await expect(page.getByText(C.history.kind.questions)).toBeVisible();
-  await expect(page.getByText(C.history.kind.failed)).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open the check from/ }).getByText(C.history.kind.questions)).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open the check from/ }).getByText(C.history.kind.failed)).toBeVisible();
 });
 
 // TD-24 (1) replaces O-D4: an opened check shows its own readings, always with the fixed line.
