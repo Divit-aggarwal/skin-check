@@ -138,11 +138,14 @@
   .home-grid {
     display: grid;
     grid-template-columns: 1fr 1fr 1fr;
+    /* The right column's cards span rows, so the main column does not wait for them. */
     grid-template-areas:
       "latest latest weather"
       "latest latest next"
+      "record routine next"
       "record routine echo"
       "banner banner echo";
+    grid-template-rows: auto min-content 1fr auto auto;
     gap: 1.5rem;
     align-items: start;
   }

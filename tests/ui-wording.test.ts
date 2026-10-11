@@ -116,7 +116,7 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
     // they are separate cards in one column. The routine card itself shows no reading or photo.
     const css = readFileSync("app/globals.css", "utf8");
     const rows = Array.from(css.slice(css.indexOf("grid-template-areas:"), css.indexOf(";", css.indexOf("grid-template-areas:"))).matchAll(/"([a-z ]+)"/g)).map((m) => m[1]!);
-    expect(rows.length).toBe(4);
+    expect(rows.length).toBe(5);
     for (const row of rows) expect(row.includes("latest") && row.includes("routine"), row).toBe(false);
     expect(rows.findIndex((r) => r.includes("routine"))).toBeGreaterThan(rows.findIndex((r) => r.includes("latest")));
     const home = readFileSync("components/dashboard/DashboardPage.tsx", "utf8");

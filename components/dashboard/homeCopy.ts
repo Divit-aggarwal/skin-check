@@ -64,7 +64,7 @@ export const HOME_COPY = {
     uvNote: (category: string) => `${category}, today's peak`,
     humidity: "Humidity",
     humidityValue: (n: number) => `${Math.round(n)}%`,
-    air: "Air quality",
+    air: "Air",
     airNote: (category: string) => `${category} (US AQI)`,
     why: "See the UV index, humidity and air quality for your city, to plan sunscreen and time outdoors.",
     useLocation: "Use my location",

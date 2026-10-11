@@ -399,7 +399,7 @@ export function WeatherCard({ user, settings, onSettings }: { user: User; settin
 function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-lg bg-brand-linen p-3">
-      <dt className="truncate text-xs font-semibold text-brand-muted">{label}</dt>
+      <dt className="text-xs font-semibold text-brand-muted">{label}</dt>
       <dd className="font-display text-xl font-semibold text-brand-title">{value}</dd>
       {note && <dd className="text-xs text-brand-ink">{note}</dd>}
     </div>
