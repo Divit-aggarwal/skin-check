@@ -64,8 +64,8 @@ test("sign in as a seeded user and see the dashboard", async ({ page }) => {
   await shot(page, "building");
 });
 
-// TD-39: one table for the whole face and each area; the face drawing is a picture, nothing to choose.
-test("readings by face area: one table, every level in the same style, nothing to choose, no score", async ({ page }) => {
+// TD-39: one table for the whole face and each area. TD-46: a face area on the drawing opens Echo on it.
+test("readings by face area: one table, every level in the same style, no score; a face area opens Echo on it", async ({ page }) => {
   await dashboardAs(page, U.set!.phoneNumber);
   const current = page.locator("section", { has: page.getByRole("heading", { name: C.current.title }) });
   const table = current.getByRole("table", { name: C.table.caption });
@@ -77,7 +77,6 @@ test("readings by face area: one table, every level in the same style, nothing t
   // Every level cell has one style, whatever its band; no Dryness.
   const classes = await table.getByRole("cell").evaluateAll((els) => Array.from(new Set(els.map((e) => e.className))));
   expect(classes).toHaveLength(1);
-  await expect(current.getByRole("button", { name: "Forehead" })).toHaveCount(0);
   await expect(current.getByText(C.current.areaNote)).toBeVisible();
   await expect(current.getByText("Dryness")).toHaveCount(0);
   await expect(current).not.toContainText(/\/100|%/);
@@ -85,6 +84,10 @@ test("readings by face area: one table, every level in the same style, nothing t
   const recent = page.locator("section", { has: page.getByRole("heading", { name: T.recent }) });
   await expect(recent).not.toContainText(/\b(Low|Moderate|Elevated)\b/);
   await shot(page, "home-areas");
+  // TD-46: the drawing's areas are buttons (keyboard too) that open Echo on that area.
+  await current.getByRole("button", { name: C.chat.askAbout("Nose") }).focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/echo\?region=nose$/);
 });
 
 test("loading", async ({ page }) => {
@@ -170,6 +173,8 @@ test("one opened check: its own readings with the fixed line; unknown id is not 
   await expect(opened.getByText(C.photoCheck.override)).toBeVisible();
   await expect(opened.getByText("Redness", { exact: true })).toBeVisible();
   await expect(opened).not.toContainText(/\/100|%|Dryness/);
+  // TD-46: an older check's areas open nothing (Echo talks about the newest check only).
+  await expect(opened.getByRole("button", { name: C.chat.askAbout("Forehead") })).toHaveCount(0);
   // One check only: the newest reading's card is not on this page.
   await expect(page.getByRole("heading", { name: C.current.title })).toHaveCount(0);
   await shot(page, "past-check");

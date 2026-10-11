@@ -1,7 +1,7 @@
 "use client";
 
 import { ShieldCheck } from "lucide-react";
-import { ECHO_REGION_LABELS, ECHO_REGIONS } from "@/lib/echo-regions";
+import { ECHO_REGION_LABELS, ECHO_REGIONS, type EchoRegion } from "@/lib/echo-regions";
 import { isEarlyEstimate } from "@/lib/skin-check-skus";
 import { DASHBOARD_COPY as C } from "./copy";
 import { FaceDrawing } from "./FaceDrawing";
@@ -67,9 +67,11 @@ export function ReadingsTable({ view }: { view: Pick<CheckView, "bands" | "areas
 // picture is the kept photo with the face mesh (`photo`), or the face drawing
 // without one or until the mesh is ready. The results screen passes its own
 // picture (the photo with both overlays). Nothing on it can be chosen.
-export function CheckReadings({ view, photo = null, picture }: { view: CheckView; photo?: Blob | null; picture?: JSX.Element }) {
+// TD-46: `onArea` makes the drawing's areas tappable (Home opens Echo on that area).
+export function CheckReadings({ view, photo = null, picture, onArea }: { view: CheckView; photo?: Blob | null; picture?: JSX.Element; onArea?: ((region: EchoRegion) => void) | undefined }) {
   // No drawing of areas when there are no readings to go with it.
-  const drawing = view.areas.length > 0 && view.bands !== null ? <FaceDrawing labels={ECHO_REGION_LABELS} available={view.areas.map((a) => a.region)} /> : undefined;
+  const drawing =
+    view.areas.length > 0 && view.bands !== null ? <FaceDrawing labels={ECHO_REGION_LABELS} available={view.areas.map((a) => a.region)} onArea={onArea} areaLabel={C.chat.askAbout} /> : undefined;
   const own = picture ?? (photo ? <FacePhoto photo={photo} fallback={drawing} /> : drawing);
   return (
     <div className="flex flex-col gap-5">
