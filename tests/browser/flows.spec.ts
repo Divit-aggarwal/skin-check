@@ -144,6 +144,16 @@ test("returning user: 'New check' to the results without meeting a question", as
   await expect(page.getByRole("heading", { name: "Your photo reading" })).toBeVisible({ timeout: 60_000 });
   // The saved answers went with the new check: no "answer the questions" note.
   await expect(page.getByRole("link", { name: Q.answerLink })).toHaveCount(0);
+  // TD-47 (3): a returning user never asked before sees the permissions screen once, now, between the results and Home.
+  await page.getByRole("link", { name: C.entryLink }).first().click();
+  await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole("heading", { level: 1, name: H.permissions.title })).toBeVisible();
+  await page.screenshot({ path: "docs/design/home-v2/permissions-after-check-390.png", fullPage: true });
+  await page.getByRole("button", { name: H.permissions.continue }).click();
+  await expect(page.getByRole("heading", { level: 1, name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("heading", { level: 1, name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: H.permissions.title })).toHaveCount(0);
 });
 
 test("under 18 shows the confirm step; No goes back, Yes blocks", async ({ page }) => {
