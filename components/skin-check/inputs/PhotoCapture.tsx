@@ -26,11 +26,8 @@ import { btnPrimary, btnSecondary } from "@/components/ui/page";
 import type { PhotoCaptureStep } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanState } from "@/types/skin-scan";
 
-// Optional — the storefront's real Terms & Conditions page. Left unset, the
-// checkbox still gates the scan; the label just doesn't link anywhere ("do
-// not invent a final legal URL" — PART 12 of the redesign brief). This app
-// is mounted on its own subdomain (PROJECT_CONTEXT.md), so a relative path
-// like "/terms" would 404 rather than reach the storefront.
+// Optional: the storefront's Terms page, absolute (this app is on its own
+// subdomain). Unset, the checkbox still gates the scan and the label has no link.
 const TERMS_URL = process.env.NEXT_PUBLIC_TERMS_URL;
 
 interface PhotoCaptureProps {
@@ -45,13 +42,8 @@ interface PhotoCaptureProps {
   onScanChange: (scan: SkinScanState, forScanId?: string) => void;
 }
 
-// capture="user" on a file input only actually opens the device camera on
-// mobile browsers — on desktop it's ignored and degrades to a plain file
-// picker, which is a worse UX than the existing getUserMedia+canvas live
-// preview. So the two capture paths are chosen by device, not by feature
-// support: mobile gets the native file input (real camera file, EXIF
-// intact); desktop keeps getUserMedia+canvas (no higher-fidelity source
-// exists there to fall back to).
+// Chosen by device: capture="user" opens the camera on phones only, so a
+// laptop uses getUserMedia and a canvas instead of a plain file picker.
 function isMobileCaptureDevice(): boolean {
   if (typeof navigator === "undefined") return false;
   const uaData = (navigator as Navigator & { userAgentData?: { mobile?: boolean } }).userAgentData;
@@ -101,15 +93,8 @@ async function downscaleToJpeg(file: Blob, maxDimension: number, quality: number
   }
 }
 
-// Inline capture, not the full-screen ScanCapture used by the old post-login
-// /scan route — this step has to accumulate on the same scrolling page like
-// every other /skin-check step (CLAUDE.md-adjacent product spec for this
-// flow), not break into a full-screen slide.
 export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, onScanChange }: PhotoCaptureProps) {
-  // PHASE 1: this step is only reachable after the "verify" section, so a
-  // signed-in user is the normal case. Read anyway — ordering alone is a
-  // property of the SECTIONS array, and the camera and the CV request are
-  // worth gating on the identity itself.
+  // The camera and the request are gated on the user, not on section order.
   const { user, loading: authLoading } = useAuth();
   // Computed once — the device type doesn't change mid-session.
   const [isMobile] = useState(isMobileCaptureDevice);
@@ -126,22 +111,12 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   const originalBlobRef = useRef<Blob | null>(null);
   const hasCaptured = previewUrl !== null;
 
-  // The retake loop (C01) and both consent booleans, in one pure reducer
-  // (lib/capture-quality/gate.ts) so a retake clears the photo's gate result
-  // and both consents in the same transition.
-  //
-  // Required data-collection consent (PART 11-15 of the redesign brief) —
-  // `hasConsented` gates the scan request itself, not just the button's
-  // disabled look. Local, session-scoped state: re-mounting this step (e.g.
-  // navigating away and back) resets it, and every retake resets it, so
-  // consent never silently carries over to a different image.
-  // `hasRetentionConsent` is a SEPARATE permission, separate boolean,
-  // deliberately never merged with the one above: that one allows this photo
-  // to be analyzed, this one allows the original to be RETAINED in private
-  // S3. Optional — declining it still gives the user their analysis, it just
-  // means nothing is stored. Never written to the draft, so a new scan (or a
-  // retake) has to ask again rather than inheriting an answer given for a
-  // different image.
+  // The retake loop (C01) and both consents in one reducer
+  // (lib/capture-quality/gate.ts): a retake clears the gate result and both
+  // consents together, so consent never carries over to another image.
+  // `hasConsented` (required) gates the analysis request itself.
+  // `hasRetentionConsent` (optional, separate) only decides whether the
+  // original is kept in private S3. Neither is written to the draft.
   const [flow, dispatch] = useReducer(captureFlowReducer, initialCaptureFlow);
   const { hasConsented, hasRetentionConsent } = flow;
   // Tags each capture so a gate result that arrives after a retake is dropped.
@@ -259,11 +234,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     }
   }, [isMobile, requestCamera]);
 
-  // Same as handleRetake, plus unwinding an already-committed step: reopens
-  // the capture UI (value leaves "done") and clears the stale scan result,
-  // so a retake after a completed or failed scan can't leave old data
-  // sitting behind the new photo. Reachable from the "done" summary view,
-  // including after a remount (PART 8's back-and-restore requirement).
+  // handleRetake, plus reopening a committed step and clearing its old scan result.
   const handleRetakeFromDone = useCallback(() => {
     handleRetake();
     onChange("");
@@ -285,11 +256,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     const captureMethod: CaptureMethod = isMobile ? "native" : "canvas";
     const quality = flow.quality ?? undefined;
 
-    // Unlock the next section immediately. The scan runs in the background
-    // while the user answers the remaining sections; by the time they reach
-    // the results step it has almost always resolved. Awaiting here would
-    // park them on this step for the scan's full duration — which is the
-    // exact dead time moving capture earlier was meant to eliminate.
+    // Move on now; the scan runs in the background.
     onChange("done");
     onCommit();
 
@@ -310,17 +277,8 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
       retentionConsentVersion,
       quality,
     });
-    // Request every traversable category's overlay in this one call — the
-    // skin-scan service accepts a comma-separated `overlays` list and
-    // generates all of them in one pipeline run (measured well under its own
-    // 25s timeout even for all 7 categories), so the results screen's
-    // category switcher has every heatmap already in hand with no per-click
-    // follow-up request. Deliberately not gated on `answers.primary_concerns`
-    // (usually still unanswered here — skin-photo is section 2, your-skin is
-    // section 3) since we want all of them regardless.
-    // PHASE 3 ordering: the original image is PUT to private S3 first and the
-    // CV analysis only starts once that succeeded (runSkinScan owns both
-    // halves, so the dashboard's retry runs the same sequence).
+    // The original goes to private S3 first; the analysis starts only after
+    // that succeeded (runSkinScan owns both, so a retry runs the same order).
 
     void runSkinScan({
       scanId,
@@ -355,12 +313,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
         const retakeReason = isRetakeError(err) ? retakeReasonFromServerCode(err.code) ?? undefined : undefined;
         onScanChange({
           status: "error",
-          // An expired/refused session is not a photo problem, and telling
-          // the user to retake the picture wouldn't fix it. This message is
-          // rendered by SkinCheckDashboard (the step commits and advances
-          // before the scan resolves), and the results view has no verify
-          // step to send them to — so it points at the one action that does
-          // work there: a refresh, which re-runs Firebase auth restoration.
+          // A refused session, not a photo problem: a refresh restores sign-in.
           message: retakeReason
             ? RETAKE_COPY[retakeReason]
             : isAuthError(err)

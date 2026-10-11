@@ -57,12 +57,8 @@ export const SECTIONS: SectionConfig[] = [
     ],
   },
   {
-    // PHASE 1: authentication boundary. Deliberately sits between
-    // "about-you" and "skin-photo" — the under-18 gate in useSkinCheckFlow's
-    // `next()` still fires first (it keys off section id "about-you", not an
-    // index), so a blocked minor never gets as far as burning an SMS, and no
-    // camera or /api/skin-scan request exists on any path that hasn't passed
-    // through here. The ordering invariant IS this array's literal order.
+    // Sign-in, after the under-18 gate and before any camera or scan request.
+    // This array's order is the invariant.
     id: "verify",
     label: "VERIFY",
     steps: [
@@ -175,10 +171,6 @@ export const SECTIONS: SectionConfig[] = [
         ],
       },
       {
-        // Same id as before — options reduced from 8 to 6 (left/right cheek
-        // merged into "Cheeks", "Mouth area" dropped per the target list).
-        // No downstream code reads specific acne_areas values, so this is a
-        // pure content change.
         id: "acne_areas",
         type: "body-map",
         prompt: "Where do you usually get breakouts?",
@@ -358,13 +350,8 @@ export const SECTIONS: SectionConfig[] = [
       {
         id: "final_phone",
         type: "phone",
-        // PHASE 1: no longer the authentication boundary — that moved to the
-        // "verify" section above. Firebase has already signed this user in by
-        // the time this renders, so PhoneAuthStep takes its already-signed-in
-        // branch (an explicit "Get my results" tap, never an auto-submit) and
-        // this step keeps its existing job: writing the finished scan to
-        // Firestore. Copy updated because the old "where should we send your
-        // results?" now sits above a button with no input.
+        // The user is already signed in here: an explicit "Get my results"
+        // tap writes the finished scan to Firestore.
         savesScan: true,
         prompt: "That's everything, {name} — ready for your results?",
         note: "We'll send your personalised skin report to the number you verified.",

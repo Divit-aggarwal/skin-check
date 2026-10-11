@@ -10,14 +10,9 @@ export const SCORING_VERSION = "v0-provisional";
 
 export type Band = "Low" | "Moderate" | "Elevated";
 
-// pores is excluded from every rule below, not merely unbanded by omission -
-// it returns exactly 0.0 on every real photo today (a broken/non-measuring
-// metric, confirmed empirically, not a genuinely low reading - see
-// pores.py:81's duplicate pore_density/pore_density_per_kpx and the CV
-// audit). Banding a metric that never measures anything would always
-// produce the best possible band and silently claim "no pore concern" -
-// worse, feeding that into SKU selection would recommend products off a
-// signal that was never real. Re-include once pores.py is fixed upstream.
+// pores is excluded from every rule: it reads 0.0 on every real photo (a
+// broken metric, see pores.py:81), so a band would falsely say "no concern".
+// Re-include once pores.py is fixed upstream.
 export type BandableMetric = Exclude<keyof SkinScanScores, "pores">;
 
 const BANDABLE_METRICS: BandableMetric[] = [
@@ -43,23 +38,10 @@ const BANDABLE_METRICS: BandableMetric[] = [
 // condition actually is... the severity signal gets divided out by the
 // normalization step, before the score is even computed."
 //
-// Consequence: no choice of cut points below makes bands comparable ACROSS
-// USERS, or across repeat scans of the SAME user. They only separate where
-// one photo's own metrics landed relative to each other after that photo's
-// own contrast was stretched to fill [0,1]. Do not read a distribution of
-// bands as population data, and do not build a "your skin improved since
-// last scan" feature on top of these - both would be reading noise as
-// signal.
-//
-// The real fix already exists and isn't wired up here: region_hist (fixed-
-// edge histograms, stored on every scan since PIPELINE_VERSION 0.1.1) is
-// built specifically to let absolute thresholds be applied RETROACTIVELY
-// once a real, labeled photo set exists - that's the entire reason those
-// fixed edges were added instead of another per-image-relative statistic.
-// Re-deriving bands from region_hist instead of scores is the post-
-// collection recalibration this file is provisional pending on (see
-// PROJECT_CONTEXT.md's dermatologist-rubric dependency) - not a hypothetical
-// future nice-to-have, the specific next version of this file.
+// So bands are NOT comparable across users or across scans of the same
+// user: never read them as population data or as "improved since last scan".
+// The fix is to derive bands from region_hist (fixed-edge histograms, stored
+// since PIPELINE_VERSION 0.1.1) once a labeled photo set exists.
 // ============================================================================
 //
 // Cut points against CONCERN-space value in [0,1] (0 = no concern this
@@ -69,18 +51,9 @@ const BANDABLE_METRICS: BandableMetric[] = [
 // toConcern() below for how a metric's raw [0,1] score maps into this
 // shared space (hydration inverts; the other five don't).
 //
-// Skewed toward Low/Moderate, same reasoning as above: these scores are
-// heuristics with no calibration behind them (CALIBRATION.md - "do not use
-// [the CV service's own constants] to score real users" applies here too;
-// nothing downstream is any more calibrated). Telling an early user their
-// skin is Elevated on that basis is the wrong error to make, so Elevated
-// requires strong evidence (concern >= 0.45) rather than a coin-flip
-// threshold at 0.5 - v0's first cut (low: 0.45, moderate: 0.75) put 5 of 6
-// concern values from the one real fixture photo below the Low ceiling,
-// which is a constant function, not a conservative one; these numbers were
-// picked to at least separate what was actually observed (redness 0.383 vs.
-// oiliness 0.124), not because 0.20/0.45 are themselves calibrated - see the
-// block above for why nothing here can be.
+// Skewed toward Low/Moderate: uncalibrated scores should not call skin
+// Elevated without strong evidence (concern >= 0.45). 0.20/0.45 only separate
+// what the fixture photo showed; they are not calibrated.
 export const BAND_THRESHOLDS: Record<BandableMetric, { low: number; moderate: number }> = {
   redness: { low: 0.20, moderate: 0.45 },
   oiliness: { low: 0.20, moderate: 0.45 },
@@ -104,17 +77,8 @@ export function toConcern(scores: SkinScanScores, metric: BandableMetric): numbe
   return 1 - healthValue(scores, metric);
 }
 
-// The ONLY band a metric gets - no separate display-space value. Band words
-// mean concern-level uniformly at every metric and every render site: Low
-// always means least concern, Elevated always means most. There is
-// deliberately no per-metric flip here (there used to be one, for
-// hydration) - a flip meant "Low" carried opposite meanings on the same
-// screen depending on which row it was next to (Redness: Low = good,
-// Hydration: Low = bad), which a user has no way to know without reading
-// this file. The metric that needed its own direction gets its own LABEL
-// instead (see METRIC_LABELS/CATEGORY_LABELS/SKIN_SCAN_CATEGORY_LABELS'
-// "Dryness" override for hydration, at each render site) - the word means
-// one thing everywhere; the label is what tells you which trait it's about.
+// Band words mean concern level for every metric (Low = least concern). No
+// per-metric flip: hydration is labelled "Dryness" instead.
 function bandForConcern(metric: BandableMetric, concern: number): Band {
   const t = BAND_THRESHOLDS[metric];
   if (concern < t.low) return "Low";
@@ -176,13 +140,8 @@ interface BandedScores {
   trace: RuleTraceEntry[];
 }
 
-// Bands a single SkinScanScores object (whole-face `scores`, or one region's
-// entry from `region_scores` - both are the same shape). Exported on its
-// own, not just inlined into runSkinCheckRules() below, because /echo's
-// region-scoped display (EchoPage.tsx) only ever has a bare SkinScanScores
-// for one region, never a full SkinScanResult to build the whole-face
-// engine's other outputs (skus, scoring_version) from - it still needs the
-// identical threshold logic, not a second copy of it.
+// Bands one SkinScanScores (whole face or one region): the same thresholds
+// for callers that have no full SkinScanResult.
 export function bandScores(scores: SkinScanScores): BandedScores {
   const trace: RuleTraceEntry[] = [];
   const bands = {} as Record<BandableMetric, Band>;

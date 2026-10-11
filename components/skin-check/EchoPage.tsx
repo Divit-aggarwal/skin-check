@@ -68,14 +68,8 @@ function greetingFor(region: EchoRegion): string {
 
 let messageSeq = 0;
 
-// /echo (Step 4b) — replaces the old modal EchoChat with a dedicated page:
-// one thread per real skin-scan region, tab-switched (not route-switched,
-// so switching never remounts and each thread's history lives only in
-// SkinCheckSessionProvider — see that file's isolation contract). Session
-// data comes from the same provider, mirrored in from SkinCheckDashboard on
-// scan success; if it's empty (fresh tab, or a refresh — session is
-// deliberately in-memory only, see Step 4b spec) there's nothing to ground
-// Echo in, so this shows a way back to /skin-check instead of a blind chat.
+// /echo: one thread per face area, switched in place (no remount), each held
+// only in SkinCheckSessionProvider (in memory).
 // TD-34: Echo's opening suggestion for the check, fetched once per check on
 // this page (the server keeps it, so a reload costs nothing). "none" covers
 // every refusal (switch off, limit, no answers): the plain greeting stays.
@@ -95,14 +89,9 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
   activeRegionRef.current = activeRegion;
   const [draft, setDraft] = useState("");
   const [sendingRegion, setSendingRegion] = useState<EchoRegion | null>(null);
-  // Transient, not part of `threads` — an error is UI state about a failed
-  // request, not a message Echo said. The old version pushed a role:"echo"
-  // error string into thread history, which meant it got replayed back to
-  // Gemini as a model turn on the next send (context pollution) and gave the
-  // user no way to retry without retyping. `retryBefore` (the thread and its
-  // historyToken from BEFORE the failed turn) plus `retryMessage` are exactly
-  // what failed to send, so Retry resends them verbatim instead of
-  // reconstructing them (which could silently drop or reorder the failed turn).
+  // UI state, never part of `threads`: an error is not something Echo said and
+  // must not reach Gemini as a turn. Retry resends `retryBefore` (the thread
+  // and token before the failed turn) and `retryMessage` exactly.
   const [sendError, setSendError] = useState<{
     region: EchoRegion;
     retryBefore: EchoThread;

@@ -34,20 +34,11 @@ interface PhoneAuthStepProps {
   productNames?: ProductNames | undefined;
 }
 
-// This component now serves the flow's TWO phone steps, which are the same
-// interaction with different consequences:
-//
-//   - `phone_verify` (section "verify", before image capture) — PHASE 1's
-//     authentication boundary. Authenticates and nothing else. Nothing is
-//     written to `answers.phone_verify` until Firebase has verified the code,
-//     so the section stays incomplete — and the flow stays on this step, one
-//     section short of the camera — through the entire phone/OTP interaction.
-//   - `final_phone` (section "get-your-results", `savesScan: true`) — the
-//     unchanged end of the questionnaire: an explicit tap that writes the
+// The flow's two phone steps:
+//   - `phone_verify` (before the camera): signs in and nothing else; no
+//     answer until Firebase has verified the code.
+//   - `final_phone` (`savesScan: true`): an explicit tap that writes the
 //     finished scan to Firestore.
-//
-// That keeps the existing state machine untouched: it still just sees "this
-// step got a valid answer, commit it," exactly like every other step.
 export function PhoneAuthStep({
   step,
   value,

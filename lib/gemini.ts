@@ -163,22 +163,11 @@ Frame anything causal as a possibility ("may be associated with"), never a
 certainty.`;
 
 /**
- * Shared multi-turn call mechanics for Echo chat (see
- * buildSkinCheckEchoSystemInstruction below) — reuses the same Gemini 2.5
- * Flash client as synthesis (CLAUDE.md:
- * same provider/model already proven for the mobile app's twin chat, no new
- * client). History is capped to the last 20 messages; the leading
- * assistant-only seed message (before the first user turn) is dropped since
- * Gemini's contents array must start on a user turn. Every call sends the
- * full accumulated conversation, not just the latest message — the grounding
- * data lives once in systemInstruction, not repeated per turn.
+ * Multi-turn Echo chat: the last 20 messages, starting at the first user
+ * turn (Gemini's contents must start on one); the grounding data lives once
+ * in systemInstruction.
  */
-// Per-attempt timeout, not a total-request budget — withGeminiRetry can call
-// this up to 3 times (2 retries), so the worst case is roughly this value
-// times 3 plus backoff. Sized so that worst case stays comfortably inside a
-// typical serverless function timeout rather than the API's own multi-minute
-// default, which would otherwise let one hung attempt block the retry loop
-// for far longer than the platform is willing to run the handler at all.
+// Per attempt: with retries the worst case is about 3x this plus backoff.
 const GEMINI_REQUEST_TIMEOUT_MS = 10_000;
 
 async function runEchoChat(messages: EchoChatMessage[], systemInstruction: string): Promise<string> {
@@ -204,11 +193,8 @@ async function runEchoChat(messages: EchoChatMessage[], systemInstruction: strin
   return text;
 }
 
-// score scale note: per-category readings are bands (Low/Moderate/Elevated),
-// matching what the user already sees on their dashboard — see
-// lib/skin-check-rules.ts. Band words mean concern-level uniformly across
-// every category. Hydration is not sent at all (H03, owner decision 8), so
-// the note no longer has to explain the "Dryness" relabel.
+// Readings are bands (Low/Moderate/Elevated), as on the dashboard. Hydration
+// is not sent (H03, owner decision 8).
 const SKIN_CHECK_SCORE_SCALE_NOTE = `Band scale: Low, Moderate, or Elevated per category, matching what the user
 already sees on their dashboard. These are not percentages or scores — do
 not invent or imply a number behind them. Elevated always means MORE of the
@@ -282,16 +268,7 @@ ${scanSection}${regionSection}
 ${ECHO_SAFETY_INSTRUCTION}`;
 }
 
-/**
- * /skin-check's retrofit of getEchoChatReply — same chat mechanics
- * (runEchoChat), a system instruction built from /skin-check's actual data
- * shape instead of the old /assessment QuizAnswers/SynthesisResult/VisionResult
- * shape. root_cause_tags, recommendations, and vision regions have no
- * equivalent here (computeCompositeScore is deterministic local scoring, not
- * a Gemini synthesis call, and /skin-check never collects allergy_status) —
- * omitted rather than fabricated. `regionFocus` (Step 4b) is optional — null
- * for a general thread, set for a region-scoped /echo thread.
- */
+/** Echo over /skin-check's data (runEchoChat). `regionFocus` is null for the whole face. */
 export async function getSkinCheckChatReply(
   messages: EchoChatMessage[],
   context: {

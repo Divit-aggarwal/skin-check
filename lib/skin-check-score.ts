@@ -13,35 +13,9 @@ export function healthValue(scores: SkinScanScores, key: keyof SkinScanScores): 
   return POSITIVE_TRAITS.includes(key) ? raw : 1 - raw;
 }
 
-// ============================================================================
-// WHAT WAS REMOVED HERE, AND WHY IT IS NOT COMING BACK
-//
-// This file used to export computeCompositeScore(), returning a 0-100 number
-// plus a confidence level, both of which the dashboard rendered — the number
-// at 3rem, directly over the user's face.
-//
-// Three separate problems, any one of which is disqualifying:
-//
-//   1. It contradicted the project's own locked decision: results are shown
-//      as BANDS, never numbers. A two-digit score next to a face is
-//      fabricated precision that reads as a clinical claim.
-//
-//   2. It was arithmetically wrong. The mean ran over all 7 keys including
-//      `pores`, which returns exactly 0.0 on every real photo. healthValue()
-//      inverts that to a perfect 1.0, so a metric that measures nothing
-//      contributed a guaranteed ~14.3 points to every user's score. The
-//      scale had a floor of 14 and a systematic upward bias.
-//
-//   3. `confidence: "high"` was a hardcoded literal. Every successful scan
-//      claimed high confidence, on heuristics that CALIBRATION.md says are
-//      not comparable across users or across repeat scans of the same user.
-//      That badge was the most legally exposed element on the page and it
-//      was a constant.
-//
-// What replaces it is a summary of which concerns actually banded highest —
-// derived from the same rule engine that drives the display and the SKU
-// selection, so the sentence and the tiles can never disagree.
-// ============================================================================
+// No composite 0-100 score or confidence level, by locked decision: results
+// are bands, never numbers. Instead, a summary of the concerns that banded
+// highest, from the same rule engine as the display.
 
 export interface ConcernSummary {
   /** Metrics that banded Elevated, then Moderate, ordered by concern desc. */
