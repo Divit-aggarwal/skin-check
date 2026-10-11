@@ -86,8 +86,9 @@ describe("dashboard wording (D-12)", () => {
     const src = readFileSync("components/dashboard/CheckReadings.tsx", "utf8");
     // TD-40: the table's level cells (ReadingRows was removed; Echo's panel uses the table).
     const cells = Array.from(src.matchAll(/<td\b[^>]*>/g)).map((m) => m[0]);
-    expect(cells.length).toBe(1);
-    for (const c of cells) expect(c, c).toMatch(/^<td key=\{b\.metric\} className="[^"{]*">$/);
+    // TD-41: and the Echo panel's cells.
+    expect(cells.length).toBe(2);
+    for (const c of cells) expect(c, c).toMatch(/^<td key=\{(?:b\.metric|c\.key)\} className="[^"{]*">$/);
   });
 
   it("the dashboard never imports the rules feature or the longitudinal engine", () => {

@@ -250,8 +250,10 @@ test("Echo opened from the nav or after a refresh talks about the newest check; 
   // The readings of the check being discussed, with the fixed line, in the fold-away panel on a phone.
   await page.getByText(E.readingsSummary).click();
   await expect(page.getByText(C.history.pastLine).first()).toBeVisible();
-  // TD-40: the same five-reading table as the results, Home and an opened check.
-  await expect(page.getByRole("table", { name: C.table.caption }).first().getByRole("columnheader")).toHaveCount(6);
+  // TD-41: the five readings as rows (three tagged early estimate), whole face and the chat's area as columns.
+  const panel = page.getByRole("table", { name: C.table.caption }).first();
+  await expect(panel.getByRole("columnheader")).toHaveText([C.table.reading, C.current.wholeFace, "Forehead"]);
+  await expect(panel.getByRole("rowheader")).toHaveText(["Redness", "Oiliness", /^Breakouts\s*early estimate$/, /^Texture\s*early estimate$/, /^Dark marks\s*early estimate$/]);
   await expect(page.locator("main")).not.toContainText(/\/100|Dryness|Pores/);
   await page.reload();
   await expect(page.getByRole("textbox")).toBeEnabled();
@@ -339,3 +341,21 @@ for (const key of ["noreading", "legacy", "building"] as const) {
     await expect(page.getByRole("main").getByText(label)).toHaveCount(0);
   });
 }
+
+// TD-41: on a laptop Echo's side panel shows every reading without cutting a column off, and follows the area chips.
+test.describe("Echo's side panel at 1280", () => {
+  test.use({ viewport: { width: 1280, height: 800 }, isMobile: false, hasTouch: false });
+  test("five readings as rows, whole face and the chat's area as columns, nothing cut off", async ({ page }) => {
+    await signIn(page, U.echo!.phoneNumber);
+    await page.goto("/echo");
+    await expect(page.getByRole("textbox")).toBeEnabled();
+    const panel = page.getByRole("table", { name: C.table.caption });
+    await expect(panel.getByRole("rowheader")).toHaveCount(5);
+    await expect(panel.getByRole("columnheader")).toHaveText([C.table.reading, C.current.wholeFace, "Forehead"]);
+    // No column is cut off: the table is no wider than its box.
+    expect(await panel.evaluate((t) => t.scrollWidth <= t.parentElement!.clientWidth + 1)).toBe(true);
+    await page.getByRole("button", { name: "Cheeks", exact: true }).click();
+    await expect(panel.getByRole("columnheader").last()).toHaveText("Cheeks");
+    await page.screenshot({ path: ".local-stack/browser-shots/echo-panel-1280.png" });
+  });
+});
