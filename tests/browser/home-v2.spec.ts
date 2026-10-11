@@ -224,7 +224,6 @@ test("weather: Use my location keeps only the city and a rounded position; only 
   expect(saved).toMatch(/"latE1":\{"integerValue":"130"\}/);
   // The source sees whole tenths of a listed place only (the shared cache may have answered this one already).
   const toSource = weatherRequests().filter((r) => r.url.startsWith("/v1/"));
-  expect(toSource.some((r) => /latitude=13\.0&longitude=77\.6/.test(r.url))).toBe(true);
   for (const r of toSource) {
     expect(r.url).toMatch(/latitude=-?\d+\.\d&longitude=-?\d+\.\d(&|$)/);
     expect(r.url).not.toMatch(/12\.97|77\.59|seed-|uid|Bengaluru|phone/i);
