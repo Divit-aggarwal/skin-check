@@ -35,7 +35,7 @@ export function nearestPlace(latE1: number, lonE1: number): Place {
   return place(best);
 }
 
-const fold = (s: string) => s.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase().trim();
+const fold = (s: string) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
 
 /** Up to five places whose name starts with the query; the list is sorted by population, largest first. */
 export function searchPlaces(query: string): Place[] {
