@@ -29,7 +29,7 @@ import { formatDate } from "./format";
 import type { DashboardData } from "./data";
 import { checkAnswers, type Dashboard } from "./state";
 import { newestEchoSession } from "./echo-session";
-import { browserState, weatherAt, enableReminders, lastWeather, locateCity, placesNamed, rememberWeather, saveHomeSettings } from "./homeSettings";
+import { ASK_KEY, browserState, weatherAt, enableReminders, lastWeather, locateCity, placesNamed, rememberWeather, saveHomeSettings } from "./homeSettings";
 
 // TD-47 Home cards (docs/design/home-v2.md). One check's readings at a time,
 // level words only; nothing compares checks; the weather card never names
@@ -537,6 +537,13 @@ export function useOpenEcho(uid: string, data: DashboardData) {
     const session = newestEchoSession(uid, data);
     if (!session) return;
     setSession(session);
+    if (opts.ask) {
+      try {
+        sessionStorage.setItem(ASK_KEY, opts.ask);
+      } catch {
+        /* storage blocked: Echo opens without sending */
+      }
+    }
     const q = new URLSearchParams({ ...(opts.region ? { region: opts.region } : {}), ...(opts.ask ? { ask: opts.ask } : {}) }).toString();
     router.push(q ? `/echo?${q}` : "/echo");
   };

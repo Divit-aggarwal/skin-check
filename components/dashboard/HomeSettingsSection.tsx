@@ -79,7 +79,13 @@ export function HomeSettingsSection() {
               onClick={async () => {
                 if (busy) return;
                 setBusy(true);
-                await disableReminders(user).catch(() => undefined);
+                try {
+                  await disableReminders(user);
+                } catch {
+                  // Not confirmed by the server: say so, and keep showing "allowed".
+                  setBusy(false);
+                  return setMessage(A.failed);
+                }
                 setBusy(false);
                 await save({ reminders: "not_now" });
               }}

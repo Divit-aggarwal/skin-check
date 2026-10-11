@@ -3,6 +3,7 @@
 import { useAuth } from "@/lib/auth-context";
 import { PhoneAuthForm } from "@/components/auth/PhoneAuthForm";
 import { btnSecondary } from "@/components/ui/page";
+import { forgetHomeDevice } from "@/components/dashboard/homeSettings";
 
 // The /account surface: signed-in state, or the same phone-auth form the
 // Skin Check flow uses. All of the OTP mechanics live in PhoneAuthForm /
@@ -19,7 +20,11 @@ export function PhoneOtpForm() {
         <p>
           Signed in as <span className="font-semibold">{user.phoneNumber}</span>.
         </p>
-        <button type="button" className={btnSecondary} onClick={() => void signOut()}>
+        <button type="button" className={btnSecondary} onClick={async () => {
+            // TD-47: this device's weather and reminder subscription go with the sign-out (shared phones).
+            await forgetHomeDevice(user).catch(() => undefined);
+            await signOut();
+          }}>
           Sign out
         </button>
       </div>

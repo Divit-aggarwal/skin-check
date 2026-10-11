@@ -86,13 +86,11 @@ export async function enableReminders(user: User): Promise<PermissionOutcome> {
   }
 }
 
-/** Account: stop reminders on this browser and on our server. */
+/** Account's "Turn reminders off": every browser of the account on our server, then this one. Throws when the server did not confirm. */
 export async function disableReminders(user: User): Promise<void> {
+  await post(user, "/api/home/reminders", { all: true }, "DELETE");
   const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration("/sw.js") : undefined;
-  const sub = await reg?.pushManager.getSubscription();
-  if (!sub) return;
-  await post(user, "/api/home/reminders", { endpoint: sub.endpoint }, "DELETE");
-  await sub.unsubscribe();
+  await (await reg?.pushManager.getSubscription())?.unsubscribe().catch(() => undefined);
 }
 
 /** The last reading this device saw for a place, so an outage still shows something with its time. */
@@ -113,14 +111,26 @@ export function lastWeather(city: SavedCity): WeatherReading | null {
   }
 }
 
-/** After an account erase: this device's last weather reading and its push subscription go too (the server copy is erased with users/{uid}). */
-export async function forgetHomeDevice(): Promise<void> {
+/**
+ * Sign-out and account erase: this device's weather and its push
+ * subscription go, so a shared phone keeps nothing of the account. With a
+ * user (sign-out), this browser's subscription is removed on our server
+ * first; after an erase the server copy is already gone.
+ */
+export async function forgetHomeDevice(user?: User): Promise<void> {
   try {
     localStorage.removeItem(LAST_KEY);
     sessionStorage.removeItem("home-v2:after-check");
+    sessionStorage.removeItem(ASK_KEY);
   } catch {
     /* nothing kept */
   }
   const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration("/sw.js").catch(() => undefined) : undefined;
-  await (await reg?.pushManager.getSubscription())?.unsubscribe().catch(() => undefined);
+  const sub = await reg?.pushManager.getSubscription().catch(() => null);
+  if (!sub) return;
+  if (user) await post(user, "/api/home/reminders", { endpoint: sub.endpoint }, "DELETE").catch(() => undefined);
+  await sub.unsubscribe().catch(() => undefined);
 }
+
+/** The starter question Home hands to Echo; Echo sends ?ask= only when it matches (no sending from an outside link). */
+export const ASK_KEY = "home-v2:ask";

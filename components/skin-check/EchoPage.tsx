@@ -191,7 +191,15 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
     url.searchParams.delete("ask");
     window.history.replaceState(window.history.state, "", url);
     const pool = productsOn ? Object.values(STARTER_POOL).flat() : Object.entries(STARTER_POOL).filter(([g]) => g !== "products").flatMap(([, q]) => q);
-    if (pool.includes(askParam) && safetyQuestionsAnswered(session.answers)) handleSendRef.current(askParam);
+    // Only a question Home itself handed over in this tab (security review TD-47): a link from elsewhere sends nothing.
+    let handed: string | null = null;
+    try {
+      handed = sessionStorage.getItem("home-v2:ask");
+      sessionStorage.removeItem("home-v2:ask");
+    } catch {
+      /* storage blocked: nothing is sent */
+    }
+    if (handed === askParam && pool.includes(askParam) && safetyQuestionsAnswered(session.answers)) handleSendRef.current(askParam);
   }, [askParam, session, echoOn, productsOn]);
 
   const messages = threads[activeRegion].messages;

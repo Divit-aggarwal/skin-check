@@ -16,6 +16,8 @@ function hosts(): { forecast: string; air: string; key: string | null } {
   // Local stack only (scripts/fake-conditions.mjs): never in a production build.
   const local = process.env.NODE_ENV !== "production" ? process.env.WEATHER_LOCAL_BASE_URL : undefined;
   if (local) return { forecast: local, air: local, key: null };
+  // Development without the local stand-in: never the paid hosts (and never the key in a dev log line).
+  if (process.env.NODE_ENV !== "production") throw new WeatherUnavailableError("development: set WEATHER_LOCAL_BASE_URL");
   const key = process.env.OPEN_METEO_API_KEY;
   if (!key) throw new WeatherUnavailableError("OPEN_METEO_API_KEY is not set");
   return { forecast: "https://customer-api.open-meteo.com", air: "https://customer-air-quality-api.open-meteo.com", key };

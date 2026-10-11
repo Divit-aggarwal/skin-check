@@ -1,7 +1,7 @@
 import { createHash, createPrivateKey, sign } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
 import { deriveDashboard, type Doc } from "@/components/dashboard/state";
-import { currentRoutine, todayIn, weekdayOf, type RoutineEvent } from "@/lib/routine/events";
+import { currentRoutine, isTimeZone, todayIn, weekdayOf, type RoutineEvent } from "@/lib/routine/events";
 import { nextCheck } from "./schedule";
 
 // SERVER ONLY. TD-47 reminders: standard web push (RFC 8030) signed with our
@@ -11,7 +11,7 @@ import { nextCheck } from "./schedule";
 // fixed line and opens Home, which says what is due.
 
 /** Push services a browser may hand us; anything else is refused (no request to an address a client chose). */
-const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /^web\.push\.apple\.com$/, /\.notify\.windows\.com$/, /\.push\.apple\.com$/];
+const PUSH_HOSTS = [/^fcm\.googleapis\.com$/, /^updates\.push\.services\.mozilla\.com$/, /^web\.push\.apple\.com$/, /^[a-z0-9-]+\.notify\.windows\.com$/];
 
 export function allowedEndpoint(endpoint: unknown): endpoint is string {
   if (typeof endpoint !== "string" || endpoint.length > 1000) return false;
@@ -51,6 +51,8 @@ export async function sendPush(endpoint: string): Promise<"sent" | "gone"> {
     method: "POST",
     headers: { Authorization: vapidHeader(endpoint), TTL: String(12 * 3600), Urgency: "normal", "Content-Length": "0" },
     signal: AbortSignal.timeout(10_000),
+    // An allowed host must not bounce the request somewhere else.
+    redirect: "error",
   });
   if (res.status === 404 || res.status === 410) return "gone";
   if (!res.ok) throw new Error(`push service ${res.status}`);
@@ -65,47 +67,89 @@ export function dueToday(uid: string, data: { checks: Doc[]; analyses: Doc[]; ev
   return { check: nextCheck(last, now, timeZone).kind === "today", routine };
 }
 
+/** Subscriptions one account may keep (one per browser; old ones go when a service says they are gone). */
+export const MAX_SUBSCRIPTIONS_PER_USER = 5;
+/** The cron stops starting new users after this, well inside the 300 s function limit, and says so. */
+const CRON_BUDGET_MS = 240_000;
+
+type Sub = { ref: { delete: () => Promise<unknown>; update: (d: Record<string, unknown>) => Promise<unknown>; parent: { parent: { id: string } | null } }; data: () => Record<string, unknown> };
+
 /**
  * The daily cron: at most one notification per subscription per local day
- * (lastSentOn), only when something is due. Counts only; no uid is logged.
+ * (lastSentOn), only when something is due and the account still has
+ * reminders on. One read of each user's data, not one per subscription. A
+ * browser shared by two accounts keeps only the newest account's
+ * subscription. Counts only; no uid is logged.
  */
-export async function sendReminders(db: Firestore, now = new Date(), send = sendPush) {
-  const subs = await db.collectionGroup("pushSubscriptions").get();
+export async function sendReminders(db: Firestore, now = new Date(), send = sendPush, budgetMs = CRON_BUDGET_MS) {
+  const started = Date.now();
+  const subs = (await db.collectionGroup("pushSubscriptions").get()).docs as unknown as Sub[];
   let sent = 0;
   let removed = 0;
   let failed = 0;
-  for (const sub of subs.docs) {
-    const uid = sub.ref.parent.parent?.id;
-    const { endpoint, timeZone, lastSentOn } = sub.data() as { endpoint: string; timeZone: string; lastSentOn?: string };
-    if (!uid) continue;
-    const today = todayIn(timeZone, now);
-    if (lastSentOn === today) continue;
+  let skipped = 0;
+
+  // One browser, two accounts: the newest subscription wins.
+  const byEndpoint = new Map<string, Sub>();
+  const created = (s: Sub) => {
+    const c = s.data().createdAt as { toMillis?: () => number } | undefined;
+    return typeof c?.toMillis === "function" ? c.toMillis() : 0;
+  };
+  for (const s of subs) {
+    const endpoint = String(s.data().endpoint);
+    const other = byEndpoint.get(endpoint);
+    if (!other) byEndpoint.set(endpoint, s);
+    else {
+      const [keep, drop] = created(s) >= created(other) ? [s, other] : [other, s];
+      byEndpoint.set(endpoint, keep);
+      await drop.ref.delete().catch(() => undefined);
+      removed += 1;
+    }
+  }
+  const byUser = new Map<string, Sub[]>();
+  for (const s of Array.from(byEndpoint.values())) {
+    const uid = s.ref.parent.parent?.id;
+    if (uid) byUser.set(uid, [...(byUser.get(uid) ?? []), s]);
+  }
+
+  for (const [uid, list] of Array.from(byUser.entries())) {
+    if (Date.now() - started > budgetMs) {
+      skipped += list.length;
+      continue;
+    }
     try {
       const user = db.collection("users").doc(uid);
-      // ponytail: three reads per subscriber per day; batch by user if subscribers reach the thousands.
-      const [checks, analyses, events] = await Promise.all(["skinChecks", "scanAnalyses", "routineEvents"].map((c) => user.collection(c).get()));
-      const due = dueToday(uid, {
-        checks: checks!.docs.map((d) => ({ id: d.id, data: d.data() })),
-        analyses: analyses!.docs.map((d) => ({ id: d.id, data: d.data() })),
-        events: events!.docs.map((d) => d.data() as RoutineEvent),
-      }, timeZone, now);
-      if (!due.check && !due.routine) continue;
-      if (!allowedEndpoint(endpoint)) {
-        await sub.ref.delete();
-        removed += 1;
-        continue;
-      }
-      if ((await send(endpoint)) === "gone") {
-        await sub.ref.delete();
-        removed += 1;
-      } else {
-        await sub.ref.update({ lastSentOn: today });
-        sent += 1;
+      const [settings, checks, analyses, events] = await Promise.all([
+        user.collection("settings").doc("home").get(),
+        ...["skinChecks", "scanAnalyses", "routineEvents"].map((c) => user.collection(c).get()),
+      ] as const);
+      // Reminders turned off in Account (even if a browser's subscription is still here): nothing is sent.
+      if ((settings as { get: (f: string) => unknown }).get("reminders") !== "allowed") continue;
+      const data = {
+        checks: (checks as FirebaseFirestore.QuerySnapshot).docs.map((d) => ({ id: d.id, data: d.data() })),
+        analyses: (analyses as FirebaseFirestore.QuerySnapshot).docs.map((d) => ({ id: d.id, data: d.data() })),
+        events: (events as FirebaseFirestore.QuerySnapshot).docs.map((d) => d.data() as RoutineEvent),
+      };
+      for (const sub of list) {
+        const { endpoint, timeZone, lastSentOn } = sub.data() as { endpoint: string; timeZone: string; lastSentOn?: string };
+        const tz = isTimeZone(timeZone) ? timeZone : "Asia/Kolkata";
+        const today = todayIn(tz, now);
+        if (lastSentOn === today) continue;
+        const due = dueToday(uid, data, tz, now);
+        if (!due.check && !due.routine) continue;
+        if (!allowedEndpoint(endpoint) || (await send(endpoint)) === "gone") {
+          await sub.ref.delete();
+          removed += 1;
+        } else {
+          await sub.ref.update({ lastSentOn: today });
+          sent += 1;
+        }
       }
     } catch (err) {
-      console.error("reminders: one subscription failed:", (err as Error)?.name ?? "unknown");
+      console.error("reminders: one account failed:", (err as Error)?.name ?? "unknown");
       failed += 1;
     }
   }
-  return { sent, removed, failed };
+  if (skipped) console.error(`reminders: time budget reached, ${skipped} subscriptions left for tomorrow`);
+  return { sent, removed, failed, skipped };
 }

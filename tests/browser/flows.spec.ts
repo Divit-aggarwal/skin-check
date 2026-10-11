@@ -1,12 +1,14 @@
 import { readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
+import { HOME_COPY as H } from "@/components/dashboard/homeCopy";
 import { CAPTURE_QUALITY_SETTINGS } from "@/lib/capture-quality/settings";
 import { RETAKE_COPY } from "@/lib/capture-quality/retake";
 import { AI_SHARE_CONSENT_COPY, ERASE_CONFIRMATION } from "@/lib/consent";
 import { ROUTINE_COPY as R } from "@/lib/routine/copy";
 import { CATALOGUE } from "@/lib/catalog/catalogue";
 import { TIMELINE_COPY as T } from "@/components/timeline/copy";
+import { CHECKS_COPY as K } from "@/components/checks/copy";
 import { ECHO_COPY as E } from "@/components/skin-check/echoCopy";
 import { DASHBOARD_SEED as U } from "./seed-users";
 import { shot, signIn } from "./helpers";
@@ -88,11 +90,11 @@ test("a normal scan finishes and shows on the dashboard", async ({ page }) => {
   const today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
   await expect(async () => {
     await page.goto("/dashboard");
-    await expect(page.getByText(C.current.checkedOn(today))).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText(H.latest.checkedOn(today, H.latest.ago(0)))).toBeVisible({ timeout: 5_000 });
   }).toPass({ timeout: 240_000, intervals: [5_000] });
   await expect(page.getByText(C.photoCheck.pass)).toBeVisible();
   await expect(page.getByText(C.trend.notEnough)).toBeVisible();
-  await expect(page.getByText(C.empty)).toHaveCount(0);
+  await expect(page.getByText(H.latest.none)).toHaveCount(0);
   await shot(page, "after-scan");
 });
 
@@ -168,20 +170,23 @@ async function askEcho(page: Page) {
 
 test("Echo asks for AI-share consent first", async ({ page }) => {
   await signIn(page, U.echo!.phoneNumber);
-  await page.goto("/dashboard");
+  // TD-47: the privacy card is on Account.
+  await page.goto("/account");
   await expect(page.getByText(C.privacy.aiNotAsked)).toBeVisible();
+  await page.goto("/dashboard");
   await askEcho(page);
   await expect(page.getByText(AI_SHARE_CONSENT_COPY)).toBeVisible();
   await page.screenshot({ path: ".local-stack/browser-shots/dashboard-flow-echo-consent.png", fullPage: true });
 });
 
-test("withdraw AI-share consent on the dashboard, then Echo asks again", async ({ page }) => {
+test("withdraw AI-share consent on Account, then Echo asks again", async ({ page }) => {
   await signIn(page, U.withdraw!.phoneNumber);
-  await page.goto("/dashboard");
+  await page.goto("/account");
   await page.getByRole("button", { name: C.privacy.stop }).click();
   await expect(page.getByText(C.privacy.aiOff)).toBeVisible();
   await page.getByRole("heading", { name: C.privacy.title }).scrollIntoViewIfNeeded();
   await shot(page, "privacy-off");
+  await page.goto("/dashboard");
   await askEcho(page);
   await expect(page.getByText(AI_SHARE_CONSENT_COPY)).toBeVisible();
 });
@@ -242,7 +247,7 @@ test("routine: the four steps, an empty step invites an add, used and skipped in
   await page.screenshot({ path: ".local-stack/browser-shots/dashboard-flow-routine.png", fullPage: true });
 });
 
-test("Home: today's routine logs used or skipped in one tap, and the entry shows in Recently", async ({ page }) => {
+test("Home: today's routine marks a step done in one tap, and the entry shows on the timeline", async ({ page }) => {
   await signIn(page, U.routine!.phoneNumber);
   await page.goto("/routine");
   const addSection = page.locator("section", { has: page.getByRole("heading", { name: R.add }) });
@@ -254,12 +259,12 @@ test("Home: today's routine logs used or skipped in one tap, and the entry shows
 
   await page.goto("/dashboard");
   const today = page.locator("section", { has: page.getByRole("heading", { name: R.todayTitle }) });
-  const used = today.getByRole("button", { name: R.logAs(R.status.used, name, R.slot.AM.toLowerCase()) });
+  // TD-47: one-tap "Mark done" (a used event); the timeline on Checks shows the entry.
+  const used = today.getByRole("button", { name: H.routine.markDoneLabel(name, R.slot.AM.toLowerCase()) });
   await used.click();
   await expect(used).toHaveAttribute("aria-pressed", "true");
-  const morningEntry = today.getByRole("region", { name: R.slot.AM, exact: true }).locator("[data-routine-entry]", { hasText: name });
-  await expect(morningEntry.getByText(R.todayStatus(R.status.used))).toBeVisible();
-  const recent = page.locator("section", { has: page.getByRole("heading", { name: T.recent }) });
+  await page.goto("/checks?view=timeline");
+  const recent = page.getByRole("region", { name: K.timeline });
   await expect(recent.getByText(T.routine.usage(name, R.slot.AM.toLowerCase(), R.status.used))).toBeVisible();
   await shot(page, "home-routine");
 });
@@ -270,7 +275,7 @@ test("Ask Echo, back to the dashboard, a new check starts at the questions", asy
   await page.getByRole("button", { name: C.chat.button }).click();
   await expect(page).toHaveURL(/\/echo/);
   await page.goBack();
-  await page.getByRole("link", { name: C.newCheck }).first().click();
+  await page.getByRole("link", { name: H.banner.start }).click();
   // TD-44: the questions choice is the first screen of a check that starts afresh.
   await expect(page.getByRole("heading", { name: Q.title, exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Your photo reading" })).toHaveCount(0);
@@ -306,7 +311,7 @@ test("K-1 fixed: Echo's back link after a dashboard hand-off returns to the dash
   await expect(page).toHaveURL(/\/echo/);
   await page.getByRole("link", { name: "Back to your skin checks" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole("heading", { name: C.title })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
 });
 
 test("account: sign-in lands on Home; the account page has the sign-in, privacy and delete, and no second history list", async ({ page }) => {
@@ -322,10 +327,9 @@ test("account: sign-in lands on Home; the account page has the sign-in, privacy 
 
 test("delete the account, sign in again, no history", async ({ page }) => {
   await signIn(page, U.erase!.phoneNumber);
-  await page.goto("/dashboard");
+  await page.goto("/checks");
   await expect(page.getByText(C.history.kind.reading).first()).toBeVisible();
-  await page.getByRole("link", { name: C.privacy.delete }).click();
-  await expect(page).toHaveURL(/\/account#delete-account/);
+  await page.goto("/account#delete-account");
   await page.getByRole("button", { name: "Delete my account and data" }).click();
   await page.getByLabel(/to confirm/).fill(ERASE_CONFIRMATION);
   await page.getByRole("button", { name: "Delete permanently" }).click();
@@ -333,7 +337,7 @@ test("delete the account, sign in again, no history", async ({ page }) => {
 
   await signIn(page, U.erase!.phoneNumber);
   await page.goto("/dashboard");
-  await expect(page.getByText(C.empty)).toBeVisible();
+  await expect(page.getByText(H.latest.none)).toBeVisible();
   await expect(page.getByText(C.history.title)).toHaveCount(0);
   await shot(page, "after-delete");
 });
@@ -349,7 +353,7 @@ test("O-D3: the signed-in start page and the account page link to the dashboard;
   await page.goto("/skin-check");
   await page.getByRole("link", { name: C.entryLink }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole("heading", { name: C.title })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
 
   await page.goto("/account");
   await page.getByRole("link", { name: C.entryLink }).click();

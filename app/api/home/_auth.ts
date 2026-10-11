@@ -16,6 +16,19 @@ export async function verifiedUid(request: NextRequest): Promise<string | NextRe
   }
 }
 
+// Per verified uid, so rotating IPs does not help (security review TD-47).
+// ponytail: in-memory and per instance, like the routine route's cap; move to
+// a shared store if a hard global per-user cap is ever needed.
+const perUid = new Map<string, { day: string; n: number }>();
+export function overUserCap(scope: string, uid: string, max: number): boolean {
+  const day = new Date().toISOString().slice(0, 10);
+  const key = `${scope}:${uid}`;
+  const w = perUid.get(key);
+  const n = w?.day === day ? w.n + 1 : 1;
+  perUid.set(key, { day, n });
+  return n > max;
+}
+
 /** A small JSON body, or null (too large or not JSON). */
 export async function smallJson(request: NextRequest, max = 1000): Promise<Record<string, unknown> | null> {
   const text = await request.text();
