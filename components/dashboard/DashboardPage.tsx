@@ -22,6 +22,7 @@ import { deriveDashboard, isEmpty, waitingQuestions, type Dashboard } from "./st
 import { QuestionsCard } from "@/components/skin-check/QuestionsChoice";
 import { newestEchoSession } from "./echo-session";
 import { echoOn } from "@/lib/echo-limits";
+import type { EchoRegion } from "@/lib/echo-regions";
 
 // Home (G03, docs/design/map.md). The newest reading by face area, the
 // starting point, recent timeline, Echo, a new check, today's routine and
@@ -123,7 +124,7 @@ export function DashboardPage() {
                 }
               />
             ) : (
-              <CurrentSection dashboard={dashboard} />
+              <CurrentSection dashboard={dashboard} uid={user.uid} data={load.data} />
             )}
             {/* TD-33 (1): right under the newest reading, while its questions wait. */}
             {waiting && (
@@ -179,9 +180,12 @@ function Shell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function CurrentSection({ dashboard }: { dashboard: Dashboard }) {
+function CurrentSection({ dashboard, uid, data }: { dashboard: Dashboard; uid: string; data: DashboardData }) {
   const { current } = dashboard;
   const scanId = current.kind === "reading" ? current.view.scanId : null;
+  const openEcho = useOpenEcho(uid, data);
+  // TD-46: a face area opens Echo on it, only where "Chat with Echo" would work (Echo talks about the newest check).
+  const onArea = echoOn() && scanId !== null && scanId === dashboard.echoScanId ? openEcho : undefined;
   // TD-37 (2): the mesh over this check's kept photo (extends the TD-25 (2) own-photo exception to Home).
   const photo = useKeptPhoto(scanId, dashboard.history.some((h) => h.scanId === scanId && h.photoClaimed));
   return (
@@ -211,7 +215,7 @@ function CurrentSection({ dashboard }: { dashboard: Dashboard }) {
       ) : (
         <>
           {dashboard.newerCheckNotShown && <p className="rounded-xl bg-brand-linen px-4 py-3 text-sm">{C.current.newerNotShown}</p>}
-          <CheckReadings view={current.view} photo={photo} />
+          <CheckReadings view={current.view} photo={photo} onArea={onArea} />
           {/* Only next to readings that are on screen. */}
           {current.view.bands && (
             <div className="border-t border-brand-line pt-5">
@@ -265,17 +269,21 @@ function RecentSection({ history, routine }: { history: Dashboard["history"]; ro
   );
 }
 
-function ChatSection({ uid, dashboard, data }: { uid: string; dashboard: Dashboard; data: DashboardData }) {
+/** Echo on the newest reading, optionally on one face area (TD-46). */
+function useOpenEcho(uid: string, data: DashboardData) {
   const { setSession } = useSkinCheckSession();
   const router = useRouter();
-  const scanId = dashboard.echoScanId;
-
-  function openEcho() {
+  return (region?: EchoRegion) => {
     const session = newestEchoSession(uid, data);
     if (!session) return;
     setSession(session);
-    router.push("/echo");
-  }
+    router.push(region ? `/echo?region=${region}` : "/echo");
+  };
+}
+
+function ChatSection({ uid, dashboard, data }: { uid: string; dashboard: Dashboard; data: DashboardData }) {
+  const openEcho = useOpenEcho(uid, data);
+  const scanId = dashboard.echoScanId;
 
   return (
     <section aria-labelledby="chat-title" className={`${card} flex flex-col items-start gap-3`}>
@@ -285,7 +293,7 @@ function ChatSection({ uid, dashboard, data }: { uid: string; dashboard: Dashboa
       {scanId ? (
         <>
           <p className="text-brand-muted">{C.chat.body}</p>
-          <button type="button" className={btnPrimary} onClick={openEcho}>
+          <button type="button" className={btnPrimary} onClick={() => openEcho()}>
             {C.chat.button}
           </button>
         </>

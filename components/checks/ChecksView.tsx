@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
@@ -183,6 +183,7 @@ function CheckList({ dashboard, data, uid, selected }: { dashboard: Dashboard; d
 /** One opened check: its own readings, always with the fixed line. */
 function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: string; data: DashboardData; dashboard: Dashboard }) {
   const check = pastCheck(uid, scanId, data.checks, data.analyses);
+  const router = useRouter();
   // TD-37 (2): the mesh over this check's kept photo; the face drawing without one.
   const photo = useKeptPhoto(check?.scanId ?? null, check?.photoClaimed ?? false);
   // The back link above (phone) and the list beside it (desktop) are the ways on.
@@ -212,7 +213,8 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
         <>
           {/* TD-24 (1): on every opened check with readings, never behind a toggle. */}
           <p className="rounded-2xl bg-brand-mist px-5 py-4 text-brand-ink">{C.history.pastLine}</p>
-          <CheckReadings view={{ ...check.view, photoCheck: null }} photo={photo} />
+          {/* TD-46: on the newest check, a face area opens Echo on it (Echo talks about the newest check only). */}
+          <CheckReadings view={{ ...check.view, photoCheck: null }} photo={photo} onArea={newest && echoOn() ? (r) => router.push(`/echo?region=${r}`) : undefined} />
           {check.view.bands && (
             <div className="border-t border-brand-line pt-5">
               <KnownAndNotKnown />

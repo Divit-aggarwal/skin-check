@@ -17,20 +17,25 @@ const AREAS: Record<EchoRegion, { shapes: JSX.Element[]; text: [number, number][
 
 /**
  * An abstract face with the four areas the pipeline reads, labelled, so the
- * readings table below it can be read against it. A picture only (TD-39:
- * nothing to choose). An area without a reading is drawn faint. Nothing is
- * coloured by band (system.md §2).
+ * readings table below it can be read against it. An area without a reading
+ * is drawn faint. Nothing is coloured by band (system.md §2).
+ * TD-46: with `onArea`, an area with a reading can be tapped (Home opens Echo on it).
  */
 export function FaceDrawing({
   labels,
   available,
+  onArea,
+  areaLabel,
 }: {
   labels: Record<EchoRegion, string>;
   /** Areas with a reading. Any other area is drawn faint. */
   available: readonly EchoRegion[];
+  onArea?: ((region: EchoRegion) => void) | undefined;
+  /** The accessible name of a tappable area. */
+  areaLabel?: ((label: string) => string) | undefined;
 }) {
   return (
-    <svg role="img" aria-label="A drawing of a face with its four areas: forehead, nose, cheeks and chin" viewBox="0 0 280 330" className="mx-auto block h-auto w-full max-w-[240px] select-none font-body sm:max-w-[300px]">
+    <svg role={onArea ? "group" : "img"} aria-label="A drawing of a face with its four areas: forehead, nose, cheeks and chin" viewBox="0 0 280 330" className="mx-auto block h-auto w-full max-w-[240px] select-none font-body sm:max-w-[300px]">
       <g aria-hidden fill="none" stroke="#B0AAA2" strokeLinecap="round" strokeWidth="1.5">
         <path d="M140 16C78 16 40 62 40 130c0 88 46 186 100 186s100-98 100-186C240 62 202 16 140 16Z" fill="#FFFFFF" stroke="#2C2C2A" />
         <path d="M58 88c16-34 46-52 82-52s66 18 82 52" />
@@ -46,9 +51,24 @@ export function FaceDrawing({
             </g>
           );
         }
+        const tap = onArea
+          ? {
+              role: "button",
+              tabIndex: 0,
+              "aria-label": areaLabel?.(labels[r]) ?? labels[r],
+              onClick: () => onArea(r),
+              onKeyDown: (e: React.KeyboardEvent) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  onArea(r);
+                }
+              },
+              className: "group cursor-pointer outline-none",
+            }
+          : {};
         return (
-          <g key={r}>
-            <g className="fill-white stroke-brand-ink [stroke-dasharray:5_4] [stroke-width:1.25]">{shapes}</g>
+          <g key={r} {...tap}>
+            <g className={`fill-white stroke-brand-ink [stroke-dasharray:5_4] [stroke-width:1.25] ${onArea ? "group-hover:fill-brand-linen group-focus-visible:[stroke-dasharray:none] group-focus-visible:[stroke-width:2.5]" : ""}`}>{shapes}</g>
             {text.map(([x, y]) => (
               <text key={`${x}-${y}`} x={x} y={y} textAnchor="middle" fontSize="14" fontWeight={600} className="fill-brand-ink">
                 {labels[r]}

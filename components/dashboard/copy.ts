@@ -111,6 +111,8 @@ export const DASHBOARD_COPY = {
     title: "Ask Echo",
     body: "Ask Echo about your newest photo reading.",
     button: "Chat with Echo",
+    // TD-46: a face area on Home's drawing.
+    askAbout: (area: string) => `Ask Echo about your ${String(area).toLowerCase()}`,
     needsReading: "Echo talks about a photo reading from our server. Take a new check to chat with Echo.",
     needsFirst: "Echo talks about a photo reading. Take your first check to chat with Echo.",
   },
