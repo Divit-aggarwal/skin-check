@@ -120,10 +120,9 @@ export type AnswerTopic = (typeof ANSWER_TOPICS)[number];
 // never stored, so asking for fewer changes no saved value.
 export const OVERLAY_CATEGORIES: BandableMetric[] = [...PHOTO_METRICS];
 
-// The user's own stated primary concern(s) from the quiz — used only to pick
-// which category the results screen shows FIRST (SkinCheckDashboard's
-// resolveFocus), not which overlays get requested (all of OVERLAY_CATEGORIES
-// are requested regardless of what's answered by capture time).
+// The user's own stated primary concern(s) from the quiz. No screen uses it
+// since TD-39 removed the results chips (it once picked the first chip); it
+// never decided which overlays get requested.
 //
 // `primary_concerns` is a multi-select (up to 3, lib/skin-check-steps.ts) —
 // the first selection is treated as "the" stated concern (array order is
