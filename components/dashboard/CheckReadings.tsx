@@ -2,10 +2,11 @@
 
 import { ShieldCheck } from "lucide-react";
 import { ECHO_REGION_LABELS, ECHO_REGIONS } from "@/lib/echo-regions";
+import { isEarlyEstimate } from "@/lib/skin-check-skus";
 import { DASHBOARD_COPY as C } from "./copy";
 import { FaceDrawing } from "./FaceDrawing";
 import { FacePhoto } from "@/components/mesh/FacePhoto";
-import type { Bands, CheckView } from "./state";
+import type { CheckView } from "./state";
 
 export { formatDate } from "./format";
 
@@ -19,50 +20,45 @@ export function PhotoCheckLine({ text }: { text: string }) {
   );
 }
 
-/** Metric on the left, band word on the right, both in ink. Every band looks the same: no colour, no score, no bar. */
-export function ReadingRows({ bands }: { bands: Bands | null }) {
-  if (!bands) return <p>{C.current.unreadable}</p>;
-  return (
-    <dl className="divide-y divide-brand-line">
-      {bands.map((b) => (
-        <div key={b.metric} className="flex min-h-12 items-center justify-between gap-4 py-2">
-          <dt className="text-brand-ink">{b.label}</dt>
-          <dd className="font-medium text-brand-ink">{b.band}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
 /**
- * One table (TD-39 (3)): the Redness and Oiliness level for the whole face and
- * each face area. Levels only, all in ink: no number, no colour, no bar.
+ * One table (TD-39 (3), TD-40): the five levels for the whole face and each
+ * face area. Levels only, all in ink: no number, no colour, no bar. On a phone
+ * the table scrolls inside its own box with the Area column pinned; the page
+ * itself never scrolls sideways.
  */
-export function ReadingsTable({ view }: { view: CheckView }) {
+export function ReadingsTable({ view }: { view: Pick<CheckView, "bands" | "areas"> }) {
   if (!view.bands) return <p>{C.current.unreadable}</p>;
   const rows = [{ key: "whole", label: C.current.wholeFace, bands: view.bands }, ...view.areas.map((a) => ({ key: a.region, label: a.label, bands: a.bands }))];
   return (
-    <table className="w-full table-fixed text-left">
-      <caption className="mb-2 text-left font-display text-base font-semibold tracking-[-0.01em] text-brand-title">{C.table.caption}</caption>
-      <thead>
-        <tr className="border-b border-brand-line text-sm text-brand-muted">
-          <th scope="col" className="py-2 pr-2 font-semibold">{C.table.area}</th>
-          {view.bands.map((b) => (
-            <th key={b.metric} scope="col" className="px-2 py-2 font-semibold">{b.label}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-brand-line">
-        {rows.map((r) => (
-          <tr key={r.key} className="h-12">
-            <th scope="row" className={`pr-2 text-brand-ink ${r.key === "whole" ? "font-semibold" : "font-medium"}`}>{r.label}</th>
-            {view.bands!.map((b) => (
-              <td key={b.metric} className="px-2 text-brand-ink">{r.bands?.find((x) => x.metric === b.metric)?.band ?? C.current.noReading}</td>
+    <div className="flex flex-col gap-2">
+      <h3 aria-hidden className="font-display text-base font-semibold tracking-[-0.01em] text-brand-title">{C.table.caption}</h3>
+      <div className="max-w-full overflow-x-auto">
+        <table className="w-full min-w-[30rem] text-left text-sm">
+          <caption className="sr-only">{C.table.caption}</caption>
+          <thead>
+            <tr className="border-b border-brand-line align-bottom text-brand-muted">
+              <th scope="col" className="sticky left-0 bg-brand-paper py-2 pr-2 font-semibold">{C.table.area}</th>
+              {view.bands.map((b) => (
+                <th key={b.metric} scope="col" className="px-2 py-2 font-semibold">
+                  {b.label}
+                  {isEarlyEstimate(b.metric) && <span className="block text-xs font-normal">{C.table.earlyEstimate}</span>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-brand-line">
+            {rows.map((r) => (
+              <tr key={r.key} className="h-12">
+                <th scope="row" className={`sticky left-0 bg-brand-paper pr-2 text-brand-ink ${r.key === "whole" ? "font-semibold" : "font-medium"}`}>{r.label}</th>
+                {view.bands!.map((b) => (
+                  <td key={b.metric} className="px-2 text-brand-ink">{r.bands?.find((x) => x.metric === b.metric)?.band ?? C.current.noReading}</td>
+                ))}
+              </tr>
             ))}
-          </tr>
-        ))}
-      </tbody>
-    </table>
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 }
 

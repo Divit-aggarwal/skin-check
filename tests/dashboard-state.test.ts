@@ -46,8 +46,8 @@ describe("dashboard view model", () => {
     expect(d.current.kind).toBe("reading");
     if (d.current.kind !== "reading") throw new Error();
     expect(d.current.view.source).toBe("measured");
-    // TD-37 (1): Redness and Oiliness only (was five).
-    expect(d.current.view.bands?.map((b) => b.metric)).toEqual(["redness", "oiliness"]);
+    // TD-40: the five readings.
+    expect(d.current.view.bands?.map((b) => b.metric)).toEqual(["redness", "oiliness", "blemishes", "texture", "pigment"]);
     expect(d.current.view.photoCheck).toBe("not_recorded");
     expect(d.trend).toMatchObject({ kind: "building", count: 0, needed: 3, engineBoundary: false });
     expect(d.echoScanId).toBe("s1");

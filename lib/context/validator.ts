@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { ANSWER_TOPICS } from "@/lib/skin-check-skus";
 import type { AllowedClaim, ContextPackage, ForbiddenClaim } from "@/lib/contracts/context-package";
 import { packageFacts, type CitableFact, type FactKind } from "./builder";
 import { nonMedicalRedFlagHit, redFlagHit } from "./prefilter";
@@ -417,17 +416,6 @@ export function validateAnswer(raw: string, pkg: ContextPackage, userMessage: st
           const held = readings.filter((r) => r.metric === metric && (regions.length === 0 || regions.includes(r.region)));
           if (!held.some((r) => r.band.toLowerCase() === band.word)) fail("contradicts_package", i, band.word);
         }
-      }
-    }
-
-    // TD-37 (1): breakouts, texture and dark marks have no reading. Outside a
-    // told echo, they may appear only inside a verbatim quote of a cited fact
-    // (the missing item, or a told answer in a product reason), never in
-    // Gemini's own words: "Your skin shows breakouts" (safety review 2026-10-11).
-    if (claim.claim_type !== "self_reported_echo") {
-      for (const m of ANSWER_TOPICS) {
-        const hit = firstMatch(METRIC_WORDS[m], stripped);
-        if (hit) fail("contradicts_package", i, hit);
       }
     }
 

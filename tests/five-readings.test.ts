@@ -7,19 +7,18 @@ import { DASHBOARD_COPY } from "@/components/dashboard/copy";
 import { bandScores } from "@/lib/skin-check-rules";
 import { summarizeConcerns } from "@/lib/skin-check-score";
 import { summarizeSkinScanScores } from "@/lib/skin-check-format";
-import { ANSWER_TOPICS, OVERLAY_CATEGORIES, PHOTO_METRICS } from "@/lib/skin-check-skus";
+import { EARLY_ESTIMATE_METRICS, OVERLAY_CATEGORIES, PHOTO_METRICS, SHOWN_METRICS } from "@/lib/skin-check-skus";
 import { bannedWordsIn } from "@/lib/catalog/wording";
 import { syntheticAnalysis, syntheticNative } from "./synthetic-scan";
 
-// TD-37 (owner, 2026-10-10): Redness and Oiliness are the only readings shown;
-// TD-39 replaced the user's own answers under Breakouts, Texture and Dark marks:
-// those three are not shown at all.
+// TD-40 (owner, 2026-10-11): the table shows all five readings again, on every
+// screen and for old checks; Breakouts, Texture and Dark marks are tagged
+// "early estimate". The photo still draws only the Redness and Oiliness overlays.
 
 const UID = "SYNTH_UID";
 const day = (d: number) => new Date(Date.UTC(2026, 9, d, 10));
-// The three hidden scores at their highest, so any leak would show as Elevated.
 const LOUD = { redness: 0.1, oiliness: 0.1, texture: 1, pores: 0, blemishes: 1, hydration: 0, pigment: 1 };
-const HIDDEN_LABELS = /Breakouts|Texture|Dark marks|blemish|pigment/i;
+const FIVE = ["redness", "oiliness", "blemishes", "texture", "pigment"];
 
 function analysis(scanId: string, d: number): Doc {
   const sha = scanId.padEnd(64, "0").replace(/[^0-9a-f]/g, "a");
@@ -29,66 +28,65 @@ function analysis(scanId: string, d: number): Doc {
 }
 const check = (id: string, d: number, extra: Record<string, unknown> = {}): Doc => ({ id, data: { scanId: id, status: "completed", answers: {}, createdAt: day(d), ...extra } });
 
-describe("TD-37: what is shown", () => {
-  it("one shared list: two photo readings, three answer topics, two overlays requested", () => {
+describe("TD-40: what is shown", () => {
+  it("five readings in table order, three early estimates, two overlays requested", () => {
+    expect(SHOWN_METRICS).toEqual(FIVE);
+    expect(EARLY_ESTIMATE_METRICS).toEqual(["blemishes", "texture", "pigment"]);
     expect(PHOTO_METRICS).toEqual(["redness", "oiliness"]);
-    expect(ANSWER_TOPICS).toEqual(["blemishes", "texture", "pigment"]);
     expect(OVERLAY_CATEGORIES).toEqual(["redness", "oiliness"]);
   });
 
-  it("a measured check shows Redness and Oiliness only, whole face and every area", () => {
+  it("a measured check shows all five, whole face and every area, never Dryness", () => {
     const d = deriveDashboard(UID, [check("s1", 1)], [analysis("s1", 1)]);
     if (d.current.kind !== "reading") throw new Error("no reading");
-    expect(d.current.view.bands?.map((b) => b.metric)).toEqual(["redness", "oiliness"]);
-    for (const a of d.current.view.areas) expect(a.bands?.map((b) => b.metric) ?? []).toEqual(a.bands ? ["redness", "oiliness"] : []);
-    expect(JSON.stringify(d.current.view)).not.toMatch(HIDDEN_LABELS);
+    expect(d.current.view.bands?.map((b) => b.metric)).toEqual(FIVE);
+    for (const a of d.current.view.areas) expect(a.bands?.map((b) => b.metric) ?? []).toEqual(a.bands ? FIVE : []);
+    expect(JSON.stringify(d.current.view)).not.toMatch(/Dryness|hydration/);
   });
 
-  it("the server record still holds all five values, unchanged (TD-37 (4))", () => {
-    const rec = analysis("s1", 1).data as { scores: Record<string, number> };
-    expect(rec.scores).toMatchObject({ texture: 1, blemishes: 1, pigment: 1, redness: 0.1, oiliness: 0.1 });
-  });
-
-  it("an old check saved by the app (legacy) follows the same rule", () => {
+  it("an old check saved by the app (legacy) shows the same five", () => {
     const legacy = check("old", 1, { result: { scores: LOUD, regions: [], region_scores: { chin: LOUD }, pipeline_version: "scan-0.1.4" } });
     const past = pastCheck(UID, "old", [legacy], []);
     expect(past?.view?.source).toBe("legacy");
-    expect(past?.view?.bands?.map((b) => b.metric)).toEqual(["redness", "oiliness"]);
-    expect(past?.view?.areas[0]?.bands?.map((b) => b.metric)).toEqual(["redness", "oiliness"]);
+    expect(past?.view?.bands?.map((b) => b.metric)).toEqual(FIVE);
+    expect(past?.view?.areas[0]?.bands?.map((b) => b.metric)).toEqual(FIVE);
   });
 
-  it("Echo's panel and the results screen (readingsOf) show the same two", () => {
-    expect(readingsOf({ scores: LOUD }).bands?.map((b) => b.label)).toEqual(["Redness", "Oiliness"]);
+  it("Echo's panel and the results screen (readingsOf) show the same five labels", () => {
+    expect(readingsOf({ scores: LOUD }).bands?.map((b) => b.label)).toEqual(["Redness", "Oiliness", "Breakouts", "Texture", "Dark marks"]);
   });
 
-  it("summary line and top concerns never name a hidden reading, even at Elevated", () => {
+  it("summary line and top concerns can name the three again, never Dryness", () => {
     const { bands } = bandScores(LOUD);
     expect(bands.blemishes).toBe("Elevated");
-    const s = summarizeConcerns(LOUD, bands);
-    expect(s.topConcerns).toEqual([]);
-    expect(s.summaryLine).toBe("Nothing stood out in this photo.");
-    const high = { ...LOUD, redness: 0.9 };
-    expect(summarizeConcerns(high, bandScores(high).bands).topConcerns).toEqual(["redness"]);
+    expect(summarizeConcerns(LOUD, bands).topConcerns.sort()).toEqual(["blemishes", "pigment", "texture"]);
+    const dry = { ...LOUD, hydration: 0 };
+    expect(summarizeConcerns(dry, bandScores(dry).bands).topConcerns).not.toContain("hydration");
   });
 
-  it("the legacy Echo prompt lists two readings", () => {
-    expect(summarizeSkinScanScores(LOUD).split("\n").map((l) => l.split(":")[0])).toEqual(["Redness", "Oiliness"]);
+  it("the legacy Echo prompt lists five readings, the three marked early estimate", () => {
+    const lines = summarizeSkinScanScores(LOUD).split("\n");
+    expect(lines.map((l) => l.split(":")[0])).toEqual(["Redness", "Oiliness", "Texture irregularity", "Blemishes", "Pigmentation"]);
+    expect(lines.filter((l) => l.endsWith("(early estimate)")).length).toBe(3);
+  });
+
+  it("the table header tags the three as early estimate, and fits a phone in its own scroll box", () => {
+    const src = readFileSync("components/dashboard/CheckReadings.tsx", "utf8");
+    expect(src).toMatch(/isEarlyEstimate\(b\.metric\) && <span[^>]*>\{C\.table\.earlyEstimate\}/);
+    expect(src).toMatch(/overflow-x-auto/);
+    expect(DASHBOARD_COPY.table.earlyEstimate).toBe("early estimate");
+    expect(readFileSync("components/skin-check/EchoPage.tsx", "utf8")).toMatch(/<ReadingsTable view=\{readings\} \/>/);
   });
 });
 
 // TD-39 (owner, 2026-10-11): no chips and no "From what you told us" panels
-// anywhere. Nothing about Breakouts, Texture or Dark marks shows on a screen
-// that shows the photo readings, and nothing there can be chosen.
+// anywhere, and nothing on these screens can be chosen.
 const SCREENS = ["components/skin-check/SkinCheckDashboard.tsx", "components/dashboard/CheckReadings.tsx", "components/dashboard/DashboardPage.tsx", "components/dashboard/FaceDrawing.tsx", "components/checks/ChecksView.tsx", "components/skin-check/EchoPage.tsx", "components/mesh/FacePhoto.tsx", "components/mesh/MeshLayer.tsx"];
 
 describe("TD-39: one photo, both overlays, one table, nothing to choose", () => {
-  it("no screen with the readings names the three, or shows the user's answers about them as a panel", () => {
-    for (const f of SCREENS) {
-      const src = readFileSync(f, "utf8");
-      expect(src, f).not.toMatch(/Breakouts|Texture|Dark marks|From what you told us|told-topics|ToldTopics|ToldPanel|SourcesLine|ANSWER_TOPICS/);
-    }
+  it("no \"From what you told us\" panels or told-topic code on any screen", () => {
+    for (const f of SCREENS) expect(readFileSync(f, "utf8"), f).not.toMatch(/From what you told us|told-topics|ToldTopics|ToldPanel|SourcesLine|ANSWER_TOPICS/);
     expect(existsSync("lib/told-topics.ts")).toBe(false);
-    expect(JSON.stringify(DASHBOARD_COPY)).not.toMatch(/Breakouts|breakouts|Texture|texture|Dark marks|dark marks|told us/);
   });
 
   it("no chips, no face-area choice, no toggle on any of those screens", () => {
@@ -116,7 +114,7 @@ describe("TD-39: one photo, both overlays, one table, nothing to choose", () => 
 
   it("the new copy passes the D-12 word checks and never claims more than the photo", () => {
     const P = DASHBOARD_COPY.photo;
-    const texts = [P.alt, P.failed, P.read, P.legend, P.legendNote, P.mapsOnResults, P.overlayAlt.redness, P.overlayAlt.oiliness, DASHBOARD_COPY.table.caption, DASHBOARD_COPY.table.area, DASHBOARD_COPY.current.known, ...DASHBOARD_COPY.current.notKnown];
+    const texts = [P.alt, P.failed, P.read, P.legend, P.legendNote, P.mapsOnResults, P.overlayAlt.redness, P.overlayAlt.oiliness, DASHBOARD_COPY.table.caption, DASHBOARD_COPY.table.area, DASHBOARD_COPY.table.earlyEstimate, DASHBOARD_COPY.current.known, ...DASHBOARD_COPY.current.notKnown];
     for (const t of texts) expect(bannedWordsIn(t), t).toEqual([]);
     expect(P.legendNote).toMatch(/relative to the rest of your face/);
   });

@@ -10,7 +10,8 @@ import { signIn } from "./helpers";
 // TD-39: the results show the photo once with the mesh and both overlays, a
 // legend and one readings table; Home and an opened check the photo with the
 // mesh (or the face drawing) and the same table. No chips, nothing to choose,
-// nothing about Breakouts, Texture or Dark marks. At 390, 768 and 1280, on a
+// TD-40: the table has all five readings, the last three tagged "early
+// estimate"; the photo still has only two overlays. At 390, 768 and 1280, on a
 // darker and a lighter skin tone. AFTER_SHOTS=1 writes the screenshots to
 // docs/design/after-one-photo/.
 
@@ -38,7 +39,6 @@ const DEVICE: Record<Width, Parameters<typeof test.use>[0]> = {
 
 // No word boundary: a panel's text runs together ("RednessModerate").
 const BAND = /(Low|Moderate|Elevated)/;
-const HIDDEN_ROW = /^(Breakouts|Texture|Dark marks)$/;
 
 // Firebase Auth's phone sign-in loads its own helper from Google (before TD-37, unchanged).
 const SIGN_IN_HOSTS = new Set(["apis.google.com"]);
@@ -96,13 +96,17 @@ async function toResults(page: Page) {
 }
 
 const LEVEL = /^(Low|Moderate|Elevated|No reading)$/;
-const HIDDEN = /Breakouts|Texture|Dark marks|From what you told us|breakouts, texture and dark marks/i;
+const EARLY = (label: string) => new RegExp(`^${label}${C.table.earlyEstimate}$`);
+const COLUMNS = [C.table.area, "Redness", "Oiliness", EARLY("Breakouts"), EARLY("Texture"), EARLY("Dark marks")];
+const HIDDEN = /From what you told us|breakouts, texture and dark marks/i;
 
-/** One readings table: Area, Redness, Oiliness; whole face first; level words only. Never one of the three. */
+/** One readings table: Area and the five readings, three tagged; whole face first; level words only; the page never scrolls sideways. */
 async function expectTable(scope: Page | Locator) {
   const table = scope.getByRole("table", { name: C.table.caption });
   await expect(table).toHaveCount(1);
-  await expect(table.getByRole("columnheader")).toHaveText([C.table.area, "Redness", "Oiliness"]);
+  await expect(table.getByRole("columnheader")).toHaveText(COLUMNS);
+  const page = "page" in scope ? scope.page() : scope;
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await expect(table.getByRole("rowheader").first()).toHaveText(C.current.wholeFace);
   expect(await table.getByRole("rowheader").count()).toBeGreaterThan(1);
   const cells = await table.getByRole("cell").allTextContents();
@@ -110,7 +114,7 @@ async function expectTable(scope: Page | Locator) {
   for (const c of cells) expect(c).toMatch(LEVEL);
 }
 
-/** Nothing to choose and nothing about the three removed readings anywhere on the page. */
+/** Nothing to choose and no "told us" panels anywhere on the page. */
 async function expectNothingElse(page: Page) {
   await expect(page.getByRole("tab")).toHaveCount(0);
   await expect(page.getByRole("tablist")).toHaveCount(0);

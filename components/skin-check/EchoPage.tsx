@@ -8,7 +8,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, MessageCircle, SendHorizontal }
 import { TypingIndicator } from "@/components/primitives/TypingIndicator";
 import { ECHO_COPY as E } from "./echoCopy";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
-import { PhotoCheckLine, ReadingRows } from "@/components/dashboard/CheckReadings";
+import { PhotoCheckLine, ReadingsTable } from "@/components/dashboard/CheckReadings";
 import { formatDate } from "@/components/dashboard/format";
 import { loadDashboard } from "@/components/dashboard/data";
 import { newestEchoSession } from "@/components/dashboard/echo-session";
@@ -210,7 +210,6 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
   const date = formatDate(toDate(record.createdAt));
   const verdict = (record.captureQuality as { verdict?: unknown } | undefined)?.verdict;
   const photoCheck = verdict === "pass" || verdict === "override" || verdict === "unchecked" ? verdict : null;
-  const area = readings.areas.find((a) => a.region === activeRegion);
   const areaLabel = ECHO_REGION_LABELS[activeRegion].toLowerCase();
   const activeSession = session; // fresh const so the closure below keeps the non-null narrowing
 
@@ -223,16 +222,8 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
       </div>
       {photoCheck && <PhotoCheckLine text={C.photoCheck[photoCheck]} />}
       <p className="rounded-2xl bg-brand-mist px-4 py-3 text-sm text-brand-ink">{C.history.pastLine}</p>
-      <div>
-        <h3 className="mb-1 font-semibold">{E.wholeFace}</h3>
-        <ReadingRows bands={readings.bands} />
-      </div>
-      {area && (
-        <div>
-          <h3 className="mb-1 font-semibold">{area.label}</h3>
-          <ReadingRows bands={area.bands} />
-        </div>
-      )}
+      {/* TD-40: the same table as the results, Home and an opened check. */}
+      <ReadingsTable view={readings} />
       <Link href={`/checks/${encodeURIComponent(session.scanId)}`} className="inline-flex min-h-11 items-center gap-1 font-medium text-brand-forest underline-offset-4 hover:underline">
         {E.openCheck}
         <ChevronRight aria-hidden size={16} />

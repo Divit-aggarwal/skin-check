@@ -54,8 +54,10 @@ export const DASHBOARD_COPY = {
   },
 
   table: {
-    caption: "Redness and oiliness in this photo",
+    caption: "Readings in this photo",
     area: "Area",
+    // TD-40: on Breakouts, Texture and Dark marks.
+    earlyEstimate: "early estimate",
   },
 
   photoCheck: {
