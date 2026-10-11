@@ -175,7 +175,7 @@ for (const width of WIDTHS) {
       const release = await holdScan(page);
       await signIn(page, MESH_SEED.skipped[width].phoneNumber);
       await page.goto("/skin-check");
-      await expect(page.getByRole("heading", { name: Q.title })).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByRole("heading", { name: Q.title, exact: true })).toBeVisible({ timeout: 60_000 });
       await page.getByRole("button", { name: Q.skipNow }).click();
       await photoAndAnalyze(page);
       await expectScanning(page);
