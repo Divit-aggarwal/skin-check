@@ -18,6 +18,7 @@ import { readingsOf, toDate } from "@/components/dashboard/state";
 import { AccountButton, btnPrimary, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getEchoOpening, getSkinCheckChatReply, ApiError, type ShownProduct } from "@/lib/api";
 import { ProductCards, splitDoctorLine } from "./ProductCards";
+import { pickStarters } from "./echoStarters";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import { useAuth } from "@/lib/auth-context";
 import { AI_SHARE_CONSENT_COPY, AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
@@ -178,6 +179,14 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
   }, [openingWanted, openingScanId]);
   const shownOpening = opening && opening.scanId === openingScanId ? opening : null;
 
+  // Owner decision 2026-10-11: starter questions, a new set on each visit and after each answer.
+  const askedKey = Object.values(threads).flatMap((t) => t.messages.filter((m) => m.role === "user").map((m) => m.text)).join("\n");
+  const answerCount = threads[activeRegion].messages.filter((m) => m.role === "echo").length;
+  const [starters, setStarters] = useState<string[]>([]);
+  useEffect(() => {
+    setStarters(pickStarters({ productsOn, asked: askedKey ? askedKey.split("\n") : [] }));
+  }, [productsOn, askedKey, answerCount]);
+
   const messages = threads[activeRegion].messages;
   const isThinking = sendingRegion === activeRegion;
   const activeError = sendError?.region === activeRegion ? sendError : null;
@@ -276,8 +285,8 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
     }
   }
 
-  function handleSend() {
-    const text = draft.trim();
+  function handleSend(typed = draft) {
+    const text = typed.trim();
     if (!text || sendingRegion) return;
 
     const region = activeRegion;
@@ -460,6 +469,24 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
           </div>
         )}
         </div>
+
+        {/* Hidden whenever Echo cannot answer: Echo off, the questions not answered (F11), the day's limit. */}
+        {echoOn && starters.length > 0 && safetyQuestionsAnswered(session.answers) && activeError?.code !== "ECHO_DAILY_LIMIT" && activeError?.code !== "ECHO_OFF" && (
+          <ul aria-label={E.startersLabel} className="flex shrink-0 gap-2 overflow-x-auto pb-2 pt-1 [scrollbar-width:none]">
+            {starters.map((q) => (
+              <li key={q} className="shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleSend(q)}
+                  disabled={sendingRegion !== null}
+                  className="min-h-11 max-w-[16rem] rounded-2xl border border-brand-line bg-brand-paper px-4 py-2 text-left text-sm font-medium text-brand-forest hover:border-brand-action disabled:opacity-50"
+                >
+                  {q}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
 
         {/* TD-29 (5): with Echo switched off, a plain notice replaces the input. */}
         {!echoOn ? (

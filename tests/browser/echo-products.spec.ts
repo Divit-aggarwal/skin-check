@@ -5,6 +5,7 @@ import { OWN_PRODUCTS, OWN_PRODUCTS_LINE, PRODUCT_DOCTOR_LINE, STEP_LABEL } from
 import { COPY } from "@/lib/rules/settings";
 import { AI_SHARE_CONSENT_COPY } from "@/lib/consent";
 import { P_SEED } from "./seed-products";
+import { STARTER_POOL } from "@/components/skin-check/echoStarters";
 import { signIn } from "./helpers";
 
 // TD-34 (docs/design/echo-own-products.md): Echo's opening suggestion and the
@@ -113,5 +114,29 @@ test.describe("TD-34 guards and flows (390px)", () => {
     await expect(page.getByText(OPENING)).toHaveCount(2, { timeout: 60_000 });
     await expect(page.getByRole("region", { name: E.productsLabel })).toHaveCount(2);
     await shot(page, "echo-product-question-390");
+  });
+
+  // Owner decisions 2026-10-11: starter questions above the message box; products on.
+  test("starter questions: three or four above the box; tapping one sends it, its cards follow, and it is not offered again", async ({ page }) => {
+    await signIn(page, P_SEED.ask.phoneNumber);
+    await page.goto("/echo");
+    await expect(page.getByText(OPENING)).toBeVisible({ timeout: 60_000 });
+    const starters = page.getByRole("list", { name: E.startersLabel }).getByRole("button");
+    expect(await starters.count()).toBeGreaterThanOrEqual(3);
+    expect(await starters.count()).toBeLessThanOrEqual(4);
+    await page.getByRole("log").evaluate((el) => el.scrollTo({ top: 0 }));
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${DIR}/echo-starters-390.png` });
+    const texts = await starters.allInnerTexts();
+    const q = texts.find((t) => STARTER_POOL.products.includes(t))!;
+    expect(q).toBeTruthy();
+    // Keyboard: the starter is a real button.
+    await starters.filter({ hasText: q }).focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("log").getByText(q, { exact: true })).toBeVisible();
+    await expect(page.getByRole("region", { name: E.productsLabel })).toHaveCount(2, { timeout: 60_000 });
+    await expect(starters.filter({ hasText: q })).toHaveCount(0);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${DIR}/echo-product-cards-390.png` });
   });
 });

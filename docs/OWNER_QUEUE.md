@@ -371,3 +371,23 @@ gh pr merge 12 --merge
 4. Home and the opened check of a check with "keep my photo" ticked: the photo with the mesh, the line "The colours for redness and oiliness are shown only right after a new check.", and the same table. A check without a kept photo shows the face drawing and the table. (The photo there needs TD-37 step M2; without it, the face drawing shows.)
 5. Echo: "How are my breakouts?" gets no level for breakouts; Echo may repeat what you said in the questions.
 - Undo for any failure: the O1 undo.
+
+---
+
+# TD-42: switch product suggestions on (prepared 2026-10-11)
+
+Owner decision TD-42: product suggestions go on in production without a further real-model run (this replaces the condition on P4 above). Run it **after** the pull request for branch `feat/echo-starters-returning-check` is merged and the agent has checked that deployment. **Nothing below has been run.** One step at a time; tell the agent after each.
+
+## S1. Remove the off switch and redeploy
+
+```bash
+vercel env rm ECHO_PRODUCTS_SWITCH production --yes
+vercel redeploy $(vercel api /v9/projects/skin-check | jq -r '.targets.production.id') --target production
+```
+- Good output: `Removed Environment Variable`, then a new production deployment READY (about 2 minutes). The switch is built into the page, so the redeploy is needed: removing the setting alone changes nothing live.
+- Check (agent): the new deployment is READY on the merge commit; `curl -s https://skin-check-sigma.vercel.app/echo | grep -o 'productsOn[^,]*'` prints `productsOn\":true`. If it still prints `false` (a redeploy that reused an old build), run `vercel deploy --prod --force` from an up-to-date `master` checkout.
+- Undo (suggestions off again, Echo stays on): `printf 'off' | vercel env add ECHO_PRODUCTS_SWITCH production --no-sensitive`, then the same redeploy command.
+
+## S2. Try it on your phone (made-up test accounts only)
+
+The P5 checks above, plus: three or four starter questions above the message box; tapping "Suggest a routine with your products" sends it and shows cards. Then tell the agent: it reads the production log (`vercel logs`) for `/api/skin-check/chat` and reports whether suggestions were served without errors.

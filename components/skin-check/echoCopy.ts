@@ -13,6 +13,7 @@ export const ECHO_COPY = {
   openCheck: "Open this check",
   placeholder: (area: string) => `Ask Echo about your ${area}`,
   send: "Send",
+  startersLabel: "Questions to ask Echo",
   newCheck: "Take a new Skin Check",
   signIn: "Sign in",
   signedOut: "Sign in to talk with Echo about your newest check.",

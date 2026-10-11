@@ -40,14 +40,15 @@ describe("skin-check flow navigation", () => {
 
   // D-19 (owner decision 2; R6): current_products is re-confirmed on every
   // scan, so a repeat scan (this saved user is male) also visits your-skin.
-  it("a repeat scan goes verify → photo → your-skin (re-confirm) → results", () => {
+  // Owner decision 2026-10-11: nothing is re-asked on a repeat check.
+  it("a repeat scan goes verify → photo → results", () => {
     const reuse = reusableAnswers(savedAnswers())!;
-    expect(walk(reuse, true, indexOf("verify"))).toEqual(["verify", "skin-photo", "your-skin", "get-your-results"]);
+    expect(walk(reuse, true, indexOf("verify"))).toEqual(["verify", "skin-photo", "get-your-results"]);
   });
 
-  it("back from results on a repeat scan returns to the re-confirm section, not the rest of the questionnaire", () => {
+  it("back from results on a repeat scan returns to the photo step, not the questionnaire", () => {
     const reuse = reusableAnswers(savedAnswers())!;
-    expect(SECTIONS[prevEligibleIndex(indexOf("get-your-results") - 1, reuse, true)]!.id).toBe("your-skin");
+    expect(SECTIONS[prevEligibleIndex(indexOf("get-your-results") - 1, reuse, true)]!.id).toBe("skin-photo");
   });
 
   it("back from verify on a repeat scan reaches About You so answers can still be corrected", () => {

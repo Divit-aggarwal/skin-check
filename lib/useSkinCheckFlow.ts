@@ -8,12 +8,10 @@ import {
   keptProductNames,
   PER_SCAN_SECTION_IDS,
   QUESTION_SECTION_IDS,
-  RECONFIRM_EACH_SCAN_IDS,
   reusableAnswers,
   reusableBasics,
   type ProductNames,
 } from "@/lib/skin-check-validation";
-import { reconfirmHints } from "@/lib/skin-check-format";
 import { markUnder18Chosen, postAgeAttestation } from "@/lib/consent";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
 import { useAuth } from "@/lib/auth-context";
@@ -57,19 +55,15 @@ export function revealCountFor(section: SectionConfig, answers: SkinCheckAnswers
 // eligibleStepsFor has no way to guarantee that for every future section, so
 // this stays as the general-purpose guard.
 // When a previous questionnaire is being reused, its sections are skipped as
-// well, leaving only the per-scan ones: verify → photo → results — plus any
-// section holding a question re-confirmed on every scan (D-19), which is
-// shown with its other answers already filled in and that one blank.
+// well, leaving only the per-scan ones: verify → photo → results. Owner
+// decision 2026-10-11: nothing is asked again (this replaced D-19's re-asking).
 // TD-33 (1): "skip for now" skips every optional question section too.
 function isSkipped(idx: number, answers: SkinCheckAnswers, reusing: boolean, skipQuestions = false): boolean {
   const section = SECTIONS[idx]!;
-  const eligible = eligibleStepsFor(section, answers);
   return (
-    eligible.length === 0 ||
+    eligibleStepsFor(section, answers).length === 0 ||
     (skipQuestions && QUESTION_SECTION_IDS.has(section.id)) ||
-    (reusing &&
-      !PER_SCAN_SECTION_IDS.has(section.id) &&
-      !eligible.some((step) => RECONFIRM_EACH_SCAN_IDS.includes(step.id)))
+    (reusing && !PER_SCAN_SECTION_IDS.has(section.id))
   );
 }
 
@@ -89,6 +83,7 @@ export function prevEligibleIndex(fromIndex: number, answers: SkinCheckAnswers, 
   return idx;
 }
 
+const SAVED_READ_WAIT_MS = 4000;
 const VERIFY_INDEX = SECTIONS.findIndex((section) => section.id === "verify");
 const ABOUT_INDEX = SECTIONS.findIndex((section) => section.id === "about-you");
 
@@ -231,12 +226,11 @@ export function useSkinCheckFlow() {
   const [confirmingUnder18, setConfirmingUnder18] = useState(false);
   // True when this scan reuses a questionnaire the user already answered, so
   // only verify, photo and results are left to go through.
-  const [reusing, setReusing] = useState(false);
-  // Decision 10(a): "Last time you said: …" for each re-confirmed step, from
-  // the previous scan's answers. Display text only — kept out of `answers`,
-  // so it is never saved to the draft or to Firestore. Rendering it is
-  // SkinCheckFlow's job (request R9).
-  const [lastAnswerHints, setLastAnswerHints] = useState<Record<string, string>>({});
+  const [reusingSaved, setReusing] = useState(false);
+  // "Anything changed? Update your answers" on the photo step: the question
+  // sections come back for this check, filled in with the saved answers.
+  const [updating, setUpdating] = useState(false);
+  const reusing = reusingSaved && !updating;
   // TD-33 (1): answer the questions now or skip them. Shown right after About
   // you ("About the questions"); a reused, answered questionnaire is "answer".
   const [questionsChoice, setQuestionsChoice] = useState<QuestionsChoice>(() => (session ? "answer" : "pending"));
@@ -367,8 +361,13 @@ export function useSkinCheckFlow() {
   // Once Firebase says who they are, their most recent saved answers fill the
   // questionnaire in. Only before the photo step — someone already partway
   // through the later sections carries on as they are.
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const reuseCheckedForRef = useRef<string | null>(null);
+  // Until the saved answers are read, a signed-in user at the start sees the
+  // placeholder frame, not About you: typing there while the read was slow is
+  // what stranded returning users on a filled-in About you. Never longer than
+  // SAVED_READ_WAIT_MS; the full questionnaire still works after that.
+  const [savedRead, setSavedRead] = useState<"pending" | "done">("pending");
   const flowRef = useRef({ answers, sectionIndex, complete, questionsChoice });
   flowRef.current = { answers, sectionIndex, complete, questionsChoice };
 
@@ -377,6 +376,8 @@ export function useSkinCheckFlow() {
     if (!uid || !restored || complete || reusing || sectionIndex > PHOTO_INDEX) return;
     if (reuseCheckedForRef.current === uid) return;
     reuseCheckedForRef.current = uid;
+    setSavedRead("pending");
+    const wait = setTimeout(() => setSavedRead("done"), SAVED_READ_WAIT_MS);
 
     latestSkinCheckAnswers(uid)
       .then((previous) => {
@@ -385,14 +386,19 @@ export function useSkinCheckFlow() {
         // TD-33 (flow review H1): a "Skip for now" made before signing in
         // stands; the saved questionnaire must not bring the questions back.
         if (now.questionsChoice === "skip") return;
+        // An under-18 answer given in this visit goes through its own confirm step.
+        if (now.answers.age === "under-18") return;
         // Anything already answered in this visit wins over the saved copy.
         const reuse = reusableAnswers({ ...previous, ...now.answers });
+        // Positioned by where the user is, never by whether they typed
+        // anything: before the photo step means straight on to it (Verify
+        // passes by itself for a signed-in user).
+        const atStart = now.sectionIndex <= VERIFY_INDEX;
         if (!reuse) {
           // TD-33 (1): the last check skipped the questions. Its name, age and
-          // gender carry over and the choice is offered again, with no
-          // re-confirm steps and no "Last time" hints.
+          // gender carry over and the choice is offered again.
           const basics = reusableBasics(previous);
-          if (basics && now.sectionIndex === 0 && Object.keys(now.answers).length === 0) {
+          if (basics && now.sectionIndex === 0) {
             setAnswers((prev) => ({ ...basics, ...prev }));
             setChoosingQuestions(true);
           }
@@ -401,8 +407,9 @@ export function useSkinCheckFlow() {
         setAnswers((prev) => ({ ...reuse, ...prev }));
         setReusing(true);
         setQuestionsChoice("answer");
-        setLastAnswerHints(reconfirmHints(previous));
-        if (now.sectionIndex === 0 && Object.keys(now.answers).length === 0) {
+        if (atStart) {
+          setChoosingQuestions(false);
+          setDirection(1);
           setSectionIndex(VERIFY_INDEX);
           setRevealCount(revealCountFor(SECTIONS[VERIFY_INDEX]!, reuse));
         }
@@ -410,6 +417,10 @@ export function useSkinCheckFlow() {
       .catch((error) => {
         // Non-fatal: the full questionnaire still works.
         console.warn("[skin-check] couldn't load previous answers", error);
+      })
+      .finally(() => {
+        clearTimeout(wait);
+        setSavedRead("done");
       });
   }, [user, restored, complete, reusing, sectionIndex]);
 
@@ -477,10 +488,10 @@ export function useSkinCheckFlow() {
     setScanId(newScanId());
     setAnswers(reuse ?? basics ?? {});
     setReusing(reuse !== null);
+    setUpdating(false);
     setQuestionsChoice(reuse ? "answer" : "pending");
     setChoosingQuestions(basics !== null);
     setProductNames({});
-    setLastAnswerHints(reuse ? reconfirmHints(answers) : {});
     setScan({ status: "idle" });
     setSectionIndex(idx);
     setRevealCount(revealCountFor(SECTIONS[idx]!, reuse ?? basics ?? {}));
@@ -506,6 +517,9 @@ export function useSkinCheckFlow() {
       ),
     []
   );
+
+  /** The photo step's "Update your answers": the question sections come back, filled in. Never blocks the check. */
+  const updateAnswers = useCallback(() => setUpdating(true), []);
 
   const activeIndex = complete ? SECTIONS.length - 1 : sectionIndex;
   const section = SECTIONS[activeIndex]!;
@@ -685,7 +699,11 @@ export function useSkinCheckFlow() {
     blocked,
     confirmingUnder18,
     confirmUnder18,
-    lastAnswerHints,
+    // The placeholder frame while a signed-in user's saved answers are read (at the start only).
+    waitingForSaved: !complete && sectionIndex === 0 && !choosingQuestions && (authLoading || (!!user && savedRead === "pending")),
+    reusingSaved,
+    updating,
+    updateAnswers,
     choosingQuestions,
     questionsChoice,
     chooseQuestions,

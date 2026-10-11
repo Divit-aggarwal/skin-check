@@ -15,7 +15,8 @@ import { StepAnswer } from "./StepAnswer";
 import { SkinCheckDashboard } from "./SkinCheckDashboard";
 import { DashboardLink } from "@/components/dashboard/DashboardLink";
 import { QuestionsChoice, SkippedNote } from "./QuestionsChoice";
-import { hasQuestionAnswers } from "@/lib/skin-check-validation";
+import { hasQuestionAnswers, QUESTION_SECTION_IDS } from "@/lib/skin-check-validation";
+import { textLink } from "@/components/ui/page";
 
 // Section-to-section only — individual questions within a section never
 // slide, they fade in and accumulate on the growing page.
@@ -56,7 +57,10 @@ export function SkinCheckFlow() {
     blocked,
     confirmingUnder18,
     confirmUnder18,
-    lastAnswerHints,
+    waitingForSaved,
+    reusingSaved,
+    updating,
+    updateAnswers,
     choosingQuestions,
     chooseQuestions,
     productNames,
@@ -125,7 +129,7 @@ export function SkinCheckFlow() {
   // start or a recovered one. Rendering section 1 first and snapping to the
   // restored position a tick later would be a visible flash, so hold the
   // frame — this resolves synchronously off localStorage in practice.
-  if (!restored) {
+  if (!restored || waitingForSaved) {
     return <div className="min-h-dvh bg-brand-linen" />;
   }
 
@@ -275,11 +279,6 @@ export function SkinCheckFlow() {
                 className="flex flex-col gap-5"
               >
                 <EchoBubble message={formatPrompt(step.prompt, answers)} />
-                {/* R9, decision 10a: re-confirmed steps start blank; last time's
-                    answer is shown, never filled in. Only those steps have a hint. */}
-                {lastAnswerHints[step.id] && (
-                  <p className="text-sm text-brand-muted">{lastAnswerHints[step.id]}</p>
-                )}
                 <StepAnswer
                   step={step}
                   value={answers[step.id] ?? defaultAnswerFor(step)}
@@ -295,6 +294,18 @@ export function SkinCheckFlow() {
                 />
               </motion.div>
             ))}
+            {/* Owner decision 2026-10-11: saved answers carry over; changing them is optional. */}
+            {section.id === "skin-photo" && reusingSaved && !updating && (
+              <button type="button" onClick={updateAnswers} className={`${textLink} self-start text-sm`}>
+                Anything changed? Update your answers
+              </button>
+            )}
+            {/* Filled-in sections never advance by themselves (no answer is tapped), so they get a Continue. */}
+            {updating && QUESTION_SECTION_IDS.has(section.id) && isSectionComplete && (
+              <Button type="button" variant="ink" size="lg" onClick={next} className="self-start">
+                Continue
+              </Button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
