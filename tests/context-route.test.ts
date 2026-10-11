@@ -181,8 +181,8 @@ describe("switch on: the new path", () => {
     expect(h.getSkinCheckChatReply).not.toHaveBeenCalled();
     expect(h.generateContent).toHaveBeenCalledTimes(1);
     const meta = h.recordChatTurns.mock.calls[0]![5];
-    // TD-34: product suggestions are on by default, so ctx-3 and ctx-prompt-5. TD-40: ctx-3 with five readings is ctx-7, ctx-2 is ctx-6.
-    expect(meta).toMatchObject({ packageVersion: "ctx-7", promptVersion: "ctx-prompt-5", modelId: expect.any(String), prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
+    // TD-34: product suggestions are on by default, so ctx-3 and ctx-prompt-6 (TD-41). TD-40: ctx-3 with five readings is ctx-7, ctx-2 is ctx-6.
+    expect(meta).toMatchObject({ packageVersion: "ctx-7", promptVersion: "ctx-prompt-6", modelId: expect.any(String), prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
     expect(meta.packageSha256).toMatch(/^[0-9a-f]{64}$/);
   });
 

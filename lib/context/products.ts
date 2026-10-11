@@ -118,15 +118,15 @@ export function cardsFor<T extends { productId: string; reason?: string }>(produ
 
 /**
  * TD-34 (advisor review of the live run): a question whether a product works,
- * fixes, suits, is good or safe, or is for a concern. A card beside such a
- * question reads as "yes", so the app shows no product for it (a stricter
- * guard, in code; the user's own message, never a hidden answer).
+ * fixes, suits, is good or safe. A card beside such a question reads as "yes",
+ * so the app shows no product for it (a stricter guard, in code; the user's
+ * own message, never a hidden answer). TD-41 (owner, 2026-10-11): "what should
+ * I use for my acne" / "redness ke liye kya lagaun" is an ordinary product
+ * question and gets cards; only the result words below remove them.
  */
 export const RESULT_QUESTION = new RegExp(
   [
     String.raw`\b(?:work|works|working|fix|fixes|helps|help (?:with|my|clear|reduce|control|fade)|cure|cures|heal|clear|clears|treat|treats|get rid|remove|reduce|reduces|fade|fades|good for|safe for|okay for|ok for|right for|best for|suit|suits|suitable|fastest|quickest|effective)\b`,
-    String.raw`\bfor (?:my|the|your) (?:\w+ )?(?:redness|red|oil\w*|acne|spots?|marks?|pigment\w*|blemish\w*|breakouts?|pimples?|texture|pores?|tan\w*|dark \w+)\b`,
-    String.raw`\b(?:redness|oil\w*|acne|daag|daane|pimples?|spots?|marks?|pigment\w*|blemish\w*|tan) ke liye\b`,
     String.raw`\b(?:theek|thik|sahi|accha|achha) (?:hai|hoga|rahega) kya\b`,
     String.raw`\bkaam (?:kar|karta|karti|karega|karegi)\b`,
     String.raw`\b(?:mita|hata|saaf kar)\w*`,

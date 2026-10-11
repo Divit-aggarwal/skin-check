@@ -126,6 +126,15 @@ describe("the product switch (TD-34, build part 7)", () => {
     expect(text).not.toContain(ECHO_SAFETY_INSTRUCTION);
     expect(ECHO_PRODUCTS_INSTRUCTION).not.toMatch(/pregnan|breastfeed|prescri|caution|doctor/i);
   });
+
+  // TD-41 (owner, 2026-10-11): "what should I use for my acne" gets products, not the doctor line.
+  it("on: a 'what to use for a skin concern' question is a product question, not a referral (ctx-prompt-6)", () => {
+    const text = renderSystemInstruction(pkg);
+    expect(text).toMatch(/what to use or do for their skin or a skin concern/);
+    expect(text).toMatch(/is a product question, not a\s+request for a medicine or a diagnosis/);
+    expect(text).toMatch(/Still set needs_referral for pain,\s+bleeding/);
+    expect(renderSystemInstruction(buildContextPackage(input({ ownProducts: false })))).not.toMatch(/product question/);
+  });
 });
 
 describe("the answer checker (TD-34, build parts 2 and 6)", () => {
@@ -335,12 +344,13 @@ describe("the card drawing (TD-34, build part 3)", () => {
 describe("a question whether a product works or is good for something gets no product (TD-34, stricter guard)", () => {
   const none = evaluateSafety({ answers: { primary_concerns: ["blemishes"] }, confirmedThisScan: [] });
   const withProducts = { reply: "Massage onto damp skin.", withoutProducts: "", products: [{ productId: "refreshing-cleanser", reason: "r" }], productContent: true };
-  it.each(["Which of your products works fastest on oily skin?", "Which serum should I buy for my redness?", "Is niacinamide good for me?", "Niacinamide serum mere liye theek hai kya?", "Kaunsi cream lagaun redness ke liye?", "Will the cleanser fix my blemishes?", "Kya yeh serum mere daag mita dega?"])("%s", (message) => {
+  it.each(["Which of your products works fastest on oily skin?", "Is niacinamide good for me?", "Niacinamide serum mere liye theek hai kya?", "Will the cleanser fix my blemishes?", "Kya yeh serum mere daag mita dega?", "Will it clear my acne?", "How do I get rid of acne on my forehead?", "Is this serum good for my acne?"])("%s", (message) => {
     const guard = productGuard(none, message);
     expect(guard).toBe("result_question");
     expect(guardedReply(withProducts, guard)).toEqual({ reply: RESULT_QUESTION_LINE, products: [] });
   });
-  it.each(["Can you suggest a routine for me?", "What is Clear Seal for?", "How do I use the Refreshing Cleanser?", "Mere liye kaunsa routine sahi rahega?", "Oily skin ke liye kaunsa face wash lun?", "Which moisturiser do you have?"])("not for an ordinary product question: %s", (message) => {
+  // TD-41 (owner, 2026-10-11): asking what to use for a concern is an ordinary product question.
+  it.each(["Can you suggest a routine for me?", "What is Clear Seal for?", "How do I use the Refreshing Cleanser?", "Mere liye kaunsa routine sahi rahega?", "Oily skin ke liye kaunsa face wash lun?", "Which moisturiser do you have?", "i am having acne on my forehead what shall i use ?", "What should I use for my acne?", "Which serum should I buy for my redness?", "Kaunsi cream lagaun redness ke liye?", "Acne ke liye kya use karun?", "What do you have for my dark marks?"])("not for an ordinary product question: %s", (message) => {
     expect(productGuard(none, message)).toBeNull();
   });
   it("a red flag still wins over it; the line passes the D-12 word check", () => {

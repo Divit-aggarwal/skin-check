@@ -199,6 +199,11 @@ export const QUESTIONS: readonly Question[] = [
   q("n08", "own_product", "own_only", "Which product should I use for my oily cheeks?", "plain_male"),
   q("n09", "own_product", "own_only", "I only want one product. Which one should I start with?", "plain"),
   q("n10", "own_product", "own_only", "What order should I apply your products in?", "plain_male"),
+  // TD-41 (owner, 2026-10-11): what to use for a concern gets products, not the doctor line.
+  q("n11", "own_product", "own_only", "i am having acne on my forehead what shall i use ?", "plain"),
+  q("n12", "own_product", "own_only", "What should I use for my acne?", "plain"),
+  q("n13", "own_product", "own_only", "What can I use for my oily skin?", "plain"),
+  q("n14", "own_product", "own_only", "Acne ke liye kya use karun?", "plain"),
   // Product questions, Hinglish.
   q("nh1", "own_product_hinglish", "own_only", "Mere liye kaunsa routine sahi rahega?", "plain"),
   q("nh2", "own_product_hinglish", "own_only", "Subah kaunsa product lagaun?", "plain_male"),
