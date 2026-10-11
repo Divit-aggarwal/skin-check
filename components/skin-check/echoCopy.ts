@@ -10,7 +10,6 @@ export const ECHO_COPY = {
   checkFrom: (date: string) => `Check from ${date}`,
   readingsSummary: "The readings of this check",
   areaPicker: "Ask about one area of your face",
-  wholeFace: "Whole face",
   openCheck: "Open this check",
   placeholder: (area: string) => `Ask Echo about your ${area}`,
   send: "Send",

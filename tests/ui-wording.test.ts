@@ -1,6 +1,6 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PHOTO_METRICS } from "@/lib/skin-check-skus";
+import { SHOWN_METRICS } from "@/lib/skin-check-skus";
 import { describe, expect, it } from "vitest";
 import { CHECKS_COPY } from "@/components/checks/copy";
 import { bannedWordsIn } from "@/lib/catalog/wording";
@@ -91,11 +91,11 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
       expect(src, f).not.toMatch(/\/100|toConcern|BAND_STYLE|scorePct|tabular-nums/);
     }
     const results = readFileSync("components/skin-check/SkinCheckDashboard.tsx", "utf8");
-    // TD-39: no chips; the table's columns come from the fixed photo list (no
-    // Dryness in it), in a fixed order: never sorted by a band.
+    // TD-39: no chips; the table's columns come from the fixed list (no
+    // Dryness in it, TD-40), in a fixed order: never sorted by a band.
     expect(results).not.toMatch(/\.sort\(|role="tab|ANSWER_TOPICS/);
     expect(readFileSync("components/dashboard/CheckReadings.tsx", "utf8")).not.toMatch(/\.sort\(/);
-    expect(PHOTO_METRICS).toEqual(["redness", "oiliness"]);
+    expect(SHOWN_METRICS).toEqual(["redness", "oiliness", "blemishes", "texture", "pigment"]);
     expect(results).toMatch(/readingsOf\(/);
     expect(results).toMatch(/<CheckReadings view=\{view\} picture=\{<FacePhoto photo=\{scan\.photo\} overlays=\{overlays\} read \/>\} \/>/);
   });
@@ -132,5 +132,14 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
     // check with no photo reading has no photos to compare, so no line.
     expect(detail).toMatch(/\{check\.view \? \(\s*<>\s*\{\/\*[^*]*\*\/\}\s*<p[^>]*>\{C\.history\.pastLine\}/);
     expect(detail).not.toMatch(/useState|<details|aria-expanded/);
+  });
+});
+
+// G23: the check flow shows only the last 4 digits of the phone number, as the account button does.
+describe("G23: phone number on the check flow", () => {
+  it("never renders the full number", () => {
+    const src = readFileSync("components/skin-check/inputs/PhoneAuthStep.tsx", "utf8");
+    expect(src).not.toMatch(/\{activeUser\.phoneNumber\}/);
+    expect(src).toMatch(/phone ending <span[^>]*>\{activeUser\.phoneNumber\?\.slice\(-4\)\}<\/span>/);
   });
 });

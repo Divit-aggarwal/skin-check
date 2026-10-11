@@ -103,17 +103,18 @@ export const METRIC_LABELS: Record<BandableMetric, string> = {
   pigment: "Dark marks",
 };
 
-// TD-37 (1): the only readings the app shows as measured, with an overlay,
-// anywhere (results, Home, Checks, Echo's panel and what Echo receives). The
-// engine still returns and the server still stores all of them (TD-37 (4)).
+// The only readings drawn as an overlay on the photo (TD-37, TD-39).
 export const PHOTO_METRICS = ["redness", "oiliness"] as const satisfies readonly BandableMetric[];
-export type PhotoMetric = (typeof PHOTO_METRICS)[number];
-export const isPhotoMetric = (m: string): m is PhotoMetric => (PHOTO_METRICS as readonly string[]).includes(m);
 
-// Not measured from the photo: never shown on a screen (TD-39), and Echo
-// treats them as not measured (lib/context/validator.ts).
-export const ANSWER_TOPICS = ["blemishes", "texture", "pigment"] as const satisfies readonly BandableMetric[];
-export type AnswerTopic = (typeof ANSWER_TOPICS)[number];
+// TD-40: the five readings every table shows and Echo receives, in table
+// order. Replaces TD-37 (1), which hid the last three.
+export const SHOWN_METRICS = ["redness", "oiliness", "blemishes", "texture", "pigment"] as const satisfies readonly BandableMetric[];
+export type ShownMetric = (typeof SHOWN_METRICS)[number];
+export const isShownMetric = (m: string): m is ShownMetric => (SHOWN_METRICS as readonly string[]).includes(m);
+
+// TD-40: tagged "early estimate" in the table header and in Echo's data.
+export const EARLY_ESTIMATE_METRICS = ["blemishes", "texture", "pigment"] as const satisfies readonly ShownMetric[];
+export const isEarlyEstimate = (m: string) => (EARLY_ESTIMATE_METRICS as readonly string[]).includes(m);
 
 // The overlays PhotoCapture and the retry request in the one scan call (the
 // skin-scan service takes a comma-separated `overlays` list). Overlays are

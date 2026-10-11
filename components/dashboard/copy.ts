@@ -30,7 +30,7 @@ export const DASHBOARD_COPY = {
     unreadable: "The readings of this check could not be shown.",
     hardToRead: (areas: string) => `Hard to read in this photo: ${areas}. Those readings are uncertain.`,
     knownTitle: "What this tells you",
-    known: "How redness and oiliness showed up in each area of your face in this one photo, as Low, Moderate or Elevated.",
+    known: "How redness, oiliness, breakouts, texture and dark marks showed up in each area of your face in this one photo, as Low, Moderate or Elevated. Breakouts, texture and dark marks are early estimates.",
     notKnownTitle: "What this does not tell you",
     notKnown: [
       "It is not a medical opinion.",
@@ -54,8 +54,11 @@ export const DASHBOARD_COPY = {
   },
 
   table: {
-    caption: "Redness and oiliness in this photo",
+    caption: "Readings in this photo",
     area: "Area",
+    // TD-40: on Breakouts, Texture and Dark marks.
+    earlyEstimate: "early estimate",
+    swipe: "Swipe the table sideways to see all five readings.",
   },
 
   photoCheck: {

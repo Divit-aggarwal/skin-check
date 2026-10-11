@@ -1,7 +1,7 @@
 import { SECTIONS } from "@/lib/skin-check-steps";
 import { RECONFIRM_EACH_SCAN_IDS } from "@/lib/skin-check-validation";
 import { bandScores } from "@/lib/skin-check-rules";
-import { isPhotoMetric, type PhotoMetric } from "@/lib/skin-check-skus";
+import { isEarlyEstimate, isShownMetric, type ShownMetric } from "@/lib/skin-check-skus";
 import type { SkinCheckAnswers, StepAnswerValue, StepConfig } from "@/types/skin-check";
 import type { SkinScanScores } from "@/types/skin-scan";
 
@@ -115,8 +115,8 @@ const SKIN_SCAN_CATEGORY_LABELS: Record<keyof SkinScanScores, string> = {
 export function summarizeSkinScanScores(scores: SkinScanScores): string {
   const { bands } = bandScores(scores);
   return (Object.keys(SKIN_SCAN_CATEGORY_LABELS) as (keyof SkinScanScores)[])
-    // TD-37 (1): Redness and Oiliness only.
-    .filter((key): key is PhotoMetric => isPhotoMetric(key))
-    .map((key) => `${SKIN_SCAN_CATEGORY_LABELS[key]}: ${bands[key]}`)
+    // The five shown readings (TD-40).
+    .filter((key): key is ShownMetric => isShownMetric(key))
+    .map((key) => `${SKIN_SCAN_CATEGORY_LABELS[key]}: ${bands[key]}${isEarlyEstimate(key) ? " (early estimate)" : ""}`)
     .join("\n");
 }

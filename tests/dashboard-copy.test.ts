@@ -84,9 +84,10 @@ describe("dashboard wording (D-12)", () => {
 
   it("a band's style never depends on the band: every reading row has one fixed class", () => {
     const src = readFileSync("components/dashboard/CheckReadings.tsx", "utf8");
-    const rows = Array.from(src.matchAll(/<(dt|dd)\b[^>]*>/g)).map((m) => m[0]);
-    expect(rows.length).toBe(2);
-    for (const r of rows) expect(r, r).toMatch(/^<d[dt] className="[^"{]*">$/);
+    // TD-40: the table's level cells (ReadingRows was removed; Echo's panel uses the table).
+    const cells = Array.from(src.matchAll(/<td\b[^>]*>/g)).map((m) => m[0]);
+    expect(cells.length).toBe(1);
+    for (const c of cells) expect(c, c).toMatch(/^<td key=\{b\.metric\} className="[^"{]*">$/);
   });
 
   it("the dashboard never imports the rules feature or the longitudinal engine", () => {

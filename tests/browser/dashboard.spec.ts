@@ -66,7 +66,8 @@ test("readings by face area: one table, every level in the same style, nothing t
   await dashboardAs(page, U.set!.phoneNumber);
   const current = page.locator("section", { has: page.getByRole("heading", { name: C.current.title }) });
   const table = current.getByRole("table", { name: C.table.caption });
-  await expect(table.getByRole("columnheader")).toHaveText([C.table.area, "Redness", "Oiliness"]);
+  // TD-40: five readings, the last three tagged.
+  await expect(table.getByRole("columnheader")).toHaveText([C.table.area, "Redness", "Oiliness", /^Breakouts\s*early estimate$/, /^Texture\s*early estimate$/, /^Dark marks\s*early estimate$/]);
   await expect(table.getByRole("rowheader").first()).toHaveText(C.current.wholeFace);
   await expect(table.getByRole("rowheader", { name: "Forehead" })).toBeVisible();
   for (const c of await table.getByRole("cell").allTextContents()) expect(c).toMatch(/^(Low|Moderate|Elevated|No reading)$/);

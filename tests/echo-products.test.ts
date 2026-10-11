@@ -106,8 +106,8 @@ describe("the product switch (TD-34, build part 7)", () => {
       const off = buildContextPackage(input({ message, ownProducts: false }));
       const before = buildContextPackage({ regionFocus: "cheeks", message, skin: SKIN, answers: ANSWERS });
       expect(packageJson(off)).toBe(packageJson(before));
-      // TD-37 (1): ctx-2 narrowed to redness and oiliness is ctx-4.
-      expect(off.packageVersion).toBe("ctx-4");
+      // TD-40: ctx-2 with five readings is ctx-6.
+      expect(off.packageVersion).toBe("ctx-6");
       expect(renderSystemInstruction(off)).toBe(renderSystemInstruction(before));
       expect(renderSystemInstruction(off)).toContain(ECHO_SAFETY_INSTRUCTION);
       expect(renderSystemInstruction(off)).not.toContain(ECHO_PRODUCTS_INSTRUCTION);

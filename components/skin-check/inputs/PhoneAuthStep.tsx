@@ -154,7 +154,7 @@ export function PhoneAuthStep({
     return (
       <div className="flex flex-col gap-3">
         <p className="text-body text-text/70">
-          Verified{activeUser?.phoneNumber ? <> <span className="whitespace-nowrap text-text">{activeUser.phoneNumber}</span></> : null}.
+          Verified{activeUser?.phoneNumber ? <>, phone ending <span className="whitespace-nowrap text-text">{activeUser.phoneNumber.slice(-4)}</span></> : null}.
         </p>
         {/* The flow has no Continue button — forward motion comes only from
             `advanceSignal`, which `commitStep` ticks. Every other section is
@@ -194,7 +194,8 @@ export function PhoneAuthStep({
           </>
         )}
         <p className="text-body text-text/70">
-          You&rsquo;re signed in as <span className="whitespace-nowrap text-text">{activeUser.phoneNumber}</span>.
+          {/* G23: last 4 digits only, as on the account button. */}
+          You&rsquo;re signed in with the phone ending <span className="whitespace-nowrap text-text">{activeUser.phoneNumber?.slice(-4)}</span>.
         </p>
         <Button
           variant="ink"

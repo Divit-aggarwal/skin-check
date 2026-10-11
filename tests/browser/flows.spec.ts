@@ -250,6 +250,8 @@ test("Echo opened from the nav or after a refresh talks about the newest check; 
   // The readings of the check being discussed, with the fixed line, in the fold-away panel on a phone.
   await page.getByText(E.readingsSummary).click();
   await expect(page.getByText(C.history.pastLine).first()).toBeVisible();
+  // TD-40: the same five-reading table as the results, Home and an opened check.
+  await expect(page.getByRole("table", { name: C.table.caption }).first().getByRole("columnheader")).toHaveCount(6);
   await expect(page.locator("main")).not.toContainText(/\/100|Dryness|Pores/);
   await page.reload();
   await expect(page.getByRole("textbox")).toBeEnabled();

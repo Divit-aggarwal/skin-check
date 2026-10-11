@@ -1,6 +1,6 @@
 import type { SkinScanScores } from "@/types/skin-scan";
 import type { Band, BandableMetric } from "@/lib/skin-check-rules";
-import { isPhotoMetric } from "@/lib/skin-check-skus";
+import { isShownMetric } from "@/lib/skin-check-skus";
 
 // hydration is the one skin-scan map framed positively (higher = more
 // hydrated = healthier). The other 6 are concern-framed, so they invert
@@ -68,9 +68,9 @@ export function summarizeConcerns(
   scores: SkinScanScores,
   bands: Record<BandableMetric, Band>
 ): ConcernSummary {
-  // TD-37 (1): only the photo readings can be a top concern or reach the summary line.
+  // The five shown readings (TD-40); never Dryness.
   const ranked = (Object.keys(bands) as BandableMetric[])
-    .filter((m) => isPhotoMetric(m) && bands[m] !== "Low")
+    .filter((m) => isShownMetric(m) && bands[m] !== "Low")
     .sort((a, b) => (1 - healthValue(scores, b)) - (1 - healthValue(scores, a)));
 
   return { topConcerns: ranked, summaryLine: summaryLineFor(ranked) };
