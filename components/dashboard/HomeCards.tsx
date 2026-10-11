@@ -4,8 +4,8 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
-import { Check, CloudSun, Flame, MapPin } from "lucide-react";
-import { btnPrimary, btnSecondary, card, eyebrow, h2, textLink } from "@/components/ui/page";
+import { Check, ChevronDown, CloudSun, Flame, MapPin } from "lucide-react";
+import { btnPrimary, btnSecondary, card, h2, LoadingState, ReloadButton, textLink } from "@/components/ui/page";
 import { Thumb } from "@/components/checks/Thumb";
 import { useRoutine } from "@/components/routine/useRoutine";
 import { stepOf, STEPS } from "@/components/routine/RoutineSteps";
@@ -36,6 +36,8 @@ import { ASK_KEY, browserState, weatherAt, enableReminders, lastWeather, locateC
 // the skin. Each card is its own <section> with an h2.
 
 type Routine = ReturnType<typeof useRoutine>;
+/** After a choice removes the focused button, focus goes to the card's heading (design review). */
+const focusCard = (id: string) => requestAnimationFrame(() => document.getElementById(`${id}-title`)?.focus());
 const tz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata";
 const dayMs = 86_400_000;
 
@@ -47,7 +49,8 @@ export const lastReadingDate = (d: Dashboard) =>
 function Card({ id, title, children, className = "" }: { id: string; title: string; children: React.ReactNode; className?: string }) {
   return (
     <section aria-labelledby={`${id}-title`} className={`${card} flex min-w-0 flex-col gap-4 ${className}`}>
-      <h2 id={`${id}-title`} className={h2}>
+      {/* tabIndex -1: focus lands here when a choice inside the card replaces the button that had it. */}
+      <h2 id={`${id}-title`} tabIndex={-1} className={`${h2} outline-none`}>
         {title}
       </h2>
       {children}
@@ -60,18 +63,22 @@ function Card({ id, title, children, className = "" }: { id: string; title: stri
 export function NextCheckCard({ dashboard, user, settings, onSettings }: { dashboard: Dashboard; user: User; settings: HomeSettings | null; onSettings: (s: HomeSettings) => void }) {
   const next = nextCheck(lastReadingDate(dashboard), new Date(), tz());
   const due = isDue(next);
-  const line = next.kind === "first" ? (dashboard.history.length > 0 ? H.next.noReading : H.next.first) : next.kind === "today" ? H.next.today : next.kind === "overdue" ? H.next.overdue(next.days) : H.next.in(next.days);
+  const noReading = next.kind === "first" && dashboard.history.length > 0;
+  const line = next.kind === "first" ? (noReading ? H.next.noReading : H.next.first) : next.kind === "today" ? H.next.today : next.kind === "overdue" ? H.next.overdue(next.days) : H.next.in(next.days);
+  const act = due || next.kind === "first";
   return (
     <Card id="next" title={H.next.title}>
-      <p className="font-display text-2xl font-semibold text-brand-title" data-testid="next-check">
+      <p className="font-display text-xl font-semibold text-brand-title" data-testid="next-check">
         {line}
       </p>
       <div className="flex flex-col gap-1 text-sm text-brand-muted">
+        {noReading && <p>{H.next.noReadingNote}</p>}
         <p>{H.next.every(CHECK_INTERVAL_RULE.days)}</p>
         {dashboard.trend.kind !== "empty" && <p>{H.next.starting(dashboard.trend.count, dashboard.trend.needed)}</p>}
-        <p>{H.next.tip}</p>
+        {/* The photo tip only when a check is to be taken now (design review: a short card when nothing is due). */}
+        {act && <p>{H.next.tip}</p>}
       </div>
-      <Link href="/skin-check" className={`${due || next.kind === "first" ? btnPrimary : btnSecondary} self-start`}>
+      <Link href="/skin-check" className={`${act ? btnPrimary : btnSecondary} self-start`}>
         {H.next.take}
       </Link>
       {pushOn() && <RemindersPrompt user={user} settings={settings} onSettings={onSettings} />}
@@ -103,6 +110,7 @@ function RemindersPrompt({ user, settings, onSettings }: { user: User; settings:
           await saveHomeSettings(user.uid, { reminders }).catch(() => undefined);
           onSettings({ ...settings, reminders });
           setState(await browserState("notifications"));
+          focusCard("next");
         }}
       >
         {H.next.remindersOn}
@@ -121,9 +129,6 @@ export function LatestCheckCard({ dashboard, onArea }: { dashboard: Dashboard; o
     return (
       <Card id="latest" title={H.latest.title}>
         <p>{H.latest.none}</p>
-        <Link href="/skin-check" className={`${btnPrimary} self-start`}>
-          {H.latest.first}
-        </Link>
       </Card>
     );
   // A check made in the last 10 minutes with no reading yet is still being read.
@@ -137,23 +142,24 @@ export function LatestCheckCard({ dashboard, onArea }: { dashboard: Dashboard; o
   return (
     <section aria-labelledby="latest-title" className={`${card} flex min-w-0 flex-col gap-5`}>
       <div>
-        <p className={`${eyebrow} mb-1`}>{H.latest.eyebrow}</p>
         <h2 id="latest-title" className={h2}>
           {H.latest.title}
         </h2>
         {date && <p className="mt-1 text-sm text-brand-muted">{H.latest.checkedOn(formatDate(date), ago)}</p>}
       </div>
       {(analysing || dashboard.newerCheckNotShown) && (
-        <p role="status" className="rounded-xl bg-brand-linen px-4 py-3 text-sm">
-          {analysing ? H.latest.analysing : C.current.newerNotShown}
-        </p>
+        <div className="flex flex-col items-start gap-2 rounded-xl bg-brand-linen px-4 py-3 text-sm">
+          <p>{analysing ? H.latest.analysing : C.current.newerNotShown}</p>
+          {analysing && view && <p>{H.latest.analysingBelow(formatDate(date))}</p>}
+          {analysing && <ReloadButton label={H.latest.refresh} />}
+        </div>
       )}
       {!view ? (
         !analysing && <p>{H.latest.noReading}</p>
       ) : (
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
           {(shownRow?.photoClaimed || drawing) && (
-            <div className="flex shrink-0 justify-center rounded-2xl bg-brand-linen p-3 sm:w-48">
+            <div className="mx-auto flex w-40 shrink-0 justify-center rounded-2xl bg-brand-linen p-3 sm:mx-0 sm:w-48">
               {shownRow?.photoClaimed ? <Thumb scanId={view.scanId} date={formatDate(date)} size={112} fallback={drawing} /> : drawing}
             </div>
           )}
@@ -183,7 +189,10 @@ export function LatestCheckCard({ dashboard, onArea }: { dashboard: Dashboard; o
       )}
       {view?.bands && (
         <details className="group border-t border-brand-line pt-3">
-          <summary className="flex min-h-11 cursor-pointer items-center font-semibold text-brand-forest">{H.latest.meaningTitle}</summary>
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1 font-semibold text-brand-forest [&::-webkit-details-marker]:hidden">
+            {H.latest.meaningTitle}
+            <ChevronDown aria-hidden size={18} className="group-open:rotate-180 motion-safe:transition-transform" />
+          </summary>
           <div className="pt-2">
             <KnownAndNotKnown />
           </div>
@@ -214,14 +223,13 @@ export function RoutineCard({ routine }: { routine: Routine }) {
     return (
       <Card id="routine" title={title}>
         <p role="alert">{ROUTINE_COPY.error}</p>
+        <ReloadButton label={ROUTINE_COPY.tryAgain} />
       </Card>
     );
   if (!data)
     return (
       <Card id="routine" title={title}>
-        <p role="status" className="text-brand-muted">
-          {ROUTINE_COPY.loading}
-        </p>
+        <LoadingState label={ROUTINE_COPY.loading} blocks={["h-6", "h-16", "h-16"]} />
       </Card>
     );
   if (data.routine.length === 0)
@@ -250,11 +258,11 @@ export function RoutineCard({ routine }: { routine: Routine }) {
       ) : (
         <>
           <div className="flex flex-col gap-2">
-            <p className="font-semibold">
+            <p className="font-semibold" aria-live="polite">
               {H.routine.done(done, dueToday.length)}
             </p>
             {/* The line above says it in words; the bar is for the eye only. */}
-            <div aria-hidden className="h-2 w-full overflow-hidden rounded-full bg-brand-linen2">
+            <div aria-hidden className="h-2 w-full overflow-hidden rounded-full bg-brand-line">
               <div className="h-full rounded-full bg-brand-action" style={{ width: `${(done / dueToday.length) * 100}%` }} />
             </div>
           </div>
@@ -283,7 +291,7 @@ export function RoutineCard({ routine }: { routine: Routine }) {
                           aria-disabled={busy || isDone}
                           aria-label={H.routine.markDoneLabel(nameOf(d.productId), ROUTINE_COPY.slot[slot].toLowerCase())}
                           onClick={() => !busy && !isDone && void send({ type: "usage", productId: d.productId, slot, status: "used" })}
-                          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-brand-line px-4 text-sm font-semibold hover:border-brand-ink aria-disabled:cursor-default aria-pressed:border-brand-forest aria-pressed:bg-brand-forest aria-pressed:text-white"
+                          className="inline-flex min-h-12 shrink-0 items-center gap-1.5 rounded-full border border-brand-line px-4 text-[15px] font-semibold hover:border-brand-ink aria-disabled:cursor-default aria-pressed:border-brand-forest aria-pressed:bg-brand-forest aria-pressed:text-white"
                         >
                           {isDone && <Check aria-hidden size={16} />}
                           {isDone ? H.routine.isDone : H.routine.markDone}
@@ -300,9 +308,7 @@ export function RoutineCard({ routine }: { routine: Routine }) {
       <div className="flex items-start gap-2 border-t border-brand-line pt-3 text-sm">
         <Flame aria-hidden size={16} className="mt-0.5 shrink-0 text-brand-muted" />
         {streak > 0 ? (
-          <p>
-            <span className="font-semibold">{H.routine.streak(streak)}</span> <span className="text-brand-muted">{H.routine.streakNote}</span>
-          </p>
+          <p className="font-semibold">{H.routine.streak(streak)}</p>
         ) : (
           <p className="text-brand-muted">{H.routine.streakNone}</p>
         )}
@@ -348,6 +354,7 @@ export function WeatherCard({ user, settings, onSettings }: { user: User; settin
     await saveHomeSettings(user.uid, patch).catch((e) => console.error("[home] settings not saved", e instanceof Error ? e.name : e));
     onSettings({ ...settings, ...patch });
     setChanging(false);
+    focusCard("weather");
   };
 
   if (!city || changing) return <Card id="weather" title={H.weather.title}><ChooseCity user={user} onCity={(c, location) => save({ city: c, ...(location ? { location } : {}) })} /></Card>;
@@ -355,11 +362,7 @@ export function WeatherCard({ user, settings, onSettings }: { user: User; settin
   const time = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
   return (
     <Card id="weather" title={H.weather.title}>
-      {weather.kind === "loading" && (
-        <p role="status" className="text-brand-muted">
-          {H.weather.loading}
-        </p>
-      )}
+      {weather.kind === "loading" && <LoadingState label={H.weather.loading} blocks={["h-5", "h-24", "h-10"]} />}
       {weather.kind === "unavailable" && <p className="text-brand-muted">{H.weather.unavailable}</p>}
       {(weather.kind === "ready" || weather.kind === "stale") && (
         <>
@@ -369,22 +372,26 @@ export function WeatherCard({ user, settings, onSettings }: { user: User; settin
           </p>
           {weather.kind === "stale" && <p className="text-sm text-brand-muted">{H.weather.lastKnown(time(weather.c.observedAt))}</p>}
           <dl className="grid grid-cols-3 gap-2">
-            <Tile label={H.weather.uv} value={String(Math.round(weather.c.uv))} note={uvCategory(weather.c.uv)} />
+            <Tile label={H.weather.uv} value={String(Math.round(weather.c.uv))} note={H.weather.uvNote(uvCategory(weather.c.uv))} />
             <Tile label={H.weather.humidity} value={H.weather.humidityValue(weather.c.humidity)} />
-            <Tile label={H.weather.air} value={String(Math.round(weather.c.usAqi))} note={aqiCategory(weather.c.usAqi)} />
+            <Tile label={H.weather.air} value={String(Math.round(weather.c.usAqi))} note={H.weather.airNote(aqiCategory(weather.c.usAqi))} />
           </dl>
           <p className="flex items-start gap-2">
             <CloudSun aria-hidden size={18} className="mt-0.5 shrink-0 text-brand-muted" />
             <span>{UV_ADVICE[uvCategory(weather.c.uv)]}</span>
           </p>
-          <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" className="text-xs text-brand-muted underline underline-offset-2">
-            {H.weather.source}
-          </a>
         </>
       )}
-      <button type="button" className={`${textLink} self-start`} onClick={() => setChanging(true)}>
-        {H.weather.change}
-      </button>
+      <div className="flex flex-wrap items-center justify-between gap-x-4">
+        <button type="button" className={textLink} onClick={() => setChanging(true)}>
+          {H.weather.change}
+        </button>
+        {(weather.kind === "ready" || weather.kind === "stale") && (
+          <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-xs text-brand-muted underline underline-offset-2">
+            {H.weather.source}
+          </a>
+        )}
+      </div>
     </Card>
   );
 }
@@ -392,7 +399,7 @@ export function WeatherCard({ user, settings, onSettings }: { user: User; settin
 function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
   return (
     <div className="flex min-w-0 flex-col gap-1 rounded-lg bg-brand-linen p-3">
-      <dt className="text-xs font-semibold text-brand-muted">{label}</dt>
+      <dt className="truncate text-xs font-semibold text-brand-muted">{label}</dt>
       <dd className="font-display text-xl font-semibold text-brand-title">{value}</dd>
       {note && <dd className="text-xs text-brand-ink">{note}</dd>}
     </div>

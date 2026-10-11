@@ -74,7 +74,8 @@ test.describe("Home at three widths, every card filled", () => {
       await expect(page.getByRole("heading", { level: 1, name: /Good (morning|afternoon|evening), Meera/ })).toBeVisible();
       const titles = [H.next.title, H.latest.title, R.todayTitle, H.weather.title, H.record.title, H.echo.title];
       for (const t of titles) await expect(page.getByRole("heading", { name: t, exact: true })).toBeVisible();
-      await expect(page.getByRole("region", { name: H.banner.start })).toBeVisible();
+      // Overdue: the Next check card asks for the check, so the banner stands aside.
+      await expect(page.getByRole("region", { name: H.banner.start })).toHaveCount(0);
 
       // Next check: last reading 8 days ago, every 7 days.
       await expect(page.getByTestId("next-check")).toHaveText(H.next.overdue(1));
@@ -90,7 +91,7 @@ test.describe("Home at three widths, every card filled", () => {
       // Weather: city, three tiles, the rule for High UV; nothing about the skin.
       const weather = section(page, H.weather.title);
       await expect(weather.getByText(/^Bengaluru, updated/)).toBeVisible();
-      await expect(weather.getByText("High", { exact: true })).toBeVisible();
+      await expect(weather.getByText(H.weather.uvNote("High"))).toBeVisible();
       await expect(weather.getByText("68%")).toBeVisible();
       await expect(weather.getByText("85", { exact: true })).toBeVisible();
       await expect(weather.getByText(UV_ADVICE.High)).toBeVisible();
@@ -130,6 +131,9 @@ test.describe("Home at three widths, every card filled", () => {
         expect((await top(R.todayTitle)).y).toBeGreaterThan((await top(H.latest.title)).y);
       }
       await shot(page, `home-${width}`);
+      // What the user sees first, without scrolling (the full-page capture paints the phone's fixed bar mid-page).
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.screenshot({ path: `${SHOTS}/home-${width}-first-screen.png` });
     });
   }
 });
@@ -149,9 +153,17 @@ test("next check: due today is the primary action; a first check; in X days", as
 test("latest check: none yet, still being read, no reading", async ({ page }) => {
   await homeAs(page, U.empty!.phoneNumber);
   await expect(page.getByText(H.latest.none)).toBeVisible();
-  await expect(page.getByRole("link", { name: H.latest.first })).toHaveAttribute("href", "/skin-check");
+  // One way in: the Next check card's primary button (design review: one primary per view).
+  await expect(section(page, H.latest.title).getByRole("link")).toHaveCount(0);
+  await expect(section(page, H.next.title).getByRole("link", { name: H.next.take })).toHaveClass(/bg-brand-action/);
   await expect(page.getByRole("region", { name: H.banner.start })).toHaveCount(0);
   await shot(page, "empty-390");
+  // A check made just now with no reading yet (the seeded one may be older than the 10 minutes by the time this runs).
+  await fetch(`http://${FS}/v1/projects/demo-skin-check/databases/(default)/documents/users/${U.homeAnalysing!.uid}/skinChecks?documentId=fresh-${Date.now()}`, {
+    method: "POST",
+    headers: { authorization: "Bearer owner", "content-type": "application/json" },
+    body: JSON.stringify({ fields: { status: { stringValue: "questionnaire_only" }, createdAt: { timestampValue: new Date().toISOString() } } }),
+  });
   await homeAs(page, U.homeAnalysing!.phoneNumber);
   await expect(page.getByText(H.latest.analysing)).toBeVisible();
   await shot(page, "analysing-390");

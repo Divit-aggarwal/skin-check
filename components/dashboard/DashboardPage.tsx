@@ -9,7 +9,7 @@ import { useRoutine } from "@/components/routine/useRoutine";
 import { QuestionsCard } from "@/components/skin-check/QuestionsChoice";
 import { echoOn } from "@/lib/echo-limits";
 import type { EchoRegion } from "@/lib/echo-regions";
-import { partOfDay } from "@/lib/home/schedule";
+import { isDue, nextCheck, partOfDay } from "@/lib/home/schedule";
 import { AFTER_CHECK_KEY, showPermissions, type HomeSettings } from "@/lib/home/permissions";
 import { weatherOn, pushOn } from "@/lib/home/switches";
 import { formatDate } from "./CheckReadings";
@@ -17,15 +17,15 @@ import { DASHBOARD_COPY as C } from "./copy";
 import { HOME_COPY as H } from "./homeCopy";
 import { loadDashboard, type DashboardData } from "./data";
 import { deriveDashboard, toDate, waitingQuestions, type Dashboard } from "./state";
-import { AskEchoCard, LatestCheckCard, NewCheckBanner, NextCheckCard, RecordCard, RoutineCard, useOpenEcho, WeatherCard } from "./HomeCards";
+import { AskEchoCard, lastReadingDate, LatestCheckCard, NewCheckBanner, NextCheckCard, RecordCard, RoutineCard, useOpenEcho, WeatherCard } from "./HomeCards";
 import { loadHomeSettings } from "./homeSettings";
 import { PermissionsScreen } from "./PermissionsScreen";
 
 // Home v2 (TD-47, docs/design/home-v2.md): what to do for the skin today.
 // One check's readings only, never two side by side (TD-24 (1)); the routine
 // card never shows a reading (D-12); the weather card never names the skin.
-// Phone and tablet: one column in the brief's order (CSS `order` over
-// `contents` columns). From 1280: main column (8) and right column (4).
+// The DOM is the phone order (design review: reading and tab order match the
+// screen); from 1280 grid areas place a main column and a right column.
 
 type Load = { kind: "loading" } | { kind: "error" } | { kind: "ready"; data: DashboardData };
 /** The settings doc: undefined while loading; null when absent; "error" when it could not be read (Home still works). */
@@ -171,47 +171,51 @@ function Home({
 
   return (
     <Shell title={name ? H.greetingName(hello, name) : hello}>
-      <div className="flex flex-col gap-4 sm:gap-6 xl:grid xl:grid-cols-12 xl:items-start">
-        <div className="contents xl:col-span-8 xl:flex xl:flex-col xl:gap-6">
-          <div className="order-2 flex flex-col gap-4 sm:gap-6">
+      {/* Phone order in the DOM; desktop placement by grid areas (app/globals.css .home-grid). */}
+      <div className="home-grid flex flex-col gap-4 sm:gap-6">
+        <Area name="next">
+          <NextCheckCard dashboard={dashboard} user={user} settings={settings} onSettings={onSettings} />
+        </Area>
+        <Area name="latest">
+          <div className="flex flex-col gap-4 sm:gap-6">
             <LatestCheckCard dashboard={dashboard} onArea={onArea} />
             {/* TD-33 (1): right under the newest reading, while its questions wait. */}
             {waiting && <QuestionsCard isEcho={waiting.isEcho} date={waiting.date ? formatDate(waiting.date) : null} />}
           </div>
-          <div className="contents xl:order-3 xl:grid xl:grid-cols-2 xl:items-start xl:gap-6">
-            <div className="order-6 xl:order-none">
-              <RecordCard dashboard={dashboard} routine={routine} />
-            </div>
-            <div className="order-3 xl:order-none">
-              <RoutineCard routine={routine} />
-            </div>
-          </div>
-          {dashboard.history.length > 0 && (
-            <div className="order-8">
-              <NewCheckBanner />
-            </div>
-          )}
-        </div>
-        <div className="contents xl:col-span-4 xl:flex xl:flex-col xl:gap-6">
-          {weatherOn() && (
-            <div className="order-4 xl:order-none">
-              <WeatherCard user={user} settings={settings} onSettings={onSettings} />
-            </div>
-          )}
-          <div className="order-1 xl:order-none">
-            <NextCheckCard dashboard={dashboard} user={user} settings={settings} onSettings={onSettings} />
-          </div>
-          {/* TD-29 (5): no way into Echo while it is switched off. */}
-          {echoOn() && (
-            <div className="order-7 xl:order-none">
-              <AskEchoCard uid={user.uid} dashboard={dashboard} data={data} productsOn={productsOn} />
-            </div>
-          )}
-        </div>
+        </Area>
+        <Area name="routine">
+          <RoutineCard routine={routine} />
+        </Area>
+        {weatherOn() && (
+          <Area name="weather">
+            <WeatherCard user={user} settings={settings} onSettings={onSettings} />
+          </Area>
+        )}
+        <Area name="record">
+          <RecordCard dashboard={dashboard} routine={routine} />
+        </Area>
+        {/* TD-29 (5): no way into Echo while it is switched off. */}
+        {echoOn() && (
+          <Area name="echo">
+            <AskEchoCard uid={user.uid} dashboard={dashboard} data={data} productsOn={productsOn} />
+          </Area>
+        )}
+        {/* Not while a check is due: the Next check card already asks for one. */}
+        {dashboard.history.length > 0 && !isDue(nextCheck(lastReadingDate(dashboard), new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata")) && (
+          <Area name="banner">
+            <NewCheckBanner />
+          </Area>
+        )}
       </div>
     </Shell>
   );
 }
+
+const Area = ({ name, children }: { name: string; children: React.ReactNode }) => (
+  <div data-area={name} style={{ "--area": name } as React.CSSProperties} className="min-w-0">
+    {children}
+  </div>
+);
 
 /** The first word of the name given on the newest check that has one. */
 function firstName(data: DashboardData): string | null {

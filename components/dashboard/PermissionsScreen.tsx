@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { User } from "firebase/auth";
-import { BellRing, MapPin } from "lucide-react";
+import { BellRing, Check, MapPin } from "lucide-react";
 import { btnPrimary, btnSecondary, card } from "@/components/ui/page";
 import { needsHomeScreen, type HomeSettings, type PermissionOutcome } from "@/lib/home/permissions";
 import { weatherOn, pushOn } from "@/lib/home/switches";
@@ -56,7 +56,7 @@ export function PermissionsScreen({ user, settings, onDone }: { user: User; sett
           {icon}
         </span>
         <div className="flex flex-col gap-1">
-          <h2 id={`perm-${kind}`} className="font-display text-lg font-semibold text-brand-title">
+          <h2 id={`perm-${kind}`} className="font-display text-base font-semibold tracking-[-0.01em] text-brand-title">
             {title}
           </h2>
           <p>{why}</p>
@@ -64,8 +64,10 @@ export function PermissionsScreen({ user, settings, onDone }: { user: User; sett
         </div>
       </div>
       {choice ? (
-        <p role="status" className="font-semibold">
-          {status(choice)}
+        // Focus moves here when the buttons give way, so it is announced and never lost (design review).
+        <p ref={(el) => el?.focus()} tabIndex={-1} className="flex items-start gap-2 pl-[34px] text-sm text-brand-muted outline-none">
+          <Check aria-hidden size={16} className="mt-0.5 shrink-0" />
+          <span>{status(choice)}</span>
         </p>
       ) : (
         <div className="flex flex-wrap gap-3" role="group" aria-labelledby={`perm-${kind}`}>
@@ -81,7 +83,7 @@ export function PermissionsScreen({ user, settings, onDone }: { user: User; sett
   );
 
   return (
-    <section aria-labelledby="perm-title" className={`${card} mx-auto flex max-w-2xl flex-col gap-5`}>
+    <section aria-labelledby="perm-title" className={`${card} flex max-w-2xl flex-col gap-5`}>
       <div>
         <h1 ref={heading} tabIndex={-1} id="perm-title" className="font-display text-[30px] font-semibold leading-[1.15] tracking-[-0.025em] text-brand-title outline-none sm:text-[40px]">
           {P.title}

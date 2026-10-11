@@ -69,7 +69,7 @@ export function HomeSettingsSection() {
         </div>
       )}
       {pushOn() ? (
-        <div className="flex flex-col items-start gap-2 border-t border-brand-line pt-3">
+        <div className="flex w-full flex-col items-start gap-2 border-t border-brand-line pt-3">
           <p>{A.reminders(state(settings?.reminders))}</p>
           {settings?.reminders === "allowed" ? (
             <button
@@ -100,7 +100,7 @@ export function HomeSettingsSection() {
               onClick={async () => {
                 if (busy) return;
                 setBusy(true);
-                const reminders = await enableReminders(user);
+                const reminders = await enableReminders(user).catch(() => "unsupported" as const);
                 setBusy(false);
                 await save({ reminders });
               }}
