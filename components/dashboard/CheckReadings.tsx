@@ -79,7 +79,7 @@ export function CheckReadings({ view, photo = null, picture }: { view: CheckView
       {own && (
         <div className="flex flex-col items-center gap-3 rounded-2xl bg-brand-linen p-4">
           {own}
-          {!picture && view.bands && <p className="text-center text-sm text-brand-muted">{C.photo.mapsOnResults}</p>}
+          {!picture && photo && view.bands && <p className="text-center text-sm text-brand-muted">{C.photo.mapsOnResults}</p>}
         </div>
       )}
       <ReadingsTable view={view} />

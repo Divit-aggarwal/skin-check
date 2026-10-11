@@ -36,7 +36,7 @@ export function MeshLayer({ mesh, scanning = false, faint = false }: { mesh: Fac
         preserveAspectRatio="xMidYMid slice"
         className="absolute inset-0 h-full w-full animate-in fade-in duration-200 motion-reduce:animate-none"
       >
-        <path d={lines} fill="none" stroke="#FFFFFF" strokeOpacity={faint ? 0.3 : 0.55} strokeWidth={0.75} vectorEffect="non-scaling-stroke" />
+        <path d={lines} fill="none" stroke="#FFFFFF" strokeOpacity={faint ? 0.15 : 0.55} strokeWidth={0.75} vectorEffect="non-scaling-stroke" />
       </svg>
       {scanning && (
         // One soft white band, moved by transform only (no repaint of the mesh per frame).

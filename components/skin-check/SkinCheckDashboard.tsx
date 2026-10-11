@@ -108,7 +108,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
   return (
     <div className="flex flex-col gap-10">
       {/* TD-39: one photo with the mesh and both overlays, the table below it. Nothing to choose. */}
-      <section aria-labelledby="readings-title" className="mx-auto flex w-full max-w-3xl flex-col gap-5 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
+      <section aria-labelledby="readings-title" className="flex w-full max-w-3xl flex-col gap-5 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
         <h2 id="readings-title" className="font-display text-xl font-semibold uppercase leading-tight tracking-[0.04em] text-brand-title sm:text-[22px]">
           What this photo shows
         </h2>

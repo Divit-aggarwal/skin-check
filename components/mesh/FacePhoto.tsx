@@ -18,7 +18,7 @@ const KEYS = ["redness", "oiliness"] as const;
 type Key = (typeof KEYS)[number];
 
 const STYLE: Record<Key, CSSProperties> = {
-  redness: { backgroundImage: `repeating-linear-gradient(45deg, ${REDNESS} 0 4px, transparent 4px 8px)` },
+  redness: { backgroundImage: `repeating-linear-gradient(45deg, ${REDNESS} 0 5px, transparent 5px 10px)` },
   oiliness: { backgroundColor: OILINESS },
 };
 // The overlay's alpha stops at 0.6; stripes cover half the area, so their mask is laid twice (about 0.84).
@@ -65,7 +65,7 @@ export function FacePhoto({ photo, overlays = null, fallback, mesh: withMesh = t
   if (fallback && (!url || !mesh || failed)) return fallback;
   return (
     <div className="flex w-full flex-col items-center gap-3">
-      <div data-testid="face-photo" className="relative aspect-[3/4] w-full max-w-[340px] select-none overflow-hidden rounded-media bg-surface">
+      <div data-testid="face-photo" className="relative aspect-[3/4] w-full max-w-[340px] select-none lg:max-w-[400px] overflow-hidden rounded-media bg-surface">
         {url && !failed ? (
           // eslint-disable-next-line @next/next/no-img-element -- transient object URL
           <img src={url} alt={C.photo.alt} className="absolute inset-0 h-full w-full object-cover" onError={() => setFailed(true)} />

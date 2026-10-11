@@ -184,7 +184,8 @@ for (const width of WIDTHS) {
       await expect(page.getByText(C.history.pastLine)).toBeVisible({ timeout: 60_000 });
       await expect(page.getByTestId("face-photo")).toHaveCount(0);
       await expect(page.getByRole("img", { name: /A drawing of a face/ })).toBeVisible();
-      await expect(page.getByText(C.photo.mapsOnResults)).toBeVisible();
+      // No photo, so no line about colours on it (design review).
+      await expect(page.getByText(C.photo.mapsOnResults)).toHaveCount(0);
       await expectTable(page);
       await expectNothingElse(page);
       await shot(page, "check-no-photo", width);
@@ -206,6 +207,9 @@ for (const width of WIDTHS) {
         await shot(page, `home-kept-${tone}`, width);
         await page.goto(`/checks/${user.uid}-1`);
         await expect(page.getByTestId("face-photo")).toBeVisible({ timeout: 90_000 });
+        // One photo: the header thumbnail gives way to the large photo (design review).
+        const opened = page.locator("section", { has: page.getByRole("heading", { name: /Check from/ }) });
+        await expect(opened.getByRole("img", { name: /Your kept photo/ })).toHaveCount(0);
         await expectTable(page);
         await expectNothingElse(page);
         await shot(page, `check-kept-${tone}`, width);

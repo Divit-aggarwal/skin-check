@@ -6,10 +6,10 @@ const AREAS: Record<EchoRegion, { shapes: JSX.Element[]; text: [number, number][
   forehead: { shapes: [<rect key="f" x="76" y="52" width="128" height="52" rx="24" />], text: [[140, 83]] },
   nose: { shapes: [<rect key="n" x="118" y="116" width="44" height="82" rx="22" />], text: [[140, 161]] },
   cheeks: {
-    shapes: [<ellipse key="l" cx="85" cy="196" rx="29" ry="27" />, <ellipse key="r" cx="195" cy="196" rx="29" ry="27" />],
+    shapes: [<ellipse key="l" cx="82" cy="196" rx="32" ry="27" />, <ellipse key="r" cx="198" cy="196" rx="32" ry="27" />],
     text: [
-      [85, 200],
-      [195, 200],
+      [82, 201],
+      [198, 201],
     ],
   },
   chin: { shapes: [<ellipse key="c" cx="140" cy="276" rx="44" ry="22" />], text: [[140, 280]] },
@@ -50,7 +50,7 @@ export function FaceDrawing({
           <g key={r}>
             <g className="fill-white stroke-brand-ink [stroke-dasharray:5_4] [stroke-width:1.25]">{shapes}</g>
             {text.map(([x, y]) => (
-              <text key={`${x}-${y}`} x={x} y={y} textAnchor="middle" fontSize="12.5" fontWeight={600} className="fill-brand-ink">
+              <text key={`${x}-${y}`} x={x} y={y} textAnchor="middle" fontSize="14" fontWeight={600} className="fill-brand-ink">
                 {labels[r]}
               </text>
             ))}

@@ -204,7 +204,8 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
           </h2>
           <p className="mt-1 text-brand-muted">{C.history.kind[check.kind]}</p>
         </div>
-        {check.photoClaimed && <Thumb key={check.scanId} scanId={check.scanId} date={date} size={112} />}
+        {/* TD-39: one photo. The thumbnail only until the large photo below can be shown. */}
+        {check.photoClaimed && !photo && <Thumb key={check.scanId} scanId={check.scanId} date={date} size={112} />}
       </div>
       {check.photoCheck && <PhotoCheckLine text={C.photoCheck[check.photoCheck]} />}
       {check.view ? (
