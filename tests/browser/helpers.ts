@@ -1,4 +1,5 @@
 import { expect, type Page } from "@playwright/test";
+import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
 
 // Shared by the browser tests. Sign-in goes through the real phone form; the
 // code comes from the auth emulator's verification-code endpoint, as in
@@ -42,3 +43,9 @@ export async function signIn(page: Page, phoneNumber: string) {
 
 /** Saves a full-page screenshot under .local-stack/ (gitignored); the lane report keeps its own copies in docs/lanes/. */
 export const shot = (page: Page, name: string) => page.screenshot({ path: `.local-stack/browser-shots/dashboard-${name}.png`, fullPage: true });
+
+/** TD-44: the choice page's skip, then "Skip for now" in the "are you sure?" pop-up. */
+export async function skipQuestions(page: Page) {
+  await page.getByRole("button", { name: Q.skipAsk, exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", { name: Q.skipNow, exact: true }).click();
+}

@@ -92,6 +92,20 @@ export type QuestionsChoice = "pending" | "answer" | "skip";
 export const PHOTO_INDEX = SECTIONS.findIndex((section) => section.id === "skin-photo");
 
 /**
+ * TD-44: the choice is the first screen; this is where it leads. About you,
+ * or on to Verify when name, age and gender are already in (a returning user
+ * who skipped last time). An under-18 answer always goes back through About
+ * you, so its confirm step can't be passed by.
+ */
+export function indexAfterChoice(answers: SkinCheckAnswers, reusing: boolean, skip: boolean): number {
+  const about = SECTIONS[ABOUT_INDEX]!;
+  const aboutDone =
+    answers.age !== "under-18" &&
+    eligibleStepsFor(about, answers).every((step) => isStepAnswerValid(step, answers[step.id] ?? defaultAnswerFor(step)));
+  return aboutDone ? nextEligibleIndex(ABOUT_INDEX + 1, answers, reusing, skip) : ABOUT_INDEX;
+}
+
+/**
  * The finished scan may only be written once there is a photo AND its
  * analysis has reached a terminal state. The record is create-only, so
  * saving an idle or loading scan would permanently record it as
@@ -231,10 +245,11 @@ export function useSkinCheckFlow() {
   // sections come back for this check, filled in with the saved answers.
   const [updating, setUpdating] = useState(false);
   const reusing = reusingSaved && !updating;
-  // TD-33 (1): answer the questions now or skip them. Shown right after About
-  // you ("About the questions"); a reused, answered questionnaire is "answer".
+  // TD-33 (1): answer the questions now or skip them. TD-44: "About the
+  // questions" is the first screen of a check; a reused, answered
+  // questionnaire is "answer" and skips it.
   const [questionsChoice, setQuestionsChoice] = useState<QuestionsChoice>(() => (session ? "answer" : "pending"));
-  const [choosingQuestions, setChoosingQuestions] = useState(false);
+  const [choosingQuestions, setChoosingQuestions] = useState(() => session === null);
   // TD-33 (2): the two product-name boxes. Memory only: never in answers, the
   // draft or the session, so a refresh loses them (like the phone number) and
   // nothing typed outlives an account erase on this device.
@@ -282,6 +297,7 @@ export function useSkinCheckFlow() {
     setAnswers(draft.answers);
     setQuestionsChoice(draft.questionsChoice ?? "pending");
     const idx = Math.min(Math.max(draft.sectionIndex, 0), SECTIONS.length - 1);
+    setChoosingQuestions((draft.questionsChoice ?? "pending") === "pending" && idx === ABOUT_INDEX);
     setSectionIndex(idx);
     // Derived, never persisted — reveal position is a pure function of which
     // answers are filled in, so it can't drift out of sync with them.
@@ -396,12 +412,9 @@ export function useSkinCheckFlow() {
         const atStart = now.sectionIndex <= VERIFY_INDEX;
         if (!reuse) {
           // TD-33 (1): the last check skipped the questions. Its name, age and
-          // gender carry over and the choice is offered again.
+          // gender carry over; the choice is already the first screen (TD-44).
           const basics = reusableBasics(previous);
-          if (basics && now.sectionIndex === 0) {
-            setAnswers((prev) => ({ ...basics, ...prev }));
-            setChoosingQuestions(true);
-          }
+          if (basics && now.sectionIndex === 0) setAnswers((prev) => ({ ...basics, ...prev }));
           return;
         }
         setAnswers((prev) => ({ ...reuse, ...prev }));
@@ -482,7 +495,7 @@ export function useSkinCheckFlow() {
     void clearDraft();
     setDraftFinished(false);
     const reuse = reusableAnswers(answers);
-    // TD-33 (1): after a skipped check, name, age and gender carry over and the choice comes again.
+    // TD-33 (1): after a skipped check, name, age and gender carry over; the choice comes first (TD-44).
     const basics = reuse ? null : reusableBasics(answers);
     const idx = reuse ? VERIFY_INDEX : 0;
     setScanId(newScanId());
@@ -490,7 +503,7 @@ export function useSkinCheckFlow() {
     setReusing(reuse !== null);
     setUpdating(false);
     setQuestionsChoice(reuse ? "answer" : "pending");
-    setChoosingQuestions(basics !== null);
+    setChoosingQuestions(reuse === null);
     setProductNames({});
     setScan({ status: "idle" });
     setSectionIndex(idx);
@@ -604,12 +617,6 @@ export function useSkinCheckFlow() {
       setConfirmingUnder18(true);
       return;
     }
-    // TD-33 (1): "About the questions" comes right after About you, unless a
-    // reused, answered questionnaire already settled it.
-    if (section.id === "about-you" && !reusing) {
-      setChoosingQuestions(true);
-      return;
-    }
     const idx = nextEligibleIndex(sectionIndex + 1, answers, reusing, questionsChoice === "skip");
     if (idx < SECTIONS.length) {
       const nextSection = SECTIONS[idx]!;
@@ -620,7 +627,7 @@ export function useSkinCheckFlow() {
     }
   }, [section, sectionIndex, answers, reusing, questionsChoice]);
 
-  /** The answer to "About the questions": go on to Verify either way. */
+  /** The answer to "About the questions" (TD-44: confirmed first for a skip): About you, or Verify. */
   const chooseQuestions = useCallback(
     (choice: "answer" | "skip") => {
       setDirection(1);
@@ -635,7 +642,7 @@ export function useSkinCheckFlow() {
         });
         setProductNames({});
       }
-      const idx = nextEligibleIndex(ABOUT_INDEX + 1, answers, reusing, choice === "skip");
+      const idx = indexAfterChoice(answers, reusing, choice === "skip");
       setSectionIndex(idx);
       setRevealCount(revealCountFor(SECTIONS[idx]!, answers));
     },
@@ -648,12 +655,8 @@ export function useSkinCheckFlow() {
       setConfirmingUnder18(false);
       return;
     }
-    if (choosingQuestions) {
-      setChoosingQuestions(false);
-      setSectionIndex(ABOUT_INDEX);
-      setRevealCount(revealCountFor(SECTIONS[ABOUT_INDEX]!, answers));
-      return;
-    }
+    // TD-44: the choice is the first screen; nothing comes before it.
+    if (choosingQuestions) return;
     if (blocked) {
       setBlocked(false);
       return;
@@ -662,13 +665,12 @@ export function useSkinCheckFlow() {
       setComplete(false);
       return;
     }
-    const idx = prevEligibleIndex(Math.max(sectionIndex - 1, 0), answers, reusing, questionsChoice === "skip");
-    // Back from Verify lands on "About the questions", the screen just before it.
-    if (SECTIONS[idx]!.id === "about-you" && !reusing && sectionIndex > ABOUT_INDEX) {
-      setSectionIndex(ABOUT_INDEX);
+    // Back from About you lands on "About the questions", the screen just before it.
+    if (sectionIndex === ABOUT_INDEX && !reusing) {
       setChoosingQuestions(true);
       return;
     }
+    const idx = prevEligibleIndex(Math.max(sectionIndex - 1, 0), answers, reusing, questionsChoice === "skip");
     const prevSection = SECTIONS[idx]!;
     setSectionIndex(idx);
     setRevealCount(revealCountFor(prevSection, answers));
@@ -691,7 +693,8 @@ export function useSkinCheckFlow() {
     revealTarget,
     isSectionComplete,
     sectionFill,
-    isFirst: sectionIndex === 0 && !complete && !blocked && !confirmingUnder18 && !choosingQuestions,
+    // TD-44: the choice is the first screen; About you is first only for a reused questionnaire.
+    isFirst: !complete && !blocked && !confirmingUnder18 && (choosingQuestions || (sectionIndex === 0 && reusing)),
     next,
     back,
     direction,
@@ -700,7 +703,8 @@ export function useSkinCheckFlow() {
     confirmingUnder18,
     confirmUnder18,
     // The placeholder frame while a signed-in user's saved answers are read (at the start only).
-    waitingForSaved: !complete && sectionIndex === 0 && !choosingQuestions && (authLoading || (!!user && savedRead === "pending")),
+    // Not gated on the choice (TD-44): it is on screen from the start, and must not flash before a reuse.
+    waitingForSaved: !complete && sectionIndex === 0 && (authLoading || (!!user && savedRead === "pending")),
     reusingSaved,
     updating,
     updateAnswers,

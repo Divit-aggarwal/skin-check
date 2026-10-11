@@ -4,7 +4,7 @@ import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
 import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
 import { WIDTHS, type Width } from "./seed-questionnaire";
 import { FACE_DARK, FACE_LIGHT, MESH_SEED } from "./seed-mesh";
-import { signIn } from "./helpers";
+import { signIn, skipQuestions } from "./helpers";
 
 // TD-37 (docs/design/face-mesh.md): the face mesh while the photo is read.
 // TD-39: the results show the photo once with the mesh and both overlays, a
@@ -174,7 +174,7 @@ for (const width of WIDTHS) {
       await signIn(page, MESH_SEED.skipped[width].phoneNumber);
       await page.goto("/skin-check");
       await expect(page.getByRole("heading", { name: Q.title, exact: true })).toBeVisible({ timeout: 60_000 });
-      await page.getByRole("button", { name: Q.skipNow }).click();
+      await skipQuestions(page); // TD-44: through the "are you sure?" pop-up
       await photoAndAnalyze(page);
       await expectScanning(page);
       release();
@@ -250,7 +250,7 @@ test("reduced motion: the mesh stays still, no sweeping band", async ({ page }) 
   const release = await holdScan(page);
   await signIn(page, MESH_SEED.skipped["390"].phoneNumber);
   await page.goto("/skin-check");
-  await page.getByRole("button", { name: Q.skipNow }).click();
+  await skipQuestions(page); // TD-44: through the "are you sure?" pop-up
   await photoAndAnalyze(page);
   await expectScanning(page);
   await expect(page.locator(".mesh-scan")).toBeHidden();
@@ -264,7 +264,7 @@ test("the mesh files cannot load: the photo and the plain progress state, and th
   const release = await holdScan(page);
   await signIn(page, MESH_SEED.skipped["768"].phoneNumber);
   await page.goto("/skin-check");
-  await page.getByRole("button", { name: Q.skipNow }).click();
+  await skipQuestions(page); // TD-44: through the "are you sure?" pop-up
   await photoAndAnalyze(page);
   const scanning = page.getByTestId("scanning-photo");
   await expect(scanning).toBeVisible({ timeout: 60_000 });

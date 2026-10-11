@@ -207,6 +207,10 @@ test("check flow to results", async ({ page }) => {
   const user = process.env.FLOW_USER ? U[process.env.FLOW_USER]! : FLOW_USER[test.info().project.name as keyof typeof FLOW_USER];
   await signIn(page, user.phoneNumber);
   await page.goto("/skin-check");
+  // TD-44: the choice is the first screen.
+  await expect(page.getByRole("button", { name: "Answer the questions now" })).toBeVisible({ timeout: 60_000 });
+  await shots(page, "flow-questions-choice");
+  await page.getByRole("button", { name: "Answer the questions now" }).click();
   const name = page.locator('input[type="text"]').first();
   await expect(name).toBeVisible({ timeout: 60_000 });
   await question(page);
@@ -218,8 +222,6 @@ test("check flow to results", async ({ page }) => {
   await shots(page, "flow-questions");
   await question(page);
   await page.getByRole("button", { name: "Female", exact: true }).click();
-  await shots(page, "flow-questions-choice");
-  await page.getByRole("button", { name: "Answer the questions now" }).click();
   const file = page.locator('input[type="file"]');
   // G16: the laptop asks for the camera from "Open camera"; then "Take photo".
   const open = page.getByRole("button", { name: "Open camera", exact: true });
@@ -276,13 +278,13 @@ test("check flow to results", async ({ page }) => {
 // is saved: the check is written only at the end of the flow.
 test("check flow: the phone question, signed out", async ({ page }) => {
   await page.goto("/skin-check");
+  await page.getByRole("button", { name: "Answer the questions now" }).click(); // TD-44: the choice comes first
   const name = page.locator('input[type="text"]').first();
   await expect(name).toBeVisible({ timeout: 60_000 });
   await name.fill("Tester");
   await name.press("Enter");
   await page.getByRole("button", { name: "25–34", exact: true }).click();
   await page.getByRole("button", { name: "Male", exact: true }).click();
-  await page.getByRole("button", { name: "Answer the questions now" }).click();
   await expect(page.getByText(/let's confirm it's you/)).toBeVisible();
   await question(page);
 });
@@ -292,13 +294,13 @@ test("check flow: the male-only question (nothing saved)", async ({ page }) => {
   await page.route((url) => url.pathname === "/api/skin-scan", (route) => route.abort());
   await signIn(page, U.routine!.phoneNumber); // no checks, so the full flow; nothing is saved
   await page.goto("/skin-check");
+  await page.getByRole("button", { name: "Answer the questions now" }).click(); // TD-44: the choice comes first
   const name = page.locator('input[type="text"]').first();
   await expect(name).toBeVisible({ timeout: 60_000 });
   await name.fill("Tester");
   await name.press("Enter");
   await page.getByRole("button", { name: "25–34", exact: true }).click();
   await page.getByRole("button", { name: "Male", exact: true }).click();
-  await page.getByRole("button", { name: "Answer the questions now" }).click();
   const file = page.locator('input[type="file"]');
   // G16: the laptop asks for the camera from "Open camera"; then "Take photo".
   const open = page.getByRole("button", { name: "Open camera", exact: true });
