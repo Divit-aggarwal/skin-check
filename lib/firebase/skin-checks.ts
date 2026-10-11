@@ -28,18 +28,9 @@ function productNamesField(answers: SkinCheckAnswers, names: ProductNames) {
 }
 
 /**
- * What we keep from a scan result, as an allowlist rather than the whole
- * object. Two reasons, both hard:
- *
- *  - `overlays` holds up to 7 base64 PNG heatmaps. Firestore's hard document
- *    limit is 1MiB, so persisting the raw result FAILS at runtime on any
- *    scan that requested overlays — which is every scan (PhotoCapture asks
- *    for all of OVERLAY_CATEGORIES).
- *  - `region_hist*` / `region_raw` are per-region stat dumps for retroactive
- *    rescoring. Useful someday, not needed to re-render a past result, and
- *    they dominate the remaining size.
- *
- * Everything the results dashboard actually reads is kept.
+ * An allowlist of the scan result: the base64 `overlays` would break
+ * Firestore's 1 MiB document limit, and the region stat dumps are not needed
+ * to show a past result. Everything the results screen reads is kept.
  */
 function persistableResult(result: SkinScanResult) {
   return {
@@ -55,24 +46,11 @@ function persistableResult(result: SkinScanResult) {
 }
 
 /**
- * Writes one completed Skin Check to `users/{uid}/skinChecks/{scanId}`.
- *
- * ONE USER → MANY SCANS: each scan is its own document under the user's own
- * subtree, keyed by a client-generated `scanId` that was minted when the
- * draft started (lib/skin-check-draft.ts). A user can hold any number of
- * these; nothing here overwrites or looks at a previous one.
- *
- * IDEMPOTENCY: the id is deterministic for a given scan attempt, so a
- * double-tap, a remount, or a retry all address the SAME document. The
- * second write is an update of an existing path, and firestore.rules denies
- * `update` outright — so the duplicate is rejected by the server, not merely
- * guarded against in the client. That's why `permission-denied` is treated
- * as "already saved" below rather than as a failure.
- *
- * The uid is never taken from anything the client asserts in the payload —
- * it comes from the ID token Firebase attaches to the request, and the rules
- * only permit a write where `request.auth.uid == uid`, so a forged uid is
- * rejected server-side.
+ * Writes one completed Skin Check to `users/{uid}/skinChecks/{scanId}`, one
+ * document per scan. A double tap or retry addresses the same document, and
+ * firestore.rules deny `update`, so `permission-denied` on an existing
+ * document means "already saved". The rules also require
+ * `request.auth.uid == uid`.
  */
 export async function saveSkinCheck(
   uid: string,
@@ -99,7 +77,7 @@ export async function saveSkinCheck(
       questionnaireVersion: QUESTIONNAIRE_VERSION,
       ...productNamesField(answers, productNames),
       status,
-      // PHASE 3: the ORIGINAL image lives in a private S3 bucket, never here
+      // The ORIGINAL image lives in a private S3 bucket, never here
       // — no bytes, no base64, no public URL. `key` is only ever the
       // deterministic path built from this uid + scanId (lib/s3-key.ts), the
       // same builder the presign route uses, so it cannot name another
@@ -166,12 +144,7 @@ export async function saveSkinCheck(
 
 // ─── Reading a user's own scans back ───────────────────────────────────────
 
-/**
- * One row of the "your previous scans" list. Deliberately a summary, not the
- * whole document: this list only needs to say what happened and when, and
- * pulling every `answers` map and `result` payload to render a date and a
- * status is bandwidth nobody asked for.
- */
+/** One row of the past-scans list: a summary, not the whole document. */
 export interface SkinCheckSummary {
   scanId: string;
   status: SkinCheckStatus;
@@ -188,16 +161,8 @@ export interface SkinCheckSummary {
 }
 
 /**
- * Every scan this user owns, newest first.
- *
- * OWNERSHIP IS NOT CHECKED HERE, ON PURPOSE. The path is
- * `users/{uid}/skinChecks`, and firestore.rules only allows `get, list` where
- * `request.auth.uid == uid` — so a caller passing someone else's uid gets a
- * permission-denied from the server, not a filtered list from this function.
- * Adding a client-side check would imply the server needed help; it doesn't.
- *
- * Returns every terminal status, not just "completed". A user whose analysis
- * failed still made a scan, and hiding it would read as "my data is gone".
+ * Every scan this user owns, newest first, every terminal status included.
+ * Ownership is enforced by firestore.rules, not here.
  */
 export async function listSkinChecks(uid: string): Promise<SkinCheckSummary[]> {
   const snapshot = await getDocs(

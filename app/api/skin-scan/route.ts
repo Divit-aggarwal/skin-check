@@ -34,12 +34,9 @@ const PERSIST_TIMEOUT_MS = 3_000;
 // TD-37 (1): only the photo readings' overlays, so no heatmap of a hidden reading is ever made or returned.
 const VALID_OVERLAYS = new Set<string>(PHOTO_METRICS);
 
-// PHASE 2: authenticated. Every request must carry a Firebase ID token that
-// this server verifies itself (see lib/firebase/admin.ts) — the browser's own
-// claim to be signed in, and Phase 1's client-side ordering, are no longer
-// part of the security decision. Proxies to the self-hosted skin-scan service
-// (OpenCV + MediaPipe FastAPI, DurtyDhiana/skin-scan) so the client never
-// talks to it directly.
+// Authenticated: every request carries a Firebase ID token this server
+// verifies (lib/firebase/admin.ts). Proxies to the self-hosted skin-scan
+// service, which the client never talks to directly.
 const SKIN_SCAN_API_URL = process.env.SKIN_SCAN_API_URL;
 
 // A function, not a shared constant: a Response body can only be consumed
@@ -156,10 +153,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Reached only by an authenticated caller now, so anonymous traffic can no
-  // longer burn the shared daily budget. Still keyed by IP, not by `uid` —
-  // rate limiting is explicitly out of scope for this phase (see the report's
-  // limitations); the verified uid is available here whenever that changes.
+  // Keyed by IP, not uid (the uid is available if that changes).
   const quotaLimited = consumeDailyQuota(request, SKIN_SCAN_ROUTE_LIMITS);
   if (quotaLimited) return quotaLimited;
 
@@ -206,10 +200,7 @@ export async function POST(request: NextRequest) {
     const status = upstreamResponse.status;
     const bodyText = await upstreamResponse.text().catch(() => "<unreadable>");
 
-    // The service now sends a stable `error_code` alongside `detail` on every
-    // error response — prefer that over guessing from the HTTP status alone,
-    // since status collapses distinct failures (e.g. a corrupt upload and a
-    // missing face both used to arrive as plain 400s).
+    // Prefer the service's `error_code`: the status alone merges distinct failures.
     let errorCode: string | null = null;
     let upstreamDetail = bodyText;
     try {
@@ -368,17 +359,10 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Loud-by-design: this schema used to silently drop region_raw/region_hist/
-  // region_hist_bin_edges/pipeline_version because z.object() strips
-  // undeclared keys. Comparing raw vs. parsed top-level keys turns the next
-  // instance of that into a visible warning instead of silent data loss.
+  // z.object() strips undeclared keys: warn when parsing drops a top-level field.
   const rawKeys = rawJson && typeof rawJson === "object" ? Object.keys(rawJson as Record<string, unknown>) : [];
   const parsedKeys = Object.keys(parsed.data);
   const droppedKeys = rawKeys.filter((key) => !parsedKeys.includes(key));
-  // Only logs when a field is actually dropped — was unconditional on every
-  // successful request, which is production log noise for a case that's
-  // fine (no key names are sensitive either way, but there's no reason to
-  // emit this on the hot path when nothing is wrong).
   if (droppedKeys.length > 0) {
     console.warn("skin-scan response fields dropped by schema:", droppedKeys);
   }

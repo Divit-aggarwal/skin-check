@@ -9,7 +9,7 @@ import { MAX_ORIGINAL_BYTES, presignOriginalUpload, S3NotConfiguredError, UPLOAD
 // firebase-admin and the AWS SDK both need Node APIs.
 export const runtime = "nodejs";
 
-// PHASE 3. Hands the browser a short-lived presigned PUT for exactly one
+// Hands the browser a short-lived presigned PUT for exactly one
 // object: this user's original image for this scan. The uid comes only from
 // the verified ID token, and the key is built here — a `uid` in the body is
 // ignored, and a scanId that isn't a plain id is rejected, so there is no

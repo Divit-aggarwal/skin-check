@@ -27,11 +27,7 @@ import { ECHO_FALLBACK_LEAD, screenEchoReply } from "@/lib/echo-reply-screen";
 // explicit opt-in as /api/skin-scan.
 export const runtime = "nodejs";
 
-// Every field below every user-controlled string/array a legitimate client
-// could ever send, generous enough that no real usage hits it (the deepest
-// case, an /echo thread, is capped client-side at nothing but server-capped
-// at the last 20 messages inside runEchoChat — this bound only exists to
-// stop a deliberately oversized payload, not to constrain the product).
+// Only stops a deliberately oversized payload; no real use comes near it.
 const MAX_BODY_BYTES = 50_000;
 
 // Authenticated (Gate 02): every request must carry a Firebase ID token this
@@ -303,14 +299,9 @@ export async function POST(request: NextRequest) {
     }
     return respond(geminiReply);
   } catch (err) {
-    // Category + message only — never the raw SDK error object, which can
-    // carry request/response internals that don't belong in server logs.
-    // Name and code only: a Firestore failure in loadTrustedEchoContext
-    // carries the doc path (users/<uid>/...) in its message.
-    // F18: a Gemini ApiError carries its HTTP status in .status (not .code) and
-    // Google's reason code (API_KEY_INVALID, RESOURCE_EXHAUSTED, ...) inside its
-    // message. Only those two are logged: never the message itself, which can
-    // quote the request.
+    // Name and code only: a Firestore message carries the doc path (the uid).
+    // F18: for Gemini, its HTTP status and Google's reason code only, never
+    // the message, which can quote the request.
     console.error("skin-check Echo chat failed:", (err as Error)?.name ?? "unknown", (err as { code?: unknown })?.code ?? "", ...geminiErrorDetail(err));
     // F15: a Gemini timeout says so, and asks for another try.
     if (isGeminiTimeout(err)) {
@@ -374,12 +365,8 @@ async function echoGates(uid: string, scanId: string): Promise<NextResponse | nu
     return NextResponse.json({ error: "Please agree to share your skin check with Echo.", code: "AI_CONSENT_REQUIRED" }, { status: 403 });
   }
 
-  // After the 18+ and consent gates (R-4): a user they refuse is told why,
-  // whatever the key. Before the quota, so a misconfiguration spends nothing.
-  // Fails loudly rather than letting getClient() throw deep inside the try
-  // block below and get flattened into the same 502 as a real Gemini outage
-  // — same reasoning as /api/skin-scan's SCAN_MISCONFIGURED check. An unset
-  // key is a deploy misconfiguration (500), not a provider failure (502).
+  // After the 18+ and consent gates (R-4), before the quota. An unset key is a
+  // deploy misconfiguration (500), not a Gemini outage (502).
   if (!geminiApiKey()) {
     console.error("Gemini API key is not set (GEMINI_API_KEY, or GEMINI_DEV_API_KEY in development) — refusing to call Gemini.");
     return NextResponse.json(

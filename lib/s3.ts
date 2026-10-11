@@ -14,9 +14,7 @@ if (typeof window !== "undefined") {
 // AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY / AWS_SESSION_TOKEN (they grant
 // nothing, but the SDK's env provider reads all three together) — setting only
 // two of the three would sign requests with our key and Vercel's stale session
-// token, which fails as InvalidToken. Reading our own names sidesteps that
-// entirely. AWS_REGION is still honoured as a fallback because on a Lambda-like
-// runtime it is always present and correct.
+// token, which fails as InvalidToken. Reading our own names sidesteps that.
 //
 // No AWS_REGION fallback, deliberately: Vercel injects its own AWS_REGION (the
 // function's region), so a forgotten S3_SKIN_IMAGES_REGION would NOT fail

@@ -47,13 +47,7 @@ export function revealCountFor(section: SectionConfig, answers: SkinCheckAnswers
   return Math.min(answeredCount + 1, eligible.length);
 }
 
-// A section can in principle end up with zero eligible steps for a given
-// user if every one of its steps carries a `condition` that fails — skip
-// straight past it instead of rendering an empty section with a vacuously
-// "complete" Continue button. No section hits this today (personal-context's
-// skin_factors step is unconditional, so that section is never empty), but
-// eligibleStepsFor has no way to guarantee that for every future section, so
-// this stays as the general-purpose guard.
+// A section with no eligible steps is skipped rather than shown empty.
 // When a previous questionnaire is being reused, its sections are skipped as
 // well, leaving only the per-scan ones: verify → photo → results. Owner
 // decision 2026-10-11: nothing is asked again (this replaced D-19's re-asking).
@@ -185,12 +179,9 @@ export function useSkinCheckFlow() {
   const { session: liveSession, setSession } = useSkinCheckSession();
   const session = liveSession?.fromDashboard ? null : liveSession;
 
-  // Minted once per scan attempt and stable from the questionnaire's first
-  // answer through to the Firestore write, where it becomes the document id.
-  // One value does three jobs: it keys the local draft, it makes a
-  // double-submission address the same document instead of creating a
-  // second one, and it's the stable id an image reference will hang off if
-  // a bucket is ever wired up.
+  // One id per scan attempt, from the first answer to the Firestore write
+  // (the document id): it keys the draft and makes a double submit hit the
+  // same document.
   const [scanId, setScanIdState] = useState(newScanId);
   // Read by updateScan to drop late responses from a superseded attempt.
   // Set in the same statement as the state, not on the next render, so a
@@ -229,11 +220,7 @@ export function useSkinCheckFlow() {
   // dashboard retry, or a remount with a live session from /echo, whose
   // draft was already cleared).
   const [draftFinished, setDraftFinished] = useState(() => session !== null);
-  // Stopgap for the under-18 age bucket, gated at the "About You" boundary —
-  // real guardian-consent handling doesn't exist yet anywhere in this repo
-  // (flagged in Step 0). This just stops the rest of the flow, including
-  // every later universal-core question, from rendering at all for that
-  // bucket; it is not a substitute for a real consent flow.
+  // Under 18 stops the flow at About you. A stopgap, not a guardian-consent flow.
   const [blocked, setBlocked] = useState(false);
   // An under-18 answer is sticky once recorded (decision 4), so the user
   // confirms it first; a mis-tap is otherwise only fixable by support.
@@ -550,9 +537,7 @@ export function useSkinCheckFlow() {
     setProductNames((prev) => ({ ...prev, [key]: text }));
   }, []);
 
-  // Only advances reveal when the step committing is the currently-active
-  // (last revealed) one — editing an earlier, already-passed answer is a
-  // no-op here.
+  // Only the last revealed step reveals the next one.
   const commitStep = useCallback(
     (stepId: string) => {
       const stepIndex = eligibleSteps.findIndex((s) => s.id === stepId);

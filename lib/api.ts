@@ -39,11 +39,7 @@ const SkinScanResponseSchema = z.object({
 // is very likely still open.
 const PERSIST_RETRY_DELAY_MS = 5_000;
 
-// Above the server route's own 30s upstream timeout (app/api/skin-scan/route.ts)
-// on purpose — that route always resolves (success, or a clean 502/504) within
-// its own bound, so this only needs to catch a request that never came back at
-// all (dropped connection, hung platform-level request), not race the server's
-// own timeout and turn an otherwise-successful slow scan into a client error.
+// Above the route's own 30s timeout: this only catches a request that never came back.
 const SKIN_SCAN_CLIENT_TIMEOUT_MS = 45_000;
 
 // Fetched per request, never cached by us. getIdToken returns the SDK's
@@ -55,10 +51,7 @@ const SKIN_SCAN_CLIENT_TIMEOUT_MS = 45_000;
 // localStorage, IndexedDB, Firestore, a cookie, the draft, or React state.
 // Firebase owns its lifetime.
 async function freshIdToken(): Promise<string> {
-  // `currentUser` is Firebase's own synchronous view of the restored/verified
-  // session, not app state, so it can't be spoofed by a stale draft or a
-  // re-render. As of PHASE 2 this is a convenience, not the security
-  // boundary: the server verifies the token itself either way.
+  // A convenience, not the security boundary: the server verifies the token itself.
   const user = auth().currentUser;
   if (!user) {
     throw new ApiError(401, "Skin scan requires a verified phone number.", "auth/required");
@@ -89,17 +82,12 @@ async function requestSkinScan(
   captureQuality?: CaptureQuality,
   processingConsentVersion?: string
 ): Promise<{ result: SkinScanResult; persisted?: boolean | undefined; reason?: "consent_missing" | undefined }> {
-  // PHASE 1 fast path — a signed-out caller is stopped before a request is
-  // even built. Every route that can put a facial image on the wire funnels
-  // through here.
+  // A signed-out caller is stopped before a request is built.
   const idToken = await freshIdToken();
 
   const formData = new FormData();
   formData.append("image", photo, "scan.jpg");
-  // The proxy (and the skin-scan service itself, main.py's `overlays` query
-  // param) accepts a comma-separated category list in one request — an array
-  // here joins into that same single field rather than firing one request
-  // per category.
+  // One comma-separated field, one request.
   const overlayParam = Array.isArray(overlay) ? overlay.join(",") : overlay;
   if (overlayParam) formData.append("overlay", overlayParam);
   // C2: lets the server persist the full analysis under this scan. Optional
@@ -136,18 +124,12 @@ async function requestSkinScan(
   }
 
   if (!response.ok) {
-    // A 401 here means the server refused the token, not that the photo was
-    // bad — surfacing it as "Failed to analyze photo." would send the user
-    // retaking pictures to fix an expired session. Carries the same
-    // `auth/required` code as the pre-flight guard above so callers have one
-    // condition to branch on.
+    // The token was refused, not the photo: the same auth/required code as the guard above.
     if (response.status === 401) {
       throw new ApiError(401, "Your session expired. Please verify your phone number again.", "auth/required");
     }
-    // The route's own error `code` (e.g. NO_FACE_DETECTED) is passed through
-    // so the capture step can name a retake reason (owner O-5). Same status
-    // and message as before. The client-only codes are never taken from the
-    // server, so isAuthError / isUploadError keep their meaning.
+    // The route's code (e.g. NO_FACE_DETECTED) names a retake reason (owner O-5).
+    // Client-only codes are never taken from the server.
     const body: unknown = await response.json().catch(() => null);
     const code = body && typeof body === "object" ? (body as { code?: unknown }).code : undefined;
     const passThrough = typeof code === "string" && code !== "auth/required" && code !== "upload/failed" ? code : undefined;
@@ -164,7 +146,7 @@ async function requestSkinScan(
 }
 
 // ─── Original image upload (private S3) ────────────────────────────────────
-// PHASE 3. Two hops, both authenticated by the same Firebase ID token the
+// Two hops, both authenticated by the same Firebase ID token the
 // scan uses: our own route mints a 5-minute presigned PUT for a key IT
 // builds from the verified uid, then the bytes go straight from the browser
 // to S3 — they never pass through Next.js.
@@ -267,11 +249,8 @@ export async function uploadOriginalImage(scanId: string, original: Blob): Promi
  * separate permissions (the user agreed to have this photo analyzed, not to
  * have it kept), and the record then truthfully says stored: false.
  *
- * `original` is optional because a restored draft only carries the downscaled
- * `photo` (types/skin-scan.ts) — there are simply no original bytes left to
- * store in that case. `alreadyStored` skips a redundant re-upload on retry
- * after the CV half failed; re-uploading would be harmless (same key, same
- * object), just wasted.
+ * `original` is absent for a restored draft (only the downscaled photo is
+ * kept). `alreadyStored` skips a re-upload on retry.
  */
 export async function runSkinScan(opts: {
   scanId: string;
@@ -358,10 +337,7 @@ const SkinCheckChatResponseSchema = z.object({
 
 const EchoOpeningResponseSchema = z.object({ ok: z.literal(true), reply: z.string(), products: z.array(ShownProductSchema).max(5) });
 
-// The route's error responses (both the upfront CHAT_MISCONFIGURED check and
-// the catch-all CHAT_SERVICE_ERROR) — `code` lets the caller tell "Echo isn't
-// set up, retrying won't help" apart from "transient failure, retry might
-// work" instead of collapsing both into one generic message.
+// `code` tells "retrying won't help" (CHAT_MISCONFIGURED) from a transient failure.
 const ChatErrorResponseSchema = z.object({
   error: z.string().optional(),
   code: z.string().optional(),
@@ -377,10 +353,7 @@ const CHAT_CLIENT_TIMEOUT_MS = 40_000;
 // verified uid (app/api/skin-check/chat/route.ts). `history` is the thread
 // BEFORE `message`; non-empty history must carry the historyToken the
 // previous reply returned, and the reply comes back with the next one.
-//
-// `signal` is optional and caller-supplied (EchoPage.tsx aborts it on
-// unmount, e.g. the user navigates away from /echo mid-request) — it
-// composes with, rather than replaces, this function's own timeout abort.
+// `signal` (EchoPage aborts on unmount) adds to this function's own timeout.
 export async function getSkinCheckChatReply(
   scanId: string,
   region: EchoRegion,
