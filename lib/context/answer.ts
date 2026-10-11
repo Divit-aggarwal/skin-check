@@ -45,11 +45,27 @@ export function fallbackLines(pkg: ContextPackage): string[] {
   return [...(focus.length > 0 ? focus : readings.filter((r) => r.region === "all")).map((r) => r.text), pkg.uncertainty[0].text];
 }
 
-export const fallbackAnswer = (pkg: ContextPackage): string => fallbackLines(pkg).join("\n");
+/** A package text as a sentence: our fact texts ("Redness, ...: Moderate") have no full stop of their own. */
+export const sentence = (text: string): string => (/[.!?:]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`);
+
+// ponytail: a short word list, two hits make Hinglish; a wrong guess only changes the lead's language.
+const HINGLISH_WORD = /\b(?:mera|mere|meri|merko|mujhe|mujhko|kya|kaise|kyun|kyu|batao|btao|bataiye|batayein|hai|hain|nahi|nahin|aap|aapka|aapki|acc?ha|kuch|ke|ki|ka|baa?re|mei|mein|karo|kare|karu|yeh|ye|wala|wali|liye|chahiye|samjhao|bolo)\b/gi;
+export const isHinglish = (message: string): boolean => new Set((message.match(HINGLISH_WORD) ?? []).map((w) => w.toLowerCase())).size >= 2;
+
+/** The lead of the fixed answer, in the user's language (English, or Hinglish in Latin letters). */
+export const FALLBACK_LEAD = "Echo couldn't answer that in a way we can check. Here is what this photo showed:";
+export const FALLBACK_LEAD_HINGLISH = "Echo iska jawab check karke nahi de saki. Is photo mein yeh dikha:";
+
+/** F28: a card reason never repeats its lead-in ("You told us You told us …"). */
+export const oneLeadIn = (reason: string): string => reason.trim().replace(/\b(you told us|aapne bataya)(?:[\s:,]+\1\b)+/gi, "$1");
+
+/** F-row 2026-10-11: a lead line, then each fact as its own sentence on its own line, never joined fragments. */
+export const fallbackAnswer = (pkg: ContextPackage, message = ""): string =>
+  [isHinglish(message) ? FALLBACK_LEAD_HINGLISH : FALLBACK_LEAD, ...fallbackLines(pkg).map(sentence)].join("\n");
 
 /** F11: the line added to the fixed reply when the check has no questionnaire answers. */
 export const FINISH_QUESTIONNAIRE_COPY = "Finish the Skin Check questions for this check, so Echo can help with your questions.";
-export const comparisonAnswer = (pkg: ContextPackage): string => [COMPARISON_LEAD, ...fallbackLines(pkg)].join("\n");
+export const comparisonAnswer = (pkg: ContextPackage): string => [COMPARISON_LEAD, ...fallbackLines(pkg).map(sentence)].join("\n");
 
 const NO_RETRY_CHECKS = new Set(["non_latin_script", "malformed_output"]);
 
@@ -83,19 +99,20 @@ export async function answerFromPackage(
     }
     if (last.passed) {
       const claims = last.answer!.claims;
-      const join = (cs: typeof claims) => cs.map((c) => c.text.trim()).join(" ");
+      // F27: in Hinglish, each claim on its own line, so our English fact texts never run into Hinglish words.
+      const join = (cs: typeof claims) => cs.map((c) => sentence(c.text)).join(isHinglish(message) ? "\n" : " ");
       return {
         reply: join(claims),
         referral: false,
         modelId,
         validator: { passed: true, failures: names(...v), regenerated, fallback: false },
-        products: (last.answer!.products ?? []).map((p) => ({ productId: p.product_id, reason: p.reason.trim() })),
+        products: (last.answer!.products ?? []).map((p) => ({ productId: p.product_id, reason: oneLeadIn(p.reason) })),
         // Under a red flag only claims that cite a fact and no product remain: no uncited sales lead-in (safety review).
         withoutProducts: join(claims.filter((c) => c.fact_ids.length > 0 && !c.fact_ids.some((id) => id.startsWith("rec.")))),
         productContent: (last.answer!.products ?? []).length > 0 || claims.some((c) => c.fact_ids.some((id) => id.startsWith("rec."))),
       };
     }
-    return plain(fallbackAnswer(pkg), false, { passed: false, failures: names(...v), regenerated, fallback: true });
+    return plain(fallbackAnswer(pkg, message), false, { passed: false, failures: names(...v), regenerated, fallback: true });
   };
 
   if (v1.passed || v1.answer?.needs_referral || v1.answer?.distress === true) return done([v1], false, first.modelId);
@@ -116,14 +133,20 @@ export async function answerFromPackage(
 
 export type ProductGuard = "red_flag" | "doctor_line" | "result_question" | null;
 
-/** A red flag first; then a pregnancy, breastfeeding or prescription answer (the extra-caution list), while the doctor line is on. */
+/**
+ * A result question first; then a pregnancy, breastfeeding or prescription answer (the extra-caution list), while the doctor line is on.
+ * Owner decision TD-45 (2026-10-11): a questionnaire red flag no longer blocks products; the opening shows the note once (openingNote).
+ * "red_flag" is set by the caller only for a red-flag chat message earlier on this check.
+ */
 export function productGuard(safety: SafetyState, message = ""): ProductGuard {
-  if (safety.redFlag) return "red_flag";
   // Our own product names ("Clear Seal") are not a result word.
   const asked = OWN_PRODUCT_NAMES.reduce((t, n) => t.replace(new RegExp(n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi"), " "), message);
   if (RESULT_QUESTION.test(asked)) return "result_question";
   return safety.extraCaution && PRODUCT_DOCTOR_LINE_ON ? "doctor_line" : null;
 }
+
+/** TD-45: the dermatologist note, once, as the opening's first line (the app shows it as its own panel). */
+export const openingNote = (safety: SafetyState, reply: string): string => (safety.redFlag ? `${COPY.referral}\n${reply}` : reply);
 
 /**
  * What the user sees. Under a red flag: the dermatologist line first and no

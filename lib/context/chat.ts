@@ -9,7 +9,7 @@ import { evaluateSafety } from "@/lib/rules/safety";
 import type { SkinStateRegionKey } from "@/lib/skin-state";
 import { loadTrustedSkinState2Series } from "@/lib/skin-state-2-loader";
 import type { SkinState2Result } from "@/lib/skin-state-2";
-import { answerFromPackage, comparisonAnswer, fallbackAnswer, FINISH_QUESTIONNAIRE_COPY, guardedReply, productGuard, type ShownProduct } from "./answer";
+import { answerFromPackage, comparisonAnswer, fallbackAnswer, FINISH_QUESTIONNAIRE_COPY, guardedReply, openingNote, productGuard, type ShownProduct } from "./answer";
 import { echoProductsOn, listedProduct, OPENING_MESSAGE, OWN_PRODUCTS_VERSION } from "./products";
 import { RULE_INPUT_FIELDS } from "@/lib/rules/settings";
 import { buildContextPackage, packageSha256 } from "./builder";
@@ -134,7 +134,7 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
     // F11: a check with no questionnaire answers gets the same fixed reply plus
     // a line asking the user to finish the questionnaire, so Echo can help.
     const noAnswers = !RULE_INPUT_FIELDS.some((f) => Object.hasOwn(trusted.answers, f));
-    const reply = noAnswers ? `${fallbackAnswer(pkg)}\n${FINISH_QUESTIONNAIRE_COPY}` : fallbackAnswer(pkg);
+    const reply = noAnswers ? `${fallbackAnswer(pkg, message)}\n${FINISH_QUESTIONNAIRE_COPY}` : fallbackAnswer(pkg, message);
     await recordChatTurns(
       uid, scanId, region, message, reply,
       meta({ ...NO_CALL, opening, packageVersion: pkg.packageVersion, packageSha256: packageSha256(pkg), validator: { passed: false, failures: [noAnswers ? "no_answers" : "safety_unavailable"], regenerated: false, fallback: true }, prefilter: null, redFlag: false })
@@ -167,6 +167,7 @@ export async function handleContextChat(input: { uid: string; scanId: string; re
   // A red-flag message earlier on this check counts like a quiz red flag (safety review).
   const guard = ownProducts && (await hadRedFlagTurn(uid, scanId)) ? "red_flag" : productGuard(safety, opening ? "" : message);
   const shown = guardedReply(outcome, guard, opening);
+  if (opening && guard !== "red_flag") shown.reply = openingNote(safety, shown.reply);
   // Not best effort: an unrecorded reply would make the D-15 history diverge.
   await recordChatTurns(
     uid, scanId, region, message, outcome.reply,
@@ -189,12 +190,15 @@ export async function serveStoredOpening(uid: string, scanId: string, stored: St
   const trusted = await loadTrustedEchoContext(uid, scanId);
   if (!trusted) return { ok: false, status: 409, code: "CHAT_ANALYSIS_UNAVAILABLE", error: "This scan's analysis isn't available yet." };
   let guard: ReturnType<typeof productGuard>;
+  let safety: SafetyState;
   try {
-    guard = (await hadRedFlagTurn(uid, scanId)) ? "red_flag" : productGuard(evaluateSafety({ answers: trusted.answers, confirmedThisScan: [] }));
+    safety = evaluateSafety({ answers: trusted.answers, confirmedThisScan: [] });
+    guard = (await hadRedFlagTurn(uid, scanId)) ? "red_flag" : productGuard(safety);
   } catch {
     // Fails closed: no opening at all rather than products without their guard.
     return { ok: false, status: 409, code: "OPENING_UNAVAILABLE", error: "No suggestion for this check." };
   }
   const shown = guardedReply(stored, guard, true);
+  if (guard !== "red_flag") shown.reply = openingNote(safety, shown.reply);
   return { ok: true, reply: shown.reply, products: onlyListed(shown.products) };
 }

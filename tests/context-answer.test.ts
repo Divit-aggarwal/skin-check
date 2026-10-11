@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { answerFromPackage, comparisonAnswer, fallbackAnswer, fallbackLines } from "@/lib/context/answer";
+import { answerFromPackage, comparisonAnswer, FALLBACK_LEAD, FALLBACK_LEAD_HINGLISH, fallbackAnswer, fallbackLines, isHinglish, sentence } from "@/lib/context/answer";
 import { buildContextPackage, packageFacts, UNCERTAINTY } from "@/lib/context/builder";
 import { DOCTOR_REFERRAL_COPY, REFERRAL_COPY, REFERRAL_LINE, redFlagHit, referralCopyFor } from "@/lib/context/prefilter";
 import { renderSystemInstruction, responseSchema } from "@/lib/context/renderer";
@@ -96,10 +96,32 @@ describe("answer path", () => {
 
   it("the fallback and the comparison template use package text only", () => {
     const texts = new Set(packageFacts(pkg).map((f) => f.text));
-    for (const line of fallbackAnswer(pkg).split("\n")) expect(texts.has(line), line).toBe(true);
-    expect(comparisonAnswer(pkg).split("\n").slice(1)).toEqual(fallbackLines(pkg));
+    const [lead, ...lines] = fallbackAnswer(pkg).split("\n");
+    expect(lead).toBe(FALLBACK_LEAD);
+    for (const line of lines) expect(texts.has(line) || texts.has(line.replace(/\.$/, "")), line).toBe(true);
+    expect(comparisonAnswer(pkg).split("\n").slice(1)).toEqual(fallbackLines(pkg).map(sentence));
     const noSkin = buildContextPackage(fullInput({ skin: null }));
-    expect(fallbackAnswer(noSkin)).toBe(UNCERTAINTY.text);
+    expect(fallbackAnswer(noSkin)).toBe(`${FALLBACK_LEAD}\n${sentence(UNCERTAINTY.text)}`);
+  });
+
+  it("the fallback reads as sentences on their own lines, with a Hinglish lead for a Hinglish message", () => {
+    const lines = fallbackAnswer(pkg, "Hii, merko mere skin ke bare mei kuch accha btao").split("\n");
+    expect(lines[0]).toBe(FALLBACK_LEAD_HINGLISH);
+    for (const line of lines.slice(1)) expect(line).toMatch(/^[A-Z].*[.!?]$/);
+    expect(lines.join("\n")).not.toMatch(/bataya: You told us/i);
+    for (const m of ["what shall i use for my acne ?", "Explain my results in simple words", "suggest me a routine", "Is this ok for me?"]) {
+      expect(fallbackAnswer(pkg, m).split("\n")[0], m).toBe(FALLBACK_LEAD);
+    }
+    expect(isHinglish("Mere liye ek routine batao")).toBe(true);
+  });
+
+  it("a passing Hinglish answer puts each claim on its own line; English stays one paragraph", async () => {
+    const self = packageFacts(pkg).find((f) => f.id.startsWith("self."))!;
+    const ok = answer({ claims: [{ claim_type: "smalltalk", text: "Main aapki photo ke baare mein bata sakti hoon.", fact_ids: [] }, { claim_type: "self_reported_echo", text: self.text, fact_ids: [self.id] }], needs_referral: false });
+    const hi = await answerFromPackage(pkg, "Hii, merko mere skin ke bare mei kuch accha btao", [], { generate: fake(ok) });
+    expect(hi.reply).toBe(`Main aapki photo ke baare mein bata sakti hoon.\n${sentence(self.text)}`);
+    const en = await answerFromPackage(pkg, "Tell me about my skin", [], { generate: fake(ok) });
+    expect(en.reply).toBe(`Main aapki photo ke baare mein bata sakti hoon. ${sentence(self.text)}`);
   });
 });
 
@@ -118,7 +140,7 @@ describe("answer path: a self-harm claim", () => {
     const ok = answer({ claims: [{ claim_type: "self_reported_echo", text: self.text, fact_ids: [self.id] }], needs_referral: false });
     const out = await answerFromPackage(p, "tell me", [], { generate: fake(ok) });
     expect(out.referral).toBe(false);
-    expect(out.reply).toBe(self.text);
+    expect(out.reply).toBe(`${self.text}.`); // a whole sentence (2026-10-11)
   });
 });
 

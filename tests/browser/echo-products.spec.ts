@@ -78,12 +78,13 @@ for (const width of ["390", "768", "1280"] as const) {
 test.describe("TD-34 guards and flows (390px)", () => {
   test.use(DEVICE["390"]);
 
-  test("red flag: the dermatologist line first, and no product card", async ({ page }) => {
+  test("questionnaire red flag (TD-45): the dermatologist note once as its own panel, then the routine with cards", async ({ page }) => {
     await signIn(page, P_SEED.redFlag.phoneNumber);
     await page.goto("/echo");
-    await expect(page.getByText(COPY.referral)).toBeVisible({ timeout: 60_000 });
-    await expect(page.getByRole("region", { name: E.productsLabel })).toHaveCount(0);
-    await expect(page.locator("main")).not.toContainText(OWN_PRODUCTS[0]!.name);
+    await expect(page.getByRole("note").getByText(COPY.referral)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(COPY.referral)).toHaveCount(1);
+    await expect(page.getByText(OPENING)).toBeVisible();
+    await expect(cards(page)).toHaveCount(4);
     await shot(page, "echo-opening-red-flag-390");
   });
 

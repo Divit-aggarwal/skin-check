@@ -4,6 +4,7 @@ import type { EchoChatMessage } from "@/lib/gemini";
 import type { EchoRegion } from "@/lib/echo-regions";
 import type { ProductGuard, ShownProduct, ValidatorRecord } from "./answer";
 import { OWN_PRODUCTS_VERSION } from "./products";
+import { DOCTOR_REFERRAL_COPY } from "./prefilter";
 
 // SERVER ONLY. D-15 (approved for local use): users/{uid}/chatTurns are the
 // only history source; client-sent turns are never fed to Gemini. Written
@@ -98,10 +99,17 @@ export async function loadSplitCheckTurns(uid: string, scanId: string, region: E
     .map((t) => ({ role: "user" as const, text: t.text as string }));
 }
 
-/** TD-34 (safety review): any red-flag turn for this check, in any thread. Then no product is shown for the check. */
+/**
+ * TD-34 (safety review): a red-flag turn for this check, in any thread, after which no product is shown for the check.
+ * F29 (owner, 2026-10-11): a reply that is only the doctor line hides products in that reply alone, so it does not count.
+ * Self-harm and other red-flag referrals (any other referral text) still count.
+ */
+export const hidesProductsAfter = (t: { role?: unknown; redFlag?: unknown; text?: unknown }): boolean =>
+  t.role === "echo" && t.redFlag === true && t.text !== DOCTOR_REFERRAL_COPY;
+
 export async function hadRedFlagTurn(uid: string, scanId: string): Promise<boolean> {
   const snap = await turns(uid).where("scanId", "==", scanId).get();
-  return snap.docs.some((d) => d.data().redFlag === true);
+  return snap.docs.some((d) => hidesProductsAfter(d.data()));
 }
 
 export interface StoredOpening {

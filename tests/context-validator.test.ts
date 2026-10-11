@@ -265,6 +265,9 @@ describe("F07 live-run fixes: real answers no longer rejected, bad answers still
     passes([{ claim_type: "smalltalk", text: "Hello! How can I help you today with your skin check results?", fact_ids: [] }]);
     fails([{ claim_type: "smalltalk", text: "Hello! Your skin looks lovely today.", fact_ids: [] }], "citation_rule");
     fails([{ claim_type: "smalltalk", text: "Your skin check looks good.", fact_ids: [] }], "citation_rule");
+    // 2026-10-11: the Hinglish name passes the same way; a state word with it still fails.
+    passes([{ claim_type: "smalltalk", text: "Hello! Main aapko aapke skin check ke baare mein bata sakti hoon.", fact_ids: [] }]);
+    fails([{ claim_type: "smalltalk", text: "Aapke skin check mein sab good hai, aapki skin oily hai.", fact_ids: [] }], "citation_rule");
     fails([{ claim_type: "smalltalk", text: "Happy to help with your skin check results, all good.", fact_ids: [] }], "citation_rule");
     fails([{ claim_type: "smalltalk", text: "Your skin check results are fine.", fact_ids: [] }], "citation_rule");
   });
@@ -477,8 +480,11 @@ describe("Hinglish replies (ctx-prompt-4)", () => {
   it("the instruction asks for Hinglish in Latin letters and forbids 'English only'", async () => {
     const { renderSystemInstruction, PROMPT_VERSION } = await import("@/lib/context/renderer");
     const sys = renderSystemInstruction(pkg);
-    expect(PROMPT_VERSION).toBe("ctx-prompt-4");
-    expect(sys).toMatch(/simple Hinglish in Latin letters if they write Hinglish/);
+    expect(PROMPT_VERSION).toBe("ctx-prompt-6");
+    expect(sys).toMatch(/simple Hinglish in Latin\s+letters if they write Hinglish/);
+    // 2026-10-11: no example that puts a Hinglish lead-in before an English fact ("Aapne bataya: You told us").
+    expect(sys).not.toMatch(/Aapne bataya: \.\.\./);
+    expect(sys).toMatch(/no Hinglish or English words added before or after it/);
     expect(sys).toMatch(/Never say you can only answer in English/);
     expect(sys).not.toMatch(/Answer in English, in at most/);
   });

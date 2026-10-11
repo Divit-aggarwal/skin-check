@@ -190,7 +190,7 @@ describe("a message in a script Echo does not support (H22)", () => {
 // Red team (2026-10-04, tracker I02, areas B and E): today's Echo checks Gemini's reply and comparison questions.
 describe("today's Echo: Gemini's reply is checked before it is shown or signed", () => {
   it("a made-up number or change: the fixed band answer is shown and signed, never Gemini's text", async () => {
-    const { ECHO_FALLBACK_LEAD } = await import("@/lib/echo-reply-screen");
+    const { FALLBACK_LEAD: ECHO_FALLBACK_LEAD } = await import("@/lib/context/answer");
     getSkinCheckChatReply.mockResolvedValue("Your redness is 73.4% and it improved since last month.");
     const res = await post("what does my redness mean?");
     const body = await res.json();
@@ -261,7 +261,7 @@ describe("today's Echo: final-review fixes", () => {
   });
 
   it("H1: a reply in Devanagari is not shown or signed; the fixed band answer is", async () => {
-    const { ECHO_FALLBACK_LEAD } = await import("@/lib/echo-reply-screen");
+    const { FALLBACK_LEAD: ECHO_FALLBACK_LEAD } = await import("@/lib/context/answer");
     getSkinCheckChatReply.mockResolvedValue("आपकी लालिमा पिछली बार से कम हुई है। रेटिनॉल लगाइए।");
     const reply = (await (await post("मेरी त्वचा कैसी है?")).json()).reply as string;
     expect(reply.startsWith(ECHO_FALLBACK_LEAD)).toBe(true);
