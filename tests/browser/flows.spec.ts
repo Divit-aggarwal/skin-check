@@ -36,9 +36,10 @@ async function darkPhoto(page: Page): Promise<Buffer> {
   return Buffer.from(dataUrl.split(",")[1]!, "base64");
 }
 
-/** Name, age and gender; a signed-in user then passes verify and lands on the photo step. */
+/** The choice (TD-44: first), then name, age and gender; a signed-in user then passes verify and lands on the photo step. */
 async function aboutYou(page: Page, age = "25–34") {
   await page.goto("/skin-check");
+  await page.getByRole("button", { name: Q.answerNow }).click();
   // The check flow's one h1 is the part of the check the user is in.
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(/about you/i);
   const name = page.getByPlaceholder(/name/i).or(page.locator('input[type="text"]')).first();
@@ -47,8 +48,6 @@ async function aboutYou(page: Page, age = "25–34") {
   await page.getByRole("button", { name: age, exact: true }).click();
   // The under-18 confirm comes at the end of the section, after gender.
   await page.getByRole("button", { name: "Female", exact: true }).click();
-  // TD-33 (1): "About the questions" comes next (not for under 18, which is blocked first).
-  if (age !== "<18") await page.getByRole("button", { name: "Answer the questions now" }).click();
 }
 
 const photoInput = (page: Page) => page.locator('input[type="file"]');
@@ -272,7 +271,8 @@ test("Ask Echo, back to the dashboard, a new check starts at the questions", asy
   await expect(page).toHaveURL(/\/echo/);
   await page.goBack();
   await page.getByRole("link", { name: C.newCheck }).first().click();
-  await expect(page.getByText(NAME_PROMPT)).toBeVisible();
+  // TD-44: the questions choice is the first screen of a check that starts afresh.
+  await expect(page.getByRole("heading", { name: Q.title, exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Your photo reading" })).toHaveCount(0);
 });
 
@@ -341,7 +341,8 @@ test("delete the account, sign in again, no history", async ({ page }) => {
 // TD-18 O-D3: the dashboard is reached from the signed-in start page and /account (the results screen is pinned in tests/dashboard-copy.test.ts).
 test("O-D3: the signed-in start page and the account page link to the dashboard; signed out, no link", async ({ page }) => {
   await page.goto("/skin-check");
-  await expect(page.getByText(NAME_PROMPT)).toBeVisible();
+  // TD-44: the choice is the start page now, not the name question.
+  await expect(page.getByRole("heading", { name: Q.title, exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: C.entryLink })).toHaveCount(0);
 
   await signIn(page, U.one!.phoneNumber);

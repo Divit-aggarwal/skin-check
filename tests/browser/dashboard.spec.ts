@@ -6,6 +6,7 @@ import { SHELL_COPY as S } from "@/components/shell/copy";
 import { ROUTINE_COPY as R } from "@/lib/routine/copy";
 import { DASHBOARD_SEED as U } from "./seed-users";
 import { shot, signIn } from "./helpers";
+import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
 
 // Every dashboard state in docs/lanes/dashboard-design.md §3, on a phone
 // screen, each saved as .local-stack/browser-shots/dashboard-<state>.png.
@@ -32,6 +33,8 @@ test("signed out: a sign-in link only", async ({ page }) => {
 test("'/' opens the check flow when signed out and Home when signed in (TD-24 (3))", async ({ page }) => {
   await page.goto("/");
   await expect(page).toHaveURL(/\/skin-check$/);
+  // TD-44: a new visitor's first page is the questions choice.
+  await expect(page.getByRole("heading", { name: Q.title, exact: true })).toBeVisible();
   await signIn(page, U.one!.phoneNumber);
   await page.goto("/");
   await expect(page).toHaveURL(/\/dashboard$/);

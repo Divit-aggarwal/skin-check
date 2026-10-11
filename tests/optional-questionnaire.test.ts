@@ -17,7 +17,8 @@ import {
   reusableBasics,
   SECONDS_PER_QUESTION,
 } from "@/lib/skin-check-validation";
-import { nextEligibleIndex, prevEligibleIndex, PHOTO_INDEX } from "@/lib/useSkinCheckFlow";
+import { indexAfterChoice, nextEligibleIndex, prevEligibleIndex, PHOTO_INDEX } from "@/lib/useSkinCheckFlow";
+import { choiceCount } from "@/components/skin-check/QuestionsChoice";
 import { questionsDone, questionsTarget, productNamesOf, type Doc } from "@/components/dashboard/state";
 import { cameraView, CAPTURE_COPY } from "@/components/skin-check/captureStates";
 import { QUESTIONS_COPY } from "@/components/skin-check/questionsCopy";
@@ -64,6 +65,59 @@ describe("TD-33 (1): how many questions, and how long", () => {
     expect(QUESTIONS_COPY.skip.join(" ")).toMatch(/Echo cannot answer questions about this check until the questions are done/);
     expect(QUESTIONS_COPY.skip.join(" ")).toMatch(/photo check and your readings/);
     expect(QUESTIONS_COPY.skip.join(" ")).toMatch(/Home or Account/);
+  });
+});
+
+describe("TD-44: the choice is the first screen; a skip is confirmed first", () => {
+  // The sections a user goes through after the choice, in order.
+  const walk = (answers: Record<string, string>, skip: boolean) => {
+    const visited: string[] = [];
+    for (let i = indexAfterChoice(answers, false, skip); i < SECTIONS.length; i = nextEligibleIndex(i + 1, answers, false, skip)) visited.push(SECTIONS[i]!.id);
+    return visited;
+  };
+
+  it("skip: About you (for the age check), Verify (consents and phone sign-in), the photo, then results; no question section", () => {
+    expect(walk({}, true)).toEqual(["about-you", "verify", "skin-photo", "get-your-results"]);
+  });
+
+  it("answer: About you, Verify, the photo, every question section, then results (the flow as before)", () => {
+    expect(walk({}, false)).toEqual(["about-you", "verify", "skin-photo", "your-skin", "personal-context", "diet-hydration", "sun-protection", "get-your-results"]);
+  });
+
+  it("name, age and gender already in (returning user who skipped): straight on to Verify, either choice", () => {
+    expect(indexAfterChoice(BASICS, false, true)).toBe(idx("verify"));
+    expect(indexAfterChoice(BASICS, false, false)).toBe(idx("verify"));
+    expect(walk(BASICS, true)).toEqual(["verify", "skin-photo", "get-your-results"]);
+  });
+
+  it("an under-18 answer always goes back through About you and its confirm step", () => {
+    expect(indexAfterChoice({ ...BASICS, age: "under-18" }, false, true)).toBe(idx("about-you"));
+  });
+
+  it("the choice is no longer opened after About you (it is shown once, first)", () => {
+    const hook = readFileSync("lib/useSkinCheckFlow.ts", "utf8");
+    expect(hook).not.toMatch(/section\.id === "about-you" && !reusing\)\s*\{\s*setChoosingQuestions\(true\)/);
+    expect(hook).toContain("useState(() => session === null)");
+  });
+
+  it("the count is real: exact once gender is known, the largest ('up to') before", () => {
+    expect(choiceCount(BASICS)).toEqual({ count: questionSteps(BASICS).length, upTo: false });
+    const most = Math.max(...["female", "male", "other"].map((gender) => questionSteps({ gender }).length));
+    expect(choiceCount({})).toEqual({ count: most, upTo: true });
+    expect(QUESTIONS_COPY.howMany(14, 3, true)).toContain("up to 14 questions");
+  });
+
+  it("the pop-up says only what the code does", () => {
+    // "Echo never receives" the hidden answers: periods and pregnancy live in female_skin_context, never sent (H03).
+    expect(GEMINI_FIELD_INVENTORY.female_skin_context).toBe("not_sent");
+    expect((STEP("female_skin_context") as { options: { value: string }[] }).options.map((o) => o.value)).toEqual(expect.arrayContaining(["period_related_breakouts", "pregnant_or_breastfeeding"]));
+    // Google and outside India, as the AI-share consent says.
+    expect(QUESTIONS_COPY.confirmEcho).toMatch(/Google, outside India/);
+    const all = [QUESTIONS_COPY.confirmTitle, QUESTIONS_COPY.confirmWhy, QUESTIONS_COPY.confirmWhyNoEcho, QUESTIONS_COPY.confirmStored, QUESTIONS_COPY.confirmEcho, QUESTIONS_COPY.confirmHidden, QUESTIONS_COPY.confirmLater].join(" ");
+    expect(all).not.toMatch(/100%|\bsafe\b|never shared|not shared|anyone|permanent/i);
+    // The two buttons, and the page's own skip names a different action (no two "Skip for now" on screen).
+    expect([QUESTIONS_COPY.answerLink, QUESTIONS_COPY.skipNow]).toEqual(["Answer the questions", "Skip for now"]);
+    expect(QUESTIONS_COPY.skipAsk).not.toBe(QUESTIONS_COPY.skipNow);
   });
 });
 

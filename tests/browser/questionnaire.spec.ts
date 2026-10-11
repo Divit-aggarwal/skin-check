@@ -6,7 +6,7 @@ import { CAPTURE_COPY as K } from "@/components/skin-check/captureStates";
 import { PRODUCT_NAME_PRIVACY_LINE } from "@/components/skin-check/inputs/ProductNameBox";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
 import { Q_SEED, SEEDED_NAMES, WIDTHS, type Width } from "./seed-questionnaire";
-import { signIn } from "./helpers";
+import { completePhoneForm, signIn, skipQuestions } from "./helpers";
 
 // TD-33 (docs/design/optional-questionnaire.md): the choice screen, skipping,
 // answering later, the product-name boxes and the camera states, at a phone
@@ -21,7 +21,8 @@ const shot = async (page: Page, name: string, width: Width) => {
   await page.screenshot({ path: `${DIR}/${name}-${width}.png`, fullPage: true });
 };
 
-const FEMALE_COUNT = questionSteps({ gender: "female" }).length;
+// TD-44: before gender is known the first screen says "up to" the most any gender gets.
+const MOST = Math.max(...["female", "male", "other"].map((gender) => questionSteps({ gender }).length));
 
 // The device decides the capture path (file input on phones and tablets, the
 // webcam on a laptop), so each width is its own device, not only a viewport.
@@ -37,8 +38,18 @@ const DEVICE: Record<Width, Parameters<typeof test.use>[0]> = {
   "1280": { ...device("Desktop Chrome"), viewport: { width: 1280, height: 800 }, permissions: ["camera"] },
 };
 
-async function aboutYou(page: Page) {
+const choice = (page: Page) => page.getByRole("heading", { name: Q.title, exact: true });
+
+/** TD-44: the choice first, then name, age and gender. */
+async function aboutYou(page: Page, pick: "answer" | "skip") {
   await page.goto("/skin-check");
+  await expect(choice(page)).toBeVisible({ timeout: 60_000 });
+  if (pick === "skip") await skipQuestions(page);
+  else await page.getByRole("button", { name: Q.answerNow }).click();
+  await basics(page);
+}
+
+async function basics(page: Page) {
   const name = page.locator('input[type="text"]').first();
   await expect(name).toBeVisible({ timeout: 60_000 });
   await name.fill("Tester");
@@ -47,21 +58,19 @@ async function aboutYou(page: Page) {
   await page.getByRole("button", { name: "Female", exact: true }).click();
 }
 
-// Exact: the progress label above is a heading too ("ABOUT THE QUESTIONS").
-const choice = (page: Page) => page.getByRole("heading", { name: Q.title, exact: true });
-
 for (const width of WIDTHS) {
   test.describe(`TD-33 at ${width}px`, () => {
     test.use(DEVICE[width]);
 
     test("the choice screen: count and time from the real list, honest about skipping, keyboard reachable", async ({ page }) => {
       await signIn(page, Q_SEED.flow[width].phoneNumber);
-      await aboutYou(page);
-      await expect(choice(page)).toBeVisible();
-      await expect(page.getByText(Q.howMany(FEMALE_COUNT, questionMinutes(FEMALE_COUNT)))).toBeVisible();
+      // TD-44: the choice is the first screen, before About you, so the count is "up to".
+      await page.goto("/skin-check");
+      await expect(choice(page)).toBeVisible({ timeout: 60_000 });
+      await expect(page.getByText(Q.howMany(MOST, questionMinutes(MOST), true))).toBeVisible();
       for (const line of Q.skip) await expect(page.getByText(line)).toBeVisible();
       const answer = page.getByRole("button", { name: Q.answerNow });
-      const skip = page.getByRole("button", { name: Q.skipNow });
+      const skip = page.getByRole("button", { name: Q.skipAsk, exact: true });
       await expect(answer).toBeVisible();
       await expect(skip).toBeVisible();
       // Big enough to tap: 48px or more.
@@ -72,22 +81,31 @@ for (const width of WIDTHS) {
       await expect(answer).toBeFocused();
       await page.keyboard.press("Tab");
       await expect(skip).toBeFocused();
-      // Back from the choice goes to About you; forward again shows it again.
+      // TD-44: nothing comes before the choice; back from About you comes back to it.
+      await expect(page.getByRole("button", { name: "Go back" })).toBeDisabled();
+      await answer.click();
+      await expect(page.getByText("Hi! What's your name?")).toBeVisible();
       await page.getByRole("button", { name: "Go back" }).click();
-      await expect(page.getByText("What's your gender?")).toBeVisible();
-      await page.getByRole("button", { name: "Female", exact: true }).click();
       await expect(choice(page)).toBeVisible();
+      // Skip asks first; Escape closes the pop-up and is not a skip.
       await skip.focus();
       await page.keyboard.press("Enter");
-      // Skip: on to the photo step (verify passes for a signed-in user).
+      const sure = page.getByRole("dialog", { name: Q.confirmTitle });
+      await expect(sure).toBeVisible();
+      await page.keyboard.press("Escape");
+      await expect(sure).toBeHidden();
+      await expect(choice(page)).toBeVisible();
+      await skipQuestions(page);
+      await basics(page);
+      // Skip: on to the photo step (verify passes for a signed-in user), no question screen.
+      await expect(page.getByText("What are your main skin concerns?")).toHaveCount(0);
       await expect(page.getByText(/a quick photo of your face, so we can read your skin/)).toBeVisible();
       await expect(page.getByRole("button", { name: K.open })).toBeVisible();
     });
 
     test("camera states: before permission, then the device's own path", async ({ page }) => {
       await signIn(page, Q_SEED.flow[width].phoneNumber);
-      await aboutYou(page);
-      await page.getByRole("button", { name: Q.skipNow }).click();
+      await aboutYou(page, "skip");
       const open = page.getByRole("button", { name: K.open });
       await expect(open).toBeVisible();
       expect((await open.boundingBox())!.height).toBeGreaterThanOrEqual(48);
@@ -127,8 +145,7 @@ for (const width of WIDTHS) {
           navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException("Permission denied", "NotAllowedError"));
         });
         await signIn(page, Q_SEED.flow[width].phoneNumber);
-        await aboutYou(page);
-        await page.getByRole("button", { name: Q.skipNow }).click();
+        await aboutYou(page, "skip");
         await page.getByRole("button", { name: K.open }).click();
         // Only the title is the alert (announced once); the how-to and Try again sit in its box.
         const alert = page.getByRole("alert").filter({ hasText: K.refusedTitle });
@@ -144,8 +161,7 @@ for (const width of WIDTHS) {
           navigator.mediaDevices.getUserMedia = () => new Promise(() => undefined);
         });
         await signIn(page, Q_SEED.flow[width].phoneNumber);
-        await aboutYou(page);
-        await page.getByRole("button", { name: Q.skipNow }).click();
+        await aboutYou(page, "skip");
         await page.getByRole("button", { name: K.open }).click();
         await expect(page.getByRole("status").filter({ hasText: K.loading })).toBeVisible();
         await shot(page, "capture-loading", width);
@@ -232,6 +248,69 @@ test("an opened check shows its own product names; Home and Echo never do", asyn
   for (const n of Object.values(SEEDED_NAMES)) await expect(page.getByText(n)).toHaveCount(0);
 });
 
+// TD-44: the three screenshots at 390 go to docs/design/after-choice-first/ with AFTER_SHOTS=1.
+const CF_DIR = process.env.AFTER_SHOTS ? "docs/design/after-choice-first" : ".local-stack/browser-shots";
+mkdirSync(CF_DIR, { recursive: true });
+
+test.describe("TD-44: the choice is the first page", () => {
+  test.use(DEVICE["390"]);
+
+  test("a new visitor lands on it; skip asks 'are you sure?' first; 'Skip for now' reaches the photo with no question screen", async ({ page }) => {
+    await page.goto("/");
+    await expect(page).toHaveURL(/\/skin-check$/);
+    await expect(choice(page)).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText(Q.howMany(MOST, questionMinutes(MOST), true))).toBeVisible();
+    await expect(page.getByText("Hi! What's your name?")).toHaveCount(0);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${CF_DIR}/choice-first-390.png`, fullPage: true });
+
+    await page.getByRole("button", { name: Q.skipAsk, exact: true }).click();
+    const sure = page.getByRole("dialog", { name: Q.confirmTitle });
+    await expect(sure).toBeVisible();
+    // Focus moves in, onto the safer choice; both buttons are easy to tap.
+    const answer = sure.getByRole("button", { name: Q.answerLink, exact: true });
+    const skip = sure.getByRole("button", { name: Q.skipNow, exact: true });
+    await expect(answer).toBeFocused();
+    for (const b of [answer, skip]) expect((await b.boundingBox())!.height).toBeGreaterThanOrEqual(48);
+    for (const line of [Q.confirmWhy, Q.confirmStored, Q.confirmEcho, Q.confirmHidden, Q.confirmLater]) await expect(sure.getByText(line)).toBeVisible();
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${CF_DIR}/skip-confirm-390.png` });
+
+    // Escape closes it and is not a skip.
+    await page.keyboard.press("Escape");
+    await expect(sure).toBeHidden();
+    await expect(choice(page)).toBeVisible();
+
+    await skipQuestions(page);
+    await basics(page);
+    // Verify: the phone sign-in inside the check, then the photo step with its consents.
+    await completePhoneForm(page, Q_SEED.flow["390"].phoneNumber);
+    await expect(page.getByRole("button", { name: K.open })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText("What are your main skin concerns?")).toHaveCount(0);
+    await expect(choice(page)).toHaveCount(0);
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: `${CF_DIR}/skip-photo-step-390.png`, fullPage: true });
+  });
+
+  test("'Answer the questions' in the pop-up: About you, the photo, then the questions", async ({ page }) => {
+    // The scan is refused, so nothing is analysed or saved; the flow still moves on to the questions.
+    await page.route((url) => url.pathname === "/api/skin-scan", (route) => route.abort());
+    await signIn(page, Q_SEED.flow["390"].phoneNumber);
+    await page.goto("/skin-check");
+    await expect(choice(page)).toBeVisible({ timeout: 60_000 });
+    await page.getByRole("button", { name: Q.skipAsk, exact: true }).click();
+    await page.getByRole("dialog").getByRole("button", { name: Q.answerLink, exact: true }).click();
+    await expect(page.getByRole("dialog")).toHaveCount(0);
+    await basics(page);
+    await page.locator('input[type="file"]').setInputFiles({ name: "face.png", mimeType: "image/png", buffer: readFileSync(FACE) });
+    await page.getByRole("checkbox").first().check();
+    await page.getByRole("button", { name: "Analyze my skin" }).click();
+    await expect(page.getByText("What are your main skin concerns?")).toBeVisible({ timeout: 60_000 });
+    // Shown once: never again after About you.
+    await expect(choice(page)).toHaveCount(0);
+  });
+});
+
 test("a returning user who skipped gets the choice again, and no re-confirm hints", async ({ page }) => {
   // The scan is refused, so nothing is analysed; the flow still moves on to the questions.
   await page.route((url) => url.pathname === "/api/skin-scan", (route) => route.abort());
@@ -250,8 +329,7 @@ test("a returning user who skipped gets the choice again, and no re-confirm hint
 test("skip end to end: the check is saved with its readings, and Home offers the questions", async ({ page }) => {
   test.setTimeout(420_000);
   await signIn(page, Q_SEED.skipFlow.phoneNumber);
-  await aboutYou(page);
-  await page.getByRole("button", { name: Q.skipNow }).click();
+  await aboutYou(page, "skip");
   await page.locator('input[type="file"]').setInputFiles({ name: "face.png", mimeType: "image/png", buffer: readFileSync(FACE) });
   await page.getByRole("checkbox").first().check();
   await page.getByRole("button", { name: "Analyze my skin" }).click();

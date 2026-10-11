@@ -4,8 +4,9 @@
 export const QUESTIONS_COPY = {
   title: "About the questions",
   // Count and minutes come from the real list for this user (questionSteps).
-  howMany: (count: number, minutes: number) =>
-    `There are ${count} questions about your skin, the products you use and your habits. They take about ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`,
+  // TD-44: "up to" on the first screen, before gender is known.
+  howMany: (count: number, minutes: number, upTo = false) =>
+    `There are ${upTo ? "up to " : ""}${count} questions about your skin, the products you use and your habits. They take about ${minutes} ${minutes === 1 ? "minute" : "minutes"}.`,
   whyTitle: "Why we ask",
   why: "A photo shows how your skin looks today. It cannot show what you use on it or what else is going on. With your answers, Echo can talk you through your readings.",
   // TD-29 (5): when Echo is switched off, nothing on screen promises it.
@@ -18,7 +19,18 @@ export const QUESTIONS_COPY = {
   ],
   skipNoEcho: ["You still get your photo check and your readings.", "You can answer them later from Home or Account."],
   answerNow: "Answer the questions now",
+  skipAsk: "Skip the questions",
   skipNow: "Skip for now",
+
+  // TD-44: "are you sure?" before a skip. Every line is checked against the
+  // code (H03 field list, consent copy, asia-south1); legal review in TD-44.
+  confirmTitle: "Skip the questions?",
+  confirmWhy: "Echo can talk you through your readings and suggest a routine only if you answer them.",
+  confirmWhyNoEcho: "A photo cannot show what you use on your skin. Your answers add that to your check.",
+  confirmStored: "Your answers are stored with your account on Google Cloud servers in India.",
+  confirmEcho: "When you use Echo, the answers it needs are sent to Google, outside India, to write its replies.",
+  confirmHidden: "Echo never receives some of your answers, such as those about periods or pregnancy.",
+  confirmLater: "You can answer the questions later from Home or Account, update them at your next check, and delete your account and data at any time from Account.",
 
   // Results screen, after a skip.
   skippedNote: "You skipped the questions. Echo can answer questions about this check once they are done.",
