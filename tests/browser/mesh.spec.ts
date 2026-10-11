@@ -98,7 +98,7 @@ async function toResults(page: Page) {
 const LEVEL = /^(Low|Moderate|Elevated|No reading)$/;
 const EARLY = (label: string) => new RegExp(`^${label}${C.table.earlyEstimate}$`);
 const COLUMNS = [C.table.area, "Redness", "Oiliness", EARLY("Breakouts"), EARLY("Texture"), EARLY("Dark marks")];
-const HIDDEN = /From what you told us|breakouts, texture and dark marks/i;
+const HIDDEN = /From what you told us/i;
 
 /** One readings table: Area and the five readings, three tagged; whole face first; level words only; the page never scrolls sideways. */
 async function expectTable(scope: Page | Locator) {
@@ -107,6 +107,10 @@ async function expectTable(scope: Page | Locator) {
   await expect(table.getByRole("columnheader")).toHaveText(COLUMNS);
   const page = "page" in scope ? scope.page() : scope;
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  // On a phone the table's own box scrolls (never the page), with the hint; wider screens need no hint.
+  const box = await table.evaluate((t) => ({ overflows: t.parentElement!.scrollWidth > t.parentElement!.clientWidth + 1, wide: window.innerWidth >= 640 }));
+  if (box.overflows) expect(box.wide).toBe(false);
+  await expect(page.getByText(C.table.swipe)).toBeVisible({ visible: !box.wide });
   await expect(table.getByRole("rowheader").first()).toHaveText(C.current.wholeFace);
   expect(await table.getByRole("rowheader").count()).toBeGreaterThan(1);
   const cells = await table.getByRole("cell").allTextContents();

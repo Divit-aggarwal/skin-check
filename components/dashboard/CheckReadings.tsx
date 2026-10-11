@@ -23,8 +23,8 @@ export function PhotoCheckLine({ text }: { text: string }) {
 /**
  * One table (TD-39 (3), TD-40): the five levels for the whole face and each
  * face area. Levels only, all in ink: no number, no colour, no bar. On a phone
- * the table scrolls inside its own box with the Area column pinned; the page
- * itself never scrolls sideways.
+ * the table scrolls inside its own box with the Area column pinned and a hint
+ * below it; the page itself never scrolls sideways.
  */
 export function ReadingsTable({ view }: { view: Pick<CheckView, "bands" | "areas"> }) {
   if (!view.bands) return <p>{C.current.unreadable}</p>;
@@ -33,15 +33,15 @@ export function ReadingsTable({ view }: { view: Pick<CheckView, "bands" | "areas
     <div className="flex flex-col gap-2">
       <h3 aria-hidden className="font-display text-base font-semibold tracking-[-0.01em] text-brand-title">{C.table.caption}</h3>
       <div className="max-w-full overflow-x-auto">
-        <table className="w-full min-w-[30rem] text-left text-sm">
+        <table className="w-full text-left text-xs sm:text-sm">
           <caption className="sr-only">{C.table.caption}</caption>
           <thead>
             <tr className="border-b border-brand-line align-bottom text-brand-muted">
-              <th scope="col" className="sticky left-0 bg-brand-paper py-2 pr-2 font-semibold">{C.table.area}</th>
+              <th scope="col" className="sticky left-0 bg-brand-paper py-2 pr-1 font-semibold sm:pr-2">{C.table.area}</th>
               {view.bands.map((b) => (
-                <th key={b.metric} scope="col" className="px-2 py-2 font-semibold">
+                <th key={b.metric} scope="col" className="px-1 py-2 font-semibold sm:px-2">
                   {b.label}
-                  {isEarlyEstimate(b.metric) && <span className="block text-xs font-normal">{C.table.earlyEstimate}</span>}
+                  {isEarlyEstimate(b.metric) && <span className="block text-[11px] font-normal leading-tight sm:text-xs">{C.table.earlyEstimate}</span>}
                 </th>
               ))}
             </tr>
@@ -49,15 +49,16 @@ export function ReadingsTable({ view }: { view: Pick<CheckView, "bands" | "areas
           <tbody className="divide-y divide-brand-line">
             {rows.map((r) => (
               <tr key={r.key} className="h-12">
-                <th scope="row" className={`sticky left-0 bg-brand-paper pr-2 text-brand-ink ${r.key === "whole" ? "font-semibold" : "font-medium"}`}>{r.label}</th>
+                <th scope="row" className={`sticky left-0 bg-brand-paper pr-1 text-brand-ink sm:pr-2 ${r.key === "whole" ? "font-semibold" : "font-medium"}`}>{r.label}</th>
                 {view.bands!.map((b) => (
-                  <td key={b.metric} className="px-2 text-brand-ink">{r.bands?.find((x) => x.metric === b.metric)?.band ?? C.current.noReading}</td>
+                  <td key={b.metric} className="px-1 text-brand-ink sm:px-2">{r.bands?.find((x) => x.metric === b.metric)?.band ?? C.current.noReading}</td>
                 ))}
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+      <p className="text-xs text-brand-muted sm:hidden">{C.table.swipe}</p>
     </div>
   );
 }

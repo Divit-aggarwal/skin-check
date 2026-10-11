@@ -114,7 +114,7 @@ describe("TD-39: one photo, both overlays, one table, nothing to choose", () => 
 
   it("the new copy passes the D-12 word checks and never claims more than the photo", () => {
     const P = DASHBOARD_COPY.photo;
-    const texts = [P.alt, P.failed, P.read, P.legend, P.legendNote, P.mapsOnResults, P.overlayAlt.redness, P.overlayAlt.oiliness, DASHBOARD_COPY.table.caption, DASHBOARD_COPY.table.area, DASHBOARD_COPY.table.earlyEstimate, DASHBOARD_COPY.current.known, ...DASHBOARD_COPY.current.notKnown];
+    const texts = [P.alt, P.failed, P.read, P.legend, P.legendNote, P.mapsOnResults, P.overlayAlt.redness, P.overlayAlt.oiliness, DASHBOARD_COPY.table.caption, DASHBOARD_COPY.table.area, DASHBOARD_COPY.table.earlyEstimate, DASHBOARD_COPY.table.swipe, DASHBOARD_COPY.current.known, ...DASHBOARD_COPY.current.notKnown];
     for (const t of texts) expect(bannedWordsIn(t), t).toEqual([]);
     expect(P.legendNote).toMatch(/relative to the rest of your face/);
   });
