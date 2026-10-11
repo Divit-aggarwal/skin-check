@@ -152,11 +152,9 @@ for (const width of WIDTHS) {
         await signIn(page, (tone === "dark" ? MESH_SEED.answered : MESH_SEED.answeredLight)[width].phoneNumber);
         await page.goto("/skin-check");
         await photoAndAnalyze(page, tone);
-        // The one question asked again on every check, then the last step, where the user waits.
-        await expect(page.getByText("What are you currently using on your skin?")).toBeVisible({ timeout: 60_000 });
-        await page.getByRole("button", { name: /Nothing right now/ }).click();
-        await page.getByRole("button", { name: "Confirm selection" }).last().click();
+        // TD-43: nothing is asked again; straight to the last step, where the user waits.
         await expectScanning(page);
+        await expect(page.getByText("What are you currently using on your skin?")).toHaveCount(0);
         await expect(page.getByRole("button", { name: "Analyzing your photo…" })).toBeDisabled();
         if (tone === "dark") await shot(page, "scanning", width);
         release();

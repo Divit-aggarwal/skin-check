@@ -47,7 +47,8 @@ async function aboutYou(page: Page) {
   await page.getByRole("button", { name: "Female", exact: true }).click();
 }
 
-const choice = (page: Page) => page.getByRole("heading", { name: Q.title });
+// Exact: the progress label above is a heading too ("ABOUT THE QUESTIONS").
+const choice = (page: Page) => page.getByRole("heading", { name: Q.title, exact: true });
 
 for (const width of WIDTHS) {
   test.describe(`TD-33 at ${width}px`, () => {
