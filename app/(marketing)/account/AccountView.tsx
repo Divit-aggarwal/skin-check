@@ -11,7 +11,7 @@ import { card, h2, LoadingState, PageHeader } from "@/components/ui/page";
 import { DeleteAccount } from "./DeleteAccount";
 import { QuestionsCard } from "@/components/skin-check/QuestionsChoice";
 import { loadDashboard } from "@/components/dashboard/data";
-import { deriveDashboard, waitingQuestions, type Dashboard } from "@/components/dashboard/state";
+import { newestPhoto, waitingQuestions, type Dashboard } from "@/components/dashboard/state";
 import { formatDate } from "@/components/dashboard/format";
 import { ACCOUNT_COPY as A } from "./copy";
 
@@ -36,7 +36,7 @@ export function AccountView() {
       (d) => {
         const w = active ? waitingQuestions(user.uid, d.checks, d.analyses, d.laterAnswers) : null;
         if (active) setQuestionsWaiting(w && { isEcho: w.isEcho, date: w.date ? formatDate(w.date) : null });
-        if (active) setPhoto(deriveDashboard(user.uid, d.checks, d.analyses).photo);
+        if (active) setPhoto(newestPhoto(d.checks));
       },
       () => undefined
     );

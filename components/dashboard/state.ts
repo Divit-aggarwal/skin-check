@@ -271,15 +271,20 @@ export function deriveDashboard(uid: string, checks: readonly Doc[], analyses: r
     shownAt !== null &&
     history.some((h) => h.scanId !== current.view.scanId && (h.date === null || h.date.getTime() > shownAt.getTime()));
 
-  const withPhoto = sortedChecks.find((c) => isObj(c.data.image));
   return {
     current,
     newerCheckNotShown,
     trend,
     history,
     echoScanId: echoScanIdFrom(uid, analyses),
-    photo: withPhoto ? { scanId: withPhoto.id, claimsStored: (withPhoto.data.image as Obj).stored === true } : null,
+    photo: newestPhoto(checks),
   };
+}
+
+/** The newest check that had a photo, and what its client-written record claims about storage (H27; Home and Account). */
+export function newestPhoto(checks: readonly Doc[]): Dashboard["photo"] {
+  const withPhoto = [...checks].sort((a, b) => newestFirst(toDate(a.data.createdAt), toDate(b.data.createdAt))).find((c) => isObj(c.data.image));
+  return withPhoto ? { scanId: withPhoto.id, claimsStored: (withPhoto.data.image as Obj).stored === true } : null;
 }
 
 // ─── Optional questionnaire (TD-33) ─────────────────────────────────────────
