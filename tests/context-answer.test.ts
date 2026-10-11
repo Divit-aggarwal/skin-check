@@ -114,6 +114,15 @@ describe("answer path", () => {
     }
     expect(isHinglish("Mere liye ek routine batao")).toBe(true);
   });
+
+  it("a passing Hinglish answer puts each claim on its own line; English stays one paragraph", async () => {
+    const self = packageFacts(pkg).find((f) => f.id.startsWith("self."))!;
+    const ok = answer({ claims: [{ claim_type: "smalltalk", text: "Main aapki photo ke baare mein bata sakti hoon.", fact_ids: [] }, { claim_type: "self_reported_echo", text: self.text, fact_ids: [self.id] }], needs_referral: false });
+    const hi = await answerFromPackage(pkg, "Hii, merko mere skin ke bare mei kuch accha btao", [], { generate: fake(ok) });
+    expect(hi.reply).toBe(`Main aapki photo ke baare mein bata sakti hoon.\n${sentence(self.text)}`);
+    const en = await answerFromPackage(pkg, "Tell me about my skin", [], { generate: fake(ok) });
+    expect(en.reply).toBe(`Main aapki photo ke baare mein bata sakti hoon. ${sentence(self.text)}`);
+  });
 });
 
 // Red team pass 2 (I02 P2-1): a passing-looking claim that reads as self-harm is a referral, never shown.

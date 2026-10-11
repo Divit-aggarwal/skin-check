@@ -96,7 +96,8 @@ export async function answerFromPackage(
     }
     if (last.passed) {
       const claims = last.answer!.claims;
-      const join = (cs: typeof claims) => cs.map((c) => sentence(c.text)).join(" ");
+      // F27: in Hinglish, each claim on its own line, so our English fact texts never run into Hinglish words.
+      const join = (cs: typeof claims) => cs.map((c) => sentence(c.text)).join(isHinglish(message) ? "\n" : " ");
       return {
         reply: join(claims),
         referral: false,
