@@ -82,7 +82,8 @@ for (const width of WIDTHS) {
       await page.keyboard.press("Tab");
       await expect(skip).toBeFocused();
       // TD-44: nothing comes before the choice; back from About you comes back to it.
-      await expect(page.getByRole("button", { name: "Go back" })).toBeDisabled();
+      // Disabled and invisible on the first screen, so hidden from the accessibility tree.
+      await expect(page.getByRole("button", { name: "Go back", includeHidden: true })).toBeDisabled();
       await answer.click();
       await expect(page.getByText("Hi! What's your name?")).toBeVisible();
       await page.getByRole("button", { name: "Go back" }).click();
