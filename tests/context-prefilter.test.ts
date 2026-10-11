@@ -52,6 +52,11 @@ describe("red-flag pre-filter (§6)", () => {
     "is niacinamide safe when pregnant",
     "my son is 12, can he use this",
     "can you prescribe something stronger",
+    // 2026-10-11: still caught with acne in the message.
+    "my acne is bleeding and painful",
+    "do i have acne",
+    "what medicine should i take for my acne",
+    "which product for my acne, I want to die",
   ])("hits: %s", (msg) => {
     expect(redFlagHit(msg)).toBe(true);
   });
@@ -66,6 +71,11 @@ describe("red-flag pre-filter (§6)", () => {
     "I'm 25 and my skin is oily",
     "hello",
     "what can I do about shine on my nose",
+    // 2026-10-11: naming one's own concern in a product question is no red flag (live check).
+    "what shall i use for my acne ?",
+    "suggest a routine for my acne and oily skin",
+    "which product for pimples?",
+    "Hii, merko mere skin ke bare mei kuch accha btao",
   ])("passes: %s", (msg) => {
     expect(redFlagHit(msg)).toBe(false);
   });

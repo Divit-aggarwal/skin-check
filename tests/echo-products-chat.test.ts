@@ -105,7 +105,9 @@ describe("TD-34: the guards never change what Gemini receives, over two turns", 
     expect(a.sent).toBe(b.sent);
     expect(a.stored).toBe(b.stored);
     // What each user SEES differs: that is the guard, applied after the call.
-    expect(a.first).not.toEqual(b.first);
+    // TD-45: a questionnaire red flag no longer changes a product answer, so that pair sees the same.
+    if (_.startsWith("red flag")) expect(a.first).toEqual(b.first);
+    else expect(a.first).not.toEqual(b.first);
   });
 
   it.each(PAIRS)("F20: %s, a first answer that fails: both users get the retry, with the same calls", async (_, withHidden, without) => {
@@ -122,12 +124,27 @@ describe("TD-34: the guards never change what Gemini receives, over two turns", 
     expect(a).toBe(await run(without));
   });
 
-  it("the guarded user sees the guard: red flag gets the dermatologist line first and no product", async () => {
+  it("TD-45: a questionnaire red flag gets a normal product answer with cards, no dermatologist line", async () => {
     h.loadTrustedEchoContext.mockResolvedValue(trusted({ ...BASE, breakout_pattern: ["deep_painful"] }));
+    const r = await handleContextChat({ uid: "uid-p", scanId: SCAN_ID, region: "cheeks", message: "Which products should I use?" });
+    expect(r).toEqual({ ok: true, reply: "Here is a simple routine from Project Skin's products.", products: [{ productId: "refreshing-cleanser", reason: "You told us your skin type: Oily" }] });
+    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ guard: null, products: [{ productId: "refreshing-cleanser" }] });
+  });
+
+  it("TD-45: the opening with a questionnaire red flag: the dermatologist note once, first, then the routine with cards", async () => {
+    h.loadTrustedEchoContext.mockResolvedValue(trusted({ ...BASE, breakout_pattern: ["deep_painful"] }));
+    const r = await handleContextChat({ uid: "uid-p", scanId: SCAN_ID, region: "cheeks", message: "", opening: true });
+    expect(r).toEqual({ ok: true, reply: `${COPY.referral}\nHere is a simple routine from Project Skin's products.`, products: [{ productId: "refreshing-cleanser", reason: "You told us your skin type: Oily" }] });
+    h.loadTrustedEchoContext.mockResolvedValue(trusted(BASE));
+    const plain = await handleContextChat({ uid: "uid-p", scanId: SCAN_ID, region: "cheeks", message: "", opening: true });
+    expect(plain.ok && plain.reply).not.toContain(COPY.referral);
+  });
+
+  it("a red-flag chat message earlier on this check still means no product afterwards", async () => {
+    h.hadRedFlagTurn.mockResolvedValueOnce(true);
     const r = await handleContextChat({ uid: "uid-p", scanId: SCAN_ID, region: "cheeks", message: "Which products should I use?" });
     expect(r).toMatchObject({ ok: true, products: [] });
     expect(r.ok && r.reply.split("\n")[0]).toBe(COPY.referral);
-    expect(r.ok && r.reply).not.toContain("Project Skin's products");
     // Stored for Gemini's history: the unguarded answer.
     expect(h.recordChatTurns.mock.calls[0]![4]).toBe("Here is a simple routine from Project Skin's products.");
     expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ guard: "red_flag", products: [{ productId: "refreshing-cleanser" }] });
@@ -180,7 +197,9 @@ describe("TD-34: the opening suggestion (route)", () => {
     expect(h.consumeEchoQuestion).not.toHaveBeenCalled();
     h.loadTrustedEchoContext.mockResolvedValue(trusted({ ...BASE, breakout_pattern: ["deep_painful"] }));
     const flagged = await (await openingPost()).json();
-    expect(flagged).toEqual({ ok: true, reply: COPY.referral, products: [] });
+    expect(flagged).toEqual({ ok: true, reply: `${COPY.referral}\nHere is a simple routine from Project Skin's products.`, products: [{ productId: "refreshing-cleanser", reason: "You told us your skin type: Oily" }] });
+    h.hadRedFlagTurn.mockResolvedValueOnce(true);
+    expect(await (await openingPost()).json()).toEqual({ ok: true, reply: COPY.referral, products: [] });
   });
 
   it.each([
@@ -261,11 +280,11 @@ describe("starter questions through the chat path (fake Gemini)", () => {
     expect(cardsFor(r.ok ? r.products : [])[0]!.url).toBe(`${STORE_URL}${CATALOGUE.products.find((p) => p.id === "refreshing-cleanser")!.shopifyHandle}`);
   });
 
-  it.each(productStarters)("%s: red flag answer, no card; prescription answer, the doctor line", async (q) => {
+  it.each(productStarters)("%s: red flag answer, cards and no dermatologist line (TD-45); prescription answer, the doctor line", async (q) => {
     h.loadTrustedEchoContext.mockResolvedValue(trusted({ ...BASE, breakout_pattern: ["deep_painful"] }));
     const flagged = await handleContextChat({ uid: "uid-p", scanId: SCAN_ID, region: "cheeks", message: q });
-    expect(flagged).toMatchObject({ ok: true, products: [] });
-    expect(flagged.ok && flagged.reply.split("\n")[0]).toBe(COPY.referral);
+    expect(flagged).toMatchObject({ ok: true, products: [{ productId: "refreshing-cleanser" }] });
+    expect(flagged.ok && flagged.reply).not.toContain(COPY.referral);
     h.loadTrustedEchoContext.mockResolvedValue(trusted({ ...BASE, current_products: ["prescription"] }));
     const rx = await handleContextChat({ uid: "uid-p", scanId: SCAN_ID, region: "cheeks", message: q });
     expect(rx.ok && rx.reply.split("\n").at(-1)).toBe(PRODUCT_DOCTOR_LINE);

@@ -68,5 +68,3 @@ export function screenEchoReply(reply: string): EchoReplyVerdict {
   return { kind: "ok" };
 }
 
-/** The lead of the fixed answer shown instead of a blocked reply; the band lines and one uncertainty line follow. */
-export const ECHO_FALLBACK_LEAD = "Echo couldn't answer that in a way we can check, so here is what this photo showed:";

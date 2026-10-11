@@ -17,7 +17,8 @@ import { QUESTIONS_COPY as Q } from "./questionsCopy";
 import { readingsOf, toDate } from "@/components/dashboard/state";
 import { AccountButton, btnPrimary, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getEchoOpening, getSkinCheckChatReply, ApiError, type ShownProduct } from "@/lib/api";
-import { ProductCards, splitDoctorLine } from "./ProductCards";
+import { ProductCards, splitDoctorLine, splitRedFlagNote } from "./ProductCards";
+import { COPY } from "@/lib/rules/settings";
 import { pickStarters } from "./echoStarters";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import { useAuth } from "@/lib/auth-context";
@@ -399,7 +400,10 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
         )}
         {echoOn && shownOpening?.status === "done" && (
           <div className="space-y-3">
-            <p className="max-w-[90%] whitespace-pre-line rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">{withPhoneLinks(splitDoctorLine(shownOpening.reply).text)}</p>
+            {splitRedFlagNote(shownOpening.reply).note && (
+              <p role="note" className="max-w-[90%] rounded-xl border border-brand-line px-4 py-2 text-sm text-brand-ink">{COPY.referral}</p>
+            )}
+            <p className="max-w-[90%] whitespace-pre-line rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">{withPhoneLinks(splitDoctorLine(splitRedFlagNote(shownOpening.reply).text).text)}</p>
             <ProductCards products={shownOpening.products} doctorLine={splitDoctorLine(shownOpening.reply).doctorLine} />
           </div>
         )}

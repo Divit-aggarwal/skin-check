@@ -20,8 +20,8 @@ import { loadOpening, loadSplitCheckTurns } from "@/lib/context/chat-turns";
 import { echoProductsOn } from "@/lib/context/products";
 import { checkComparisonHit, comparisonHit, joinedUserTurns, redFlagHit, REFERRAL_COPY, referralCopyFor, UNSUPPORTED_SCRIPT_COPY, unsupportedScript, withoutReferrals } from "@/lib/context/prefilter";
 import { buildContextPackage } from "@/lib/context/builder";
-import { comparisonAnswer, fallbackLines } from "@/lib/context/answer";
-import { ECHO_FALLBACK_LEAD, screenEchoReply } from "@/lib/echo-reply-screen";
+import { comparisonAnswer, fallbackAnswer } from "@/lib/context/answer";
+import { screenEchoReply } from "@/lib/echo-reply-screen";
 
 // firebase-admin needs Node APIs and hard-fails on the Edge runtime — same
 // explicit opt-in as /api/skin-scan.
@@ -299,7 +299,7 @@ export async function POST(request: NextRequest) {
     if (verdict.kind === "referral") return respond(REFERRAL_COPY);
     if (verdict.kind === "blocked") {
       console.warn("skin-check Echo reply blocked:", verdict.check);
-      return respond([ECHO_FALLBACK_LEAD, ...fallbackLines(pkg())].join("\n"));
+      return respond(fallbackAnswer(pkg(), message));
     }
     return respond(geminiReply);
   } catch (err) {

@@ -191,7 +191,8 @@ const REFUSED_SALE = new RegExp(
   "giu"
 );
 const notSelling = (text: string) => text.replace(REFUSED_SALE, " ");
-const SKIN_CHECK_NAME = new RegExp(String.raw`\byour skin[- ]checks?(?: results?| readings?| analysis| data)?\b`, "giu");
+// 2026-10-11: the Hinglish "aapke skin check" names the product the same way.
+const SKIN_CHECK_NAME = new RegExp(String.raw`\b(?:your|aapk[ae]|aapki|apn[ae]|apni) skin[- ]checks?(?: results?| readings?| analysis| data)?\b`, "giu");
 // F17: an uncited claim (small talk, clarify, out of scope) carries no fact,
 // so it may assert nothing about the world: "the heat is the issue" and "this
 // is from the sun" name no cause word but still say why. By sentence form, not

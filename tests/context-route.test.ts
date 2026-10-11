@@ -182,14 +182,14 @@ describe("switch on: the new path", () => {
     expect(h.generateContent).toHaveBeenCalledTimes(1);
     const meta = h.recordChatTurns.mock.calls[0]![5];
     // TD-34: product suggestions are on by default, so ctx-3 and ctx-prompt-5. TD-40: ctx-3 with five readings is ctx-7, ctx-2 is ctx-6.
-    expect(meta).toMatchObject({ packageVersion: "ctx-7", promptVersion: "ctx-prompt-5", modelId: expect.any(String), prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
+    expect(meta).toMatchObject({ packageVersion: "ctx-7", promptVersion: "ctx-prompt-7", modelId: expect.any(String), prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
     expect(meta.packageSha256).toMatch(/^[0-9a-f]{64}$/);
   });
 
-  it("TD-34 off: with product suggestions off, the versions are the ones before TD-34 (ctx-2, ctx-prompt-4)", async () => {
+  it("TD-34 off: with product suggestions off, the versions without products (ctx-6, ctx-prompt-6)", async () => {
     vi.stubEnv("ECHO_PRODUCTS_SWITCH", "off");
     await post();
-    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ packageVersion: "ctx-6", promptVersion: "ctx-prompt-4", prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
+    expect(h.recordChatTurns.mock.calls[0]![5]).toMatchObject({ packageVersion: "ctx-6", promptVersion: "ctx-prompt-6", prefilter: null, validator: { passed: true, failures: [], regenerated: false, fallback: false } });
   });
 
   it("a red-flag message: referral, no package, no Gemini call, recorded as red flag", async () => {

@@ -6,7 +6,7 @@ import { bannedWordsIn as _b, stepLabelIsExcepted } from "@/lib/catalog/wording"
 import { buildContextPackage, packageJson, screenExternalText, type BuildInput } from "@/lib/context/builder";
 import { renderSystemInstruction, responseSchema } from "@/lib/context/renderer";
 import { validateAnswer } from "@/lib/context/validator";
-import { guardedReply, productGuard, type ShownProduct } from "@/lib/context/answer";
+import { guardedReply, openingNote, productGuard, type ShownProduct } from "@/lib/context/answer";
 import { CATALOGUE } from "@/lib/catalog/catalogue";
 import { bannedWordsIn } from "@/lib/catalog/wording";
 import { evaluateSafety } from "@/lib/rules/safety";
@@ -219,17 +219,23 @@ describe("the guards, in code (TD-34, build part 5)", () => {
   const withProducts = { reply: "Here is a simple routine. Refreshing Cleanser: rinse well.", withoutProducts: "Here is a simple routine.", products, productContent: true };
   const safety = (answers: Record<string, unknown>) => evaluateSafety({ answers: { primary_concerns: ["blemishes"], ...answers }, confirmedThisScan: [] });
 
-  it("red flag: the dermatologist line comes first and no product at all", () => {
-    const guard = productGuard(safety({ breakout_pattern: ["deep_painful"] }));
-    expect(guard).toBe("red_flag");
-    const shown = guardedReply(withProducts, guard);
+  it("TD-45: a questionnaire red flag no longer blocks products; the opening note is added once", () => {
+    const flagged = safety({ breakout_pattern: ["deep_painful"] });
+    expect(productGuard(flagged)).toBe(null);
+    expect(guardedReply(withProducts, productGuard(flagged))).toEqual({ reply: withProducts.reply, products: withProducts.products });
+    expect(openingNote(flagged, "Here is a simple routine.")).toBe(`${COPY.referral}\nHere is a simple routine.`);
+    expect(openingNote(safety({}), "Here is a simple routine.")).toBe("Here is a simple routine.");
+  });
+
+  it("the red_flag guard (a red-flag chat message): the dermatologist line comes first and no product at all", () => {
+    const shown = guardedReply(withProducts, "red_flag");
     expect(shown.products).toEqual([]);
     expect(shown.reply.split("\n")[0]).toBe(COPY.referral);
     expect(shown.reply).not.toContain("Refreshing Cleanser");
   });
 
-  it("red flag from a hidden answer (irregular periods with blemishes) is a red flag too", () => {
-    expect(productGuard(safety({ gender: "female", female_skin_context: ["irregular_periods"] }))).toBe("red_flag");
+  it("red flag from a hidden answer (irregular periods with blemishes) gets the opening note too", () => {
+    expect(openingNote(safety({ gender: "female", female_skin_context: ["irregular_periods"] }), "x").split("\n")[0]).toBe(COPY.referral);
   });
 
   it("red flag on the opening: the line first even when Gemini suggested nothing", () => {
@@ -335,16 +341,18 @@ describe("the card drawing (TD-34, build part 3)", () => {
 describe("a question whether a product works or is good for something gets no product (TD-34, stricter guard)", () => {
   const none = evaluateSafety({ answers: { primary_concerns: ["blemishes"] }, confirmedThisScan: [] });
   const withProducts = { reply: "Massage onto damp skin.", withoutProducts: "", products: [{ productId: "refreshing-cleanser", reason: "r" }], productContent: true };
-  it.each(["Which of your products works fastest on oily skin?", "Which serum should I buy for my redness?", "Is niacinamide good for me?", "Niacinamide serum mere liye theek hai kya?", "Kaunsi cream lagaun redness ke liye?", "Will the cleanser fix my blemishes?", "Kya yeh serum mere daag mita dega?"])("%s", (message) => {
+  it.each(["Which of your products works fastest on oily skin?", "Which serum is good for my redness?", "Is niacinamide good for me?", "Niacinamide serum mere liye theek hai kya?", "Will the cleanser fix my blemishes?", "Kya yeh serum mere daag mita dega?"])("%s", (message) => {
     const guard = productGuard(none, message);
     expect(guard).toBe("result_question");
     expect(guardedReply(withProducts, guard)).toEqual({ reply: RESULT_QUESTION_LINE, products: [] });
   });
-  it.each(["Can you suggest a routine for me?", "What is Clear Seal for?", "How do I use the Refreshing Cleanser?", "Mere liye kaunsa routine sahi rahega?", "Oily skin ke liye kaunsa face wash lun?", "Which moisturiser do you have?"])("not for an ordinary product question: %s", (message) => {
+  it.each(["Can you suggest a routine for me?", "What is Clear Seal for?", "How do I use the Refreshing Cleanser?", "Mere liye kaunsa routine sahi rahega?", "Oily skin ke liye kaunsa face wash lun?", "Which moisturiser do you have?",
+    // Owner brief 2026-10-11: naming one's own concern in a product question gets the cards.
+    "what shall i use for my acne ?", "Which serum should I buy for my redness?", "Kaunsi cream lagaun redness ke liye?"])("not for an ordinary product question: %s", (message) => {
     expect(productGuard(none, message)).toBeNull();
   });
-  it("a red flag still wins over it; the line passes the D-12 word check", () => {
-    expect(productGuard(evaluateSafety({ answers: { primary_concerns: ["blemishes"], breakout_pattern: ["deep_painful"] }, confirmedThisScan: [] }), "Is it good for me?")).toBe("red_flag");
+  it("it applies with a questionnaire red flag too (TD-45); the line passes the D-12 word check", () => {
+    expect(productGuard(evaluateSafety({ answers: { primary_concerns: ["blemishes"], breakout_pattern: ["deep_painful"] }, confirmedThisScan: [] }), "Is it good for me?")).toBe("result_question");
     expect(bannedWordsIn(RESULT_QUESTION_LINE)).toEqual([]);
   });
 });

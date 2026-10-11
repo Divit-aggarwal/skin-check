@@ -3,6 +3,7 @@ import { useId } from "react";
 import { eyebrow, textLink } from "@/components/ui/page";
 import { PRODUCT_DOCTOR_LINE } from "@/lib/context/products";
 import { cardsFor, OWN_PRODUCTS_LINE, STEP_LABEL } from "@/lib/context/products";
+import { COPY } from "@/lib/rules/settings";
 import { ECHO_COPY as E } from "./echoCopy";
 
 // TD-34: the cards are drawn by our code from the catalogue, never from
@@ -16,6 +17,12 @@ import { ECHO_COPY as E } from "./echoCopy";
 export function splitDoctorLine(text: string): { text: string; doctorLine: boolean } {
   const tail = `\n${PRODUCT_DOCTOR_LINE}`;
   return text.endsWith(tail) ? { text: text.slice(0, -tail.length), doctorLine: true } : { text, doctorLine: false };
+}
+
+/** TD-45: the opening's dermatologist note (a questionnaire red flag), shown once as its own short panel. */
+export function splitRedFlagNote(text: string): { text: string; note: boolean } {
+  const head = `${COPY.referral}\n`;
+  return text.startsWith(head) ? { text: text.slice(head.length), note: true } : { text, note: false };
 }
 
 export function ProductCards({ products, doctorLine = false }: { products: readonly { productId: string; reason?: string }[]; doctorLine?: boolean }) {
