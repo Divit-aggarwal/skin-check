@@ -405,7 +405,8 @@ export function ChooseCity({ user, onCity }: { user: User; onCity: (c: SavedCity
   useEffect(() => {
     void browserState("geolocation").then(setState);
   }, []);
-  const prompt = state ? promptFor(state, false) : null;
+  // No city yet: offer the location while the browser can ask, or has already allowed it.
+  const prompt = state === "granted" ? "ask" : state ? promptFor(state, false) : null;
 
   return (
     <div className="flex flex-col gap-3">

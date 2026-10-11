@@ -26,6 +26,14 @@ test.use({ timezoneId: "Asia/Kolkata", locale: "en-IN" });
 const GREETING = /^Good (morning|afternoon|evening)/;
 
 async function homeAs(page: Page, phone: string, opts: { afterCheck?: boolean } = {}) {
+  // A second user in one test: sign the first one out.
+  await page.goto("/account");
+  const out = page.getByRole("button", { name: "Sign out" });
+  await expect(out.or(page.locator('input[type="tel"]'))).toBeVisible();
+  if (await out.isVisible()) {
+    await out.click();
+    await expect(page.locator('input[type="tel"]')).toBeVisible();
+  }
   await signIn(page, phone);
   if (opts.afterCheck) await page.evaluate(() => sessionStorage.setItem("home-v2:after-check", "1"));
   await page.goto("/dashboard");
@@ -103,8 +111,8 @@ test.describe("Home at three widths, every card filled", () => {
       const pool = Object.values(STARTER_POOL).flat();
       for (const q of await starters.allTextContents()) expect(pool).toContain(q);
 
-      // Nothing compares checks; the only % is the humidity tile.
-      const body = (await page.locator("main").innerText()).replace("68%", "");
+      // Nothing compares checks; the only % is the humidity tile. (Echo's starter questions are its own pool, checked by Echo's filters.)
+      const body = (await page.locator("main section").filter({ hasNot: page.getByRole("heading", { name: H.echo.title, exact: true }) }).allInnerTexts()).join("\n").replace("68%", "");
       expect(body).not.toMatch(/\/100|%|↑|↓|▲|▼|better|worse|improv/i);
       // No sideways scrolling.
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

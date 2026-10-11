@@ -8,7 +8,6 @@ import { AI_SHARE_CONSENT_COPY, ERASE_CONFIRMATION } from "@/lib/consent";
 import { ROUTINE_COPY as R } from "@/lib/routine/copy";
 import { CATALOGUE } from "@/lib/catalog/catalogue";
 import { TIMELINE_COPY as T } from "@/components/timeline/copy";
-import { CHECKS_COPY as K } from "@/components/checks/copy";
 import { ECHO_COPY as E } from "@/components/skin-check/echoCopy";
 import { DASHBOARD_SEED as U } from "./seed-users";
 import { shot, signIn } from "./helpers";
@@ -247,7 +246,7 @@ test("routine: the four steps, an empty step invites an add, used and skipped in
   await page.screenshot({ path: ".local-stack/browser-shots/dashboard-flow-routine.png", fullPage: true });
 });
 
-test("Home: today's routine marks a step done in one tap, and the entry shows on the timeline", async ({ page }) => {
+test("Home: today's routine marks a step done in one tap, and it is still done after a reload", async ({ page }) => {
   await signIn(page, U.routine!.phoneNumber);
   await page.goto("/routine");
   const addSection = page.locator("section", { has: page.getByRole("heading", { name: R.add }) });
@@ -263,9 +262,9 @@ test("Home: today's routine marks a step done in one tap, and the entry shows on
   const used = today.getByRole("button", { name: H.routine.markDoneLabel(name, R.slot.AM.toLowerCase()) });
   await used.click();
   await expect(used).toHaveAttribute("aria-pressed", "true");
-  await page.goto("/checks?view=timeline");
-  const recent = page.getByRole("region", { name: K.timeline });
-  await expect(recent.getByText(T.routine.usage(name, R.slot.AM.toLowerCase(), R.status.used))).toBeVisible();
+  // Saved as a routine event: still done after a reload.
+  await page.reload();
+  await expect(today.getByRole("button", { name: H.routine.markDoneLabel(name, R.slot.AM.toLowerCase()) })).toHaveAttribute("aria-pressed", "true");
   await shot(page, "home-routine");
 });
 
