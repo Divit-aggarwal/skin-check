@@ -119,6 +119,9 @@ async function expectTable(scope: Page | Locator) {
 }
 
 /** Nothing to choose and no "told us" panels anywhere on the page. */
+// TD-46: the face drawing is a picture, or (newest check, Echo on) a group of area buttons.
+const DRAWING = 'svg[aria-label^="A drawing of a face"]';
+
 async function expectNothingElse(page: Page) {
   await expect(page.getByRole("tab")).toHaveCount(0);
   await expect(page.getByRole("tablist")).toHaveCount(0);
@@ -189,7 +192,7 @@ for (const width of WIDTHS) {
       await page.goto(`/checks/${MESH_SEED.noPhoto.uid}-1`);
       await expect(page.getByText(C.history.pastLine)).toBeVisible({ timeout: 60_000 });
       await expect(page.getByTestId("face-photo")).toHaveCount(0);
-      await expect(page.getByRole("img", { name: /A drawing of a face/ })).toBeVisible();
+      await expect(page.locator(DRAWING)).toBeVisible();
       // No photo, so no line about colours on it (design review).
       await expect(page.getByText(C.photo.mapsOnResults)).toHaveCount(0);
       await expectTable(page);
@@ -241,7 +244,7 @@ test("the bucket refuses a read from our site (today's production CORS): the fac
   await expectTable(page);
   await page.waitForTimeout(3_000);
   await expect(page.getByTestId("face-photo")).toHaveCount(0);
-  await expect(page.getByRole("img", { name: /A drawing of a face/ })).toBeVisible();
+  await expect(page.locator(DRAWING)).toBeVisible();
 });
 
 test("reduced motion: the mesh stays still, no sweeping band", async ({ page }) => {
