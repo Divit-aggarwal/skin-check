@@ -40,7 +40,9 @@ const tz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolka
 const dayMs = 86_400_000;
 
 /** The newest check that has a reading (measured, or saved by the app): the countdown counts from it. */
-export const lastReadingDate = (d: Dashboard) => d.history.find((h) => h.kind === "reading" || h.kind === "legacy")?.date ?? null;
+export const lastReadingDate = (d: Dashboard) =>
+  // A reading can land before its check record is saved (design §3, orphan record): its own date counts then.
+  d.history.find((h) => h.kind === "reading" || h.kind === "legacy")?.date ?? (d.current.kind === "reading" ? d.current.view.date : null);
 
 function Card({ id, title, children, className = "" }: { id: string; title: string; children: React.ReactNode; className?: string }) {
   return (
@@ -114,7 +116,8 @@ function RemindersPrompt({ user, settings, onSettings }: { user: User; settings:
 export function LatestCheckCard({ dashboard, onArea }: { dashboard: Dashboard; onArea?: ((r: EchoRegion) => void) | undefined }) {
   const { current, history } = dashboard;
   const newest = history[0];
-  if (!newest)
+  // Empty only with neither a check nor a reading (a reading can land before its check record).
+  if (!newest && current.kind !== "reading")
     return (
       <Card id="latest" title={H.latest.title}>
         <p>{H.latest.none}</p>
@@ -124,10 +127,10 @@ export function LatestCheckCard({ dashboard, onArea }: { dashboard: Dashboard; o
       </Card>
     );
   // A check made in the last 10 minutes with no reading yet is still being read.
-  const analysing = newest.kind === "questions" && newest.date !== null && Date.now() - newest.date.getTime() < 10 * 60_000;
+  const analysing = !!newest && newest.kind === "questions" && newest.date !== null && Date.now() - newest.date.getTime() < 10 * 60_000;
   const view = current.kind === "reading" ? current.view : null;
   const shownRow = view ? history.find((h) => h.scanId === view.scanId) : newest;
-  const date = shownRow?.date ?? null;
+  const date = shownRow?.date ?? view?.date ?? null;
   const ago = date ? H.latest.ago(Math.max(0, Math.round((startOfDay(new Date()) - startOfDay(date)) / dayMs))) : "";
   const drawing = view && view.areas.length > 0 && view.bands ? <FaceDrawing labels={ECHO_REGION_LABELS} available={view.areas.map((a) => a.region)} onArea={onArea} areaLabel={C.chat.askAbout} /> : null;
 
