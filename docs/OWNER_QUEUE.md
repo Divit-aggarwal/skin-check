@@ -396,7 +396,7 @@ The P5 checks above, plus: three or four starter questions above the message box
 
 # TD-47: Home v2, location and reminders (prepared 2026-10-12)
 
-Pull request: branch `feat/home-v2` (link in the tracker row G28). **Nothing below has been run.** Same rules as above: in order, one step at a time, and tell the agent after each step; it runs the check and says go or stop.
+Pull request: branch `feat/home-v2`, #20 (https://github.com/Divit-aggarwal/skin-check/pull/20). **Nothing below has been run.** Same rules as above: in order, one step at a time, and tell the agent after each step; it runs the check and says go or stop.
 
 **What changes, and what is off.**
 - The merge changes Home's layout and content: greeting, next check, latest check, today's routine, your record, Ask Echo and a new-check banner.
@@ -443,9 +443,9 @@ git checkout HEAD -- firestore.rules
 ## H1. Merge the pull request (this is the production deploy)
 
 ```bash
-gh pr merge <PR number> --merge
+gh pr merge 20 --merge
 ```
-- **Good output:** `✓ Merged pull request #<n>`. Vercel builds `master` for production, which takes about 2 minutes.
+- **Good output:** `✓ Merged pull request #20`. Vercel builds `master` for production, which takes about 2 minutes.
 - **Check (agent, read only):**
   - The production deployment is READY on the merge commit, in region `bom1`.
   - `curl -sI https://skin-check-sigma.vercel.app/dashboard` returns 200.
