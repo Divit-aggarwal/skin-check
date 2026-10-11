@@ -42,9 +42,16 @@ export interface HomeSettings {
   askedAt?: unknown;
 }
 
-/** The permissions screen shows only right after a check's results, and only once (TD-47 (3)). */
-export const showPermissions = (o: { afterCheck: boolean; settings: HomeSettings | null; anythingToAsk: boolean }) =>
-  o.afterCheck && o.anythingToAsk && !o.settings?.askedAt;
+/**
+ * The permissions screen shows only right after a check's results, only
+ * once, and only for a choice not made yet (a choice made on a Home card or in
+ * Account is never asked again). A settings read that failed is "error",
+ * never "no choices": the screen does not show then (flow review TD-47).
+ */
+export function showPermissions(o: { afterCheck: boolean; settings: HomeSettings | null | "error"; weather: boolean; push: boolean }): boolean {
+  if (!o.afterCheck || o.settings === "error" || o.settings?.askedAt) return false;
+  return (o.weather && !o.settings?.location) || (o.push && !o.settings?.reminders);
+}
 
 /** iPhone and iPad web push needs the site on the home screen (iOS 16.4+). */
 export function needsHomeScreen(userAgent: string, standalone: boolean): boolean {

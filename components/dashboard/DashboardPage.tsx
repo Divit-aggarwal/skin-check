@@ -28,8 +28,8 @@ import { PermissionsScreen } from "./PermissionsScreen";
 // `contents` columns). From 1280: main column (8) and right column (4).
 
 type Load = { kind: "loading" } | { kind: "error" } | { kind: "ready"; data: DashboardData };
-/** The settings doc: undefined while loading; null when absent or unreadable (Home still works). */
-type Settings = HomeSettings | null | undefined;
+/** The settings doc: undefined while loading; null when absent; "error" when it could not be read (Home still works). */
+type Settings = HomeSettings | null | "error" | undefined;
 type SignedIn = NonNullable<ReturnType<typeof useAuth>["user"]>;
 
 export function DashboardPage({ productsOn = true }: { productsOn?: boolean }) {
@@ -52,10 +52,12 @@ export function DashboardPage({ productsOn = true }: { productsOn?: boolean }) {
     if (openId) router.replace(`/checks/${encodeURIComponent(openId)}`);
   }, [openId, router]);
 
-  // TD-47 (3): set by the results screen; read here.
+  // TD-47 (3): set by the results screen; taken once here, so it never lingers in the tab.
   useEffect(() => {
     try {
-      setAfterCheck(sessionStorage.getItem(AFTER_CHECK_KEY) === "1");
+      if (sessionStorage.getItem(AFTER_CHECK_KEY) !== "1") return;
+      sessionStorage.removeItem(AFTER_CHECK_KEY);
+      setAfterCheck(true);
     } catch {
       /* storage blocked: no screen */
     }
@@ -73,13 +75,16 @@ export function DashboardPage({ productsOn = true }: { productsOn?: boolean }) {
         if (active) setLoad({ kind: "error" });
       }
     );
-    loadHomeSettings(user.uid).then(
-      (s) => active && setSettings(s),
-      (error) => {
-        console.error("[dashboard] home settings not loaded", error instanceof Error ? error.name : error);
-        if (active) setSettings(null);
-      }
-    );
+    // Nothing to read while both features are off.
+    if (!weatherOn() && !pushOn()) setSettings(null);
+    else
+      loadHomeSettings(user.uid).then(
+        (s) => active && setSettings(s),
+        (error) => {
+          console.error("[dashboard] home settings not loaded", error instanceof Error ? error.name : error);
+          if (active) setSettings("error");
+        }
+      );
     return () => {
       active = false;
     };
@@ -120,18 +125,13 @@ export function DashboardPage({ productsOn = true }: { productsOn?: boolean }) {
     );
   }
 
-  if (showPermissions({ afterCheck, settings: settings ?? null, anythingToAsk: weatherOn() || pushOn() })) {
+  if (!openId && showPermissions({ afterCheck, settings: settings ?? null, weather: weatherOn(), push: pushOn() })) {
     return (
       <main className={`${page} pt-8 sm:pt-12`}>
         <PermissionsScreen
           user={user}
-          settings={settings ?? null}
+          settings={settings === "error" ? null : settings ?? null}
           onDone={(s) => {
-            try {
-              sessionStorage.removeItem(AFTER_CHECK_KEY);
-            } catch {
-              /* nothing kept */
-            }
             setAfterCheck(false);
             setSettings(s);
             window.scrollTo({ top: 0 });
@@ -141,7 +141,7 @@ export function DashboardPage({ productsOn = true }: { productsOn?: boolean }) {
     );
   }
 
-  return <Home user={user} data={load.data} dashboard={dashboard} settings={settings ?? null} onSettings={setSettings} routine={routine} productsOn={productsOn} />;
+  return <Home user={user} data={load.data} dashboard={dashboard} settings={settings === "error" ? null : settings ?? null} onSettings={setSettings} routine={routine} productsOn={productsOn} />;
 }
 
 function Home({

@@ -128,7 +128,12 @@ export async function forgetHomeDevice(user?: User): Promise<void> {
   const reg = "serviceWorker" in navigator ? await navigator.serviceWorker.getRegistration("/sw.js").catch(() => undefined) : undefined;
   const sub = await reg?.pushManager.getSubscription().catch(() => null);
   if (!sub) return;
-  if (user) await post(user, "/api/home/reminders", { endpoint: sub.endpoint }, "DELETE").catch(() => undefined);
+  // The server copy goes in the background (keepalive), so sign-out never waits on the network.
+  if (user) {
+    const token = await user.getIdToken().catch(() => null);
+    if (token)
+      void fetch("/api/home/reminders", { method: "DELETE", keepalive: true, headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ endpoint: sub.endpoint }) }).catch(() => undefined);
+  }
   await sub.unsubscribe().catch(() => undefined);
 }
 

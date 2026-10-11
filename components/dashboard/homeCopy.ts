@@ -12,6 +12,7 @@ export const HOME_COPY = {
   next: {
     title: "Next check",
     first: "Take your first check to start.",
+    noReading: "Your checks so far have no photo reading. Take a new check to start the count.",
     in: (n: number) => `Next check in ${plural(n, "day", "days")}`,
     today: "Due today",
     overdue: (n: number) => `Overdue by ${plural(n, "day", "days")}`,

@@ -58,7 +58,7 @@ function Card({ id, title, children, className = "" }: { id: string; title: stri
 export function NextCheckCard({ dashboard, user, settings, onSettings }: { dashboard: Dashboard; user: User; settings: HomeSettings | null; onSettings: (s: HomeSettings) => void }) {
   const next = nextCheck(lastReadingDate(dashboard), new Date(), tz());
   const due = isDue(next);
-  const line = next.kind === "first" ? H.next.first : next.kind === "today" ? H.next.today : next.kind === "overdue" ? H.next.overdue(next.days) : H.next.in(next.days);
+  const line = next.kind === "first" ? (dashboard.history.length > 0 ? H.next.noReading : H.next.first) : next.kind === "today" ? H.next.today : next.kind === "overdue" ? H.next.overdue(next.days) : H.next.in(next.days);
   return (
     <Card id="next" title={H.next.title}>
       <p className="font-display text-2xl font-semibold text-brand-title" data-testid="next-check">
@@ -124,7 +124,7 @@ export function LatestCheckCard({ dashboard, onArea }: { dashboard: Dashboard; o
       </Card>
     );
   // A check made in the last 10 minutes with no reading yet is still being read.
-  const analysing = newest.kind === "questions" && (newest.date === null || Date.now() - newest.date.getTime() < 10 * 60_000);
+  const analysing = newest.kind === "questions" && newest.date !== null && Date.now() - newest.date.getTime() < 10 * 60_000;
   const view = current.kind === "reading" ? current.view : null;
   const shownRow = view ? history.find((h) => h.scanId === view.scanId) : newest;
   const date = shownRow?.date ?? null;

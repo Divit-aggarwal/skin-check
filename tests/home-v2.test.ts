@@ -149,12 +149,17 @@ describe("permission states", () => {
     expect(promptFor("denied", true)).toBe("none");
   });
 
-  it("the screen shows only after a check, only once, and only with something to ask", () => {
-    expect(showPermissions({ afterCheck: true, settings: null, anythingToAsk: true })).toBe(true);
-    expect(showPermissions({ afterCheck: false, settings: null, anythingToAsk: true })).toBe(false); // sign-in, a link, the nav
-    expect(showPermissions({ afterCheck: true, settings: { askedAt: new Date() }, anythingToAsk: true })).toBe(false);
-    expect(showPermissions({ afterCheck: true, settings: { location: "not_now" }, anythingToAsk: true })).toBe(true);
-    expect(showPermissions({ afterCheck: true, settings: null, anythingToAsk: false })).toBe(false);
+  it("the screen shows only after a check, only once, only for a choice not made yet, never after a failed read", () => {
+    const on = { weather: true, push: true };
+    expect(showPermissions({ afterCheck: true, settings: null, ...on })).toBe(true);
+    expect(showPermissions({ afterCheck: false, settings: null, ...on })).toBe(false); // sign-in, a link, the nav
+    expect(showPermissions({ afterCheck: true, settings: { askedAt: new Date() }, ...on })).toBe(false);
+    expect(showPermissions({ afterCheck: true, settings: { location: "not_now" }, ...on })).toBe(true); // reminders not chosen yet
+    // Both chosen on Home cards or in Account: nothing to ask, the screen never wipes them.
+    expect(showPermissions({ afterCheck: true, settings: { location: "allowed", reminders: "allowed" }, ...on })).toBe(false);
+    expect(showPermissions({ afterCheck: true, settings: { location: "allowed" }, weather: true, push: false })).toBe(false);
+    expect(showPermissions({ afterCheck: true, settings: "error", ...on })).toBe(false);
+    expect(showPermissions({ afterCheck: true, settings: null, weather: false, push: false })).toBe(false);
   });
 
   it("the home-screen hint is for iPhone and iPad in the browser only", () => {

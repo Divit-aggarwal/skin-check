@@ -19,11 +19,12 @@ const P = HOME_COPY.permissions;
 type Choice = PermissionOutcome | null;
 
 export function PermissionsScreen({ user, settings, onDone }: { user: User; settings: HomeSettings | null; onDone: (s: HomeSettings) => void }) {
-  const [location, setLocation] = useState<Choice>(null);
-  const [reminders, setReminders] = useState<Choice>(null);
+  // A choice already made (on a Home card or in Account) shows as made and is never asked again.
+  const [location, setLocation] = useState<Choice>(settings?.location ?? null);
+  const [reminders, setReminders] = useState<Choice>(settings?.reminders ?? null);
+  const [touched, setTouched] = useState<{ location?: true; reminders?: true; city?: true }>({});
   const [city, setCity] = useState<HomeSettings["city"]>(settings?.city ?? null);
   const [busy, setBusy] = useState<"location" | "reminders" | "done" | null>(null);
-  const [failed, setFailed] = useState(false);
   const [ios, setIos] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
@@ -31,19 +32,17 @@ export function PermissionsScreen({ user, settings, onDone }: { user: User; sett
     setIos(needsHomeScreen(navigator.userAgent, window.matchMedia("(display-mode: standalone)").matches));
   }, []);
 
-  const finish = async () => {
+  // Only what was chosen on this screen is written, plus askedAt; an item left alone is
+  // written as "not now" only if it had no choice before. Home opens at once: the save
+  // never holds the user here (it lands when the connection allows).
+  const finish = () => {
     setBusy("done");
-    // Anything not chosen counts as "not now"; the screen never shows again.
     const result: HomeSettings = {
-      ...(weatherOn() ? { location: location ?? "not_now", city: city ?? null } : {}),
-      ...(pushOn() ? { reminders: reminders ?? "not_now" } : {}),
+      ...(weatherOn() && (touched.location || !settings?.location) ? { location: location ?? "not_now" } : {}),
+      ...(weatherOn() && touched.city ? { city: city ?? null } : {}),
+      ...(pushOn() && (touched.reminders || !settings?.reminders) ? { reminders: reminders ?? "not_now" } : {}),
     };
-    try {
-      await saveHomeSettings(user.uid, result, true);
-    } catch (e) {
-      console.error("[home] permissions not saved", e instanceof Error ? e.name : e);
-      setFailed(true);
-    }
+    saveHomeSettings(user.uid, result, true).catch((e) => console.error("[home] permissions not saved", e instanceof Error ? e.name : e));
     onDone({ ...settings, ...result, askedAt: new Date() });
   };
 
@@ -102,14 +101,19 @@ export function PermissionsScreen({ user, settings, onDone }: { user: User; sett
               try {
                 const r = await locateCity(user);
                 setLocation(r.outcome);
+                setTouched((t) => ({ ...t, location: true, ...(r.city ? { city: true } : {}) }));
                 if (r.city) setCity(r.city);
               } catch {
                 setLocation("not_now");
+                setTouched((t) => ({ ...t, location: true }));
               } finally {
                 setBusy(null);
               }
             },
-            () => setLocation("not_now"),
+            () => {
+              setLocation("not_now");
+              setTouched((t) => ({ ...t, location: true }));
+            },
             <p className="text-sm text-brand-muted" data-legal-review="TD-47 location consent">
               {P.locationConsent}
             </p>
@@ -125,16 +129,19 @@ export function PermissionsScreen({ user, settings, onDone }: { user: User; sett
               setBusy("reminders");
               try {
                 setReminders(await enableReminders(user));
+                setTouched((t) => ({ ...t, reminders: true }));
               } finally {
                 setBusy(null);
               }
             },
-            () => setReminders("not_now"),
+            () => {
+              setReminders("not_now");
+              setTouched((t) => ({ ...t, reminders: true }));
+            },
             ios ? <p className="text-sm text-brand-muted">{P.iosHint}</p> : undefined
           )}
       </ul>
-      {failed && <p role="alert">{P.saveFailed}</p>}
-      <button type="button" className={`${btnPrimary} self-start`} aria-disabled={busy !== null} onClick={() => !busy && void finish()}>
+      <button type="button" className={`${btnPrimary} self-start`} aria-disabled={busy !== null} onClick={() => !busy && finish()}>
         {P.continue}
       </button>
     </section>
