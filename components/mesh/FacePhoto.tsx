@@ -18,7 +18,7 @@ const KEYS = ["redness", "oiliness"] as const;
 type Key = (typeof KEYS)[number];
 
 const STYLE: Record<Key, CSSProperties> = {
-  redness: { backgroundImage: `repeating-linear-gradient(45deg, ${REDNESS} 0 3px, transparent 3px 7px)` },
+  redness: { backgroundImage: `repeating-linear-gradient(45deg, ${REDNESS} 0 4px, transparent 4px 8px)` },
   oiliness: { backgroundColor: OILINESS },
 };
 // The overlay's alpha stops at 0.6; stripes cover half the area, so their mask is laid twice (about 0.84).
@@ -77,7 +77,7 @@ export function FacePhoto({ photo, overlays = null, fallback, mesh: withMesh = t
           shown.map((k) => (
             <div key={k} role="img" aria-label={C.photo.overlayAlt[k]} className="absolute inset-0 animate-in fade-in duration-200 motion-reduce:animate-none" style={{ ...STYLE[k], ...masked(overlays![k]!, LAYERS[k]) }} />
           ))}
-        {mesh && url && !failed && <MeshLayer mesh={mesh} />}
+        {mesh && url && !failed && <MeshLayer mesh={mesh} faint={shown.length > 0} />}
         {read && <div className="absolute left-2 top-2 rounded-full bg-brand-paper/90 px-3 py-1 text-xs font-semibold text-brand-ink">{C.photo.read}</div>}
       </div>
       {shown.length > 0 && <OverlayLegend shown={shown} />}

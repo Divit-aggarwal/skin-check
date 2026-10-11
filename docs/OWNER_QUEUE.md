@@ -345,3 +345,29 @@ gh pr merge 11 --merge
 3. Home and the opened check of a check with "keep my photo" ticked: the mesh over the photo, and tapping an area highlights it. A check without a kept photo shows the face drawing.
 4. Echo: "How are my breakouts?" gets no level for breakouts. Echo may repeat what you said in the questions.
 5. Only once the development key has credit, and you say go: the agent runs the real-model question set (tracker F23).
+
+# TD-39 release: one photo with both overlays, no chips (prepared 2026-10-11)
+
+Pull request: branch `feat/one-photo-two-overlays` (pull request link in the tracker row G20). **Nothing below has been run.** Same rules as above: in order, one step at a time, and tell the agent after each step. Run it after the TD-37 queue (M1–M4): this change builds on the mesh from pull request #11, which is already merged into `master`.
+
+After O1, TD-37 phone checks M4 items 2 and 3 (chips, tapping an area) no longer apply; O2 replaces them.
+
+**Why this is safe.** No database rules, index, expiry, bucket or setting changes. Saved data is unchanged: the same fields are written, and the engine's five values stay on the server record. Only screens change.
+
+## O1. Merge the pull request (this is the production deploy)
+
+```bash
+gh pr merge <PR number> --merge
+```
+- Good output: `✓ Merged pull request #<PR number>`. Vercel builds `master` for production (about 2 minutes).
+- Check (agent): the production deployment is READY on the merge commit, region `bom1`; `curl -sI https://skin-check-sigma.vercel.app/dashboard` answers 200; a chat request without a login answers 401.
+- Undo: `vercel rollback <previous production deployment id>` (fast), or `git revert -m 1 <merge commit>` in a new pull request.
+
+## O2. Phone checks after the merge (made-up test accounts only, one with light skin and one with dark skin if you can)
+
+1. New check, questions answered. Results: one photo, with the thin white face mesh, lilac stripes where redness showed up and solid blue where oiliness showed up, and a legend under it naming both. No chips, no arrows, no area to tap.
+2. Under the photo, one table: Area, Redness, Oiliness; Whole face first, then each area; only Low, Moderate, Elevated or No reading.
+3. Nowhere on the results, Home, an opened check or Echo's side panel do the words Breakouts, Texture, Dark marks or "From what you told us" appear.
+4. Home and the opened check of a check with "keep my photo" ticked: the photo with the mesh, the line "The colours for redness and oiliness are shown only right after a new check.", and the same table. A check without a kept photo shows the face drawing and the table. (The photo there needs TD-37 step M2; without it, the face drawing shows.)
+5. Echo: "How are my breakouts?" gets no level for breakouts; Echo may repeat what you said in the questions.
+- Undo for any failure: the O1 undo.

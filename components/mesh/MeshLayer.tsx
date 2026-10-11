@@ -24,9 +24,9 @@ export function useFaceMesh(photo: Blob | null | undefined): { mesh: FaceMesh | 
  * the face, never a finding: one thin, even, white line for every edge, no
  * points, no colour by place or reading, and nothing to choose (TD-39).
  * `scanning` adds a band that sweeps down while the photo is read; none under
- * reduced motion.
+ * reduced motion. `faint`: fainter lines, so the overlays under them stay readable.
  */
-export function MeshLayer({ mesh, scanning = false }: { mesh: FaceMesh; scanning?: boolean }) {
+export function MeshLayer({ mesh, scanning = false, faint = false }: { mesh: FaceMesh; scanning?: boolean; faint?: boolean }) {
   const lines = useMemo(() => meshPath(mesh.points, mesh.edges), [mesh]);
   return (
     <>
@@ -36,7 +36,7 @@ export function MeshLayer({ mesh, scanning = false }: { mesh: FaceMesh; scanning
         preserveAspectRatio="xMidYMid slice"
         className="absolute inset-0 h-full w-full animate-in fade-in duration-200 motion-reduce:animate-none"
       >
-        <path d={lines} fill="none" stroke="#FFFFFF" strokeOpacity={0.55} strokeWidth={0.75} vectorEffect="non-scaling-stroke" />
+        <path d={lines} fill="none" stroke="#FFFFFF" strokeOpacity={faint ? 0.3 : 0.55} strokeWidth={0.75} vectorEffect="non-scaling-stroke" />
       </svg>
       {scanning && (
         // One soft white band, moved by transform only (no repaint of the mesh per frame).
