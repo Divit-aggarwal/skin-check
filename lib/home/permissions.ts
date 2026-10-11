@@ -51,3 +51,6 @@ export function needsHomeScreen(userAgent: string, standalone: boolean): boolean
   const ios = /iPhone|iPad|iPod/.test(userAgent) || (/Macintosh/.test(userAgent) && /Mobile\//.test(userAgent));
   return ios && !standalone;
 }
+
+/** Set in sessionStorage when a check's results are shown; Home reads it (TD-47 (3)). */
+export const AFTER_CHECK_KEY = "home-v2:after-check";

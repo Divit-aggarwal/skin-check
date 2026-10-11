@@ -1,8 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { checkRequestRate, type PublicRouteLimits } from "@/lib/rate-limit";
-import { isLatE1, isLonE1 } from "@/lib/home/conditions";
+import { isLatE1, isLonE1 } from "@/lib/home/weather";
 import { nearestPlace, searchPlaces } from "@/lib/home/places";
-import { conditionsOn } from "@/lib/home/switches";
+import { weatherOn } from "@/lib/home/switches";
 import { fail, smallJson, verifiedUid } from "../_auth";
 
 // TD-47: a place name from a rounded position ({latE1, lonE1}, whole tenths of
@@ -13,7 +13,7 @@ export const runtime = "nodejs";
 const LIMITS: PublicRouteLimits = { scope: "home-place", perMinute: 30, perDay: 500 };
 
 export async function POST(request: NextRequest) {
-  if (!conditionsOn()) return fail(404, "OFF");
+  if (!weatherOn()) return fail(404, "OFF");
   const limited = checkRequestRate(request, LIMITS);
   if (limited) return limited;
   const uid = await verifiedUid(request);

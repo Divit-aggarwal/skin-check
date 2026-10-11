@@ -151,16 +151,8 @@ export function productQuotes(p: ListedProduct): string[] {
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
-/**
- * TD-34: product suggestions are on unless ECHO_PRODUCTS_SWITCH is exactly
- * "off". Off gives Gemini exactly what it got before TD-34 and hides every
- * product card; Echo itself stays on (ECHO_SWITCH is separate).
- * next.config.js builds the value into the browser code too, so a change
- * takes effect with the next deployment (docs/OWNER_QUEUE.md).
- */
-export function echoProductsOn(): boolean {
-  return process.env.ECHO_PRODUCTS_SWITCH !== "off";
-}
+// TD-34: the product switch lives in lib/echo-limits.ts (client-safe, so Home can read it too, TD-47).
+export { echoProductsOn } from "@/lib/echo-limits";
 
 /**
  * TD-34 (owner): the fixed doctor line for a pregnancy, breastfeeding or

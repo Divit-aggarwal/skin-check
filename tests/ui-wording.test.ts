@@ -112,13 +112,19 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
   });
 
   it("D-12: on Home the routine card is never beside the readings, and the timeline carries no photos", () => {
+    // TD-47: the readings card spans the main column alone; the routine card sits below it, beside "Your record"
+    // (counts only), never beside the readings, and the routine card itself shows no reading or photo.
     const home = readFileSync("components/dashboard/DashboardPage.tsx", "utf8");
-    const left = home.slice(home.indexOf("contents lg:col-span-8"), home.indexOf("contents lg:col-span-4"));
-    const right = home.slice(home.indexOf("contents lg:col-span-4"));
-    expect(left.length).toBeGreaterThan(100);
-    expect(left).toMatch(/<TodayCard/);
-    expect(left.indexOf("<TodayCard")).toBeGreaterThan(left.indexOf("<RecentSection"));
-    expect(right).not.toMatch(/<TodayCard/);
+    const main = home.slice(home.indexOf("contents xl:col-span-8"), home.indexOf("contents xl:col-span-4"));
+    const right = home.slice(home.indexOf("contents xl:col-span-4"));
+    expect(main.length).toBeGreaterThan(100);
+    expect(main.indexOf("<RoutineCard")).toBeGreaterThan(main.indexOf("<LatestCheckCard"));
+    const row = main.slice(main.indexOf("xl:grid-cols-2"), main.indexOf("<RoutineCard"));
+    expect(row).not.toMatch(/<LatestCheckCard|<CheckReadings/);
+    expect(right).not.toMatch(/<RoutineCard|<LatestCheckCard/);
+    const cards = readFileSync("components/dashboard/HomeCards.tsx", "utf8");
+    const routineCard = cards.slice(cards.indexOf("export function RoutineCard("), cards.indexOf("// ─── Weather and air today"));
+    expect(routineCard).not.toMatch(/bands|<Thumb|<FaceDrawing|band\b/);
     const checks = readFileSync("components/checks/ChecksView.tsx", "utf8");
     const timeline = checks.slice(checks.indexOf("function TimelineSection("));
     expect(timeline).not.toMatch(/<Thumb|thumb=/);

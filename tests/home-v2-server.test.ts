@@ -10,9 +10,9 @@ vi.mock("@/lib/firebase/admin", async () => {
   return { bearerToken: actual.bearerToken, AdminNotConfiguredError: actual.AdminNotConfiguredError, verifyFirebaseIdToken, adminDb };
 });
 
-import { fetchConditions, ConditionsUnavailableError } from "@/lib/home/open-meteo";
+import { fetchWeather, WeatherUnavailableError } from "@/lib/home/open-meteo";
 import { allowedEndpoint, dueToday, sendReminders, subscriptionId, vapidHeader } from "@/lib/home/push";
-import { POST as conditionsPOST } from "@/app/api/home/conditions/route";
+import { POST as conditionsPOST } from "@/app/api/home/weather/route";
 import { POST as placePOST } from "@/app/api/home/place/route";
 import { DELETE as remindersDELETE, POST as remindersPOST } from "@/app/api/home/reminders/route";
 import { GET as sendGET } from "@/app/api/home/reminders/send/route";
@@ -56,7 +56,7 @@ describe("conditions source (Open-Meteo)", () => {
     vi.stubEnv("OPEN_METEO_API_KEY", "test-key");
     vi.stubEnv("CONDITIONS_LOCAL_BASE_URL", "http://127.0.0.1:1");
     const calls = stubFetch();
-    expect(await fetchConditions(130, 776)).toEqual({ uv: 7.4, humidity: 68, usAqi: 85, observedAt: "2026-10-11T04:00:00.000Z" });
+    expect(await fetchWeather(130, 776)).toEqual({ uv: 7.4, humidity: 68, usAqi: 85, observedAt: "2026-10-11T04:00:00.000Z" });
     expect(calls).toHaveLength(2);
     for (const c of calls) {
       const u = new URL(c);
@@ -72,49 +72,49 @@ describe("conditions source (Open-Meteo)", () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("OPEN_METEO_API_KEY", "");
     const calls = stubFetch();
-    await expect(fetchConditions(130, 776)).rejects.toBeInstanceOf(ConditionsUnavailableError);
+    await expect(fetchWeather(130, 776)).rejects.toBeInstanceOf(WeatherUnavailableError);
     expect(calls).toEqual([]);
   });
 
   it("a source failure is unavailable", async () => {
     vi.stubEnv("OPEN_METEO_API_KEY", "k");
     stubFetch(true);
-    await expect(fetchConditions(130, 776)).rejects.toBeInstanceOf(ConditionsUnavailableError);
+    await expect(fetchWeather(130, 776)).rejects.toBeInstanceOf(WeatherUnavailableError);
   });
 });
 
-describe("/api/home/conditions and /api/home/place", () => {
+describe("/api/home/weather and /api/home/place", () => {
   it("off unless CONDITIONS_SWITCH is on", async () => {
     vi.stubEnv("CONDITIONS_SWITCH", "");
-    expect((await conditionsPOST(req("/api/home/conditions", { latE1: 130, lonE1: 776 }))).status).toBe(404);
+    expect((await conditionsPOST(req("/api/home/weather", { latE1: 130, lonE1: 776 }))).status).toBe(404);
     expect((await placePOST(req("/api/home/place", { query: "Del" }))).status).toBe(404);
   });
 
   it("signed-in users only (never an open proxy to the paid source)", async () => {
     const calls = stubFetch();
-    expect((await conditionsPOST(req("/api/home/conditions", { latE1: 130, lonE1: 776 }, null))).status).toBe(401);
-    expect((await conditionsPOST(req("/api/home/conditions", { latE1: 130, lonE1: 776 }, "forged"))).status).toBe(401);
+    expect((await conditionsPOST(req("/api/home/weather", { latE1: 130, lonE1: 776 }, null))).status).toBe(401);
+    expect((await conditionsPOST(req("/api/home/weather", { latE1: 130, lonE1: 776 }, "forged"))).status).toBe(401);
     expect((await placePOST(req("/api/home/place", { latE1: 130, lonE1: 776 }, null))).status).toBe(401);
     expect(calls).toEqual([]);
   });
 
   it("a precise position is refused, not rounded and sent on", async () => {
     const calls = stubFetch();
-    expect((await conditionsPOST(req("/api/home/conditions", { latE1: 129.7194, lonE1: 775.9369 }))).status).toBe(400);
-    expect((await conditionsPOST(req("/api/home/conditions", { lat: 12.97194, lon: 77.59369 }))).status).toBe(400);
+    expect((await conditionsPOST(req("/api/home/weather", { latE1: 129.7194, lonE1: 775.9369 }))).status).toBe(400);
+    expect((await conditionsPOST(req("/api/home/weather", { lat: 12.97194, lon: 77.59369 }))).status).toBe(400);
     expect((await placePOST(req("/api/home/place", { latE1: 129.7194, lonE1: 776 }))).status).toBe(400);
-    expect((await conditionsPOST(req("/api/home/conditions", "x".repeat(2000)))).status).toBe(400);
+    expect((await conditionsPOST(req("/api/home/weather", "x".repeat(2000)))).status).toBe(400);
     expect(calls).toEqual([]);
   });
 
   it("returns the reading, or 503 UNAVAILABLE so the page can carry on", async () => {
     vi.stubEnv("OPEN_METEO_API_KEY", "k");
     stubFetch();
-    const ok = await conditionsPOST(req("/api/home/conditions", { latE1: 130, lonE1: 776 }));
+    const ok = await conditionsPOST(req("/api/home/weather", { latE1: 130, lonE1: 776 }));
     expect(ok.status).toBe(200);
     expect(await ok.json()).toMatchObject({ uv: 7.4, humidity: 68, usAqi: 85 });
     stubFetch(true);
-    const down = await conditionsPOST(req("/api/home/conditions", { latE1: 130, lonE1: 776 }));
+    const down = await conditionsPOST(req("/api/home/weather", { latE1: 130, lonE1: 776 }));
     expect(down.status).toBe(503);
     expect(await down.json()).toMatchObject({ code: "UNAVAILABLE" });
   });

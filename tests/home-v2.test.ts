@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { CHECK_INTERVAL_RULE, isDue, nextCheck, partOfDay } from "@/lib/home/schedule";
 import { daysLoggedLast7, routineStreak } from "@/lib/routine/streak";
-import { aqiCategory, isLatE1, isLonE1, toTenths, uvCategory, UV_ADVICE } from "@/lib/home/conditions";
+import { aqiCategory, isLatE1, isLonE1, toTenths, uvCategory, UV_ADVICE } from "@/lib/home/weather";
 import { needsHomeScreen, outcomeOf, promptFor, showPermissions } from "@/lib/home/permissions";
 import { nearestPlace, searchPlaces } from "@/lib/home/places";
 

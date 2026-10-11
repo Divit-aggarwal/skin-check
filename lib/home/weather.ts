@@ -5,7 +5,7 @@ export type UvCategory = "Low" | "Moderate" | "High" | "Very high" | "Extreme";
 export type AqiCategory = "Good" | "Moderate" | "Unhealthy for sensitive groups" | "Unhealthy" | "Very unhealthy" | "Hazardous";
 
 /** What the server returns for one place. */
-export interface Conditions {
+export interface WeatherReading {
   uv: number;
   humidity: number;
   usAqi: number;

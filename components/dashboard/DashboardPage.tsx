@@ -1,41 +1,42 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
-import { ChevronRight } from "lucide-react";
-import { btnPrimary, btnSecondary, card, EmptyState, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, SignedOutCard, textLink } from "@/components/ui/page";
-import { TodayCard } from "@/components/routine/TodayCard";
+import { ErrorState, LoadingState, page, PageHeader, ReloadButton, SignedOutCard } from "@/components/ui/page";
 import { useRoutine } from "@/components/routine/useRoutine";
-import { TIMELINE_COPY } from "@/components/timeline/copy";
-import { dayOf, mergeTimeline } from "@/components/timeline/timeline";
-import { TimelineList } from "@/components/timeline/TimelineList";
-import { ROUTINE_COPY } from "@/lib/routine/copy";
-import { CheckReadings, formatDate, KnownAndNotKnown } from "./CheckReadings";
-import { useKeptPhoto } from "@/components/mesh/useKeptPhoto";
-import { ConsentSection } from "./ConsentSection";
-import { DASHBOARD_COPY as C } from "./copy";
-import { loadDashboard, type DashboardData } from "./data";
-import { deriveDashboard, isEmpty, waitingQuestions, type Dashboard } from "./state";
 import { QuestionsCard } from "@/components/skin-check/QuestionsChoice";
-import { newestEchoSession } from "./echo-session";
 import { echoOn } from "@/lib/echo-limits";
 import type { EchoRegion } from "@/lib/echo-regions";
+import { partOfDay } from "@/lib/home/schedule";
+import { AFTER_CHECK_KEY, showPermissions, type HomeSettings } from "@/lib/home/permissions";
+import { weatherOn, pushOn } from "@/lib/home/switches";
+import { formatDate } from "./CheckReadings";
+import { DASHBOARD_COPY as C } from "./copy";
+import { HOME_COPY as H } from "./homeCopy";
+import { loadDashboard, type DashboardData } from "./data";
+import { deriveDashboard, toDate, waitingQuestions, type Dashboard } from "./state";
+import { AskEchoCard, LatestCheckCard, NewCheckBanner, NextCheckCard, RecordCard, RoutineCard, useOpenEcho, WeatherCard } from "./HomeCards";
+import { loadHomeSettings } from "./homeSettings";
+import { PermissionsScreen } from "./PermissionsScreen";
 
-// Home (G03, docs/design/map.md). The newest reading by face area, the
-// starting point, recent timeline, Echo, a new check, today's routine and
-// privacy. A past check opens on /checks/[id] with its own readings and the
-// fixed line (TD-24 (1)), so no two checks' readings meet on one screen, and
-// the routine card never sits beside the readings (D-12).
-
+// Home v2 (TD-47, docs/design/home-v2.md): what to do for the skin today.
+// One check's readings only, never two side by side (TD-24 (1)); the routine
+// card never shows a reading (D-12); the weather card never names the skin.
+// Phone and tablet: one column in the brief's order (CSS `order` over
+// `contents` columns). From 1280: main column (8) and right column (4).
 
 type Load = { kind: "loading" } | { kind: "error" } | { kind: "ready"; data: DashboardData };
+/** The settings doc: undefined while loading; null when absent or unreadable (Home still works). */
+type Settings = HomeSettings | null | undefined;
+type SignedIn = NonNullable<ReturnType<typeof useAuth>["user"]>;
 
-export function DashboardPage() {
+export function DashboardPage({ productsOn = true }: { productsOn?: boolean }) {
   const { user, loading } = useAuth();
   const [load, setLoad] = useState<Load>({ kind: "loading" });
+  const [settings, setSettings] = useState<Settings>(undefined);
+  const [afterCheck, setAfterCheck] = useState(false);
   const openId = useSearchParams().get("check");
   const router = useRouter();
   const { setSession } = useSkinCheckSession();
@@ -51,6 +52,15 @@ export function DashboardPage() {
     if (openId) router.replace(`/checks/${encodeURIComponent(openId)}`);
   }, [openId, router]);
 
+  // TD-47 (3): set by the results screen; read here.
+  useEffect(() => {
+    try {
+      setAfterCheck(sessionStorage.getItem(AFTER_CHECK_KEY) === "1");
+    } catch {
+      /* storage blocked: no screen */
+    }
+  }, []);
+
   useEffect(() => {
     if (!user) return;
     let active = true;
@@ -63,6 +73,13 @@ export function DashboardPage() {
         if (active) setLoad({ kind: "error" });
       }
     );
+    loadHomeSettings(user.uid).then(
+      (s) => active && setSettings(s),
+      (error) => {
+        console.error("[dashboard] home settings not loaded", error instanceof Error ? error.name : error);
+        if (active) setSettings(null);
+      }
+    );
     return () => {
       active = false;
     };
@@ -73,15 +90,15 @@ export function DashboardPage() {
     [user, load]
   );
 
-  if (loading || (user && load.kind === "loading")) {
+  if (loading || (user && (load.kind === "loading" || settings === undefined))) {
     return (
       <Shell>
-        {/* Shaped like Home: the 8/4 split, so nothing jumps when it loads. */}
-        <div className="grid gap-6 lg:grid-cols-12">
-          <div className="lg:col-span-8">
-            <LoadingState label={C.loading} blocks={["h-[28rem]", "h-64"]} />
+        {/* Shaped like Home, so nothing jumps when it loads. */}
+        <div className="grid gap-6 xl:grid-cols-12">
+          <div className="xl:col-span-8">
+            <LoadingState label={C.loading} blocks={["h-40", "h-[28rem]", "h-64"]} />
           </div>
-          <div aria-hidden className="hidden lg:col-span-4 lg:block">
+          <div aria-hidden className="hidden xl:col-span-4 xl:block">
             <LoadingState label="" blocks={["h-48", "h-40", "h-40"]} />
           </div>
         </div>
@@ -103,203 +120,115 @@ export function DashboardPage() {
     );
   }
 
+  if (showPermissions({ afterCheck, settings: settings ?? null, anythingToAsk: weatherOn() || pushOn() })) {
+    return (
+      <main className={`${page} pt-8 sm:pt-12`}>
+        <PermissionsScreen
+          user={user}
+          settings={settings ?? null}
+          onDone={(s) => {
+            try {
+              sessionStorage.removeItem(AFTER_CHECK_KEY);
+            } catch {
+              /* nothing kept */
+            }
+            setAfterCheck(false);
+            setSettings(s);
+            window.scrollTo({ top: 0 });
+          }}
+        />
+      </main>
+    );
+  }
 
-  const waiting = waitingQuestions(user.uid, load.data.checks, load.data.analyses, load.data.laterAnswers);
+  return <Home user={user} data={load.data} dashboard={dashboard} settings={settings ?? null} onSettings={setSettings} routine={routine} productsOn={productsOn} />;
+}
+
+function Home({
+  user,
+  data,
+  dashboard,
+  settings,
+  onSettings,
+  routine,
+  productsOn,
+}: {
+  user: SignedIn;
+  data: DashboardData;
+  dashboard: Dashboard;
+  settings: HomeSettings | null;
+  onSettings: (s: HomeSettings) => void;
+  routine: ReturnType<typeof useRoutine>;
+  productsOn: boolean;
+}) {
+  const openEcho = useOpenEcho(user.uid, data);
+  const current = dashboard.current;
+  // TD-46: a face area opens Echo on it, only where "Chat with Echo" would work (Echo talks about the newest check).
+  const onArea = echoOn() && current.kind === "reading" && current.view.scanId === dashboard.echoScanId ? (region: EchoRegion) => openEcho({ region }) : undefined;
+  const waiting = waitingQuestions(user.uid, data.checks, data.analyses, data.laterAnswers);
+  const name = firstName(data);
+  const hello = H.greeting[partOfDay(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata")];
+
   return (
-    <Shell>
-      {/* Phone: one column in reading order. Desktop: two columns (8/4); the
-          columns are `contents` on phones so `order` sets one sequence. */}
-      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start">
-        <div className="contents lg:col-span-8 lg:flex lg:flex-col lg:gap-6">
-          <div className="order-1">
-            {/* Empty only when there is neither a check nor a reading: an analysis
-                lands before the questionnaire is saved (design §3, orphan record). */}
-            {isEmpty(dashboard) ? (
-              <EmptyState
-                body={C.empty}
-                action={
-                  <Link href="/skin-check" className={btnPrimary}>
-                    {C.firstCheck}
-                  </Link>
-                }
-              />
-            ) : (
-              <CurrentSection dashboard={dashboard} uid={user.uid} data={load.data} />
-            )}
+    <Shell title={name ? H.greetingName(hello, name) : hello}>
+      <div className="flex flex-col gap-4 sm:gap-6 xl:grid xl:grid-cols-12 xl:items-start">
+        <div className="contents xl:col-span-8 xl:flex xl:flex-col xl:gap-6">
+          <div className="order-2 flex flex-col gap-4 sm:gap-6">
+            <LatestCheckCard dashboard={dashboard} onArea={onArea} />
             {/* TD-33 (1): right under the newest reading, while its questions wait. */}
-            {waiting && (
-              <div className="mt-6">
-                <QuestionsCard isEcho={waiting.isEcho} date={waiting.date ? formatDate(waiting.date) : null} />
-              </div>
-            )}
+            {waiting && <QuestionsCard isEcho={waiting.isEcho} date={waiting.date ? formatDate(waiting.date) : null} />}
           </div>
-          <div className="order-3">
-            <RecentSection history={dashboard.history} routine={routine} />
+          <div className="contents xl:grid xl:grid-cols-2 xl:items-start xl:gap-6">
+            <div className="order-6 xl:order-none">
+              <RecordCard dashboard={dashboard} routine={routine} />
+            </div>
+            <div className="order-3 xl:order-none">
+              <RoutineCard routine={routine} />
+            </div>
           </div>
-          {/* Never beside the readings (D-12): below Recently, in the main column. */}
-          <div className="order-5">
-            <TodayCard routine={routine} />
-          </div>
-        </div>
-        <div className="contents lg:col-span-4 lg:flex lg:flex-col lg:gap-6">
-          <div className="order-2">
-            <TrendSection trend={dashboard.trend} />
-          </div>
-          <div className="order-4">
-            {/* TD-29 (5): no way into Echo while it is switched off. */}
-            {echoOn() && <ChatSection uid={user.uid} dashboard={dashboard} data={load.data} />}
-          </div>
-          {/* Only when the lead card does not already offer a new check. */}
-          {dashboard.current.kind === "reading" && (
-          <section aria-labelledby="new-title" className={`${card} order-6 flex flex-col items-start gap-3`}>
-            <h2 id="new-title" className={h2}>
-              {C.home.newCheckTitle}
-            </h2>
-            <p className="text-brand-muted">{C.home.newCheckBody}</p>
-            <Link href="/skin-check" className={btnSecondary}>
-              {C.newCheck}
-            </Link>
-          </section>
+          {dashboard.history.length > 0 && (
+            <div className="order-8">
+              <NewCheckBanner />
+            </div>
           )}
-          <div className="order-7">
-            <ConsentSection photo={dashboard.photo} deleteLink />
+        </div>
+        <div className="contents xl:col-span-4 xl:flex xl:flex-col xl:gap-6">
+          {weatherOn() && (
+            <div className="order-4 xl:order-none">
+              <WeatherCard user={user} settings={settings} onSettings={onSettings} />
+            </div>
+          )}
+          <div className="order-1 xl:order-none">
+            <NextCheckCard dashboard={dashboard} user={user} settings={settings} onSettings={onSettings} />
           </div>
+          {/* TD-29 (5): no way into Echo while it is switched off. */}
+          {echoOn() && (
+            <div className="order-7 xl:order-none">
+              <AskEchoCard uid={user.uid} dashboard={dashboard} data={data} productsOn={productsOn} />
+            </div>
+          )}
         </div>
       </div>
     </Shell>
   );
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+/** The first word of the name given on the newest check that has one. */
+function firstName(data: DashboardData): string | null {
+  const nameOf = (c: DashboardData["checks"][number]) => (c.data.answers as { name?: unknown } | undefined)?.name;
+  const newest = data.checks
+    .filter((c) => typeof nameOf(c) === "string")
+    .sort((a, b) => (toDate(b.data.createdAt)?.getTime() ?? Infinity) - (toDate(a.data.createdAt)?.getTime() ?? Infinity))[0];
+  const first = newest ? String(nameOf(newest)).trim().split(/\s+/)[0] : "";
+  return first ? first.slice(0, 40) : null;
+}
+
+function Shell({ children, title = C.title }: { children: React.ReactNode; title?: string }) {
   const today = new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long" });
   return (
     <main className={page}>
-      <PageHeader kicker={today} title={C.title} />
+      <PageHeader kicker={today} title={title} />
       {children}
     </main>
-  );
-}
-
-function CurrentSection({ dashboard, uid, data }: { dashboard: Dashboard; uid: string; data: DashboardData }) {
-  const { current } = dashboard;
-  const scanId = current.kind === "reading" ? current.view.scanId : null;
-  const openEcho = useOpenEcho(uid, data);
-  // TD-46: a face area opens Echo on it, only where "Chat with Echo" would work (Echo talks about the newest check).
-  const onArea = echoOn() && scanId !== null && scanId === dashboard.echoScanId ? openEcho : undefined;
-  // TD-37 (2): the mesh over this check's kept photo (extends the TD-25 (2) own-photo exception to Home).
-  const photo = useKeptPhoto(scanId, dashboard.history.some((h) => h.scanId === scanId && h.photoClaimed));
-  return (
-    <section aria-labelledby="current-title" className={`${card} flex flex-col gap-5`}>
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-1">
-        <div>
-          <p className={`${eyebrow} mb-1`}>{C.current.eyebrow}</p>
-          <h2 id="current-title" className={h2}>
-            {current.kind === "reading" ? C.current.title : C.current.noneTitle}
-          </h2>
-          {current.kind === "reading" && <p className="mt-1 text-sm text-brand-muted">{C.current.checkedOn(formatDate(current.view.date))}</p>}
-        </div>
-        {current.kind === "reading" && (
-          <Link href={`/checks/${encodeURIComponent(current.view.scanId)}`} className={textLink}>
-            {C.current.openCheck}
-            <ChevronRight aria-hidden size={16} />
-          </Link>
-        )}
-      </div>
-      {current.kind === "none" ? (
-        <div className="flex flex-col items-start gap-4">
-          <p>{C.current.none}</p>
-          <Link href="/skin-check" className={btnPrimary}>
-            {C.newCheck}
-          </Link>
-        </div>
-      ) : (
-        <>
-          {dashboard.newerCheckNotShown && <p className="rounded-xl bg-brand-linen px-4 py-3 text-sm">{C.current.newerNotShown}</p>}
-          <CheckReadings view={current.view} photo={photo} onArea={onArea} />
-          {/* Only next to readings that are on screen. */}
-          {current.view.bands && (
-            <div className="border-t border-brand-line pt-5">
-              <KnownAndNotKnown />
-            </div>
-          )}
-        </>
-      )}
-    </section>
-  );
-}
-
-function TrendSection({ trend }: { trend: Dashboard["trend"] }) {
-  return (
-    <section aria-labelledby="trend-title" className={`${card} flex flex-col gap-2`}>
-      <h2 id="trend-title" className={h2}>
-        {C.trend.title}
-      </h2>
-      {trend.kind === "empty" ? (
-        <p>{C.trend.empty}</p>
-      ) : (
-        <>
-          <p className="font-semibold">{C.trend.notEnough}</p>
-          <p>{C.trend.count(trend.count, trend.needed)}</p>
-        </>
-      )}
-      <p className="text-sm text-brand-muted">{trend.kind === "set" ? C.trend.set : C.trend.howItForms(trend.needed)}</p>
-      {trend.engineBoundary && <p className="text-sm text-brand-muted">{C.trend.boundary}</p>}
-      {trend.legacyPresent && <p className="text-sm text-brand-muted">{C.trend.legacy}</p>}
-    </section>
-  );
-}
-
-/** The latest items of the timeline: checks and routine entries by date, never a reading. */
-function RecentSection({ history, routine }: { history: Dashboard["history"]; routine: ReturnType<typeof useRoutine> }) {
-  const items = mergeTimeline(history, routine.data?.events ?? [], routine.data?.today ?? dayOf(new Date())).slice(0, 4);
-  const nameOf = (id: string) => routine.data?.products.find((p) => p.id === id)?.name ?? ROUTINE_COPY.otherProduct;
-  return (
-    <section aria-labelledby="recent-title" className="flex flex-col gap-2 rounded-2xl border border-brand-line p-5 sm:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-x-4">
-        <h2 id="recent-title" className={h2}>
-          {TIMELINE_COPY.recent}
-        </h2>
-        <Link href="/checks?view=timeline" className={textLink}>
-          {TIMELINE_COPY.seeAll}
-          <ChevronRight aria-hidden size={16} />
-        </Link>
-      </div>
-      <TimelineList items={items} nameOf={nameOf} />
-    </section>
-  );
-}
-
-/** Echo on the newest reading, optionally on one face area (TD-46). */
-function useOpenEcho(uid: string, data: DashboardData) {
-  const { setSession } = useSkinCheckSession();
-  const router = useRouter();
-  return (region?: EchoRegion) => {
-    const session = newestEchoSession(uid, data);
-    if (!session) return;
-    setSession(session);
-    router.push(region ? `/echo?region=${region}` : "/echo");
-  };
-}
-
-function ChatSection({ uid, dashboard, data }: { uid: string; dashboard: Dashboard; data: DashboardData }) {
-  const openEcho = useOpenEcho(uid, data);
-  const scanId = dashboard.echoScanId;
-
-  return (
-    <section aria-labelledby="chat-title" className={`${card} flex flex-col items-start gap-3`}>
-      <h2 id="chat-title" className={h2}>
-        {C.chat.title}
-      </h2>
-      {scanId ? (
-        <>
-          <p className="text-brand-muted">{C.chat.body}</p>
-          <button type="button" className={btnPrimary} onClick={() => openEcho()}>
-            {C.chat.button}
-          </button>
-        </>
-      ) : (
-        <p className="text-brand-muted">{dashboard.history.length === 0 ? C.chat.needsFirst : C.chat.needsReading}</p>
-      )}
-    </section>
   );
 }

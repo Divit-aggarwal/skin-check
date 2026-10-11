@@ -10,7 +10,8 @@ import { CHECKS_COPY as K } from "./copy";
 
 type State = { kind: "loading" } | { kind: "none" } | { kind: "ready"; url: string };
 
-export function Thumb({ scanId, date, size = 48 }: { scanId: string; date: string; size?: 48 | 112 }) {
+// TD-47: `fallback` (Home's face drawing) shows instead of nothing when no photo comes back.
+export function Thumb({ scanId, date, size = 48, fallback = null }: { scanId: string; date: string; size?: 48 | 112; fallback?: React.ReactNode }) {
   const { user } = useAuth();
   const [state, setState] = useState<State>({ kind: "loading" });
 
@@ -37,7 +38,7 @@ export function Thumb({ scanId, date, size = 48 }: { scanId: string; date: strin
   }, [user, scanId]);
 
   const box = size === 48 ? "size-12 rounded-lg" : "size-28 rounded-2xl";
-  if (state.kind === "none") return null;
+  if (state.kind === "none") return <>{fallback}</>;
   if (state.kind === "loading") return <span role="img" aria-label={K.photoLoading} className={`${box} shrink-0 animate-pulse bg-brand-linen2`} />;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- a short-lived signed URL, not a static asset

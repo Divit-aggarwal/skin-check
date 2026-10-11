@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { PhoneOtpForm } from "@/components/auth/PhoneOtpForm";
 import { ConsentSection } from "@/components/dashboard/ConsentSection";
+import { HomeSettingsSection } from "@/components/dashboard/HomeSettingsSection";
 import { DashboardLink } from "@/components/dashboard/DashboardLink";
 import { card, h2, LoadingState, PageHeader } from "@/components/ui/page";
 import { DeleteAccount } from "./DeleteAccount";
@@ -70,8 +71,10 @@ export function AccountView() {
                   <DashboardLink />
                 </section>
                 {questionsWaiting && <QuestionsCard isEcho={questionsWaiting.isEcho} date={questionsWaiting.date} />}
-                {/* H14: consent status and the AI-share withdrawal (also on Home). */}
+                {/* H14: consent status and the AI-share withdrawal. */}
                 <ConsentSection />
+                {/* TD-47: location, city and reminders. */}
+                <HomeSettingsSection />
               </>
             )}
           </div>

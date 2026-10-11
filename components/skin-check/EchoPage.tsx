@@ -19,7 +19,7 @@ import { AccountButton, btnPrimary, EmptyState, SignedOutCard, ErrorState, eyebr
 import { getEchoOpening, getSkinCheckChatReply, ApiError, type ShownProduct } from "@/lib/api";
 import { ProductCards, splitDoctorLine, splitRedFlagNote } from "./ProductCards";
 import { COPY } from "@/lib/rules/settings";
-import { pickStarters } from "./echoStarters";
+import { pickStarters, STARTER_POOL } from "./echoStarters";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, isEchoRegion, type EchoRegion } from "@/lib/echo-regions";
 import { useAuth } from "@/lib/auth-context";
 import { AI_SHARE_CONSENT_COPY, AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
@@ -177,6 +177,23 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
     setStarters(pickStarters({ productsOn, asked: askedKey ? askedKey.split("\n") : [] }));
   }, [productsOn, askedKey, answerCount]);
 
+  // TD-47: a starter tapped on Home arrives as ?ask=. Only an exact pool
+  // question is sent (never any other text from a link), only once, and only
+  // where Echo's own starters would show; the consent and limit gates still
+  // apply on the server. The parameter is then removed from the address.
+  const askParam = searchParams.get("ask");
+  const askedFromHome = useRef(false);
+  const handleSendRef = useRef<(text: string) => void>(() => undefined);
+  useEffect(() => {
+    if (askedFromHome.current || !askParam || !session || !echoOn) return;
+    askedFromHome.current = true;
+    const url = new URL(window.location.href);
+    url.searchParams.delete("ask");
+    window.history.replaceState(window.history.state, "", url);
+    const pool = productsOn ? Object.values(STARTER_POOL).flat() : Object.entries(STARTER_POOL).filter(([g]) => g !== "products").flatMap(([, q]) => q);
+    if (pool.includes(askParam) && safetyQuestionsAnswered(session.answers)) handleSendRef.current(askParam);
+  }, [askParam, session, echoOn, productsOn]);
+
   const messages = threads[activeRegion].messages;
   const isThinking = sendingRegion === activeRegion;
   const activeError = sendError?.region === activeRegion ? sendError : null;
@@ -286,6 +303,8 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
     setDraft("");
     void sendToEcho(region, before, userMessage);
   }
+
+  handleSendRef.current = handleSend;
 
   function handleRetry() {
     if (!activeError || sendingRegion) return;
