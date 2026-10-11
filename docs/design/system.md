@@ -37,7 +37,7 @@ eyebrows, which keep the live `#0f6e56`.
 | Shop buttons | Not used | ADD TO BAG: `#111` fill, square, 12px weight 700, uppercase, +0.1em. Checkout: `#0f6e56` pill. Product page Add to Cart: `#0f9b8e` pill | Not used. The app sells nothing, and white on `#0f9b8e` fails contrast |
 | Page background | White `#ffffff` | Linen `#f5f3ee` (`body`) | Linen `#f5f3ee` |
 | Cards | Linen fill, no border, 16px corners | Product card: white, 1px `#ece8e1` border, 12px corners. Menu and learn cards: 16px corners | White, 1px `#ece8e1` border, 16px corners |
-| Selected tint (nav item, chosen face area, selected chip) | Mist `#e1f5ee` | `:root --color-mist` `#e1f5ee` (barely used). Lines and borders are `rgba(31,71,62,.12)` | `#e4e9e8`, which is `#1f473e` at 12% on white |
+| Selected tint (nav item, selected chip) | Mist `#e1f5ee` | `:root --color-mist` `#e1f5ee` (barely used). Lines and borders are `rgba(31,71,62,.12)` | `#e4e9e8`, which is `#1f473e` at 12% on white |
 | Ink (body text) | `#2c2c2a` | `#2c2c2a` | `#2c2c2a` |
 | Title colour (h1, h2) | `#2c2c2a` | `#111111` (section titles), `#252422` (product h1) | `#111111` |
 | Muted text | `#6b6862` | `#6b6862` | `#6b6862` |
@@ -134,7 +134,7 @@ Contrast was measured against WCAG 2.1. Text needs 4.5:1, or 3:1 for large text 
 | Primary button | action `#1f473e` with white text (§0) | 10.4 | – |
 | Links, focus ring, selected nav item | green `#1f473e` (§0) | 10.4 | 9.3 |
 | Eyebrows (small uppercase labels) | `#0f6e56` (§0) | 6.2 | 5.6 |
-| Selected nav background, chosen face area, info panel | tint `#e4e9e8` (with ink or green text) (§0) | – | – |
+| Selected nav background, info panel | tint `#e4e9e8` (with ink or green text) (§0) | – | – |
 | Decorative only, never text | accent, blush, gold, taupe, sky, mint, cyan | 1.3–3.4 | – |
 | Error text and border | `#b42318` (assumed; the store has no error colour) | 6.5 | 5.9 |
 
@@ -149,11 +149,14 @@ Hard rules (D-12, TD-24 (4), LONGITUDINAL_METHOD §1):
   no green, amber or red, no fill length, no gauge. The repo's `confidence`
   and `subscore` palettes are never used on readings.
 - No arrows, deltas, sparklines or side-by-side numbers between checks.
-- The face drawing's chosen area gets the brand tint `#e4e9e8` and a solid
-  2.5px `#1f473e` outline (10:1 on the tint). The tint follows the user's
-  choice only, never a band or a reading.
+- Nothing on the face drawing or the photo can be chosen (TD-39), so no area
+  is ever tinted.
 - Decorative colours are allowed only on things that carry no meaning about
-  skin, such as an illustration, the Echo mark or a routine product dot.
+  skin, such as an illustration, the Echo mark or a routine product dot. The
+  one exception is the two overlays on the results photo (TD-39): lilac
+  `#6a479e` stripes for Redness and sky `#0096d6` solid for Oiliness. They mark
+  where a reading showed up, never its level, and the level stays ink text in
+  the table. Neither swatch carries text; each is 3:1 or more on white.
 
 ## 3. Type
 
@@ -193,7 +196,9 @@ Hard rules (D-12, TD-24 (4), LONGITUDINAL_METHOD §1):
 | Secondary button | Pill shape with a 1px `#ddd8ce` border, transparent fill and ink text, 15px weight 600, 48px tall (§0). |
 | Text link | Forest colour, underlined on hover and focus. Tap area at least 44px tall in lists. |
 | Card | White on the linen page, 1px `#ece8e1` border, 16px corners, 16–24px padding (§0). A card's h3 is the card's name. |
-| Face drawing | One drawing on Home, an opened check and the results screen (components/dashboard/FaceDrawing.tsx). Each area with a reading (forehead, nose, cheeks, chin) is a button: `role="button"`, `aria-pressed`, the area's name, Enter and Space. Choosing the chosen area again, or the "Whole face" button, shows the whole face. Labels sit inside the areas: no pointer lines. Unchosen areas: dashed ink outline. Chosen: tint fill and a solid green outline. Keyboard focus: a solid 3px green outline. An area without a reading is faint, cannot be chosen, and a line under the drawing says "No reading for <area> in this photo." Every area is at least 44 units wide. Fits 390px: up to 240px wide on phones, so the readings stay close; 300px from 640px. Hover tints only on devices that can hover (Tailwind `hoverOnlyWhenSupported`), so a tap never leaves a tint behind. The screen reader hears the new area heading (`aria-live` on the heading only). |
+| Face drawing | One drawing on Home and an opened check when there is no kept photo (components/dashboard/FaceDrawing.tsx). A picture only (TD-39): the four areas (forehead, nose, cheeks, chin) with their names inside, dashed ink outlines, no buttons and nothing to choose. An area without a reading is faint, and a line under the table says "No reading for <area> in this photo." Up to 240px wide on phones, 300px from 640px. |
+| Photo with overlays (TD-39) | The user's photo once (components/mesh/FacePhoto.tsx), 3:4, up to 340px, with the white face mesh. On the results only, both overlays together, using the engine overlay's alpha as a CSS mask: Redness in lilac `#6a479e` diagonal stripes, Oiliness in sky `#0096d6` solid. Pattern and colour differ, so they stay apart where they overlap and without colour vision; neither is red, green, amber or a skin tone. A legend under the photo names each with a swatch in the same style. Home and an opened check have no overlays (they are not saved) and say so in one line. Nothing on the photo can be chosen. |
+| Readings table (TD-39) | One `<table>` under the picture: columns Area, Redness, Oiliness; rows Whole face, then each face area. Level words only (Low, Moderate, Elevated, or "No reading"), all ink, one style. No numbers, no colour, no bar. |
 | Routine steps | Home's "Today's routine" and /routine use one component (components/routine/RoutineSteps.tsx). The store's four steps, numbered, for morning and for evening: Cleanse, Treat, Moisturise, Protect, as on the store. "Treat" is an owner-approved exact-match exception for this step label only (TD-26 (1), `STEP_LABEL_EXCEPTIONS` in lib/catalog/wording.ts); the D-12 word check still applies everywhere else. A step with a product: a white card with the product name, "Today: Used / Skipped / Not logged" with an icon, and one-tap Used and Skipped buttons (`aria-pressed`, green when chosen). An empty step: one dashed row with "Add a product", which opens the add form with that step and slot chosen. Evening Protect, when empty, says "Sunscreen is a morning step." The step comes from the product's catalogue category when it is shown, so the event schema is unchanged. "Other product (not ours)" has no category and goes in an "Other products" group under the steps. On Home, a slot with no products is one line ("No products yet." and "Add a product"), not four empty steps. Step rows have 8px corners. A logged Used or Skipped can be changed but not cleared: the routine events have no "clear" event (unchanged data model). Never a reading, a photo or a claim next to an entry. |
 | Reading row | Metric on the left, band word on the right, both in ink, divided by a 1px border. Never a bar or a colour. |
 | List row (checks, timeline) | Min height 56px. Date first, then kind, then the photo check. The whole row is the link. A thumbnail (48px, 8px corners) appears only when the user chose to keep the photo. |
