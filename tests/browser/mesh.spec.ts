@@ -115,7 +115,7 @@ async function expectNothingElse(page: Page) {
   await expect(page.getByRole("tab")).toHaveCount(0);
   await expect(page.getByRole("tablist")).toHaveCount(0);
   for (const area of ["Forehead", "Nose", "Cheeks", "Chin", C.current.wholeFace]) await expect(page.getByRole("button", { name: area, exact: true })).toHaveCount(0);
-  await expect(page.locator("main")).not.toContainText(HIDDEN);
+  await expect(page.locator("body")).not.toContainText(HIDDEN);
 }
 
 /** The one photo with the mesh drawn and both overlays, and the legend naming each. */
