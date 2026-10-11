@@ -348,7 +348,7 @@ gh pr merge 11 --merge
 
 # TD-39 release: one photo with both overlays, no chips (prepared 2026-10-11)
 
-Pull request: branch `feat/one-photo-two-overlays` (pull request link in the tracker row G20). **Nothing below has been run.** Same rules as above: in order, one step at a time, and tell the agent after each step. Run it after the TD-37 queue (M1–M4): this change builds on the mesh from pull request #11, which is already merged into `master`.
+Pull request: branch `feat/one-photo-two-overlays` (pull request #12: https://github.com/Divit-aggarwal/skin-check/pull/12). **Nothing below has been run.** Same rules as above: in order, one step at a time, and tell the agent after each step. Run it after the TD-37 queue (M1–M4): this change builds on the mesh from pull request #11, which is already merged into `master`.
 
 After O1, TD-37 phone checks M4 items 2 and 3 (chips, tapping an area) no longer apply; O2 replaces them.
 
@@ -357,9 +357,9 @@ After O1, TD-37 phone checks M4 items 2 and 3 (chips, tapping an area) no longer
 ## O1. Merge the pull request (this is the production deploy)
 
 ```bash
-gh pr merge <PR number> --merge
+gh pr merge 12 --merge
 ```
-- Good output: `✓ Merged pull request #<PR number>`. Vercel builds `master` for production (about 2 minutes).
+- Good output: `✓ Merged pull request #12`. Vercel builds `master` for production (about 2 minutes).
 - Check (agent): the production deployment is READY on the merge commit, region `bom1`; `curl -sI https://skin-check-sigma.vercel.app/dashboard` answers 200; a chat request without a login answers 401.
 - Undo: `vercel rollback <previous production deployment id>` (fast), or `git revert -m 1 <merge commit>` in a new pull request.
 
