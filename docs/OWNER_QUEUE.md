@@ -429,6 +429,8 @@ The reminder cron (`/api/home/reminders/send`, 03:30 UTC = 09:00 IST, give or ta
 
 ## H0. Deploy the new database rules (before the merge)
 
+Checked by the agent on 2026-10-12, read only: the live Firestore rules are the same text as `origin/master`'s `firestore.rules`. H0 therefore adds only the two TD-47 matches, and the undo (redeploying `master`'s copy) restores exactly what is live now. If another rules step from an earlier queue runs first, tell the agent so it checks this again before H0.
+
 ```bash
 git fetch origin && git checkout origin/feat/home-v2 -- firestore.rules
 npx -y firebase-tools@latest deploy --only firestore:rules --project projectskin-a202c

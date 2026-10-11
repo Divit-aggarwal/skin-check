@@ -66,9 +66,15 @@ const fakePush = (page: Page, id: string) =>
 
 const section = (page: Page, title: string | RegExp) => page.locator("section", { has: page.getByRole("heading", { name: title, exact: typeof title === "string" }) });
 
+const DESKTOP_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36";
+/** At 768 and 1280 a desktop browser (no iPhone hint); at 390 the default iPhone. */
+const widthUse = (width: number) => (width === 390 ? {} : { userAgent: DESKTOP_UA, isMobile: false, hasTouch: false });
+
 test.describe("Home at three widths, every card filled", () => {
   for (const width of [390, 768, 1280]) {
-    test(`${width}: cards, order, no sideways scroll, no score or arrow`, async ({ page }) => {
+    test(`${width}: cards, order, no sideways scroll, no score or arrow`, async ({ browser }) => {
+      const ctx = await browser.newContext({ timezoneId: "Asia/Kolkata", locale: "en-IN", viewport: { width, height: 900 }, ...widthUse(width) });
+      const page = await ctx.newPage();
       await page.setViewportSize({ width, height: 900 });
       await homeAs(page, U.homeDue!.phoneNumber);
       await expect(page.getByRole("heading", { level: 1, name: /Good (morning|afternoon|evening), Meera/ })).toBeVisible();
@@ -134,8 +140,98 @@ test.describe("Home at three widths, every card filled", () => {
       // What the user sees first, without scrolling (the full-page capture paints the phone's fixed bar mid-page).
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.screenshot({ path: `${SHOTS}/home-${width}-first-screen.png` });
+      await ctx.close();
     });
   }
+});
+
+// Every read-only card state at the three widths (testing item 3). Runs before the tests that change these users.
+for (const width of [390, 768, 1280]) {
+  test(`every card state at ${width}`, async ({ browser }) => {
+    test.setTimeout(400_000);
+    const ctx = await browser.newContext({ timezoneId: "Asia/Kolkata", locale: "en-IN", viewport: { width, height: 900 }, ...widthUse(width) });
+    const page = await ctx.newPage();
+    const noSideways = async () => expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    // Empty: one primary, on Next check.
+    await homeAs(page, U.empty!.phoneNumber);
+    await expect(page.getByText(H.latest.none)).toBeVisible();
+    await noSideways();
+    await shot(page, `state-empty-${width}`);
+    // Still being read.
+    await fetch(`http://${FS}/v1/projects/demo-skin-check/databases/(default)/documents/users/${U.homeAnalysing!.uid}/skinChecks?documentId=fresh-${width}-${Date.now()}`, {
+      method: "POST",
+      headers: { authorization: "Bearer owner", "content-type": "application/json" },
+      body: JSON.stringify({ fields: { status: { stringValue: "questionnaire_only" }, createdAt: { timestampValue: new Date().toISOString() } } }),
+    });
+    await homeAs(page, U.homeAnalysing!.phoneNumber);
+    await expect(page.getByText(H.latest.analysing)).toBeVisible();
+    await shot(page, `state-analysing-${width}`);
+    // No reading (questions-only and failed checks).
+    await homeAs(page, U.noreading!.phoneNumber);
+    await expect(page.getByText(H.latest.noReading)).toBeVisible();
+    await expect(page.getByTestId("next-check")).toHaveText(H.next.noReading);
+    await shot(page, `state-no-reading-${width}`);
+    // Due today; no routine; no city.
+    await homeAs(page, U.homeToday!.phoneNumber);
+    await expect(page.getByTestId("next-check")).toHaveText(H.next.today);
+    await expect(section(page, R.todayTitle).getByText(H.routine.empty)).toBeVisible();
+    await expect(section(page, H.weather.title).getByText(H.weather.why)).toBeVisible();
+    await noSideways();
+    await shot(page, `state-due-no-routine-no-city-${width}`);
+    // Next check in a few days (compact card), no city yet.
+    await homeAs(page, U.permAllow!.phoneNumber);
+    await expect(page.getByTestId("next-check")).toHaveText(H.next.in(5));
+    await expect(page.getByText(H.next.tip)).toHaveCount(0);
+    await shot(page, `state-not-due-${width}`);
+    // Weather down: nothing kept on this device, then the last reading with its time.
+    writeFileSync(`${WEATHER}/down`, "");
+    try {
+      await homeAs(page, U.homeDown!.phoneNumber);
+      await expect(section(page, H.weather.title).getByText(H.weather.unavailable)).toBeVisible();
+      await shot(page, `state-weather-unavailable-${width}`);
+      await page.evaluate(() => localStorage.setItem("home-v2:last-weather", JSON.stringify({ at: "100,763", c: { uv: 4, humidity: 80, usAqi: 40, observedAt: "2026-10-11T03:00:00.000Z" } })));
+      await page.reload();
+      await expect(section(page, H.weather.title).getByText(H.weather.lastKnown("8:30 am"))).toBeVisible();
+      await shot(page, `state-weather-last-known-${width}`);
+    } finally {
+      rmSync(`${WEATHER}/down`, { force: true });
+    }
+    await ctx.close();
+    // A browser that blocks location (an asked user: the help, and Type my city).
+    const blocked = await browser.newContext({ timezoneId: "Asia/Kolkata", locale: "en-IN", viewport: { width, height: 900 }, ...widthUse(width) });
+    const bp = await blocked.newPage();
+    await blockLocation(bp);
+    await homeAs(bp, U.homeType!.phoneNumber);
+    await expect(section(bp, H.weather.title).getByText(H.weather.blocked)).toBeVisible();
+    await shot(bp, `state-weather-blocked-${width}`);
+    await blocked.close();
+  });
+}
+
+test("never asked: no browser prompt can be triggered from Home or Account before the permissions screen", async ({ browser }) => {
+  const ctx = await browser.newContext({ timezoneId: "Asia/Kolkata", viewport: { width: 1280, height: 900 }, userAgent: DESKTOP_UA });
+  const p = await ctx.newPage();
+  await p.addInitScript(() => {
+    (window as unknown as { prompts: number }).prompts = 0;
+    const count = () => ((window as unknown as { prompts: number }).prompts += 1);
+    const geo = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+    navigator.geolocation.getCurrentPosition = (...a: Parameters<Geolocation["getCurrentPosition"]>) => (count(), geo(...a));
+    const ask = Notification.requestPermission.bind(Notification);
+    Notification.requestPermission = (...a: Parameters<typeof Notification.requestPermission>) => (count(), ask(...a));
+  });
+  await homeAs(p, U.neverAsked!.phoneNumber);
+  await expect(section(p, H.weather.title).getByRole("button", { name: H.weather.typeCity })).toBeVisible();
+  await expect(p.getByRole("button", { name: H.weather.useLocation })).toHaveCount(0);
+  await expect(p.getByRole("button", { name: H.next.remindersOn })).toHaveCount(0);
+  await p.goto("/account");
+  const box = section(p, H.account.title);
+  await expect(box.getByText(H.account.afterCheck)).toBeVisible();
+  await box.getByRole("button", { name: H.weather.change }).click();
+  await expect(box.getByRole("button", { name: H.weather.useLocation })).toHaveCount(0);
+  await expect(box.getByRole("button", { name: H.account.remindersOn })).toHaveCount(0);
+  expect(await p.evaluate(() => (window as unknown as { prompts: number }).prompts)).toBe(0);
+  await shot(p, "account-never-asked-1280");
+  await ctx.close();
 });
 
 test("next check: due today is the primary action; a first check; in X days", async ({ page }) => {
@@ -233,7 +329,7 @@ test("weather: Use my location keeps only the city and a rounded position; only 
 
 test("weather: a browser block shows how to turn it on, and Type my city", async ({ page }) => {
   await blockLocation(page);
-  await homeAs(page, U.permRefused!.phoneNumber);
+  await homeAs(page, U.homeRoutine!.phoneNumber); // asked, no city
   const weather = section(page, H.weather.title);
   await expect(weather.getByText(H.weather.blocked)).toBeVisible();
   await expect(weather.getByRole("button", { name: H.weather.useLocation })).toHaveCount(0);

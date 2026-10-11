@@ -36,6 +36,7 @@ export const DASHBOARD_SEED: Record<string, User> = {
   permAllow: { uid: "seed-home-perm-allow", phoneNumber: "+919999900833", checks: [m(2)] },
   permAllow768: { uid: "seed-home-perm-allow-768", phoneNumber: "+919999900840", checks: [m(2)] },
   permAllow1280: { uid: "seed-home-perm-allow-1280", phoneNumber: "+919999900841", checks: [m(2)] },
+  neverAsked: { uid: "seed-home-never-asked", phoneNumber: "+919999900842", checks: [m(2)] },
   permNotNow: { uid: "seed-home-perm-notnow", phoneNumber: "+919999900834", checks: [m(2)] },
   permRefused: { uid: "seed-home-perm-refused", phoneNumber: "+919999900835", checks: [m(2)] },
   homeType: { uid: "seed-home-type", phoneNumber: "+919999900836", checks: [m(3)], home: { asked: true } },

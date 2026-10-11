@@ -82,6 +82,7 @@ export const HOME_COPY = {
     unavailable: "The weather is not available right now.",
     change: "Change city",
     source: "Weather data by Open-Meteo.com",
+    places: "Places from GeoNames.org",
   },
 
   record: {
@@ -134,6 +135,7 @@ export const HOME_COPY = {
     remindersOn: "Turn reminders on",
     remindersOff: "Turn reminders off",
     off: "Reminders are not available yet. Home shows when your next check is due.",
+    afterCheck: "You can choose this after your next check.",
     saved: "Saved.",
     failed: "That did not save. Please try again.",
   },

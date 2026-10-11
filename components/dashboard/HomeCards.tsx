@@ -29,7 +29,7 @@ import { formatDate } from "./format";
 import type { DashboardData } from "./data";
 import { checkAnswers, type Dashboard } from "./state";
 import { newestEchoSession } from "./echo-session";
-import { ASK_KEY, browserState, weatherAt, enableReminders, lastWeather, locateCity, placesNamed, rememberWeather, saveHomeSettings } from "./homeSettings";
+import { ASK_KEY, browserState, hasSubscription, weatherAt, enableReminders, lastWeather, locateCity, placesNamed, rememberWeather, saveHomeSettings } from "./homeSettings";
 
 // TD-47 Home cards (docs/design/home-v2.md). One check's readings at a time,
 // level words only; nothing compares checks; the weather card never names
@@ -89,15 +89,20 @@ export function NextCheckCard({ dashboard, user, settings, onSettings }: { dashb
 /** Reminders missing: ask again where the browser can, else say how; the iPhone home-screen hint. */
 function RemindersPrompt({ user, settings, onSettings }: { user: User; settings: HomeSettings | null; onSettings: (s: HomeSettings) => void }) {
   const [state, setState] = useState<BrowserState | null>(null);
+  const [subscribed, setSubscribed] = useState(false);
   const [ios, setIos] = useState(false);
   useEffect(() => {
     void browserState("notifications").then(setState);
+    void hasSubscription().then(setSubscribed);
     setIos(needsHomeScreen(navigator.userAgent, window.matchMedia("(display-mode: standalone)").matches));
   }, []);
   if (ios) return <p className="border-t border-brand-line pt-3 text-sm text-brand-muted">{H.next.iosHint}</p>;
   if (!state) return null;
-  const prompt = promptFor(state, settings?.reminders === "allowed" && state === "granted");
+  // "Allowed" counts only while this browser really holds a subscription (a sign-out removes it).
+  const prompt = promptFor(state, settings?.reminders === "allowed" && state === "granted" && subscribed);
   if (prompt === "none" || prompt === "unsupported") return null;
+  // TD-47 (3): no browser prompt before the permissions screen; with permission already granted, no prompt shows.
+  if (prompt === "ask" && !settings?.askedAt && state !== "granted") return null;
   if (prompt === "blocked") return <p className="border-t border-brand-line pt-3 text-sm text-brand-muted">{H.next.remindersBlocked}</p>;
   return (
     <div className="flex flex-col items-start gap-2 border-t border-brand-line pt-3">
@@ -110,6 +115,7 @@ function RemindersPrompt({ user, settings, onSettings }: { user: User; settings:
           await saveHomeSettings(user.uid, { reminders }).catch(() => undefined);
           onSettings({ ...settings, reminders });
           setState(await browserState("notifications"));
+          setSubscribed(await hasSubscription());
           focusCard("next");
         }}
       >
@@ -357,7 +363,7 @@ export function WeatherCard({ user, settings, onSettings }: { user: User; settin
     focusCard("weather");
   };
 
-  if (!city || changing) return <Card id="weather" title={H.weather.title}><ChooseCity user={user} onCity={(c, location) => save({ city: c, ...(location ? { location } : {}) })} /></Card>;
+  if (!city || changing) return <Card id="weather" title={H.weather.title}><ChooseCity user={user} canAsk={!!settings?.askedAt} onCity={(c, location) => save({ city: c, ...(location ? { location } : {}) })} /></Card>;
 
   const time = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
   return (
@@ -387,9 +393,15 @@ export function WeatherCard({ user, settings, onSettings }: { user: User; settin
           {H.weather.change}
         </button>
         {(weather.kind === "ready" || weather.kind === "stale") && (
-          <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-xs text-brand-muted underline underline-offset-2">
-            {H.weather.source}
-          </a>
+          <span className="flex flex-wrap gap-x-3">
+            <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-xs text-brand-muted underline underline-offset-2">
+              {H.weather.source}
+            </a>
+            {/* City names: GeoNames, CC BY 4.0 (lib/home/cities.json). */}
+            <a href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-xs text-brand-muted underline underline-offset-2">
+              {H.weather.places}
+            </a>
+          </span>
         )}
       </div>
     </Card>
@@ -407,7 +419,12 @@ function Tile({ label, value, note }: { label: string; value: string; note?: str
 }
 
 /** No city yet (or changing it): why it helps, "Use my location" while the browser can ask, and always "Type my city". */
-export function ChooseCity({ user, onCity }: { user: User; onCity: (c: SavedCity, location?: HomeSettings["location"]) => void }) {
+/**
+ * `canAsk`: the permissions screen has been shown (TD-47 (3): the app never
+ * triggers a browser prompt before it). Without it, "Use my location" shows
+ * only when the browser already allows it, which needs no prompt.
+ */
+export function ChooseCity({ user, canAsk, onCity }: { user: User; canAsk: boolean; onCity: (c: SavedCity, location?: HomeSettings["location"]) => void }) {
   const [state, setState] = useState<BrowserState | null>(null);
   const [busy, setBusy] = useState<false | "locating">(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -417,6 +434,7 @@ export function ChooseCity({ user, onCity }: { user: User; onCity: (c: SavedCity
   }, []);
   // No city yet: offer the location while the browser can ask, or has already allowed it.
   const prompt = state === "granted" ? "ask" : state ? promptFor(state, false) : null;
+  const offerLocation = prompt === "ask" && (canAsk || state === "granted");
 
   return (
     <div className="flex flex-col gap-3">
@@ -429,7 +447,7 @@ export function ChooseCity({ user, onCity }: { user: User; onCity: (c: SavedCity
         </p>
       )}
       <div className="flex flex-wrap gap-3">
-        {prompt === "ask" && (
+        {offerLocation && (
           <button
             type="button"
             className={btnSecondary}
@@ -497,6 +515,9 @@ function CitySearch({ user, onPick }: { user: User; onPick: (p: Place) => void }
         </button>
       </div>
       {failed && <p role="alert">{H.weather.unavailable}</p>}
+      <a href="https://www.geonames.org/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center self-start text-xs text-brand-muted underline underline-offset-2">
+        {H.weather.places}
+      </a>
       {found && found.length === 0 && <p role="status">{H.weather.noMatch}</p>}
       {found && found.length > 0 && (
         <ul className="flex flex-col gap-2">

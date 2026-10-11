@@ -86,6 +86,13 @@ export async function enableReminders(user: User): Promise<PermissionOutcome> {
   }
 }
 
+/** Whether this browser holds a push subscription now (a sign-out removes it). */
+export async function hasSubscription(): Promise<boolean> {
+  if (!("serviceWorker" in navigator)) return false;
+  const reg = await navigator.serviceWorker.getRegistration("/sw.js").catch(() => undefined);
+  return !!(await reg?.pushManager.getSubscription().catch(() => null));
+}
+
 /** Account's "Turn reminders off": every browser of the account on our server, then this one. Throws when the server did not confirm. */
 export async function disableReminders(user: User): Promise<void> {
   await post(user, "/api/home/reminders", { all: true }, "DELETE");

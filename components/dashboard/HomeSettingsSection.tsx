@@ -53,7 +53,7 @@ export function HomeSettingsSection() {
           <p>{A.location(state(settings?.location))}</p>
           <p>{settings?.city ? A.city(settings.city.name) : A.noCity}</p>
           {changing ? (
-            <ChooseCity user={user} onCity={(city, location) => void save({ city, ...(location ? { location } : {}) })} />
+            <ChooseCity user={user} canAsk={!!settings?.askedAt} onCity={(city, location) => void save({ city, ...(location ? { location } : {}) })} />
           ) : (
             <div className="flex flex-wrap gap-3">
               <button type="button" className={btnSecondary} onClick={() => setChanging(true)}>
@@ -71,7 +71,10 @@ export function HomeSettingsSection() {
       {pushOn() ? (
         <div className="flex w-full flex-col items-start gap-2 border-t border-brand-line pt-3">
           <p>{A.reminders(state(settings?.reminders))}</p>
-          {settings?.reminders === "allowed" ? (
+          {/* TD-47 (3): no browser prompt before the permissions screen has been shown. */}
+          {!settings?.askedAt && settings?.reminders !== "allowed" ? (
+            <p className="text-sm text-brand-muted">{A.afterCheck}</p>
+          ) : settings?.reminders === "allowed" ? (
             <button
               type="button"
               className={btnSecondary}
