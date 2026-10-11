@@ -90,7 +90,7 @@ describe("TD-33 (1): skipping", () => {
     expect(reusableBasics({ name: "Tester", age: "25-34" })).toBeNull();
   });
 
-  it("a returning user who answered is handled as today (reuse, with the re-confirm steps)", () => {
+  it("a returning user who answered reuses everything, the two once re-asked included (owner decision 2026-10-11)", () => {
     const answered = Object.fromEntries(
       SECTIONS.flatMap((s) => s.steps)
         .filter((s) => "options" in s)
@@ -100,7 +100,7 @@ describe("TD-33 (1): skipping", () => {
     expect(reusableBasics(all)).toBeNull();
     const reuse = reusableAnswers(all)!;
     expect(reuse).not.toBeNull();
-    for (const id of RECONFIRM_EACH_SCAN_IDS) expect(reuse).not.toHaveProperty(id);
+    for (const id of RECONFIRM_EACH_SCAN_IDS) expect(reuse).toHaveProperty(id);
   });
 
   it("an answer-later record holds only the optional questions", () => {

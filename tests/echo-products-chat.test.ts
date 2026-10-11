@@ -36,7 +36,9 @@ vi.mock("@/app/api/account/_ledger", async () => {
 import { NextRequest, NextResponse } from "next/server";
 import { POST } from "@/app/api/skin-check/chat/route";
 import { handleContextChat } from "@/lib/context/chat";
-import { OPENING_MESSAGE, PRODUCT_DOCTOR_LINE } from "@/lib/context/products";
+import { cardsFor, OPENING_MESSAGE, PRODUCT_DOCTOR_LINE, STORE_URL } from "@/lib/context/products";
+import { CATALOGUE } from "@/lib/catalog/catalogue";
+import { STARTER_POOL } from "@/components/skin-check/echoStarters";
 import { COPY } from "@/lib/rules/settings";
 import { REFERRAL_COPY } from "@/lib/context/prefilter";
 import { SCORES, CHEEK_SCORES } from "./context-fixtures";
@@ -241,5 +243,36 @@ describe("TD-34: the opening suggestion (route)", () => {
   it("the request shape is strict: a message or history is refused", async () => {
     expect((await openingPost({ scanId: SCAN_ID, region: "cheeks", opening: true, message: "hi" })).status).toBe(400);
     expect((await openingPost({ scanId: SCAN_ID, region: "cheeks", opening: false })).status).toBe(400);
+  });
+});
+
+// Owner decision 2026-10-11: product suggestions go on without another
+// real-model run, and Echo offers starter questions. Each product starter,
+// through the real chat path with the fake Gemini: Gemini gets the product
+// list, the user gets the cards (store links come from the catalogue), and the
+// guards still apply. A results starter never carries the list.
+describe("starter questions through the chat path (fake Gemini)", () => {
+  const productStarters = [...STARTER_POOL.products, "Mere liye ek routine batao"];
+
+  it.each(productStarters)("%s: product list sent, cards shown with their store link", async (q) => {
+    const r = await handleContextChat({ uid: "uid-p", scanId: SCAN_ID, region: "cheeks", message: q });
+    expect(calls()).toContain("refreshing-cleanser");
+    expect(r).toMatchObject({ ok: true, products: [{ productId: "refreshing-cleanser" }] });
+    expect(cardsFor(r.ok ? r.products : [])[0]!.url).toBe(`${STORE_URL}${CATALOGUE.products.find((p) => p.id === "refreshing-cleanser")!.shopifyHandle}`);
+  });
+
+  it.each(productStarters)("%s: red flag answer, no card; prescription answer, the doctor line", async (q) => {
+    h.loadTrustedEchoContext.mockResolvedValue(trusted({ ...BASE, breakout_pattern: ["deep_painful"] }));
+    const flagged = await handleContextChat({ uid: "uid-p", scanId: SCAN_ID, region: "cheeks", message: q });
+    expect(flagged).toMatchObject({ ok: true, products: [] });
+    expect(flagged.ok && flagged.reply.split("\n")[0]).toBe(COPY.referral);
+    h.loadTrustedEchoContext.mockResolvedValue(trusted({ ...BASE, current_products: ["prescription"] }));
+    const rx = await handleContextChat({ uid: "uid-p", scanId: SCAN_ID, region: "cheeks", message: q });
+    expect(rx.ok && rx.reply.split("\n").at(-1)).toBe(PRODUCT_DOCTOR_LINE);
+  });
+
+  it.each(STARTER_POOL.results)("%s: no product list goes to Gemini", async (q) => {
+    await handleContextChat({ uid: "uid-p", scanId: SCAN_ID, region: "cheeks", message: q });
+    expect(calls()).not.toContain("refreshing-cleanser");
   });
 });

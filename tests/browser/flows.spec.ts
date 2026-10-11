@@ -10,6 +10,9 @@ import { TIMELINE_COPY as T } from "@/components/timeline/copy";
 import { ECHO_COPY as E } from "@/components/skin-check/echoCopy";
 import { DASHBOARD_SEED as U } from "./seed-users";
 import { shot, signIn } from "./helpers";
+import { SHELL_COPY as S } from "@/components/shell/copy";
+import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
+import { DRAFT_VERSION } from "@/lib/skin-check-draft";
 
 const SERUM = CATALOGUE.products.find((p) => p.category === "serum")!.name;
 
@@ -94,23 +97,53 @@ test("a normal scan finishes and shows on the dashboard", async ({ page }) => {
   await shot(page, "after-scan");
 });
 
-test("a returning user is asked the two questions again, with the 'Last time you said' hint", async ({ page }) => {
+// Owner decision 2026-10-11: a returning user who answered the questions goes
+// from "New check" to the photo step; nothing is asked again. These run before
+// the full walk below, which saves a check for the same seeded user.
+const photoStep = (page: Page) => expect(page.getByRole("heading", { level: 1 })).toHaveText(/skin photo/i, { timeout: 30_000 });
+
+test("returning user: a slow read of the saved answers never strands them on a filled-in About you", async ({ page }) => {
   await signIn(page, U.returning!.phoneNumber);
-  await page.goto("/skin-check");
-  // The saved questionnaire is reused: the flow starts at verify, not at the name.
+  // The bug: the saved answers landed after the user had started typing, filled About you in and left it with nothing to tap.
+  let slow = true;
+  await page.route(new RegExp(`${process.env.PW_FIRESTORE_HOST}/`), async (route) => {
+    if (slow) await new Promise((r) => setTimeout(r, 2500));
+    await route.continue().catch(() => undefined);
+  });
+  await page.getByRole("link", { name: S.nav.newCheck }).first().click();
   await expect(page.getByText(NAME_PROMPT)).toHaveCount(0);
+  slow = false;
+  await photoStep(page);
+  await expect(page.getByText(NAME_PROMPT)).toHaveCount(0);
+});
+
+test("returning user: a draft left on About you from an earlier visit still goes to the photo step", async ({ page }) => {
+  await signIn(page, U.returning!.phoneNumber);
+  await page.evaluate((version) => {
+    localStorage.setItem("skin-check-draft", JSON.stringify({ version, scanId: "scan-left-behind", answers: { name: "Tester" }, sectionIndex: 0, questionsChoice: "pending", updatedAt: Date.now() }));
+  }, DRAFT_VERSION);
+  await page.getByRole("link", { name: S.nav.newCheck }).first().click();
+  await photoStep(page);
+});
+
+test("returning user: 'New check' to the results without meeting a question", async ({ page }) => {
+  test.setTimeout(420_000);
+  await signIn(page, U.returning!.phoneNumber);
+  await page.getByRole("link", { name: S.nav.newCheck }).first().click();
+  await photoStep(page);
+  await expect(page.getByRole("button", { name: "Anything changed? Update your answers" })).toBeVisible();
+  await page.waitForTimeout(400); // entrance animation
+  await page.screenshot({ path: ".local-stack/browser-shots/new-check-returning-390.png", fullPage: true });
   await choosePhoto(page, { name: "face.png", mimeType: "image/png", buffer: readFileSync(FACE) });
   await page.getByRole("checkbox").first().check();
   await page.getByRole("button", { name: "Analyze my skin" }).click();
-  await expect(page.getByText("What are you currently using on your skin?")).toBeVisible({ timeout: 240_000 });
-  await expect(page.getByText("Last time you said: Nothing right now")).toBeVisible();
-  // Blank, not pre-filled (decision 10a): the confirm button needs a new tap first.
-  await page.getByRole("button", { name: /Nothing right now/ }).click();
-  await page.getByRole("button", { name: "Confirm selection" }).last().click();
-  // The next section replaces this one on screen, with its own hint.
-  await expect(page.getByText(/hormonal or reproductive factors/)).toBeVisible();
-  await expect(page.getByText("Last time you said: My breakouts change around my period")).toBeVisible();
-  await page.screenshot({ path: ".local-stack/browser-shots/dashboard-flow-returning.png", fullPage: true });
+  // Straight to the last step: no question section in between.
+  const results = page.getByRole("button", { name: "Get my results" });
+  await expect(results).toBeEnabled({ timeout: 300_000 });
+  await results.click();
+  await expect(page.getByRole("heading", { name: "Your photo reading" })).toBeVisible({ timeout: 60_000 });
+  // The saved answers went with the new check: no "answer the questions" note.
+  await expect(page.getByRole("link", { name: Q.answerLink })).toHaveCount(0);
 });
 
 test("under 18 shows the confirm step; No goes back, Yes blocks", async ({ page }) => {

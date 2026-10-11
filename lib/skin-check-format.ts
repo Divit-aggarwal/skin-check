@@ -1,5 +1,4 @@
 import { SECTIONS } from "@/lib/skin-check-steps";
-import { RECONFIRM_EACH_SCAN_IDS } from "@/lib/skin-check-validation";
 import { bandScores } from "@/lib/skin-check-rules";
 import { isEarlyEstimate, isShownMetric, type ShownMetric } from "@/lib/skin-check-skus";
 import type { SkinCheckAnswers, StepAnswerValue, StepConfig } from "@/types/skin-check";
@@ -75,21 +74,6 @@ export function summarizeSkinCheckAnswers(answers: SkinCheckAnswers, isSent: (st
     }
   }
   return lines.length > 0 ? lines.join("\n") : "No quiz answers provided.";
-}
-
-/**
- * Decision 10(a): "Last time you said: …" for each re-confirmed step the
- * previous scan answered, keyed by step id. Only labels from our own config,
- * like summarizeSkinCheckAnswers. For display under a blank step; never an answer.
- */
-export function reconfirmHints(previous: SkinCheckAnswers): Record<string, string> {
-  const hints: Record<string, string> = {};
-  for (const step of SECTIONS.flatMap((s) => s.steps)) {
-    if (!RECONFIRM_EACH_SCAN_IDS.includes(step.id)) continue;
-    const described = describeStepAnswer(step, previous[step.id]);
-    if (described) hints[step.id] = `Last time you said: ${described}`;
-  }
-  return hints;
 }
 
 // hydration is labeled "Dryness" - see lib/skin-check-skus.ts's METRIC_LABELS
