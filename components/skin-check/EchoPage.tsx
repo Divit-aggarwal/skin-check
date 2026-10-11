@@ -8,7 +8,7 @@ import { ChevronDown, ChevronLeft, ChevronRight, MessageCircle, SendHorizontal }
 import { TypingIndicator } from "@/components/primitives/TypingIndicator";
 import { ECHO_COPY as E } from "./echoCopy";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
-import { PhotoCheckLine, ReadingsTable } from "@/components/dashboard/CheckReadings";
+import { PanelReadings, PhotoCheckLine } from "@/components/dashboard/CheckReadings";
 import { formatDate } from "@/components/dashboard/format";
 import { loadDashboard } from "@/components/dashboard/data";
 import { newestEchoSession } from "@/components/dashboard/echo-session";
@@ -222,8 +222,8 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
       </div>
       {photoCheck && <PhotoCheckLine text={C.photoCheck[photoCheck]} />}
       <p className="rounded-2xl bg-brand-mist px-4 py-3 text-sm text-brand-ink">{C.history.pastLine}</p>
-      {/* TD-40: the same table as the results, Home and an opened check. */}
-      <ReadingsTable view={readings} />
+      {/* TD-41: the same readings, turned on their side for the narrow panel; follows the area chips. */}
+      <PanelReadings view={readings} region={activeRegion} />
       <Link href={`/checks/${encodeURIComponent(session.scanId)}`} className="inline-flex min-h-11 items-center gap-1 font-medium text-brand-forest underline-offset-4 hover:underline">
         {E.openCheck}
         <ChevronRight aria-hidden size={16} />

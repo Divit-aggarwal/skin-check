@@ -56,6 +56,8 @@ export const DASHBOARD_COPY = {
   table: {
     caption: "Readings in this photo",
     area: "Area",
+    // TD-41: first column of the Echo panel table.
+    reading: "Reading",
     // TD-40: on Breakouts, Texture and Dark marks.
     earlyEstimate: "early estimate",
     swipe: "Swipe the table sideways to see all five readings.",

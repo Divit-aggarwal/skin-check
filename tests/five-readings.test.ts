@@ -75,7 +75,8 @@ describe("TD-40: what is shown", () => {
     expect(src).toMatch(/isEarlyEstimate\(b\.metric\) && <span[^>]*>\{C\.table\.earlyEstimate\}/);
     expect(src).toMatch(/overflow-x-auto/);
     expect(DASHBOARD_COPY.table.earlyEstimate).toBe("early estimate");
-    expect(readFileSync("components/skin-check/EchoPage.tsx", "utf8")).toMatch(/<ReadingsTable view=\{readings\} \/>/);
+    // TD-41: Echo's narrow panel shows the same readings on their side (whole face and the chat's area).
+    expect(readFileSync("components/skin-check/EchoPage.tsx", "utf8")).toMatch(/<PanelReadings view=\{readings\} region=\{activeRegion\} \/>/);
   });
 });
 

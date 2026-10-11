@@ -1,7 +1,7 @@
 "use client";
 
 import { ShieldCheck } from "lucide-react";
-import { ECHO_REGION_LABELS, ECHO_REGIONS } from "@/lib/echo-regions";
+import { ECHO_REGION_LABELS, ECHO_REGIONS, type EchoRegion } from "@/lib/echo-regions";
 import { isEarlyEstimate } from "@/lib/skin-check-skus";
 import { DASHBOARD_COPY as C } from "./copy";
 import { FaceDrawing } from "./FaceDrawing";
@@ -60,6 +60,44 @@ export function ReadingsTable({ view }: { view: Pick<CheckView, "bands" | "areas
       </div>
       <p className="text-xs text-brand-muted sm:hidden">{C.table.swipe}</p>
     </div>
+  );
+}
+
+/**
+ * Echo's side panel (TD-41): too narrow for six columns, so the same readings
+ * turned on their side: one row per reading (the last three tagged), and two
+ * columns, the whole face and the area Echo is talking about. Levels only, in
+ * ink. The full table is on the opened check.
+ */
+export function PanelReadings({ view, region }: { view: Pick<CheckView, "bands" | "areas">; region: EchoRegion }) {
+  if (!view.bands) return <p>{C.current.unreadable}</p>;
+  const area = view.areas.find((a) => a.region === region);
+  const cols = [{ key: "whole", label: C.current.wholeFace, bands: view.bands }, ...(area ? [{ key: area.region, label: area.label, bands: area.bands }] : [])];
+  return (
+    <table className="w-full text-left text-sm">
+      <caption className="mb-2 text-left font-display text-base font-semibold tracking-[-0.01em] text-brand-title">{C.table.caption}</caption>
+      <thead>
+        <tr className="border-b border-brand-line text-brand-muted">
+          <th scope="col" className="py-2 pr-2 font-semibold">{C.table.reading}</th>
+          {cols.map((c) => (
+            <th key={c.key} scope="col" className="px-2 py-2 font-semibold">{c.label}</th>
+          ))}
+        </tr>
+      </thead>
+      <tbody className="divide-y divide-brand-line">
+        {view.bands.map((b) => (
+          <tr key={b.metric} className="h-12">
+            <th scope="row" className="pr-2 font-medium text-brand-ink">
+              {b.label}
+              {isEarlyEstimate(b.metric) && <span className="block text-xs font-normal text-brand-muted">{C.table.earlyEstimate}</span>}
+            </th>
+            {cols.map((c) => (
+              <td key={c.key} className="px-2 text-brand-ink">{c.bands?.find((x) => x.metric === b.metric)?.band ?? C.current.noReading}</td>
+            ))}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }
 
