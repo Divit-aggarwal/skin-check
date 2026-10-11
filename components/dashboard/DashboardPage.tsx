@@ -178,7 +178,7 @@ function Home({
             {/* TD-33 (1): right under the newest reading, while its questions wait. */}
             {waiting && <QuestionsCard isEcho={waiting.isEcho} date={waiting.date ? formatDate(waiting.date) : null} />}
           </div>
-          <div className="contents xl:grid xl:grid-cols-2 xl:items-start xl:gap-6">
+          <div className="contents xl:order-3 xl:grid xl:grid-cols-2 xl:items-start xl:gap-6">
             <div className="order-6 xl:order-none">
               <RecordCard dashboard={dashboard} routine={routine} />
             </div>
