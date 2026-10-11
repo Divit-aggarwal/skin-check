@@ -14,7 +14,7 @@ const TIMEOUT_MS = 5000;
 
 function hosts(): { forecast: string; air: string; key: string | null } {
   // Local stack only (scripts/fake-conditions.mjs): never in a production build.
-  const local = process.env.NODE_ENV !== "production" ? process.env.CONDITIONS_LOCAL_BASE_URL : undefined;
+  const local = process.env.NODE_ENV !== "production" ? process.env.WEATHER_LOCAL_BASE_URL : undefined;
   if (local) return { forecast: local, air: local, key: null };
   const key = process.env.OPEN_METEO_API_KEY;
   if (!key) throw new WeatherUnavailableError("OPEN_METEO_API_KEY is not set");

@@ -35,11 +35,11 @@ const nextConfig = {
   // takes effect with the next deployment (docs/OWNER_QUEUE.md).
   // TD-34: ECHO_PRODUCTS_SWITCH the same way: "off" hides product suggestions
   // and every product card, while Echo itself stays on.
-  // TD-47: CONDITIONS_SWITCH and PUSH_SWITCH the same way, both off unless "on".
+  // TD-47: WEATHER_SWITCH and PUSH_SWITCH the same way, both off unless "on".
   env: {
     ECHO_SWITCH: process.env.ECHO_SWITCH ?? "",
     ECHO_PRODUCTS_SWITCH: process.env.ECHO_PRODUCTS_SWITCH ?? "",
-    CONDITIONS_SWITCH: process.env.CONDITIONS_SWITCH ?? "",
+    WEATHER_SWITCH: process.env.WEATHER_SWITCH ?? "",
     PUSH_SWITCH: process.env.PUSH_SWITCH ?? "",
   },
 

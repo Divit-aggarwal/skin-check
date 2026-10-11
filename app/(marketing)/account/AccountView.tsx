@@ -11,7 +11,7 @@ import { card, h2, LoadingState, PageHeader } from "@/components/ui/page";
 import { DeleteAccount } from "./DeleteAccount";
 import { QuestionsCard } from "@/components/skin-check/QuestionsChoice";
 import { loadDashboard } from "@/components/dashboard/data";
-import { waitingQuestions } from "@/components/dashboard/state";
+import { deriveDashboard, waitingQuestions, type Dashboard } from "@/components/dashboard/state";
 import { formatDate } from "@/components/dashboard/format";
 import { ACCOUNT_COPY as A } from "./copy";
 
@@ -27,6 +27,8 @@ export function AccountView() {
   const wasSignedOut = useRef(false);
   // TD-33 (1): the way in from Account while questions wait. A failed read shows nothing extra.
   const [questionsWaiting, setQuestionsWaiting] = useState<{ isEcho: boolean; date: string | null } | null>(null);
+  // H27: the newest photo's kept or not kept line, moved here from Home with the privacy card (TD-47).
+  const [photo, setPhoto] = useState<Dashboard["photo"]>(null);
   useEffect(() => {
     if (!user) return setQuestionsWaiting(null);
     let active = true;
@@ -34,6 +36,7 @@ export function AccountView() {
       (d) => {
         const w = active ? waitingQuestions(user.uid, d.checks, d.analyses, d.laterAnswers) : null;
         if (active) setQuestionsWaiting(w && { isEcho: w.isEcho, date: w.date ? formatDate(w.date) : null });
+        if (active) setPhoto(deriveDashboard(user.uid, d.checks, d.analyses).photo);
       },
       () => undefined
     );
@@ -72,7 +75,7 @@ export function AccountView() {
                 </section>
                 {questionsWaiting && <QuestionsCard isEcho={questionsWaiting.isEcho} date={questionsWaiting.date} />}
                 {/* H14: consent status and the AI-share withdrawal. */}
-                <ConsentSection />
+                <ConsentSection photo={photo} />
                 {/* TD-47: location, city and reminders. */}
                 <HomeSettingsSection />
               </>

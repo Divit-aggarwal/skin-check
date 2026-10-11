@@ -4,7 +4,7 @@
 // browser code; a Vercel setting takes effect with the next deployment.
 
 /** The weather card and the location question. Production also needs OPEN_METEO_API_KEY. */
-export const weatherOn = () => process.env.CONDITIONS_SWITCH === "on";
+export const weatherOn = () => process.env.WEATHER_SWITCH === "on";
 
 /** Reminder notifications (web push). Also needs both VAPID keys. */
 export const pushOn = () => process.env.PUSH_SWITCH === "on" && !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;

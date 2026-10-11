@@ -3,7 +3,9 @@
 // per dashboard state and per browser test that changes data.
 
 export type Check = { days: number; kind: "measured" | "legacy" | "questions" | "failed"; build?: string; verdict?: "pass" | "override" | "unchecked"; lowForehead?: boolean; badScores?: boolean; kept?: boolean };
-export type User = { uid: string; phoneNumber: string; checks: Check[]; aiShare?: boolean; fullAnswers?: boolean };
+/** TD-47: Home settings (users/{uid}/settings/home) and a routine whose steps were logged on these days ago. */
+export type HomeSeed = { city?: { name: string; region: string; country: string; latE1: number; lonE1: number }; asked?: boolean; routineLoggedDaysAgo?: number[] };
+export type User = { uid: string; phoneNumber: string; checks: Check[]; aiShare?: boolean; fullAnswers?: boolean; home?: HomeSeed };
 
 const m = (days: number, extra: Partial<Check> = {}): Check => ({ days, kind: "measured", ...extra });
 
@@ -27,4 +29,17 @@ export const DASHBOARD_SEED: Record<string, User> = {
   newer: { uid: "seed-dash-newer", phoneNumber: "+919999900816", checks: [m(5), { days: 1, kind: "questions" }], aiShare: true },
   // G03 / TD-25 (2): one check with a kept photo (a synthetic test pattern in local S3), one without.
   kept: { uid: "seed-dash-kept", phoneNumber: "+919999900817", checks: [m(6, { kept: true }), m(2)] },
+  // TD-47 Home v2 (tests/browser/home-v2.spec.ts). Each city has its own position, so the weather cache never mixes tests.
+  homeDue: { uid: "seed-home-due", phoneNumber: "+919999900830", checks: [m(30), m(8, { verdict: "pass" })], fullAnswers: true, aiShare: true, home: { asked: true, city: { name: "Bengaluru", region: "Karnataka", country: "India", latE1: 130, lonE1: 776 }, routineLoggedDaysAgo: [1, 2] } },
+  homeToday: { uid: "seed-home-today", phoneNumber: "+919999900831", checks: [m(7, { verdict: "pass" })], home: { asked: true } },
+  homeAnalysing: { uid: "seed-home-analysing", phoneNumber: "+919999900832", checks: [m(5), { days: 0, kind: "questions" }], home: { asked: true } },
+  permAllow: { uid: "seed-home-perm-allow", phoneNumber: "+919999900833", checks: [m(2)] },
+  permAllow768: { uid: "seed-home-perm-allow-768", phoneNumber: "+919999900840", checks: [m(2)] },
+  permAllow1280: { uid: "seed-home-perm-allow-1280", phoneNumber: "+919999900841", checks: [m(2)] },
+  permNotNow: { uid: "seed-home-perm-notnow", phoneNumber: "+919999900834", checks: [m(2)] },
+  permRefused: { uid: "seed-home-perm-refused", phoneNumber: "+919999900835", checks: [m(2)] },
+  homeType: { uid: "seed-home-type", phoneNumber: "+919999900836", checks: [m(3)], home: { asked: true } },
+  homeDown: { uid: "seed-home-down", phoneNumber: "+919999900837", checks: [m(3)], home: { asked: true, city: { name: "Kochi", region: "Kerala", country: "India", latE1: 100, lonE1: 763 } } },
+  homeRoutine: { uid: "seed-home-routine", phoneNumber: "+919999900838", checks: [m(4)], home: { asked: true, routineLoggedDaysAgo: [] } },
+  homeErase: { uid: "seed-home-erase", phoneNumber: "+919999900839", checks: [m(4)], home: { asked: true, city: { name: "Pune", region: "Maharashtra", country: "India", latE1: 185, lonE1: 739 } } },
 };

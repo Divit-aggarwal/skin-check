@@ -35,7 +35,7 @@ beforeEach(() => {
     if (t !== "good") throw new Error("bad token");
     return "uid-1";
   });
-  vi.stubEnv("CONDITIONS_SWITCH", "on");
+  vi.stubEnv("WEATHER_SWITCH", "on");
 });
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -54,7 +54,7 @@ describe("conditions source (Open-Meteo)", () => {
   it("production: the paid customer hosts with the key, and only the rounded position", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.stubEnv("OPEN_METEO_API_KEY", "test-key");
-    vi.stubEnv("CONDITIONS_LOCAL_BASE_URL", "http://127.0.0.1:1");
+    vi.stubEnv("WEATHER_LOCAL_BASE_URL", "http://127.0.0.1:1");
     const calls = stubFetch();
     expect(await fetchWeather(130, 776)).toEqual({ uv: 7.4, humidity: 68, usAqi: 85, observedAt: "2026-10-11T04:00:00.000Z" });
     expect(calls).toHaveLength(2);
@@ -84,8 +84,8 @@ describe("conditions source (Open-Meteo)", () => {
 });
 
 describe("/api/home/weather and /api/home/place", () => {
-  it("off unless CONDITIONS_SWITCH is on", async () => {
-    vi.stubEnv("CONDITIONS_SWITCH", "");
+  it("off unless WEATHER_SWITCH is on", async () => {
+    vi.stubEnv("WEATHER_SWITCH", "");
     expect((await conditionsPOST(req("/api/home/weather", { latE1: 130, lonE1: 776 }))).status).toBe(404);
     expect((await placePOST(req("/api/home/place", { query: "Del" }))).status).toBe(404);
   });
@@ -222,5 +222,19 @@ describe("web push", () => {
     expect((await get()).status).toBe(401);
     expect((await get("Bearer wrong!")).status).toBe(401);
     expect(await (await get("Bearer s3cret")).json()).toEqual({ ok: true, off: true });
+  });
+});
+
+describe("nothing of Home reaches Gemini (TD-47 (4))", () => {
+  it("no Echo or Gemini code reads the Home settings, the push subscriptions or the weather", async () => {
+    const { readdirSync, readFileSync } = await import("node:fs");
+    const files = [
+      ...readdirSync("lib/context").map((f) => `lib/context/${f}`),
+      "lib/gemini.ts",
+      "lib/echo-trusted-context.ts",
+      "lib/echo-newest-scan.ts",
+      "app/api/skin-check/chat/route.ts",
+    ];
+    for (const f of files) expect(readFileSync(f, "utf8"), f).not.toMatch(/"settings"|'settings'|pushSubscriptions|lib\/home|open-meteo|latE1/);
   });
 });

@@ -73,7 +73,7 @@ export const HOME_COPY = {
     locating: "Finding your city…",
     locateFailed: "Your location could not be read. Type your city instead.",
     loading: "Loading the weather…",
-    lastKnown: (time: string) => `Not updated right now. Showing the reading from ${time}.`,
+    lastKnown: (time: string) => `Not updated right now. Showing the weather from ${time}.`,
     unavailable: "The weather is not available right now.",
     change: "Change city",
     source: "Weather data by Open-Meteo.com",

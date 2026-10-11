@@ -93,7 +93,7 @@ skipped.
 
 | Setting | Effect |
 |---|---|
-| `CONDITIONS_SWITCH=on` | The weather card and the location question. They also need `OPEN_METEO_API_KEY`; without the key the card shows "not available". |
+| `WEATHER_SWITCH=on` | The weather card and the location question. They also need `OPEN_METEO_API_KEY`; without the key the card shows "not available". |
 | `PUSH_SWITCH=on` | The reminders question and push sending. They also need `NEXT_PUBLIC_VAPID_PUBLIC_KEY` and `VAPID_PRIVATE_KEY`. |
 
 Without them, Home shows the next-check card, which is the reminder.
