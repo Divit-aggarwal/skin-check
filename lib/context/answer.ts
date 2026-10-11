@@ -56,6 +56,9 @@ export const isHinglish = (message: string): boolean => new Set((message.match(H
 export const FALLBACK_LEAD = "Echo couldn't answer that in a way we can check. Here is what this photo showed:";
 export const FALLBACK_LEAD_HINGLISH = "Echo iska jawab check karke nahi de saki. Is photo mein yeh dikha:";
 
+/** F28: a card reason never repeats its lead-in ("You told us You told us …"). */
+export const oneLeadIn = (reason: string): string => reason.trim().replace(/\b(you told us|aapne bataya)(?:[\s:,]+\1\b)+/gi, "$1");
+
 /** F-row 2026-10-11: a lead line, then each fact as its own sentence on its own line, never joined fragments. */
 export const fallbackAnswer = (pkg: ContextPackage, message = ""): string =>
   [isHinglish(message) ? FALLBACK_LEAD_HINGLISH : FALLBACK_LEAD, ...fallbackLines(pkg).map(sentence)].join("\n");
@@ -103,7 +106,7 @@ export async function answerFromPackage(
         referral: false,
         modelId,
         validator: { passed: true, failures: names(...v), regenerated, fallback: false },
-        products: (last.answer!.products ?? []).map((p) => ({ productId: p.product_id, reason: p.reason.trim() })),
+        products: (last.answer!.products ?? []).map((p) => ({ productId: p.product_id, reason: oneLeadIn(p.reason) })),
         // Under a red flag only claims that cite a fact and no product remain: no uncited sales lead-in (safety review).
         withoutProducts: join(claims.filter((c) => c.fact_ids.length > 0 && !c.fact_ids.some((id) => id.startsWith("rec.")))),
         productContent: (last.answer!.products ?? []).length > 0 || claims.some((c) => c.fact_ids.some((id) => id.startsWith("rec."))),

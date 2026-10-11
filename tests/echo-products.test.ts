@@ -6,7 +6,9 @@ import { bannedWordsIn as _b, stepLabelIsExcepted } from "@/lib/catalog/wording"
 import { buildContextPackage, packageJson, screenExternalText, type BuildInput } from "@/lib/context/builder";
 import { renderSystemInstruction, responseSchema } from "@/lib/context/renderer";
 import { validateAnswer } from "@/lib/context/validator";
-import { guardedReply, openingNote, productGuard, type ShownProduct } from "@/lib/context/answer";
+import { guardedReply, oneLeadIn, openingNote, productGuard, type ShownProduct } from "@/lib/context/answer";
+import { hidesProductsAfter } from "@/lib/context/chat-turns";
+import { DOCTOR_REFERRAL_COPY, REFERRAL_COPY } from "@/lib/context/prefilter";
 import { CATALOGUE } from "@/lib/catalog/catalogue";
 import { bannedWordsIn } from "@/lib/catalog/wording";
 import { evaluateSafety } from "@/lib/rules/safety";
@@ -354,5 +356,22 @@ describe("a question whether a product works or is good for something gets no pr
   it("it applies with a questionnaire red flag too (TD-45); the line passes the D-12 word check", () => {
     expect(productGuard(evaluateSafety({ answers: { primary_concerns: ["blemishes"], breakout_pattern: ["deep_painful"] }, confirmedThisScan: [] }), "Is it good for me?")).toBe("result_question");
     expect(bannedWordsIn(RESULT_QUESTION_LINE)).toEqual([]);
+  });
+});
+
+describe("F28 and F29 (owner, 2026-10-11)", () => {
+  it("F28: a card reason never repeats its lead-in", () => {
+    expect(oneLeadIn("You told us You told us your main skin concerns: Breakouts")).toBe("You told us your main skin concerns: Breakouts");
+    expect(oneLeadIn(" you told us: You told us your skin type: Oily ")).toBe("you told us your skin type: Oily");
+    expect(oneLeadIn("Aapne bataya Aapne bataya: skin type Oily")).toBe("Aapne bataya: skin type Oily");
+    expect(oneLeadIn("You told us your skin type: Oily")).toBe("You told us your skin type: Oily");
+  });
+
+  it("F29: a doctor-line reply hides products in that reply only; self-harm and red-flag referrals still hide them afterwards", () => {
+    expect(hidesProductsAfter({ role: "echo", redFlag: true, text: DOCTOR_REFERRAL_COPY })).toBe(false);
+    expect(hidesProductsAfter({ role: "echo", redFlag: true, text: REFERRAL_COPY })).toBe(true);
+    expect(hidesProductsAfter({ role: "echo", redFlag: true, text: "an older referral wording" })).toBe(true);
+    expect(hidesProductsAfter({ role: "echo", redFlag: false, text: "Here is a simple routine." })).toBe(false);
+    expect(hidesProductsAfter({ role: "user", redFlag: true, text: "what medicine should i take" })).toBe(false);
   });
 });
