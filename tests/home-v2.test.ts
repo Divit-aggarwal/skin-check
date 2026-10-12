@@ -84,6 +84,18 @@ describe("routine streak", () => {
     expect(routineStreak([used("2026-10-10")], "2026-10-11")).toBe(1);
   });
 
+  it("TD-49: a cleared step is not logged; the latest event per step and slot decides the day", () => {
+    const at = (n: number) => `2026-10-11T00:00:0${n}.000Z`;
+    const e = (d: string, status: string, n: number, productId = "a", slot = "AM") => ({ type: "usage" as const, effectiveDate: d, status, productId, slot, recordedAt: at(n), eventId: `e${n}` });
+    // Today used then cleared: not logged, so the run ends yesterday.
+    expect(routineStreak([e("2026-10-10", "used", 1), e("2026-10-11", "used", 2), e("2026-10-11", "cleared", 3)], today)).toBe(1);
+    // Cleared then used again: logged.
+    expect(routineStreak([e("2026-10-11", "cleared", 1), e("2026-10-11", "used", 2)], today)).toBe(1);
+    // One product cleared, another still used that day: the day counts.
+    expect(routineStreak([e("2026-10-11", "used", 1, "a"), e("2026-10-11", "used", 2, "b"), e("2026-10-11", "cleared", 3, "a")], today)).toBe(1);
+    expect(daysLoggedLast7([e("2026-10-11", "used", 1), e("2026-10-11", "cleared", 2)], today)).toBe(0);
+  });
+
   it("days logged in the last 7 days, today included", () => {
     expect(daysLoggedLast7([used("2026-10-05"), used("2026-10-04"), used("2026-10-11"), used("2026-10-11")], today)).toBe(2);
     expect(daysLoggedLast7([], today)).toBe(0);

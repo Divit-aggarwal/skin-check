@@ -8,6 +8,9 @@ import { IsoDate } from "@/lib/catalog/schema";
 // Gemini. Shown next to the user's own checks on the dashboard (TD-24 (2)).
 export const ROUTINE_EVENT_SCHEMA_VERSION = 1 as const;
 
+/** TD-49: the usage status that undoes a log (the slot reads "not logged" again). */
+export const UNDO_STATUS = "cleared" as const;
+
 /** R-5 B: the one unnamed "other product (not ours)" entry. Not a catalogue row. */
 export const OTHER_PRODUCT_ID = "other-not-ours";
 export const DEFAULT_TIME_ZONE = "Asia/Kolkata";
@@ -70,7 +73,9 @@ export const RoutineEventInputSchema = z.discriminatedUnion("type", [
     type: z.literal("usage"),
     ...common,
     slot: z.enum(["AM", "PM"]),
-    status: z.enum(["used", "skipped"]),
+    // TD-49: "cleared" undoes a log. For each product, day and slot the latest
+    // usage event decides: used, skipped, or (cleared, or none) not logged.
+    status: z.enum(["used", "skipped", "cleared"]),
   }),
 ]);
 

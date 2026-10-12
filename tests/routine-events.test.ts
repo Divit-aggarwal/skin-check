@@ -165,3 +165,11 @@ describe("E03 currentRoutine", () => {
     expect(currentRoutine(events, "2026-10-03")).toEqual([{ productId: "b", schedule: am, since: "2026-09-20" }]);
   });
 });
+
+describe("TD-49: the undo status", () => {
+  const base = { eventId: "0f8fad5b-d9cb-469f-a165-70867728950e", productId: "refreshing-cleanser", effectiveDate: "2026-10-12", timeZone: "Asia/Kolkata", type: "usage", slot: "AM" };
+  it("a usage event may be used, skipped or cleared; nothing else", () => {
+    for (const status of ["used", "skipped", "cleared"]) expect(parses({ ...base, status }), status).toBe(true);
+    for (const status of ["unknown", "deleted", ""]) expect(parses({ ...base, status }), status).toBe(false);
+  });
+});

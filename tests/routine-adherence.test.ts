@@ -20,7 +20,7 @@ function ev(e: Record<string, unknown> & { type: RoutineEvent["type"] }): Routin
 }
 const start = (date: string, slot = "AM", days = EVERY_DAY, productId = "a") =>
   ev({ type: "start", productId, effectiveDate: date, schedule: { slot, days } });
-const use = (date: string, status: "used" | "skipped", slot = "AM", productId = "a") =>
+const use = (date: string, status: "used" | "skipped" | "cleared", slot = "AM", productId = "a") =>
   ev({ type: "usage", productId, effectiveDate: date, slot, status });
 const statuses = (r: ReturnType<typeof adherence>) => r.days.map((d) => `${d.date} ${d.productId} ${d.slot} ${d.status}`);
 const win = (from: string, to: string, today = "2030-01-01") => ({ from, to, today });
@@ -105,5 +105,19 @@ describe("E04 adherence", () => {
     const r = adherence([start("2026-10-01"), use("2026-10-01", "used")], win("2026-10-01", "2026-10-02"));
     expect(Object.keys(r).sort()).toEqual(["counts", "days"]);
     expect(Object.keys(r.counts).sort()).toEqual(["skipped", "unknown", "used"]);
+  });
+
+  it("TD-49: the latest event per slot decides; cleared reads as not logged; a log after a clear counts again", () => {
+    const r = adherence(
+      [start("2026-10-01"), use("2026-10-01", "used"), use("2026-10-01", "cleared"), use("2026-10-02", "skipped"), use("2026-10-02", "cleared"), use("2026-10-02", "used"), use("2026-10-03", "cleared")],
+      win("2026-10-01", "2026-10-03")
+    );
+    expect(statuses(r)).toEqual(["2026-10-01 a AM unknown", "2026-10-02 a AM used", "2026-10-03 a AM unknown"]);
+    expect(r.counts).toEqual({ used: 1, skipped: 0, unknown: 2 });
+  });
+
+  it("TD-49: old data with no cleared event reads exactly as before", () => {
+    const r = adherence([start("2026-10-01"), use("2026-10-01", "used"), use("2026-10-01", "skipped")], win("2026-10-01", "2026-10-01"));
+    expect(statuses(r)).toEqual(["2026-10-01 a AM skipped"]);
   });
 });

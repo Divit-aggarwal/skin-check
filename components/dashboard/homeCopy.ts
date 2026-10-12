@@ -145,8 +145,8 @@ export const HOME_COPY = {
     analysing: "Still being read",
   },
   tiles: {
-    // "progress" is a D-12 banned word (TD-47 agent note): the tile keeps the v2 name.
-    progress: "Your record",
+    // TD-49: exact-label exception.
+    progress: "Your progress",
     progressValue: (n: number) => `${n} of 7 days`,
     progressNote: "routine days logged",
     starting: "Starting checks",

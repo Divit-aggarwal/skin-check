@@ -17,7 +17,11 @@ export function adherence(
   // Latest usage log per (product, date, slot), in the deterministic event order.
   const logged = new Map<string, "used" | "skipped">();
   for (const e of sortEvents(events)) {
-    if (e.type === "usage") logged.set(`${e.productId}|${e.effectiveDate}|${e.slot}`, e.status);
+    if (e.type !== "usage") continue;
+    const key = `${e.productId}|${e.effectiveDate}|${e.slot}`;
+    // TD-49: a later "cleared" makes the slot not logged again.
+    if (e.status === "cleared") logged.delete(key);
+    else logged.set(key, e.status);
   }
 
   const days: AdherenceDay[] = [];

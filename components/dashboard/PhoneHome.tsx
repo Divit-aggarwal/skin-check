@@ -12,6 +12,7 @@ import { pickStarters } from "@/components/skin-check/echoStarters";
 import { QuestionsCard } from "@/components/skin-check/QuestionsChoice";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
 import { ROUTINE_COPY } from "@/lib/routine/copy";
+import { UNDO_STATUS } from "@/lib/routine/events";
 import { daysLoggedLast7, routineStreak } from "@/lib/routine/streak";
 import { ECHO_REGION_LABELS } from "@/lib/echo-regions";
 import { echoOn } from "@/lib/echo-limits";
@@ -79,7 +80,7 @@ export function PhoneHome({
     const s = stepOf(id);
     return s ? ROUTINE_COPY.steps[s] : nameOf(id);
   };
-  const send = (d: DueStep, status: "used" | "skipped") => void routine.send({ type: "usage", productId: d.productId, slot: d.slot, status });
+  const send = (d: DueStep, status: "used" | typeof UNDO_STATUS) => void routine.send({ type: "usage", productId: d.productId, slot: d.slot, status });
   const city = settings?.city ?? null;
   const date = now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
@@ -170,7 +171,7 @@ function TodayCard({
   next: ReturnType<typeof nextCheck>;
   action: ReturnType<typeof mainAction>;
   stepLabel: (id: string) => string;
-  send: (d: DueStep, s: "used" | "skipped") => void;
+  send: (d: DueStep, s: "used" | typeof UNDO_STATUS) => void;
 }) {
   const { done, total } = ringValues(steps);
   const streak = routine.data ? routineStreak(routine.data.events, routine.data.today) : 0;
@@ -256,7 +257,7 @@ function UvLine({ user, settings, open }: { user: User; settings: HomeSettings |
 
 // ─── Routine row ────────────────────────────────────────────────────────────
 
-function RoutineRow({ routine, steps, slot, stepLabel, nameOf, send }: { routine: Routine; steps: DueStep[]; slot: "AM" | "PM"; stepLabel: (id: string) => string; nameOf: (id: string) => string; send: (d: DueStep, s: "used" | "skipped") => void }) {
+function RoutineRow({ routine, steps, slot, stepLabel, nameOf, send }: { routine: Routine; steps: DueStep[]; slot: "AM" | "PM"; stepLabel: (id: string) => string; nameOf: (id: string) => string; send: (d: DueStep, s: "used" | typeof UNDO_STATUS) => void }) {
   const slotName = ROUTINE_COPY.slot[slot];
   if (routine.failed) return <p role="alert" className="text-sm">{ROUTINE_COPY.error}</p>;
   if (!routine.data) return <div aria-hidden className={`${row} h-[104px] motion-safe:animate-pulse`} />;
@@ -291,7 +292,7 @@ function RoutineRow({ routine, steps, slot, stepLabel, nameOf, send }: { routine
                   aria-pressed={isDone}
                   aria-disabled={routine.busy}
                   aria-label={isDone ? H.routineRow.undo(name, slotName.toLowerCase()) : H.routine.markDoneLabel(name, slotName.toLowerCase())}
-                  onClick={() => !routine.busy && send(d, isDone ? "skipped" : "used")}
+                  onClick={() => !routine.busy && send(d, isDone ? UNDO_STATUS : "used")}
                   className="flex min-h-[56px] w-full flex-col items-center justify-center gap-1 rounded-xl border border-brand-line px-1 text-xs font-semibold text-brand-ink aria-pressed:border-brand-forest aria-pressed:bg-brand-forest aria-pressed:text-white"
                 >
                   {isDone ? <Check aria-hidden size={16} /> : <span aria-hidden className="size-4 rounded-full border-2 border-brand-line" />}
