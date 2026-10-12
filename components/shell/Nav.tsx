@@ -98,10 +98,11 @@ export function Nav({ phoneLast4 }: { phoneLast4: string | null }) {
               >
                 {p.key === "newCheck" ? (
                   <>
-                    <span className="grid size-10 place-items-center rounded-full bg-brand-action text-white group-aria-[current=page]:ring-2 group-aria-[current=page]:ring-brand-forest group-aria-[current=page]:ring-offset-2">
+                    <span className="grid size-9 place-items-center rounded-full bg-brand-action text-white group-aria-[current=page]:ring-2 group-aria-[current=page]:ring-brand-forest group-aria-[current=page]:ring-offset-2">
                       <p.icon aria-hidden size={20} />
                     </span>
-                    <span className="sr-only">{S.nav[p.key]}</span>
+                    {/* TD-48: the new check is a labelled centre item (the phone Home has no banner). */}
+                    <span className="-mt-0.5 text-brand-forest">{S.nav[p.key]}</span>
                   </>
                 ) : (
                   <>

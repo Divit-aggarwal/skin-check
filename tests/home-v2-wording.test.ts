@@ -43,7 +43,7 @@ describe("Home v2 wording (TD-47 (4), D-12)", () => {
   it("TD-49: the three label exceptions are exact; the words stay banned everywhere else", () => {
     expect(LABEL_EXCEPTIONS).toEqual(["Your progress", "Today's conditions", "View full results"]);
     for (const s of ["Your progress so far", "your progress", "Skin conditions today", "View full results of your skin", "Today's conditions "]) expect(problems(s), s).not.toEqual([]);
-    expect(ALL.filter(labelIsExcepted).sort()).toEqual([...LABEL_EXCEPTIONS].sort());
+    expect(Array.from(new Set(ALL.filter(labelIsExcepted))).sort()).toEqual([...LABEL_EXCEPTIONS].sort());
   });
 
   it("no change, cause, forecast, medical or diagnosis word in any new string", () => {

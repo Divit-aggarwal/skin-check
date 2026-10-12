@@ -5,7 +5,7 @@ import { HOME_COPY as H } from "@/components/dashboard/homeCopy";
 import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
 import { WIDTHS, type Width } from "./seed-questionnaire";
 import { FACE_DARK, FACE_LIGHT, MESH_SEED } from "./seed-mesh";
-import { signIn, skipQuestions } from "./helpers";
+import { desktop, signIn, skipQuestions } from "./helpers";
 
 // TD-37 (docs/design/face-mesh.md): the face mesh while the photo is read.
 // TD-39: the results show the photo once with the mesh and both overlays, a
@@ -207,6 +207,7 @@ for (const width of WIDTHS) {
         const user = tone === "dark" ? MESH_SEED.kept : MESH_SEED.keptLight;
         await signIn(page, user.phoneNumber);
         // TD-47: Home's latest check has the kept photo as a thumbnail (no mesh, no overlays) and the whole-face levels.
+        await desktop(page); // TD-48: the Home v2 content is the desktop Home
         const latest = page.locator("section", { has: page.getByRole("heading", { name: H.latest.title }) });
         const thumb = latest.getByRole("img", { name: /Your kept photo from/ });
         await expect(thumb).toBeVisible({ timeout: 90_000 });
@@ -243,6 +244,7 @@ test("the bucket refuses a read from our site (today's production CORS): the fac
   await page.route((url) => url.hostname === "127.0.0.1" && url.pathname.includes("/original.jpg"), (route) => route.abort("accessdenied"));
   await signIn(page, MESH_SEED.kept.phoneNumber);
   // TD-47: Home falls back to the face drawing; the opened check too.
+  await desktop(page); // TD-48: the Home v2 content is the desktop Home
   await expect(page.getByRole("heading", { name: H.latest.title })).toBeVisible();
   await expect(page.getByRole("img", { name: /A drawing of a face/ }).or(page.getByRole("group", { name: /A drawing of a face/ }))).toBeVisible();
   await page.goto(`/checks/${MESH_SEED.kept.uid}-1`);

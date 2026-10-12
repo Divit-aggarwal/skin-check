@@ -90,7 +90,7 @@ async function main() {
         userRef.collection("routineEvents").doc(id).set({ eventId: id, timeZone: "Asia/Kolkata", schemaVersion: 1, catalogVersion: CATALOG_VERSION, recordedAt: Timestamp.now(), source: "user", ...e });
       const all = [0, 1, 2, 3, 4, 5, 6];
       await event("00000000-0000-4000-8000-000000000001", { type: "start", productId: "refreshing-cleanser", effectiveDate: day(30), schedule: { slot: "AM", days: all } });
-      await event("00000000-0000-4000-8000-000000000002", { type: "start", productId: "calming-moisturiser", effectiveDate: day(30), schedule: { slot: "PM", days: all } });
+      if (!user.home.amOnly) await event("00000000-0000-4000-8000-000000000002", { type: "start", productId: "calming-moisturiser", effectiveDate: day(30), schedule: { slot: "PM", days: all } });
       let k = 0;
       for (const n of user.home.routineLoggedDaysAgo)
         await event(`00000000-0000-4000-8000-0000000001${String(k++).padStart(2, "0")}`, { type: "usage", productId: "refreshing-cleanser", slot: "AM", status: "used", effectiveDate: day(n) });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
@@ -20,6 +20,7 @@ import { deriveDashboard, toDate, waitingQuestions, type Dashboard } from "./sta
 import { AskEchoCard, lastReadingDate, LatestCheckCard, NewCheckBanner, NextCheckCard, RecordCard, RoutineCard, useOpenEcho, WeatherCard } from "./HomeCards";
 import { loadHomeSettings } from "./homeSettings";
 import { PermissionsScreen } from "./PermissionsScreen";
+import { PhoneHome } from "./PhoneHome";
 
 // Home v2 (TD-47, docs/design/home-v2.md): what to do for the skin today.
 // One check's readings only, never two side by side (TD-24 (1)); the routine
@@ -168,6 +169,12 @@ function Home({
   const waiting = waitingQuestions(user.uid, data.checks, data.analyses, data.laterAnswers);
   const name = firstName(data);
   const hello = H.greeting[partOfDay(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata")];
+  // TD-48: phones and tablets get the compact Home; 1024px and up keep Home v2 unchanged.
+  const wide = useWide();
+  if (!wide)
+    return (
+      <PhoneHome user={user} data={data} dashboard={dashboard} settings={settings} onSettings={onSettings} routine={routine} productsOn={productsOn} hello={name ? H.greetingName(hello, name) : hello} waiting={waiting} />
+    );
 
   return (
     <Shell title={name ? H.greetingName(hello, name) : hello}>
@@ -208,6 +215,19 @@ function Home({
         )}
       </div>
     </Shell>
+  );
+}
+
+/** 1024px and up (the desktop Home). Read once on the client and on resize. */
+function useWide(): boolean {
+  return useSyncExternalStore(
+    (on) => {
+      const m = window.matchMedia("(min-width: 1024px)");
+      m.addEventListener("change", on);
+      return () => m.removeEventListener("change", on);
+    },
+    () => window.matchMedia("(min-width: 1024px)").matches,
+    () => true
   );
 }
 

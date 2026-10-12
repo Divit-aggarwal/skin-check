@@ -21,7 +21,8 @@ const SHOTS = "docs/design/home-v2";
 mkdirSync(SHOTS, { recursive: true });
 const shot = (page: Page, name: string) => page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 
-test.use({ timezoneId: "Asia/Kolkata", locale: "en-IN" });
+// TD-48: Home v2 now shows from 1024px; below that the compact Home (home-v3.spec.ts). The permissions screen is unchanged at every width.
+test.use({ timezoneId: "Asia/Kolkata", locale: "en-IN", viewport: { width: 1280, height: 900 } });
 
 const GREETING = /^Good (morning|afternoon|evening)/;
 
@@ -71,7 +72,7 @@ const DESKTOP_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, l
 const widthUse = (width: number) => (width === 390 ? {} : { userAgent: DESKTOP_UA, isMobile: false, hasTouch: false });
 
 test.describe("Home at three widths, every card filled", () => {
-  for (const width of [390, 768, 1280]) {
+  for (const width of [1024, 1280]) {
     test(`${width}: cards, order, no sideways scroll, no score or arrow`, async ({ browser }) => {
       const ctx = await browser.newContext({ timezoneId: "Asia/Kolkata", locale: "en-IN", viewport: { width, height: 900 }, ...widthUse(width) });
       const page = await ctx.newPage();
@@ -127,6 +128,7 @@ test.describe("Home at three widths, every card filled", () => {
       // Order: phone and tablet one column in the brief's order; desktop two columns.
       const top = async (t: string) => (await page.getByRole("heading", { name: t, exact: true }).boundingBox())!;
       if (width < 1280) {
+        // 1024-1279: Home v2 in one column.
         const ys = await Promise.all([H.next.title, H.latest.title, R.todayTitle, H.weather.title, H.record.title, H.echo.title].map(async (t) => (await top(t)).y));
         expect(ys).toEqual([...ys].sort((a, b) => a - b));
       } else {
@@ -146,7 +148,7 @@ test.describe("Home at three widths, every card filled", () => {
 });
 
 // Every read-only card state at the three widths (testing item 3). Runs before the tests that change these users.
-for (const width of [390, 768, 1280]) {
+for (const width of [1024, 1280]) {
   test(`every card state at ${width}`, async ({ browser }) => {
     test.setTimeout(400_000);
     const ctx = await browser.newContext({ timezoneId: "Asia/Kolkata", locale: "en-IN", viewport: { width, height: 900 }, ...widthUse(width) });
@@ -387,7 +389,8 @@ test.describe("permissions screen: once, after a check, before Home", () => {
       await expect(p.getByText(H.permissions.allowed)).toHaveCount(2);
       await p.getByRole("button", { name: H.permissions.continue }).click();
       await expect(p.getByRole("heading", { level: 1, name: GREETING })).toBeVisible();
-      await expect(section(p, H.weather.title).getByText(/^Mumbai, updated/)).toBeVisible();
+      // Phones and tablets show the compact Home (TD-48); the weather card is the desktop one.
+      if (width >= 1024) await expect(section(p, H.weather.title).getByText(/^Mumbai, updated/)).toBeVisible();
       const saved = JSON.stringify(await settingsOf(user.uid));
       expect(saved).toMatch(/"location":\{"stringValue":"allowed"\}/);
       expect(saved).toMatch(/"reminders":\{"stringValue":"allowed"\}/);
@@ -415,7 +418,7 @@ test.describe("permissions screen: once, after a check, before Home", () => {
   });
 
   test("refused by the browser: recorded as refused; Home shows the browser-settings help; nothing blocks", async ({ browser }) => {
-    const ctx = await browser.newContext({ timezoneId: "Asia/Kolkata", viewport: { width: 390, height: 844 }, userAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36" });
+    const ctx = await browser.newContext({ timezoneId: "Asia/Kolkata", viewport: { width: 1280, height: 900 }, userAgent: "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Mobile Safari/537.36" });
     const p = await ctx.newPage();
     await blockLocation(p);
     await p.addInitScript(() => {
@@ -428,7 +431,7 @@ test.describe("permissions screen: once, after a check, before Home", () => {
     await p.evaluate(() => sessionStorage.setItem("denied", "1"));
     await p.getByRole("group", { name: H.permissions.remindersTitle }).getByRole("button", { name: H.permissions.allow }).click();
     await expect(p.getByText(H.permissions.refused)).toHaveCount(2);
-    await shot(p, "permissions-refused-390");
+    await shot(p, "permissions-refused-1280");
     await p.getByRole("button", { name: H.permissions.continue }).click();
     await expect(p.getByRole("heading", { level: 1, name: GREETING })).toBeVisible();
     const saved = JSON.stringify(await settingsOf(U.permRefused!.uid));
@@ -436,7 +439,7 @@ test.describe("permissions screen: once, after a check, before Home", () => {
     expect(saved).toMatch(/"reminders":\{"stringValue":"refused"\}/);
     await expect(section(p, H.weather.title).getByText(H.weather.blocked)).toBeVisible();
     await expect(section(p, H.next.title).getByText(H.next.remindersBlocked)).toBeVisible();
-    await shot(p, "home-refused-390");
+    await shot(p, "home-refused-1280");
     await ctx.close();
   });
 });

@@ -34,7 +34,8 @@ export const ROUTINE_COPY = {
   today: "Today",
   used: "Used",
   skipped: "Skipped",
-  status: { used: "Used", skipped: "Skipped", unknown: "Not logged" },
+  // TD-49: an undo shows as "Undone" on the timeline; the slot then reads "Not logged".
+  status: { used: "Used", skipped: "Skipped", unknown: "Not logged", cleared: "Undone" },
   todayTitle: "Today's routine",
   // The store's four steps (theprojectskin.com). "Treat" is allowed as this
   // exact label only (owner decision TD-26 (1), lib/catalog/wording.ts
