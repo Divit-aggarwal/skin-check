@@ -7,7 +7,7 @@ import { PRODUCT_NAME_PRIVACY_LINE } from "@/components/skin-check/inputs/Produc
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
 import { HOME_COPY as H } from "@/components/dashboard/homeCopy";
 import { Q_SEED, SEEDED_NAMES, WIDTHS, type Width } from "./seed-questionnaire";
-import { completePhoneForm, signIn, skipQuestions } from "./helpers";
+import { completePhoneForm, desktop, signIn, skipQuestions } from "./helpers";
 
 // TD-33 (docs/design/optional-questionnaire.md): the choice screen, skipping,
 // answering later, the product-name boxes and the camera states, at a phone
@@ -175,6 +175,7 @@ for (const width of WIDTHS) {
       await signIn(page, Q_SEED.skipped[width].phoneNumber);
       // Home: the readings are there, and the card under them.
       await expect(page.getByRole("heading", { name: Q.cardTitle })).toBeVisible();
+      await desktop(page); // TD-48: the Home v2 content is the desktop Home
       await expect(page.getByRole("heading", { name: H.latest.title })).toBeVisible();
       await shot(page, "home-questions-card", width);
       await page.goto("/account");
@@ -224,6 +225,7 @@ for (const width of WIDTHS) {
 
       // Home no longer asks; Echo no longer shows the notice.
       await page.goto("/dashboard");
+      await desktop(page); // TD-48: the Home v2 content is the desktop Home
       await expect(page.getByRole("heading", { name: H.latest.title })).toBeVisible();
       await expect(page.getByRole("heading", { name: Q.cardTitle })).toHaveCount(0);
       await page.goto("/echo");
@@ -239,6 +241,7 @@ for (const width of WIDTHS) {
 
 test("an opened check shows its own product names; Home and Echo never do", async ({ page }) => {
   await signIn(page, Q_SEED.named.phoneNumber);
+  await desktop(page); // TD-48: the Home v2 content is the desktop Home
   await expect(page.getByRole("heading", { name: H.latest.title })).toBeVisible();
   for (const n of Object.values(SEEDED_NAMES)) await expect(page.getByText(n)).toHaveCount(0);
   await page.goto(`/checks/${Q_SEED.named.uid}-1`);
@@ -347,6 +350,7 @@ test("skip end to end: the check is saved with its readings, and Home offers the
   const today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
   await expect(async () => {
     await page.goto("/dashboard");
+    await desktop(page); // TD-48: the Home v2 content is the desktop Home
     await expect(page.getByText(H.latest.checkedOn(today, H.latest.ago(0)))).toBeVisible({ timeout: 5_000 });
   }).toPass({ timeout: 120_000, intervals: [5_000] });
   await expect(page.getByRole("heading", { name: Q.cardTitle })).toBeVisible();

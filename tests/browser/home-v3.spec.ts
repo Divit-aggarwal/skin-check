@@ -124,7 +124,7 @@ test("compact states: analysing, no permission, source down, iPhone hint; New ch
   let s = await at(browser, 390, U.homeAnalysing!.phoneNumber);
   await expect(s.page.getByRole("link", { name: /Open the check from/ })).toContainText(H.latestRow.analysing);
   // The iPhone hint (the default phone here is an iPhone in the browser): one line.
-  await expect(today(s.page).getByText(H.next.iosHint)).toBeVisible();
+  await expect(today(s.page).getByText(H.today.iosHint)).toBeVisible();
   // New check: a labelled centre item in the bottom bar.
   await expect(s.page.getByRole("navigation", { name: S.navLabel }).last().getByRole("link", { name: S.nav.newCheck })).toBeVisible();
   await s.close();

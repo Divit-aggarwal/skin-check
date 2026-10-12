@@ -15,6 +15,9 @@ import { HOME_COPY as H } from "@/components/dashboard/homeCopy";
 // the table by face area, a hard-to-read area and the kinds of past checks
 // are on an opened check and Checks; the privacy card is on Account.
 
+// TD-48: these check the Home v2 content, which now shows from 1024px; phones get the compact Home (home-v3.spec.ts).
+test.use({ viewport: { width: 1280, height: 900 } });
+
 const FS = process.env.PW_FIRESTORE_HOST!;
 const firestore = (page: Page) => (url: URL) => url.host === FS || url.href.includes("firestore.googleapis.com");
 

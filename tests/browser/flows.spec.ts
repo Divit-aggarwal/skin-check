@@ -10,7 +10,7 @@ import { CATALOGUE } from "@/lib/catalog/catalogue";
 import { TIMELINE_COPY as T } from "@/components/timeline/copy";
 import { ECHO_COPY as E } from "@/components/skin-check/echoCopy";
 import { DASHBOARD_SEED as U } from "./seed-users";
-import { shot, signIn } from "./helpers";
+import { desktop, shot, signIn } from "./helpers";
 import { SHELL_COPY as S } from "@/components/shell/copy";
 import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
 import { DRAFT_VERSION } from "@/lib/skin-check-draft";
@@ -88,6 +88,7 @@ test("a normal scan finishes and shows on the dashboard", async ({ page }) => {
   // minute under emulation): reload the dashboard until it shows.
   const today = new Date().toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
   await expect(async () => {
+    await desktop(page); // TD-48: the Home v2 content is the desktop Home
     await page.goto("/dashboard");
     await expect(page.getByText(H.latest.checkedOn(today, H.latest.ago(0)))).toBeVisible({ timeout: 5_000 });
   }).toPass({ timeout: 240_000, intervals: [5_000] });
@@ -171,6 +172,7 @@ test("under 18 shows the confirm step; No goes back, Yes blocks", async ({ page 
 });
 
 async function askEcho(page: Page) {
+  await desktop(page); // TD-48: the Home v2 content is the desktop Home
   await page.getByRole("button", { name: C.chat.button }).click();
   await expect(page).toHaveURL(/\/echo/);
   await page.getByRole("textbox").fill("What does this photo reading show?");
@@ -182,6 +184,7 @@ test("Echo asks for AI-share consent first", async ({ page }) => {
   // TD-47: the privacy card is on Account.
   await page.goto("/account");
   await expect(page.getByText(C.privacy.aiNotAsked)).toBeVisible();
+  await desktop(page); // TD-48: the Home v2 content is the desktop Home
   await page.goto("/dashboard");
   await askEcho(page);
   await expect(page.getByText(AI_SHARE_CONSENT_COPY)).toBeVisible();
@@ -195,6 +198,7 @@ test("withdraw AI-share consent on Account, then Echo asks again", async ({ page
   await expect(page.getByText(C.privacy.aiOff)).toBeVisible();
   await page.getByRole("heading", { name: C.privacy.title }).scrollIntoViewIfNeeded();
   await shot(page, "privacy-off");
+  await desktop(page); // TD-48: the Home v2 content is the desktop Home
   await page.goto("/dashboard");
   await askEcho(page);
   await expect(page.getByText(AI_SHARE_CONSENT_COPY)).toBeVisible();
@@ -266,6 +270,7 @@ test("Home: today's routine marks a step done in one tap, and it is still done a
   await addSection.getByRole("button", { name: R.addButton, exact: true }).click();
   await saved;
 
+  await desktop(page); // TD-48: the Home v2 content is the desktop Home
   await page.goto("/dashboard");
   const today = page.locator("section", { has: page.getByRole("heading", { name: R.todayTitle }) });
   // TD-47: one-tap "Mark done" (a used event); the timeline on Checks shows the entry.
@@ -280,6 +285,7 @@ test("Home: today's routine marks a step done in one tap, and it is still done a
 
 test("Ask Echo, back to the dashboard, a new check starts at the questions", async ({ page }) => {
   await signIn(page, U.echo!.phoneNumber);
+  await desktop(page); // TD-48: the Home v2 content is the desktop Home
   await page.goto("/dashboard");
   await page.getByRole("button", { name: C.chat.button }).click();
   await expect(page).toHaveURL(/\/echo/);
@@ -315,6 +321,7 @@ test("Echo with no photo reading: a designed empty state with a way to a new che
 
 test("K-1 fixed: Echo's back link after a dashboard hand-off returns to the dashboard", async ({ page }) => {
   await signIn(page, U.echo!.phoneNumber);
+  await desktop(page); // TD-48: the Home v2 content is the desktop Home
   await page.goto("/dashboard");
   await page.getByRole("button", { name: C.chat.button }).click();
   await expect(page).toHaveURL(/\/echo/);
@@ -345,6 +352,7 @@ test("delete the account, sign in again, no history", async ({ page }) => {
   await expect(page.getByText("Your account and your data have been deleted.")).toBeVisible({ timeout: 60_000 });
 
   await signIn(page, U.erase!.phoneNumber);
+  await desktop(page); // TD-48: the Home v2 content is the desktop Home
   await page.goto("/dashboard");
   await expect(page.getByText(H.latest.none)).toBeVisible();
   await expect(page.getByText(C.history.title)).toHaveCount(0);

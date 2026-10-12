@@ -124,6 +124,7 @@ export const HOME_COPY = {
     allDone: "All done today",
     slotDone: { AM: "Morning steps done", PM: "Evening steps done" },
     weatherSheet: "Weather and air details",
+    iosHint: "On iPhone, add this site to your Home Screen for reminders.",
     close: "Close",
   },
   routineRow: {

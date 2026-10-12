@@ -84,7 +84,7 @@ export function PhoneHome({
   const date = now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
   return (
-    <main className="mx-auto flex w-full max-w-[720px] flex-col gap-3 px-4 pb-28 pt-5 sm:px-6 sm:pt-8">
+    <main className="mx-auto flex w-full max-w-[600px] flex-col gap-3 px-4 pb-28 pt-5 sm:px-6 sm:pt-8">
       {/* 1. Greeting: date and city on one small line; the Account button sits top right (shell). */}
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
@@ -110,10 +110,10 @@ export function PhoneHome({
       {echoOn() && <EchoChips uid={user.uid} dashboard={dashboard} data={data} productsOn={productsOn} />}
 
       {/* 6. Below the fold: two tiles and the one honest line. */}
-      <section aria-label={H.tiles.progress} className="mt-2 grid grid-cols-2 gap-3">
+      <section aria-label={H.tiles.progress} className="grid grid-cols-2 gap-3">
         <Tile title={H.tiles.progress} value={H.tiles.progressValue(routine.data ? daysLoggedLast7(routine.data.events, routine.data.today) : 0)} note={H.tiles.progressNote} />
-        <Tile title={H.tiles.starting} value={H.tiles.startingValue(dashboard.trend.count, dashboard.trend.needed)} />
-        <p className="col-span-2 text-sm text-brand-muted">{dashboard.trend.kind === "empty" ? C.trend.empty : C.trend.notEnough}</p>
+        {/* The honest line sits in the tile, not loose on the page (design review). */}
+        <Tile title={H.tiles.starting} value={H.tiles.startingValue(dashboard.trend.count, dashboard.trend.needed)} note={dashboard.trend.kind === "empty" ? C.trend.empty : C.trend.notEnough} />
       </section>
     </main>
   );
@@ -196,7 +196,7 @@ function TodayCard({
         </ul>
       </div>
       {weatherOn() && !settings?.city && (
-        <button type="button" onClick={() => dialog.current?.showModal()} className="inline-flex min-h-11 items-center gap-1.5 self-start text-sm font-medium text-brand-forest underline-offset-4 hover:underline">
+        <button type="button" onClick={() => dialog.current?.showModal()} className="-my-2 inline-flex min-h-11 items-center gap-1.5 self-start text-sm font-medium text-brand-forest underline-offset-4 hover:underline">
           <CloudSun aria-hidden size={16} />
           {H.today.addCity}
         </button>
@@ -215,7 +215,7 @@ function TodayCard({
           {action.kind === "allDone" ? H.today.allDone : H.today.slotDone[steps.find((s) => s.status === "used")?.slot ?? "AM"]}
         </p>
       ) : null}
-      {pushOn() && ios && <p className="text-xs text-brand-muted">{H.next.iosHint}</p>}
+      {pushOn() && ios && <p className="text-xs text-brand-muted">{H.today.iosHint}</p>}
       {weatherOn() && (
         <dialog ref={dialog} aria-label={H.today.weatherSheet} className="m-0 mt-auto w-full max-w-none rounded-t-2xl bg-transparent p-0 backdrop:bg-black/30 sm:m-auto sm:max-w-md sm:rounded-2xl" onClick={(e) => e.target === dialog.current && dialog.current?.close()}>
           <div className="relative">
@@ -262,9 +262,9 @@ function RoutineRow({ routine, steps, slot, stepLabel, nameOf, send }: { routine
   if (!routine.data) return <div aria-hidden className={`${row} h-[104px] motion-safe:animate-pulse`} />;
   if (routine.data.routine.length === 0)
     return (
-      <section aria-label={ROUTINE_COPY.todayTitle} className={`${row} flex items-center justify-between gap-3`}>
+      <section aria-label={ROUTINE_COPY.todayTitle} className={`${row} flex min-h-14 items-center justify-between gap-3 !py-2`}>
         <p className="text-sm text-brand-muted">{H.routineRow.empty}</p>
-        <Link href="/routine" className="inline-flex min-h-11 items-center font-semibold text-brand-forest underline-offset-4 hover:underline">
+        <Link href="/routine" className="inline-flex min-h-11 items-center text-sm font-semibold text-brand-forest underline-offset-4 hover:underline">
           {H.routineRow.setUp}
         </Link>
       </section>
@@ -280,12 +280,12 @@ function RoutineRow({ routine, steps, slot, stepLabel, nameOf, send }: { routine
       {steps.length === 0 ? (
         <p className="text-sm text-brand-muted">{ROUTINE_COPY.nothingToday}</p>
       ) : (
-        <ul className="grid grid-cols-4 gap-2">
+        <ul className="flex flex-wrap gap-2">
           {steps.slice(0, 4).map((d) => {
             const isDone = d.status === "used";
             const name = nameOf(d.productId);
             return (
-              <li key={d.productId}>
+              <li key={d.productId} className="w-[84px]">
                 <button
                   type="button"
                   aria-pressed={isDone}
@@ -360,7 +360,7 @@ function EchoChips({ uid, dashboard, data, productsOn }: { uid: string; dashboar
   if (!scanId) return null;
   if (!answered)
     return (
-      <button type="button" onClick={() => openEcho()} className="inline-flex min-h-11 items-center gap-1 self-start font-semibold text-brand-forest underline-offset-4 hover:underline">
+      <button type="button" onClick={() => openEcho()} className="flex min-h-11 w-full items-center justify-between rounded-2xl border border-brand-line bg-brand-paper px-3 text-sm font-semibold text-brand-forest hover:border-brand-action">
         {H.echo.open}
         <ChevronRight aria-hidden size={16} />
       </button>
@@ -370,7 +370,7 @@ function EchoChips({ uid, dashboard, data, productsOn }: { uid: string; dashboar
       <ul className="grid grid-cols-2 gap-2">
         {starters.map((q) => (
           <li key={q} className="min-w-0">
-            <button type="button" onClick={() => openEcho({ ask: q })} className="flex min-h-11 w-full items-center rounded-2xl border border-brand-line bg-brand-paper px-3 py-2 text-left text-sm font-medium leading-snug text-brand-forest hover:border-brand-action">
+            <button type="button" onClick={() => openEcho({ ask: q })} className="flex h-full min-h-11 w-full items-center rounded-2xl border border-brand-line bg-brand-paper px-3 py-2 text-left text-sm font-medium leading-snug text-brand-forest hover:border-brand-action">
               <span className="line-clamp-2">{q}</span>
             </button>
           </li>
