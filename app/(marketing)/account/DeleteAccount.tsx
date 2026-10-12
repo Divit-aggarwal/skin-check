@@ -7,6 +7,7 @@ import { clearUnder18Chosen, ERASE_CONFIRMATION, ERASE_COPY, ERASE_MAX_AUTH_AGE_
 import Link from "next/link";
 import { btnPrimary, btnSecondary, h2 } from "@/components/ui/page";
 import { ACCOUNT_COPY as A } from "./copy";
+import { forgetHomeDevice } from "@/components/dashboard/homeSettings";
 
 // H01b: a signed-in user deletes their account and every copy of their data
 // we hold (S3 photos, Firestore, the sign-in account). The server does the
@@ -53,6 +54,8 @@ export function DeleteAccount() {
         // The server erased the under-18 record with the account; this tab's
         // marker goes too, or the next sign-in here would re-attest it.
         clearUnder18Chosen();
+        // TD-47: this device's weather reading and push subscription.
+        await forgetHomeDevice().catch(() => undefined);
         await signOut().catch(() => undefined);
         setState({ kind: "done" });
         return;

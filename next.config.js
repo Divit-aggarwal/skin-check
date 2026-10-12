@@ -35,7 +35,13 @@ const nextConfig = {
   // takes effect with the next deployment (docs/OWNER_QUEUE.md).
   // TD-34: ECHO_PRODUCTS_SWITCH the same way: "off" hides product suggestions
   // and every product card, while Echo itself stays on.
-  env: { ECHO_SWITCH: process.env.ECHO_SWITCH ?? "", ECHO_PRODUCTS_SWITCH: process.env.ECHO_PRODUCTS_SWITCH ?? "" },
+  // TD-47: WEATHER_SWITCH and PUSH_SWITCH the same way, both off unless "on".
+  env: {
+    ECHO_SWITCH: process.env.ECHO_SWITCH ?? "",
+    ECHO_PRODUCTS_SWITCH: process.env.ECHO_PRODUCTS_SWITCH ?? "",
+    WEATHER_SWITCH: process.env.WEATHER_SWITCH ?? "",
+    PUSH_SWITCH: process.env.PUSH_SWITCH ?? "",
+  },
 
   // "/" is app/(marketing)/page.tsx (G03, TD-24 (3)): Home when signed in,
   // the check flow when not. It replaced a fixed redirect to /skin-check.
@@ -68,8 +74,10 @@ const nextConfig = {
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           // camera=(self) is required — PhotoCapture.tsx's desktop path uses
           // getUserMedia; the default-deny Permissions-Policy baseline would
-          // silently break the app's own capture step.
-          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=()" },
+          // silently break the app's own capture step. geolocation=(self)
+          // (TD-47): Home's "Use my location", asked only from the app's own
+          // permissions screen or a button the user taps; never a third party.
+          { key: "Permissions-Policy", value: "camera=(self), microphone=(), geolocation=(self)" },
           // No `preload` — that's a separate, effectively-irreversible
           // browser-preload-list submission, not something to opt into as
           // part of a header default.

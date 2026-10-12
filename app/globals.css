@@ -129,3 +129,27 @@
 @media (prefers-reduced-motion: reduce) {
   .mesh-scan { animation: none; display: none; }
 }
+
+/* TD-47 Home: the DOM is in the phone order (screen readers and the keyboard
+   meet the cards as a phone shows them); from 1280px the same cards are placed
+   in a main column (two thirds) and a right column by grid areas, never by
+   `order`. */
+@media (min-width: 1280px) {
+  .home-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    /* The right column's cards span rows, so the main column does not wait for them. */
+    grid-template-areas:
+      "latest latest weather"
+      "latest latest next"
+      "record routine next"
+      "record routine echo"
+      "banner banner echo";
+    grid-template-rows: auto min-content 1fr auto auto;
+    gap: 1.5rem;
+    align-items: start;
+  }
+  .home-grid > [data-area] { grid-area: var(--area); }
+  .home-grid > [data-area="record"], .home-grid > [data-area="routine"] { align-self: stretch; }
+  .home-grid > [data-area="record"] > section, .home-grid > [data-area="routine"] > section { height: 100%; }
+}

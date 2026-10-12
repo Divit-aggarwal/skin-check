@@ -112,13 +112,19 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
   });
 
   it("D-12: on Home the routine card is never beside the readings, and the timeline carries no photos", () => {
+    // TD-47: no grid row holds both the readings and the routine (desktop areas in app/globals.css); on phones
+    // they are separate cards in one column. The routine card itself shows no reading or photo.
+    const css = readFileSync("app/globals.css", "utf8");
+    const rows = Array.from(css.slice(css.indexOf("grid-template-areas:"), css.indexOf(";", css.indexOf("grid-template-areas:"))).matchAll(/"([a-z ]+)"/g)).map((m) => m[1]!);
+    expect(rows.length).toBe(5);
+    for (const row of rows) expect(row.includes("latest") && row.includes("routine"), row).toBe(false);
+    expect(rows.findIndex((r) => r.includes("routine"))).toBeGreaterThan(rows.findIndex((r) => r.includes("latest")));
     const home = readFileSync("components/dashboard/DashboardPage.tsx", "utf8");
-    const left = home.slice(home.indexOf("contents lg:col-span-8"), home.indexOf("contents lg:col-span-4"));
-    const right = home.slice(home.indexOf("contents lg:col-span-4"));
-    expect(left.length).toBeGreaterThan(100);
-    expect(left).toMatch(/<TodayCard/);
-    expect(left.indexOf("<TodayCard")).toBeGreaterThan(left.indexOf("<RecentSection"));
-    expect(right).not.toMatch(/<TodayCard/);
+    expect(home).toMatch(/<Area name="routine">\s*<RoutineCard/);
+    expect(home).not.toMatch(/\border-\d/);
+    const cards = readFileSync("components/dashboard/HomeCards.tsx", "utf8");
+    const routineCard = cards.slice(cards.indexOf("export function RoutineCard("), cards.indexOf("// ─── Weather and air today"));
+    expect(routineCard).not.toMatch(/bands|<Thumb|<FaceDrawing|band\b/);
     const checks = readFileSync("components/checks/ChecksView.tsx", "utf8");
     const timeline = checks.slice(checks.indexOf("function TimelineSection("));
     expect(timeline).not.toMatch(/<Thumb|thumb=/);

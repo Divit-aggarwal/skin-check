@@ -24,3 +24,12 @@ export function echoOn(): boolean {
 }
 
 export const ECHO_OFF_COPY = "Echo is paused for now. Your checks and readings are still on your dashboard.";
+
+/**
+ * TD-34: product suggestions are on unless ECHO_PRODUCTS_SWITCH is exactly
+ * "off". Here (client-safe) so Home's starter questions can read it without
+ * importing the chat layer (TD-47); lib/context/products.ts re-exports it.
+ */
+export function echoProductsOn(): boolean {
+  return process.env.ECHO_PRODUCTS_SWITCH !== "off";
+}

@@ -204,6 +204,47 @@ service cloud.firestore {
         allow write: if false;
       }
       // ── end lane:context ──
+
+      // TD-47: Home settings, one doc (settings/home): the two permission
+      // choices and the city. Owner only, both ways. The city's position is
+      // whole tenths of a degree (about 11 km) as integers, so a precise
+      // position cannot be stored here even by a modified client.
+      match /settings/{name} {
+        allow get: if request.auth != null && request.auth.uid == uid && name == 'home';
+        allow create, update: if request.auth != null && request.auth.uid == uid && name == 'home'
+                              && notErased(uid)
+                              && notUnder18(uid)
+                              && homeSettingsOk(request.resource.data);
+        allow delete: if false;
+      }
+
+      function homeSettingsOk(d) {
+        return d.keys().hasOnly(['location', 'reminders', 'city', 'askedAt'])
+               && (!('location' in d) || d.location in ['allowed', 'not_now', 'refused', 'unsupported'])
+               && (!('reminders' in d) || d.reminders in ['allowed', 'not_now', 'refused', 'unsupported'])
+               && (!('city' in d) || d.city == null || cityOk(d.city))
+               // The server's time when first answered; kept as it is afterwards.
+               && (!('askedAt' in d) || d.askedAt == request.time
+                   || (resource != null && resource.data.get('askedAt', null) == d.askedAt));
+      }
+
+      function cityOk(c) {
+        return c is map
+               && c.keys().hasOnly(['name', 'region', 'country', 'latE1', 'lonE1', 'source'])
+               && c.keys().hasAll(['name', 'region', 'country', 'latE1', 'lonE1', 'source'])
+               && c.name is string && c.name.size() >= 1 && c.name.size() <= 100
+               && c.region is string && c.region.size() <= 100
+               && c.country is string && c.country.size() <= 100
+               && c.latE1 is int && c.latE1 >= -900 && c.latE1 <= 900
+               && c.lonE1 is int && c.lonE1 >= -1800 && c.lonE1 <= 1800
+               && c.source in ['device', 'typed'];
+      }
+
+      // TD-47: web push subscriptions, written and read only by the server
+      // (Admin SDK). No client may read or write one.
+      match /pushSubscriptions/{id} {
+        allow read, write: if false;
+      }
     }
   }
 }

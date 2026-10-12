@@ -391,3 +391,117 @@ vercel redeploy $(vercel api /v9/projects/skin-check | jq -r '.targets.productio
 ## S2. Try it on your phone (made-up test accounts only)
 
 The P5 checks above, plus: three or four starter questions above the message box; tapping "Suggest a routine with your products" sends it and shows cards. Then tell the agent: it reads the production log (`vercel logs`) for `/api/skin-check/chat` and reports whether suggestions were served without errors.
+
+---
+
+# TD-47: Home v2, location and reminders (prepared 2026-10-12)
+
+Pull request: branch `feat/home-v2`, #20 (https://github.com/Divit-aggarwal/skin-check/pull/20). **Nothing below has been run.** Same rules as above: in order, one step at a time, and tell the agent after each step; it runs the check and says go or stop.
+
+**What changes, and what is off.**
+- The merge changes Home's layout and content: greeting, next check, latest check, today's routine, your record, Ask Echo and a new-check banner.
+- Both new features ship **off**:
+  - The weather card and the location question are off until `WEATHER_SWITCH=on` and an Open-Meteo key are set (H3).
+  - Reminder notifications are off until `PUSH_SWITCH=on` and the VAPID keys are set (H4).
+  - With both off, the permissions screen never shows. The Next check card is the reminder.
+
+**Do the database rules have to go out before the merge?**
+- **Recommended: yes (H0 first).** They only add two rules: `settings/home`, owner only, and `pushSubscriptions`, server only. They change nothing that exists today.
+- Strictly, the merge works without them while both switches are off: Home reads `settings/home`, a refusal is handled, and Home shows as normal. But H3 and H4 do need them.
+
+**New settings (none needed for the merge):**
+
+| Setting | Secret? | Needed for |
+|---|---|---|
+| `WEATHER_SWITCH` | no | `on` turns weather on (H3) |
+| `OPEN_METEO_API_KEY` | yes | the paid Open-Meteo plan (H3) |
+| `PUSH_SWITCH` | no | `on` turns reminders on (H4) |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | no | reminders (H4) |
+| `VAPID_PRIVATE_KEY` | yes | reminders (H4) |
+| `VAPID_SUBJECT` | no | optional; default `mailto:info@theprojectskin.com` |
+
+The reminder cron (`/api/home/reminders/send`, 03:30 UTC = 09:00 IST, give or take an hour on Hobby) uses the existing `CRON_SECRET`.
+
+**How to turn each feature off quickly:**
+- **Weather:** `vercel env rm WEATHER_SWITCH production --yes`, then redeploy (the command in H3's undo).
+- **Reminders:** `vercel env rm PUSH_SWITCH production --yes`, then redeploy. The cron then sends nothing, and the subscriptions stay until a user turns reminders off or deletes their account.
+- **Home v2 itself has no switch.** Use `vercel rollback <previous production deployment id>`.
+
+## H0. Deploy the new database rules (before the merge)
+
+Checked by the agent on 2026-10-12, read only: the live Firestore rules are the same text as `origin/master`'s `firestore.rules`. H0 therefore adds only the two TD-47 matches, and the undo (redeploying `master`'s copy) restores exactly what is live now. If another rules step from an earlier queue runs first, tell the agent so it checks this again before H0.
+
+```bash
+git fetch origin && git checkout origin/feat/home-v2 -- firestore.rules
+npx -y firebase-tools@latest deploy --only firestore:rules --project projectskin-a202c
+git checkout HEAD -- firestore.rules
+```
+- **Good output:** `✔  firestore: released rules firestore.rules to cloud.firestore` and `✔  Deploy complete!`
+- **Check (agent, read only):** the live rules equal the branch's `firestore.rules`, including `match /settings/{name}` and `match /pushSubscriptions/{id}`.
+- **Undo:** run the same deploy with the `master` copy of `firestore.rules`: `git checkout origin/master -- firestore.rules`, then deploy, then `git checkout HEAD -- firestore.rules`.
+
+## H1. Merge the pull request (this is the production deploy)
+
+```bash
+gh pr merge 20 --merge
+```
+- **Good output:** `✓ Merged pull request #20`. Vercel builds `master` for production, which takes about 2 minutes.
+- **Check (agent, read only):**
+  - The production deployment is READY on the merge commit, in region `bom1`.
+  - `curl -sI https://skin-check-sigma.vercel.app/dashboard` returns 200.
+  - `curl -s -X POST https://skin-check-sigma.vercel.app/api/home/weather` returns 404 `OFF`.
+  - `curl -s https://skin-check-sigma.vercel.app/api/home/reminders/send` returns 401.
+  - `curl -sI https://skin-check-sigma.vercel.app/sw.js` returns 200.
+  - A chat request without a login returns 401.
+- **Undo:** `vercel rollback <previous production deployment id>` (fast), or `git revert -m 1 <merge commit>` in a new pull request. H0 can stay; it is harmless.
+
+## H2. Phone checks with both features off (made-up test accounts only)
+
+1. **Sign in.** You land on Home with "Good morning/afternoon/evening, <name>" and today's date. No permissions screen appears.
+2. **Card order on a phone:** next check, latest check, today's routine, your record, Ask Echo, new-check banner. There is no weather card.
+3. **Next check:** "Next check in X days", "Due today" or "Overdue by X days", counted from your last check, with "X of 3 starting checks".
+4. **Latest check:** the photo (if kept) or the face drawing, then the five whole-face levels with "early estimate" on the last three, the photo check line, "What this means", "Open full check" and "Check history".
+5. **Today's routine:** tap "Mark done" on a step. "X of Y done" and the streak update.
+6. **Ask Echo:** tap a starter question. Echo opens and sends it.
+7. **New check:** take one. On results, tap Home. Because both features are off, no permissions screen appears and you land on Home.
+
+## H3. Turn the weather on (after you buy the Open-Meteo plan)
+
+Buy **API Standard** at https://open-meteo.com/en/pricing (about US$29 a month, 1 million calls, commercial use allowed). Before you pay, confirm with Open-Meteo that the plan includes the Air Quality API. Then run:
+
+```bash
+vercel env add OPEN_METEO_API_KEY production --sensitive      # paste the key when asked; it is not shown
+printf 'on' | vercel env add WEATHER_SWITCH production --no-sensitive
+vercel redeploy $(vercel api /v9/projects/skin-check | jq -r '.targets.production.id') --target production
+```
+- **Good output:** `Added Environment Variable` twice, then a new production deployment READY.
+- **Check (agent):**
+  - `curl -s -X POST https://skin-check-sigma.vercel.app/api/home/weather` now returns 401, not 404. The switch is on, and the route needs a login.
+  - The production log shows no `home weather unavailable` line after your phone check.
+- **Phone check:**
+  1. On Home, the weather card shows "Use my location" and "Type my city".
+  2. Type your city. UV, humidity and air quality appear with one advice line.
+  3. Take a new check on a test account that was never asked. After results, Home shows the permissions screen with Location only, because reminders are still off.
+- **Undo:** `vercel env rm WEATHER_SWITCH production --yes`, then the same redeploy.
+
+## H4. Turn reminders on
+
+```bash
+d=$(node scripts/vapid-keys.mjs)                       # prints only a temp folder path
+vercel env add NEXT_PUBLIC_VAPID_PUBLIC_KEY production --no-sensitive < "$d/public.txt"
+vercel env add VAPID_PRIVATE_KEY production --sensitive < "$d/private.txt"
+rm -rf "$d"
+printf 'on' | vercel env add PUSH_SWITCH production --no-sensitive
+vercel redeploy $(vercel api /v9/projects/skin-check | jq -r '.targets.production.id') --target production
+```
+- **Good output:** `Added Environment Variable` three times, then a production deployment READY.
+- **Check (agent):** `curl -s -X POST https://skin-check-sigma.vercel.app/api/home/reminders` now returns 401, not 404. After the next 09:00 IST cron run, `vercel logs` for `/api/home/reminders/send` shows status 200 with `failed: 0`.
+- **Phone checks:**
+  - **Android (Chrome):** Account, then "Turn on reminders". Allow. On a day a check is due, one notification arrives around 09:00 IST. Tapping it opens Home.
+  - **iPhone:** Safari, Share, Add to Home Screen. Open the app from the icon, then Account, then "Turn on reminders". In Safari itself, Home shows the "add to Home Screen" hint instead.
+  - **Desktop (Chrome or Edge):** the same as Android, while the browser is running.
+- **Undo:** `vercel env rm PUSH_SWITCH production --yes`, then the same redeploy. Keep the keys: removing them only breaks subscriptions that already exist.
+
+## H5. Replace the placeholder app icons (any time)
+
+`public/icon-192.png`, `public/icon-512.png` and `public/apple-touch-icon.png` are placeholders: the word SKIN on the brand green. Put the real logo in place under the same names, square, at those sizes.

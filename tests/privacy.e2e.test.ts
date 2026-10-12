@@ -58,6 +58,12 @@ describe.skipIf(!WEB)("privacy: erasure end to end", () => {
         .flatMap((q) => q.docs)
         .filter((d) => JSON.stringify(d.data()).includes(CANARY)).length;
     expect(await namesLeft()).toBe(2); // the check and the later-answers record
+    // TD-47: A's city and permission choices and a push subscription, before the erase.
+    await userRef.collection("settings").doc("home").set({ location: "allowed", reminders: "allowed", city: { name: "ZZCITYZZ", region: "", country: "India", latE1: 130, lonE1: 776, source: "device" } });
+    await userRef.collection("pushSubscriptions").doc("erase-sub").set({ endpoint: "https://fcm.googleapis.com/fcm/send/zzerase", timeZone: "Asia/Kolkata" });
+    const homeLeft = async () =>
+      (await Promise.all([db.collectionGroup("settings").get(), db.collectionGroup("pushSubscriptions").get()])).flatMap((q) => q.docs).filter((d) => d.ref.path.startsWith(`users/${A.uid}/`)).length;
+    expect(await homeLeft()).toBe(2);
     const under18 = (uid: string) =>
       db.collection("users").doc(uid).collection("consentLedger").where("purpose", "==", "age_18_plus").where("granted", "==", false).get();
     expect((await under18(A.uid)).size).toBe(1);
@@ -83,6 +89,8 @@ describe.skipIf(!WEB)("privacy: erasure end to end", () => {
     // TD-33 (2): no product name is left anywhere in the database.
     expect((await userRef.collection("laterAnswers").get()).size).toBe(0);
     expect(await namesLeft()).toBe(0);
+    // TD-47: the city, both choices and the push subscription are gone.
+    expect(await homeLeft()).toBe(0);
 
     // A's old token no longer opens a server route.
     const presign = await fetch(`${WEB}/api/skin-scan/upload`, {

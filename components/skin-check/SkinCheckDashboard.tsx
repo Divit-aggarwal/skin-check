@@ -15,6 +15,7 @@ import type { SkinCheckAnswers } from "@/types/skin-check";
 import { FacePhoto } from "@/components/mesh/FacePhoto";
 import { ScanningPhoto } from "@/components/mesh/ScanningPhoto";
 import { echoOn } from "@/lib/echo-limits";
+import { AFTER_CHECK_KEY } from "@/lib/home/permissions";
 
 interface SkinCheckDashboardProps {
   scan: SkinScanState;
@@ -43,6 +44,12 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
       retentionConsentVersion: scan.retentionConsentVersion,
       captureMethod: scan.captureMethod,
     });
+    // TD-47 (3): the next Home visit in this tab may show the permissions screen first (once per account).
+    try {
+      sessionStorage.setItem(AFTER_CHECK_KEY, "1");
+    } catch {
+      /* storage blocked: Home shows no screen */
+    }
   }, [scan, scanId, answers, setSession]);
 
   if (scan.status === "idle") return null;

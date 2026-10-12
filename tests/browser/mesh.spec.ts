@@ -1,6 +1,7 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { devices, expect, test, type Locator, type Page, type Route } from "@playwright/test";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
+import { HOME_COPY as H } from "@/components/dashboard/homeCopy";
 import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
 import { WIDTHS, type Width } from "./seed-questionnaire";
 import { FACE_DARK, FACE_LIGHT, MESH_SEED } from "./seed-mesh";
@@ -201,17 +202,18 @@ for (const width of WIDTHS) {
     });
 
     for (const tone of ["dark", "light"] as const) {
-      test(`${tone} skin, a kept photo: Home and the opened check show the photo with the mesh and the table`, async ({ page }) => {
+      test(`${tone} skin, a kept photo: Home shows it as a thumbnail; the opened check shows the photo with the mesh and the table`, async ({ page }) => {
         const outside = watchHosts(page);
         const user = tone === "dark" ? MESH_SEED.kept : MESH_SEED.keptLight;
         await signIn(page, user.phoneNumber);
-        const home = page.getByTestId("face-photo");
-        await expect(home).toBeVisible({ timeout: 90_000 });
-        await expect(home.locator("svg path")).toHaveCount(1);
-        // The overlays are not kept, so they come only with a new check (TD-39 (6)).
-        await expect(home.getByRole("img", { name: /^Where/ })).toHaveCount(0);
-        await expect(page.getByText(C.photo.mapsOnResults)).toBeVisible();
-        await expectTable(page);
+        // TD-47: Home's latest check has the kept photo as a thumbnail (no mesh, no overlays) and the whole-face levels.
+        const latest = page.locator("section", { has: page.getByRole("heading", { name: H.latest.title }) });
+        const thumb = latest.getByRole("img", { name: /Your kept photo from/ });
+        await expect(thumb).toBeVisible({ timeout: 90_000 });
+        await expect.poll(() => thumb.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+        await expect(page.getByTestId("face-photo")).toHaveCount(0);
+        await expect(latest.getByRole("img", { name: /^Where/ })).toHaveCount(0);
+        await expect(latest.getByRole("table").getByRole("row")).toHaveCount(5);
         await expectNothingElse(page);
         await shot(page, `home-kept-${tone}`, width);
         await page.goto(`/checks/${user.uid}-1`);
@@ -240,7 +242,10 @@ test("skipped questions on an opened check: the existing invitation, nothing abo
 test("the bucket refuses a read from our site (today's production CORS): the face drawing, no error", async ({ page }) => {
   await page.route((url) => url.hostname === "127.0.0.1" && url.pathname.includes("/original.jpg"), (route) => route.abort("accessdenied"));
   await signIn(page, MESH_SEED.kept.phoneNumber);
-  await expect(page.getByRole("heading", { name: C.current.title })).toBeVisible();
+  // TD-47: Home falls back to the face drawing; the opened check too.
+  await expect(page.getByRole("heading", { name: H.latest.title })).toBeVisible();
+  await expect(page.getByRole("img", { name: /A drawing of a face/ }).or(page.getByRole("group", { name: /A drawing of a face/ }))).toBeVisible();
+  await page.goto(`/checks/${MESH_SEED.kept.uid}-1`);
   await expectTable(page);
   await page.waitForTimeout(3_000);
   await expect(page.getByTestId("face-photo")).toHaveCount(0);

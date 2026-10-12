@@ -28,6 +28,8 @@ export const metadata: Metadata = {
   keywords: ["skincare", "skin analysis", "digital twin", "Indian skincare", "Benotia"],
   authors: [{ name: "The Project SKIN" }],
   manifest: "/manifest.json",
+  // TD-47: iPhone home-screen icon (web push on iOS needs the site on the home screen).
+  icons: { apple: "/apple-touch-icon.png" },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

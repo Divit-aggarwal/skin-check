@@ -131,8 +131,12 @@ describe("the Echo switch (ECHO_SWITCH)", () => {
     // The notice, then the help line (safety review: a user who cannot write still sees it).
     expect(page).toMatch(/\{!echoOn \? \(\s*<div role="status"[^>]*>\s*<p>\{E\.off\}<\/p>\s*<p>\{withPhoneLinks\(REFERRAL_LINE\)\}<\/p>/);
     // Every other way into Echo is hidden while it is off, and the browser build reads the same value.
-    expect(readFileSync("next.config.js", "utf8")).toContain('env: { ECHO_SWITCH: process.env.ECHO_SWITCH ?? "", ECHO_PRODUCTS_SWITCH: process.env.ECHO_PRODUCTS_SWITCH ?? "" }'); // TD-34: the product switch beside it
-    expect(readFileSync("components/dashboard/DashboardPage.tsx", "utf8")).toContain("{echoOn() && <ChatSection");
+    // TD-47: the env block now lists four switches, one per line; the Echo two are unchanged.
+    const config = readFileSync("next.config.js", "utf8");
+    expect(config).toContain('ECHO_SWITCH: process.env.ECHO_SWITCH ?? "",');
+    expect(config).toContain('ECHO_PRODUCTS_SWITCH: process.env.ECHO_PRODUCTS_SWITCH ?? "",'); // TD-34: the product switch beside it
+    // TD-47: Home's Ask Echo card (with its starter questions) is the dashboard's way into Echo.
+    expect(readFileSync("components/dashboard/DashboardPage.tsx", "utf8")).toMatch(/\{echoOn\(\) && \(\s*<Area name="echo">\s*<AskEchoCard/);
     expect(readFileSync("components/checks/ChecksView.tsx", "utf8")).toMatch(/echoOn\(\) && \(\s*<Link href="\/echo"/);
     expect(readFileSync("components/skin-check/SkinCheckDashboard.tsx", "utf8")).toMatch(/\{echoOn\(\) && \(\s*<div className="sticky/);
     // Every refusal that stops the user writing carries the help line, the limit-store outage too (retryable).

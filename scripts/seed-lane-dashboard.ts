@@ -21,6 +21,7 @@ import { DASHBOARD_SEED } from "../tests/browser/seed-users";
 import { readFileSync } from "node:fs";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { scanImageKey } from "@/lib/s3-key";
+import { CATALOG_VERSION } from "@/lib/catalog/catalogue";
 
 // A kept photo goes to the local S3 stand-in only (scripts/local-stack.sh
 // exports its endpoint). The image is a synthetic test pattern, no person.
@@ -75,6 +76,25 @@ async function main() {
     // Fixed ids with set(): a restart resets these entries instead of adding more.
     await ledger.doc("seed-age").set(ledgerEntry("age_18_plus", true, AGE_ATTESTATION_VERSION, AGE_ATTESTATION_COPY, "attestation_route"));
     if (user.aiShare) await ledger.doc("seed-ai-share").set(ledgerEntry("ai_share", true, AI_SHARE_CONSENT_VERSION, AI_SHARE_CONSENT_COPY, "consent_route"));
+
+    // TD-47: Home settings and a two-product routine (morning cleanser, evening moisturiser, every day).
+    if (user.home?.asked || user.home?.city) {
+      await userRef.collection("settings").doc("home").set({
+        ...(user.home.asked ? { askedAt: Timestamp.now(), location: user.home.city ? "allowed" : "not_now", reminders: "not_now" } : {}),
+        city: user.home.city ? { ...user.home.city, source: "typed" } : null,
+      });
+    }
+    if (user.home?.routineLoggedDaysAgo) {
+      const day = (n: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date(Date.now() - n * 86_400_000));
+      const event = (id: string, e: Record<string, unknown>) =>
+        userRef.collection("routineEvents").doc(id).set({ eventId: id, timeZone: "Asia/Kolkata", schemaVersion: 1, catalogVersion: CATALOG_VERSION, recordedAt: Timestamp.now(), source: "user", ...e });
+      const all = [0, 1, 2, 3, 4, 5, 6];
+      await event("00000000-0000-4000-8000-000000000001", { type: "start", productId: "refreshing-cleanser", effectiveDate: day(30), schedule: { slot: "AM", days: all } });
+      await event("00000000-0000-4000-8000-000000000002", { type: "start", productId: "calming-moisturiser", effectiveDate: day(30), schedule: { slot: "PM", days: all } });
+      let k = 0;
+      for (const n of user.home.routineLoggedDaysAgo)
+        await event(`00000000-0000-4000-8000-0000000001${String(k++).padStart(2, "0")}`, { type: "usage", productId: "refreshing-cleanser", slot: "AM", status: "used", effectiveDate: day(n) });
+    }
 
     for (let i = 0; i < user.checks.length; i++) {
       const c = user.checks[i]!;
