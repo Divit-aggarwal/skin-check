@@ -4,7 +4,7 @@
 
 export type Check = { days: number; kind: "measured" | "legacy" | "questions" | "failed"; build?: string; verdict?: "pass" | "override" | "unchecked"; lowForehead?: boolean; badScores?: boolean; kept?: boolean };
 /** TD-47: Home settings (users/{uid}/settings/home) and a routine whose steps were logged on these days ago. */
-export type HomeSeed = { city?: { name: string; region: string; country: string; latE1: number; lonE1: number }; asked?: boolean; routineLoggedDaysAgo?: number[] };
+export type HomeSeed = { amOnly?: boolean; city?: { name: string; region: string; country: string; latE1: number; lonE1: number }; asked?: boolean; routineLoggedDaysAgo?: number[] };
 export type User = { uid: string; phoneNumber: string; checks: Check[]; aiShare?: boolean; fullAnswers?: boolean; home?: HomeSeed };
 
 const m = (days: number, extra: Partial<Check> = {}): Check => ({ days, kind: "measured", ...extra });
@@ -36,6 +36,10 @@ export const DASHBOARD_SEED: Record<string, User> = {
   permAllow: { uid: "seed-home-perm-allow", phoneNumber: "+919999900833", checks: [m(2)] },
   permAllow768: { uid: "seed-home-perm-allow-768", phoneNumber: "+919999900840", checks: [m(2)] },
   permAllow1280: { uid: "seed-home-perm-allow-1280", phoneNumber: "+919999900841", checks: [m(2)] },
+  // TD-48 phone Home (tests/browser/home-v3.spec.ts).
+  v3Normal: { uid: "seed-v3-normal", phoneNumber: "+919999900850", checks: [m(9), m(3, { verdict: "pass" })], fullAnswers: true, home: { asked: true, routineLoggedDaysAgo: [1] } },
+  v3AllDone: { uid: "seed-v3-alldone", phoneNumber: "+919999900851", checks: [m(2)], fullAnswers: true, home: { asked: true, amOnly: true, routineLoggedDaysAgo: [0, 1, 2] } },
+  v3Tap: { uid: "seed-v3-tap", phoneNumber: "+919999900852", checks: [m(2)], home: { asked: true, routineLoggedDaysAgo: [] } },
   neverAsked: { uid: "seed-home-never-asked", phoneNumber: "+919999900842", checks: [m(2)] },
   permNotNow: { uid: "seed-home-perm-notnow", phoneNumber: "+919999900834", checks: [m(2)] },
   permRefused: { uid: "seed-home-perm-refused", phoneNumber: "+919999900835", checks: [m(2)] },

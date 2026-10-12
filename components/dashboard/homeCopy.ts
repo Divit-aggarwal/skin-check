@@ -103,6 +103,52 @@ export const HOME_COPY = {
     start: "Start new check",
   },
 
+  // TD-48: the phone Home (below 1024px).
+  today: {
+    title: "Today",
+    // "X/Y today" inside the ring, on two lines.
+    ringCount: (done: number, total: number) => `${done}/${total}`,
+    ringToday: "today",
+    ringLabel: (done: number, total: number) => `${done} of ${total} routine steps done today`,
+    streak: (n: number) => (n > 0 ? `${n} ${n === 1 ? "day" : "days"} in a row` : "Log a step to start a run"),
+    nextIn: (n: number) => `Next check in ${n} ${n === 1 ? "day" : "days"}`,
+    nextToday: "Check due today",
+    nextOverdue: (n: number) => `Check overdue by ${n} ${n === 1 ? "day" : "days"}`,
+    nextFirst: "Take your first check",
+    uv: (value: number, category: string) => `UV ${value}, ${category}`,
+    addCity: "Add your city for UV",
+    uvDown: "UV not available right now",
+    starting: (n: number, of: number) => `${n} of ${of} starting checks`,
+    takeCheck: "Take your check",
+    markStep: (step: string) => `Mark ${step} done`,
+    allDone: "All done today",
+    slotDone: { AM: "Morning steps done", PM: "Evening steps done" },
+    weatherSheet: "Weather and air details",
+    close: "Close",
+  },
+  routineRow: {
+    eveningFrom: "Evening steps from 3 pm",
+    morningTomorrow: "Morning steps tomorrow",
+    empty: "No routine yet.",
+    setUp: "Set up routine",
+    undo: (name: string, slot: string) => `Undo: ${name}, ${slot}`,
+  },
+  latestRow: {
+    first: "No check yet. Take your first check",
+    more: (n: number) => `+${n} more`,
+    open: (date: string) => `Open the check from ${date}`,
+    noReading: "No photo reading",
+    analysing: "Still being read",
+  },
+  tiles: {
+    // "progress" is a D-12 banned word (TD-47 agent note): the tile keeps the v2 name.
+    progress: "Your record",
+    progressValue: (n: number) => `${n} of 7 days`,
+    progressNote: "routine days logged",
+    starting: "Starting checks",
+    startingValue: (n: number, of: number) => `${n} of ${of}`,
+  },
+
   permissions: {
     title: "Two quick choices",
     intro: "You can change both at any time in Account.",
