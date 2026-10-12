@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { HOME_COPY } from "@/components/dashboard/homeCopy";
 import { aqiCategory, uvCategory, UV_ADVICE } from "@/lib/home/weather";
-import { bannedWordsIn } from "@/lib/catalog/wording";
+import { bannedWordsIn, labelIsExcepted, LABEL_EXCEPTIONS } from "@/lib/catalog/wording";
 import { CAUSE, CHANGE, DIAGNOSIS, FORECAST, MEDICAL } from "@/lib/context/lexicon";
 
 // TD-47 (4): every new string on Home, the permissions screen and Account's
@@ -12,6 +12,8 @@ import { CAUSE, CHANGE, DIAGNOSIS, FORECAST, MEDICAL } from "@/lib/context/lexic
 
 const BANNED_WORDS = /\b(improve\w*|worse|better|reduc\w*|increas\w*|decreas\w*|because|caused|due to|effect\w*|works)\b/i;
 const problems = (text: string) => {
+  // TD-49: the three owner-approved labels, exact whole text only.
+  if (labelIsExcepted(text)) return [];
   const out = bannedWordsIn(text);
   for (const [name, re] of Object.entries({ BANNED_WORDS, CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST })) if (re.test(text)) out.push(name);
   return out;
@@ -34,8 +36,14 @@ describe("Home v2 wording (TD-47 (4), D-12)", () => {
     expect(problems("your redness is lower than last check")).not.toEqual([]);
     expect(problems("a sign of acne")).not.toEqual([]);
     expect(problems("your skin will improve")).not.toEqual([]);
-    expect(problems("Your progress")).toContain("progress*");
-    expect(problems("Today's conditions")).toContain("MEDICAL");
+    expect(problems("Your progress so far")).toContain("progress*");
+    expect(problems("Skin conditions")).toContain("MEDICAL");
+  });
+
+  it("TD-49: the three label exceptions are exact; the words stay banned everywhere else", () => {
+    expect(LABEL_EXCEPTIONS).toEqual(["Your progress", "Today's conditions", "View full results"]);
+    for (const s of ["Your progress so far", "your progress", "Skin conditions today", "View full results of your skin", "Today's conditions "]) expect(problems(s), s).not.toEqual([]);
+    expect(ALL.filter(labelIsExcepted).sort()).toEqual([...LABEL_EXCEPTIONS].sort());
   });
 
   it("no change, cause, forecast, medical or diagnosis word in any new string", () => {

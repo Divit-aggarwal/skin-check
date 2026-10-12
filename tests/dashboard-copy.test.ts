@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { DASHBOARD_COPY } from "@/components/dashboard/copy";
-import { bannedWordsIn } from "@/lib/catalog/wording";
+import { bannedWordsIn, labelIsExcepted } from "@/lib/catalog/wording";
 import { CAUSE, CHANGE, DIAGNOSIS, FORECAST, MEDICAL } from "@/lib/context/lexicon";
 
 // G01 wording (docs/lanes/dashboard-design.md §4; D-12). Every string and JSX
@@ -16,6 +16,8 @@ const CHANGE_WORDS = "(up|down|more|less|higher|lower|change\\w*|delta|drop\\w*|
 const DIGIT_NEXT_TO_CHANGE = new RegExp(`\\d\\s*${CHANGE_WORDS}\\b|\\b${CHANGE_WORDS}\\s*[+-]?\\d`, "i");
 
 function problems(text: string): string[] {
+  // TD-49: the three owner-approved labels, exact whole text only.
+  if (labelIsExcepted(text)) return [];
   const out = bannedWordsIn(text);
   for (const [name, re] of Object.entries({ BANNED_WORDS, DIGIT_NEXT_TO_CHANGE, CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST })) {
     if (re.test(text)) out.push(name);

@@ -37,6 +37,16 @@ export function stepLabelIsExcepted(text: string): boolean {
   return STEP_LABEL_EXCEPTIONS.includes(text);
 }
 
+/**
+ * Owner decision TD-49, 2026-10-12: three Home labels, exact whole-label
+ * match only. Any other text containing these words is still checked.
+ */
+export const LABEL_EXCEPTIONS: readonly string[] = ["Your progress", "Today's conditions", "View full results"];
+
+export function labelIsExcepted(text: string): boolean {
+  return LABEL_EXCEPTIONS.includes(text);
+}
+
 export type NameException = { name: string; approvedBy: "owner"; date: string; reason: string };
 
 /** True only for an owner product whose whole name is listed exactly. */

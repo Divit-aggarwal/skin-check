@@ -34,7 +34,8 @@ export const HOME_COPY = {
     checkedOn: (date: string, ago: string) => `Checked on ${date}, ${ago}`,
     readingsTitle: "Whole face",
     meaningTitle: "What this means",
-    open: "Open full check",
+    // TD-49: exact-label exception.
+    open: "View full results",
     history: "Check history",
     none: "You have no skin checks yet. Your first check takes about two minutes.",
     // TD-47 design review: the empty card has no button; Next check holds the one way in.
@@ -58,7 +59,8 @@ export const HOME_COPY = {
   },
 
   weather: {
-    title: "Weather and air today",
+    // TD-49: exact-label exception.
+    title: "Today's conditions",
     updated: (city: string, time: string) => `${city}, updated ${time}`,
     uv: "UV index",
     uvNote: (category: string) => `${category}, today's peak`,
@@ -86,7 +88,8 @@ export const HOME_COPY = {
   },
 
   record: {
-    title: "Your record",
+    // TD-49: exact-label exception.
+    title: "Your progress",
     routineDays: (n: number) => `Routine days logged in the last 7 days: ${n}`,
     checks: (n: number) => `Checks taken: ${n}`,
   },

@@ -17,9 +17,7 @@ Two things kept from the old Home, because owner decisions name them:
 
 The H14 privacy card moves to Account only, where it already is.
 
-**Names.** The D-12 word checks ban "progress" and "conditions" (TD-47 agent note), so the cards are titled
-"Your record" and "Weather and air today". "View full results" becomes "Open full check", because "results" is on
-the same list.
+**Names.** TD-49 (owner, 2026-10-12): "Your progress", "Today's conditions" and "View full results" are exact-label exceptions to the D-12 word checks (lib/catalog/wording.ts LABEL_EXCEPTIONS); the checks still apply to every other text.
 
 ## Cards: where the data comes from, and every state
 
