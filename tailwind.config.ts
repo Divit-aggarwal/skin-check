@@ -180,6 +180,7 @@ const config: Config = {
           "accent-soft": "#F3E9E7",
           taupe: "#B7A58F",
           error: "#B42318",
+          "error-soft": "#FDECEA",
         },
         // TD-50 (c): one identity colour per reading (keys = BandableMetric in
         // lib/skin-check-skus.ts), on its icon in a soft well only. Never on a

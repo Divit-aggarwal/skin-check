@@ -69,7 +69,7 @@ function SkipConfirm({ onChoose, onClose }: { onChoose: (choice: "answer" | "ski
       aria-describedby="skip-confirm-lines"
       // StrictMode's dev remount closes and reopens it; that late close event is not the user's.
       onClose={() => !ref.current?.open && onClose()}
-      className="w-[calc(100%-32px)] max-w-md rounded-2xl border border-brand-card-line bg-brand-paper p-5 text-brand-ink shadow-[0_18px_50px_rgba(20,20,15,.1)] backdrop:bg-black/40 sm:p-6"
+      className="w-[calc(100%-32px)] max-w-md rounded-2xl border border-brand-card-line bg-brand-paper p-5 text-brand-ink shadow-card-lg backdrop:bg-black/40 sm:p-6"
     >
       <div className="flex flex-col gap-5">
         <h2 id="skip-confirm-title" className={h2}>

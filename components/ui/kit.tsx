@@ -332,7 +332,7 @@ export function ToggleRow({ label, description, checked, onChange, busy }: { lab
 export function SettingsRow({ icon, label, value, href, onClick, danger }: { icon?: LucideIcon | undefined; label: string; value?: string | undefined; href?: string | undefined; onClick?: () => void | undefined; danger?: boolean }) {
   const inner = (
     <>
-      {icon && <IconWell icon={icon} size={36} className={danger ? "bg-concern-blemishes-soft text-brand-error" : undefined} />}
+      {icon && <IconWell icon={icon} size={36} className={danger ? "bg-brand-error-soft text-brand-error" : undefined} />}
       <span className={cn("min-w-0 flex-1 text-left font-medium", danger ? "text-brand-error" : "text-brand-text")}>{label}</span>
       {value && <span className="text-sm text-brand-text-muted">{value}</span>}
       {(href || onClick) && <ChevronRight aria-hidden size={20} className="shrink-0 text-brand-text-muted" />}

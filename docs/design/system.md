@@ -6,6 +6,8 @@ page, the check flow and the signed-out pages.
 
 ## 0. Match the live site (2026-10-06)
 
+> **Superseded by TD-50 (2026-10-14)** for colour, type and the bottom bar: the mockup palette, Plus Jakarta Sans only, and Today · Checks · camera · Routine · Echo. See [docs/lanes/redesign-report.md](../lanes/redesign-report.md) §5. Data and wording rules below are unchanged.
+
 The values in sections 1–5 came from the store theme's `:root` variables
 (brand-source-root.css). The live pages do not use all of them. On 2026-10-06
 the computed styles of https://theprojectskin.com/ (home, at 390 and 1280px)

@@ -7,6 +7,8 @@ in-page ways forward in addition to the shell.
 
 ## Main places (in the shell)
 
+TD-50 (2026-10-14): the shell names Home "Today" (route unchanged, `/dashboard`).
+
 | Place | Route | Reached from | Next (in page) |
 |---|---|---|---|
 | **Home** (dashboard) | `/dashboard` | After sign-in (TD-24 (3)); `/` when signed in; shell; results screen; every "Back" link | TD-47 (docs/design/home-v2.md): next check → New check; latest check → View full results, Check history (a face area → Echo on it, TD-46); today's routine (Mark done in place) → Routine; today's conditions (city by location or typed); your progress; Ask Echo starters → Echo, sending the question; new-check banner → New check. Right after a check's results, the first time only: the permissions screen (location, reminders), then Home |
