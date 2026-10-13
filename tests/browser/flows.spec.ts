@@ -149,7 +149,7 @@ test("returning user: 'New check' to the results without meeting a question", as
   await page.getByRole("link", { name: C.entryLink }).first().click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { level: 1, name: H.permissions.title })).toBeVisible();
-  await page.screenshot({ path: "docs/design/home-v2/permissions-after-check-390.png", fullPage: true });
+  await page.screenshot({ path: `${process.env.AFTER_SHOTS ? "docs/design/home-v2" : ".local-stack/browser-shots"}/permissions-after-check-390.png`, fullPage: true });
   await page.getByRole("button", { name: H.permissions.continue }).click();
   await expect(page.getByRole("heading", { level: 1, name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
   await page.reload();

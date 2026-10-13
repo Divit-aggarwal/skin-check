@@ -182,17 +182,19 @@ const config: Config = {
           error: "#B42318",
           "error-soft": "#FDECEA",
         },
-        // TD-50 (c): one identity colour per reading (keys = BandableMetric in
-        // lib/skin-check-skus.ts), on its icon in a soft well only. Never on a
-        // level word, never meaning better or worse. DEFAULT and soft are the
-        // mockup values (Dark marks' violet is new: the brief had four
-        // concerns, the product has five readings); ink is for text if ever needed.
+        // TD-50 (c), reworked 2026-10-14: one identity colour per reading
+        // (keys = METRIC_LABELS keys in lib/skin-check-skus.ts), on its icon in
+        // a soft well only; never on a level word, never meaning better or
+        // worse. No green (the brand colour) and no pure red. Chosen by search
+        // so every pair stays ≥ 20 ΔE apart for normal, protan, deutan and
+        // tritan vision (tests/brand-contrast.test.ts). DEFAULT = ink, so the
+        // icon itself passes 4.5:1 on its well and on white.
         concern: {
-          blemishes: { DEFAULT: "#E5566B", soft: "#FDEEF0", ink: "#B8344A" },
-          redness: { DEFAULT: "#F2B33D", soft: "#FEF7E6", ink: "#8F6206" },
-          texture: { DEFAULT: "#3D7BEA", soft: "#EDF3FE", ink: "#2A63CC" },
-          oiliness: { DEFAULT: "#2FB36B", soft: "#EAF7EF", ink: "#1E7A47" },
-          pigment: { DEFAULT: "#8B6CD9", soft: "#F2EEFC", ink: "#6A47C9" },
+          redness: { DEFAULT: "#6B2D43", soft: "#FEF0F4", ink: "#6B2D43" }, // wine
+          oiliness: { DEFAULT: "#227788", soft: "#EAF6F9", ink: "#227788" }, // teal-blue
+          texture: { DEFAULT: "#0A3E68", soft: "#EFF4FD", ink: "#0A3E68" }, // navy
+          blemishes: { DEFAULT: "#AA3DB8", soft: "#FCF0FD", ink: "#AA3DB8" }, // orchid
+          pigment: { DEFAULT: "#896733", soft: "#FBF2E9", ink: "#896733" }, // ochre
         },
         // Environment severity text (Very high / Hot / Moderate).
         severity: { high: "#B91C1C", warm: "#C2410C", moderate: "#B45309" },

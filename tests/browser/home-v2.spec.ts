@@ -17,7 +17,8 @@ const FS = process.env.PW_FIRESTORE_HOST!;
 const B = Number(process.env.PW_PORT);
 const WEATHER = `.local-stack/fake-weather`;
 const PUSH = `http://127.0.0.1:${B + 10}/push/`;
-const SHOTS = "docs/design/home-v2";
+// Baselines in docs/ are rewritten only on request (AFTER_SHOTS=1), never by a normal run.
+const SHOTS = process.env.AFTER_SHOTS ? "docs/design/home-v2" : ".local-stack/browser-shots/home-v2";
 mkdirSync(SHOTS, { recursive: true });
 const shot = (page: Page, name: string) => page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 

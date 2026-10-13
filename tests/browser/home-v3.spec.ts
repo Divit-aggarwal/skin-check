@@ -9,7 +9,8 @@ import { signIn } from "./helpers";
 
 // TD-48: the phone and tablet Home (below 1024px). Screenshots in docs/design/home-v3/.
 const FS = process.env.PW_FIRESTORE_HOST!;
-const SHOTS = "docs/design/home-v3";
+// Baselines in docs/ are rewritten only on request (AFTER_SHOTS=1), never by a normal run.
+const SHOTS = process.env.AFTER_SHOTS ? "docs/design/home-v3" : ".local-stack/browser-shots/home-v3";
 mkdirSync(SHOTS, { recursive: true });
 const DESKTOP_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36";
 const slot = slotNow(new Date(), "Asia/Kolkata");
