@@ -22,9 +22,11 @@ describe("brand contrast (WCAG 2.1)", () => {
     expect(contrast("#FFFFFF", "#FFFFFF")).toBe(1);
   });
 
-  it("the green is the live site's theme colour", () => {
-    expect(brand.forest).toBe("#1F473E");
-    expect(brand.action).toBe("#1F473E");
+  // TD-50 (2026-10-14): the mockup palette replaces the store-matched green.
+  it("the green is the redesign's --brand-700", () => {
+    expect(brand.forest).toBe("#0B4A3E");
+    expect(brand.action).toBe("#0B4A3E");
+    expect(brand["700"]).toBe("#0B4A3E");
   });
 
   const text: [string, string, string][] = [
@@ -42,7 +44,20 @@ describe("brand contrast (WCAG 2.1)", () => {
     ["eyebrow green on linen", brand.eyebrow!, brand.linen!],
     ["error on white", brand.error!, brand.paper!],
     ["error on linen", brand.error!, brand.linen!],
+    // TD-50 tokens.
+    ["white on the dark hero", "#FFFFFF", brand["900"]!],
+    ["brand green on the tint", brand["700"]!, brand["100"]!],
+    ["brand green on the light tint", brand["700"]!, brand["50"]!],
+    ["text on the tint", brand.text!, brand["100"]!],
+    ["muted on the tint", brand["text-muted"]!, brand["100"]!],
+    ["muted on the page", brand["text-muted"]!, brand.bg!],
+    ["subtle on white", brand["text-subtle"]!, brand.surface!],
+    ["subtle on the page", brand["text-subtle"]!, brand.bg!],
   ];
+  const concern = (config.theme?.extend?.colors as Record<string, Record<string, Record<string, string>>>).concern!;
+  for (const [name, c] of Object.entries(concern)) {
+    text.push([`${name} ink on its soft well`, c.ink!, c.soft!], [`${name} ink on white`, c.ink!, brand.surface!]);
+  }
   for (const [name, fg, bg] of text) {
     it(`text: ${name} is at least 4.5:1`, () => expect(contrast(fg, bg)).toBeGreaterThanOrEqual(4.5));
   }

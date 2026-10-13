@@ -8,21 +8,27 @@ import { SHELL_COPY } from "@/components/shell/copy";
 
 // Shared page pieces of the design system (docs/design/system.md §4-5).
 
-// Live site values (system.md §0): the main pill button (.ps-button) is the
-// theme green, 16px weight 500, 52px tall; the secondary (.button--secondary)
-// is a transparent pill with a 1px #ddd8ce border, 15px weight 600.
+// TD-50 (redesign): primary is a filled --brand-700 pill (a trailing → is
+// added by the caller where the mockup has one); secondary an outline pill;
+// ghost a text pill. 150ms colour transitions.
 export const btnPrimary =
-  "inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full border border-brand-action bg-brand-action px-6 text-base font-medium text-white hover:bg-brand-action-hover disabled:pointer-events-none disabled:border-brand-line disabled:bg-brand-paper disabled:text-brand-muted aria-disabled:border-brand-line aria-disabled:bg-brand-paper aria-disabled:text-brand-muted";
+  "inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full border border-brand-action bg-brand-action px-6 text-base font-semibold text-white transition-colors duration-fast hover:bg-brand-action-hover disabled:pointer-events-none disabled:border-brand-line disabled:bg-brand-paper disabled:text-brand-muted aria-disabled:border-brand-line aria-disabled:bg-brand-paper aria-disabled:text-brand-muted";
 export const btnSecondary =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-brand-line bg-transparent px-[22px] text-[15px] font-semibold text-brand-ink hover:border-brand-ink disabled:pointer-events-none disabled:text-brand-muted aria-disabled:text-brand-muted";
+  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-brand-line bg-brand-surface px-[22px] text-[15px] font-semibold text-brand-ink transition-colors duration-fast hover:border-brand-700 hover:text-brand-700 disabled:pointer-events-none disabled:text-brand-muted aria-disabled:text-brand-muted";
 export const textLink =
   "inline-flex min-h-11 items-center gap-1 font-semibold text-brand-forest underline-offset-4 hover:underline focus-visible:underline";
-/** White card on the linen page, 1px live card border, 16px corners. */
-export const card = "rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6";
-/** Live eyebrow: 11px weight 700, uppercase, +0.08em, #0f6e56; 12px here, the app's minimum size. */
-export const eyebrow = "text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow";
-/** Live section title: Bai Jamjuree 600, uppercase, +0.04em, #111 (22px on phones). */
-export const h2 = "font-display text-xl font-semibold uppercase leading-tight tracking-[0.04em] text-brand-title sm:text-[22px]";
+export const btnGhost =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-[15px] font-semibold text-brand-700 transition-colors duration-fast hover:bg-brand-50";
+/** White card: 1px --border, 16px corners, almost no shadow. */
+export const card = "rounded-card border border-brand-border bg-brand-surface p-4 shadow-card sm:p-5";
+/** Tinted card: --brand-100, no border. */
+export const tintCard = "rounded-card bg-brand-100 p-4 sm:p-5";
+/** Dark hero card: --brand-900, white text. */
+export const heroCard = "relative overflow-hidden rounded-card bg-brand-900 p-5 text-white";
+/** Eyebrow: 12px uppercase, tracked. */
+export const eyebrow = "text-xs font-semibold uppercase tracking-[0.14em] text-brand-text-muted";
+/** Section heading: 18–20px weight 600, sentence case. */
+export const h2 = "text-lg font-semibold leading-tight text-brand-text sm:text-xl";
 /** Page width and gutters: 16 / 24 / 32px (system.md §4). */
 export const page = "mx-auto w-full max-w-[1200px] px-4 pb-12 sm:px-6 lg:px-8";
 
@@ -39,7 +45,7 @@ export function PageHeader({ title, kicker, intro, children, phoneCompact = fals
       <div className="order-1 min-w-0">
         <div className={phoneCompact ? "sr-only lg:not-sr-only" : undefined}>
           {kicker && <p className={`${eyebrow} mb-2`}>{kicker}</p>}
-          <h1 className="font-display text-[30px] font-semibold leading-[1.15] tracking-[-0.025em] text-brand-title sm:text-[40px]">{title}</h1>
+          <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text text-balance sm:text-[32px]">{title}</h1>
         </div>
         {intro && <p className="mt-3 max-w-prose text-brand-muted">{intro}</p>}
         {children}
@@ -77,7 +83,7 @@ export function AccountButton() {
       href="/account"
       aria-label={SHELL_COPY.nav.account}
       aria-current={onAccount ? "page" : undefined}
-      className="grid size-11 shrink-0 place-items-center rounded-full border border-brand-line bg-brand-paper text-brand-ink aria-[current=page]:border-brand-forest aria-[current=page]:bg-brand-mist aria-[current=page]:text-brand-forest sm:hidden"
+      className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-100 text-brand-700 aria-[current=page]:ring-2 aria-[current=page]:ring-brand-700 sm:hidden"
     >
       <UserRound aria-hidden size={20} />
     </Link>
@@ -90,7 +96,7 @@ export function LoadingState({ label, blocks = ["h-56", "h-28", "h-28"] }: { lab
     <div role="status" className="flex flex-col gap-4 sm:gap-6">
       <span className="sr-only">{label}</span>
       {blocks.map((h, i) => (
-        <div key={i} aria-hidden className={`${h} w-full animate-pulse rounded-2xl bg-brand-linen2 motion-reduce:animate-none`} />
+        <div key={i} aria-hidden className={`${h} w-full animate-pulse rounded-card bg-brand-50 motion-reduce:animate-none`} />
       ))}
     </div>
   );
@@ -110,7 +116,7 @@ export function EmptyState({ title, body, action }: { title?: string; body: stri
 /** Error: a plain sentence, no code, and one way on. */
 export function ErrorState({ body, action }: { body: string; action?: React.ReactNode }) {
   return (
-    <div role="alert" className="flex max-w-2xl flex-col items-start gap-4 rounded-2xl border border-brand-line bg-brand-paper p-5 sm:p-6">
+    <div role="alert" className={`${card} flex max-w-2xl flex-col items-start gap-4`}>
       <p className="flex items-start gap-2">
         <AlertCircle aria-hidden size={20} className="mt-0.5 shrink-0 text-brand-error" />
         <span>{body}</span>

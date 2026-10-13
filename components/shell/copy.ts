@@ -5,7 +5,7 @@ export const SHELL_COPY = {
   skip: "Skip to content",
   navLabel: "Main",
   nav: {
-    home: "Home",
+    home: "Today", // TD-50 (b)
     checks: "Checks",
     newCheck: "New check",
     routine: "Routine",

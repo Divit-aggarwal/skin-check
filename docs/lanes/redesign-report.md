@@ -122,37 +122,54 @@ export) are built only to their existing data or not at all.
 exists. Keep TD-34 (store link, no price) or add price + "Buy on the store"
 link-out?
 
-## 5. Phase 1 status
+## 5. Phase 1: tokens and components (owner answers 2026-10-14, TD-50)
 
-Started, then stopped at this gate (nothing committed except this report).
-Uncommitted in the worktree:
+Owner answers a–g are recorded as TD-50 with new rows G30 (this lane), H36,
+H37, G31, E19, E20 and parked C10, C11, on branch `docs/redesign-decisions`
+(8c9f662), because a lane never edits the tracker.
 
-- `tailwind.config.ts`: new `brand.900/700/100/50`, `bg`, `surface`, `border`,
-  `text`, `text-muted`, `text-subtle`; the old role names (`paper`, `linen`,
-  `ink`, `forest`, …) point at the new values, so every screen takes the new
-  look with no per-file edits; `concern.*` and `severity.*`; one font; near-zero
-  card shadow; a small plugin writes the tokens as CSS variables (`--brand-900`,
-  `--bg`, `--text-muted`, `--concern-acne`, …) from the same values.
-- `app/globals.css`: shadcn variables re-pointed; focus ring uses `--brand-700`;
-  global `prefers-reduced-motion` rule.
-- `app/layout.tsx`: Plus Jakarta Sans only; theme colour `#0B4A3E`.
-- `components/ds/layout.tsx`: first draft. It duplicates `components/ui/page.tsx`
-  (PageHeader, `eyebrow`, `page`); after approval it is folded into the
-  existing primitives instead of a second set.
+### Changelog
 
-Unit tests with these edits: 2312 passed, 4 failed. Two are the pins in 4 a.
-Two (`dev-env-guard`, `face-mesh`) fail on master too in this worktree, because
-it borrows the main checkout's `node_modules` (no `@mediapipe/tasks-vision`);
-`npm ci` in the worktree fixes that before any test run that counts.
+| File | Change |
+|---|---|
+| `tailwind.config.ts` | `brand.900/700/100/50`, `bg`, `surface`, `border`, `text`, `text-muted`, `text-subtle` (#6B726E, AA fix); the old role names (`paper`, `linen`, `ink`, `forest`, `mist`, …) point at the new values, so every existing screen takes the new look with no per-file colour edits; `concern.<reading>` for the five readings (blemishes rose, redness amber, texture blue, oiliness green, pigment violet, new: the brief had four concerns), each `DEFAULT` / `soft` / `ink`; `severity.*`; one font; `rounded-tile` 12px; near-zero card shadow; a 10-line plugin writes the tokens as CSS variables (`--brand-900`, `--bg`, `--border`, `--text-muted`, `--concern-redness-soft`, …) from the same values (one source). shadcn's `border`/`input` now read the hex `--border` |
+| `app/globals.css` | shadcn HSL variables re-pointed at the new values; focus ring `var(--brand-700)`; body 15px weight 400; a global `prefers-reduced-motion` rule (only the mesh had one) |
+| `app/layout.tsx` | Plus Jakarta Sans only (Bai Jamjuree removed); theme colour `#0B4A3E` |
+| `components/ui/page.tsx` | Existing primitives restyled, not duplicated: `btnPrimary` / `btnSecondary` / new `btnGhost`, `card` (16px, 1px `--border`), new `tintCard`, `heroCard`; `eyebrow` (12px tracked, muted); `h2` sentence case 18–20px/600; `PageHeader` title 28–32px/600; Loading / Empty / Error states on the new cards; Account button as a tinted avatar |
+| `components/ui/kit.tsx` (new) | `Wordmark`, `AppHeader`, `IconWell`, `TintCard`, `HeroCard` (+ `btnOnDark`, `Arrow`), `MetricTile` (level word in plain text, identity colour on the icon well only, optional tag and context, empty `footer` slot), `READING_ICON`, `InsightRow` (no status pill), `Chip`, `SegmentedControl`, `TabBar` (links), `ChoiceGrid`, `Stepper`, `StepRow` + `StatusMark` (Done = filled check, Skipped = dash, Not logged = dashed empty circle, each with words for screen readers), `ToggleRow` (`role="switch"`), `SettingsRow`, `PhotoTile`, `ProgressRing` (numbers as text, ring decorative), `ChatBubble`, `SuggestionChips`, `ChatInput`, `Skel.*` |
+| `components/shell/Nav.tsx`, `copy.ts`, `AppShell.tsx` | TD-50 (b): bottom bar Today · Checks · [raised camera circle] · Routine · Echo ("Home" → "Today"; the camera keeps the accessible name "New check"); tablet rail and desktop side bar kept, restyled; wordmark in the side bar and signed-out bar |
+| `app/dev/design/*` (new) | Dev-only kit page (`notFound()` outside `next dev`), for the review screenshots |
+| `tests/brand-contrast.test.ts` | Pin changed to `#0B4A3E` (owner a); added pairs for every new token and each reading's ink on its soft well and on white |
+| `tests/shell.test.ts` | Pin changed: Bai Jamjuree must be gone (owner a) |
+| `tests/design/redesign.shots.ts` (new) | 375px screenshots per phase into `docs/design/redesign/<SHOTS>/` |
 
-After approval, the components with no conflict go first: AppHeader, Card,
-TintCard, HeroCard, Button, Chip, SegmentedControl, TabBar, ToggleRow,
-SettingsRow, Stepper, ChatBubble, SuggestionChips, ChatInput, ProgressRing
-(today's done/total), MetricTile (level words), and the existing Empty /
-Loading / Error states restyled. Screenshots at 375px reuse
-`tests/design/pages.shots.ts` (`SHOTS=redesign`).
+Not built (TD-50 e): TrendChart, BeforeAfter, status pills, sparklines.
+`MetricTile.footer` is the slot where an allowed change display would go.
 
-## 6. Proposed decision (for the owner to record)
+### Screenshots (375px), `docs/design/redesign/phase1/`
 
-TD-50 (proposed): the mockup look (section 4 a) replaces the store-matched look
-of system.md §0 / TD-26(4); data rules, wording rules and D-12 are unchanged.
+`00-kit.png` (every component), `compare-01-today.png` (mockup 01 next to
+today's Home with only the tokens changed), and `01-today`, `03-routine`,
+`13-checks`, `18-echo`, `21-account` (existing screens, tokens only; their
+layouts change in Phases 2–7).
+
+### Deviations from the mockups
+
+- `--text-subtle` `#6B726E`, not `#8A918D` (3.2:1 fails AA). Use on white and the page only (4.4:1 on tints).
+- Reading colours are on icons only (TD-50 c); the mockup's red/green statuses and coloured values are not used. The concern fills (`DEFAULT`) are below 3:1 on white for amber and green, so no chart may rely on colour alone (a text summary is required if a chart is ever allowed).
+- Dark marks needed a fifth identity colour (violet `#8B6CD9` on `#F2EEFC`).
+- The centre camera has no visible label (as the mockup); TD-48's visible "New check" label is replaced by TD-50 (b); the accessible name stays.
+- The wordmark is left-aligned in the side bar and signed-out bar; `AppHeader` centres it, as the brief asks. The Today mockup puts it top left with the bell and avatar; Phase 2 follows the mockup there.
+- Chat bubbles, chips and input exist in the kit; `EchoPage.tsx` still has its own inline copies until Phase 6 moves it onto them.
+- `SHELL_COPY.goHome` still says "Go to Home" (error and not-found pages); left for Phase 2 with the Today wording.
+
+### Tests
+
+`npm run test:all` on this tree, exit 0: typecheck and lint clean; unit 2334 passed (85 skipped); stack 84/84; browser 113/113 (22.5 min); build compiled. The only edits to existing tests are the two owner-approved pins above plus add-only contrast pairs.
+
+No API route, data fetching, Firestore rule or business logic changed.
+
+## 6. Decision
+
+TD-50 (owner, 2026-10-14) records the answers to section 4; see the
+`docs/redesign-decisions` branch.

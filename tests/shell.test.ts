@@ -38,9 +38,10 @@ describe("app shell", () => {
     expect(layout).not.toMatch(/maximumScale|userScalable/);
   });
 
-  it("the store fonts are loaded and the old ones are gone", () => {
+  // TD-50: one sans (Plus Jakarta Sans); Bai Jamjuree is gone.
+  it("the redesign font is loaded and the old ones are gone", () => {
     const layout = readFileSync("app/layout.tsx", "utf8");
-    expect(layout).toMatch(/Bai_Jamjuree/);
+    expect(layout).not.toMatch(/Bai_Jamjuree/);
     expect(layout).toMatch(/Plus_Jakarta_Sans/);
     expect(layout).not.toMatch(/Fraunces/);
     expect(readFileSync("app/(marketing)/layout.tsx", "utf8")).not.toMatch(/Space_Grotesk|Inter\b/);

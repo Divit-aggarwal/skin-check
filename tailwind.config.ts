@@ -16,8 +16,9 @@ const config: Config = {
       // Current palette is designed for "Sage + Rebel" brand positioning.
       colors: {
         // Shadcn semantic tokens — read from CSS variables in globals.css
-        border: "hsl(var(--border))",
-        input: "hsl(var(--input))",
+        // --border is the redesign's hex token (plugin below), not an HSL triplet.
+        border: "var(--border)",
+        input: "var(--border)",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
@@ -123,9 +124,9 @@ const config: Config = {
         // SkinCheckFlow.tsx, the inputs/* components), not a new palette.
         // G03 (docs/design/system.md): mapped to the Shopify store theme, so
         // every screen that already uses these names takes the store's look.
-        canvas:  "#F5F3EE",  // store --color-linen (the page; cards are white, system.md §0)
-        surface: "#FFFFFF",  // store --color-paper
-        text:    "#2C2C2A",  // store --color-ink
+        canvas:  "#FAFBFA",
+        surface: "#FFFFFF",
+        text:    "#111814",
 
         // Restrained accent for the Skin Check quiz + results redesign
         // (PART 4 of the redesign brief) — small selected-state touches
@@ -136,42 +137,70 @@ const config: Config = {
         // one accent that passes contrast for text (system.md §2).
         // G03 part 1 (2026-10-06): the live site's theme green #1f473e.
         blush: {
-          DEFAULT: "#1F473E",
-          soft: "#E4E9E8",
+          DEFAULT: "#0B4A3E",
+          soft: "#EAF4EF",
         },
         // The store theme by role (docs/design/system.md §0-2; sources:
         // docs/design/brand-source-root.css and the computed styles read from
         // the live site, docs/design/live-styles-2026-10-06.json). `error` is
         // the one value not from the store.
+        // Redesign 2026-10-14 (design/mockups, docs/lanes/redesign-report.md):
+        // the mockup palette replaces the G03 store-matched values. The old
+        // role names (paper, linen, ink, forest, ...) are kept and point at the
+        // new values, so every existing screen takes the new look unchanged.
+        // tailwind-plugin below also writes each value as a CSS variable
+        // (--brand-900, --bg, --text-muted, ...).
         brand: {
+          900: "#0A3029", // hero cards, the dark Skin Twin panel
+          700: "#0B4A3E", // primary buttons, active tabs, toggles, centre nav
+          100: "#EAF4EF", // tinted cards, selected chips, icon wells
+          50: "#F3F8F5",
+          bg: "#FAFBFA",
+          surface: "#FFFFFF",
+          border: "#ECEEEC",
+          text: "#111814",
+          "text-muted": "#5E6662",
+          // Mockup #8A918D is 3.2:1 on white; darkened to pass AA. White and bg only (4.4:1 on tints).
+          "text-subtle": "#6B726E",
+          // Old role names → new values.
           paper: "#FFFFFF",
-          linen: "#F5F3EE",
-          linen2: "#EEEAE5",
-          line: "#DDD8CE",
-          ink: "#2C2C2A",
-          muted: "#6B6862",
-          // Live site: theme-color and the main pill button (.ps-button) are #1f473e.
-          action: "#1F473E",
-          "action-hover": "#17362F",
-          forest: "#1F473E",
-          // #1f473e at 12% on white: the live site's rgba(31,71,62,.12) lines.
-          mist: "#E4E9E8",
-          // Live small uppercase labels (eyebrows, actives) keep the older green.
-          eyebrow: "#0F6E56",
-          // Live section titles and product card borders.
-          title: "#111111",
-          "card-line": "#ECE8E1",
+          linen: "#FAFBFA",
+          linen2: "#F3F8F5",
+          line: "#ECEEEC",
+          ink: "#111814",
+          muted: "#5E6662",
+          action: "#0B4A3E",
+          "action-hover": "#0A3029",
+          forest: "#0B4A3E",
+          mist: "#EAF4EF",
+          eyebrow: "#0B4A3E",
+          title: "#111814",
+          "card-line": "#ECEEEC",
           accent: "#B98783",
           "accent-soft": "#F3E9E7",
           taupe: "#B7A58F",
           error: "#B42318",
         },
+        // TD-50 (c): one identity colour per reading (keys = BandableMetric in
+        // lib/skin-check-skus.ts), on its icon in a soft well only. Never on a
+        // level word, never meaning better or worse. DEFAULT and soft are the
+        // mockup values (Dark marks' violet is new: the brief had four
+        // concerns, the product has five readings); ink is for text if ever needed.
+        concern: {
+          blemishes: { DEFAULT: "#E5566B", soft: "#FDEEF0", ink: "#B8344A" },
+          redness: { DEFAULT: "#F2B33D", soft: "#FEF7E6", ink: "#8F6206" },
+          texture: { DEFAULT: "#3D7BEA", soft: "#EDF3FE", ink: "#2A63CC" },
+          oiliness: { DEFAULT: "#2FB36B", soft: "#EAF7EF", ink: "#1E7A47" },
+          pigment: { DEFAULT: "#8B6CD9", soft: "#F2EEFC", ink: "#6A47C9" },
+        },
+        // Environment severity text (Very high / Hot / Moderate).
+        severity: { high: "#B91C1C", warm: "#C2410C", moderate: "#B45309" },
       },
 
       // ─── Typography ────────────────────────────────────────────────
       fontFamily: {
-        // Store theme: Bai Jamjuree headings, Plus Jakarta Sans body (system.md §3).
-        display: ["var(--font-display)", "system-ui", "sans-serif"],
+        // Redesign: one sans for everything (Plus Jakarta Sans). `display` is kept as a name.
+        display: ["var(--font-jakarta)", "system-ui", "sans-serif"],
         body:    ["var(--font-jakarta)", "system-ui", "sans-serif"],
         mono:    ["var(--font-mono)", "monospace"],
       },
@@ -223,6 +252,7 @@ const config: Config = {
         "3xl": "1.5rem",
         card:  "1rem",
         pill:  "9999px",
+        tile:  "0.75rem", // image tiles
         media: "1.25rem", // photo-frame corners — same radius as rounded-2xl, used consistently for cards elsewhere
       },
 
@@ -241,7 +271,7 @@ const config: Config = {
 
       // ─── Shadows ───────────────────────────────────────────────────
       boxShadow: {
-        card:      "0 1px 3px 0 rgba(0,0,0,0.06), 0 1px 2px -1px rgba(0,0,0,0.04)",
+        card:      "0 1px 2px 0 rgba(17,24,20,0.03)", // redesign: almost no shadow
         "card-md": "0 4px 12px 0 rgba(0,0,0,0.08), 0 2px 4px -2px rgba(0,0,0,0.04)",
         "card-lg": "0 8px 24px 0 rgba(0,0,0,0.10), 0 4px 8px -4px rgba(0,0,0,0.06)",
         inner:     "inset 0 1px 3px 0 rgba(0,0,0,0.08)",
@@ -269,7 +299,19 @@ const config: Config = {
       },
     },
   },
-  plugins: [require("tailwindcss-animate")],
+  plugins: [
+    require("tailwindcss-animate"),
+    // Every brand / concern token as a CSS variable on :root, from the values above (one source).
+    ({ addBase, theme }: { addBase: (b: object) => void; theme: (p: string) => Record<string, unknown> }) => {
+      const vars: Record<string, string> = {};
+      const brand = theme("colors.brand") as Record<string, string>;
+      for (const k of ["900", "700", "100", "50"]) vars[`--brand-${k}`] = brand[k]!;
+      for (const k of ["bg", "surface", "border", "text", "text-muted", "text-subtle"]) vars[`--${k}`] = brand[k]!;
+      for (const [c, shades] of Object.entries(theme("colors.concern")))
+        for (const [k, v] of Object.entries(shades as Record<string, string>)) vars[`--concern-${c}${k === "DEFAULT" ? "" : `-${k}`}`] = v;
+      addBase({ ":root": vars });
+    },
+  ],
 };
 
 export default config;

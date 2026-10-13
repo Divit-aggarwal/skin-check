@@ -6,25 +6,24 @@
   :root {
     /* Shadcn required variables — mapped to The Project SKIN tokens */
     --background: 0 0% 100%;            /* store paper */
-    --foreground: 60 2% 17%;            /* store ink #2c2c2a */
+    --foreground: 140 15% 8%;            /* --text #111814 */
     --card: 0 0% 100%;                  /* white cards on the linen page */
-    --card-foreground: 60 2% 17%;
+    --card-foreground: 140 15% 8%;
     --popover: 0 0% 100%;
-    --popover-foreground: 60 2% 17%;
-    --primary: 166 39% 20%;             /* live theme green #1f473e */
+    --popover-foreground: 140 15% 8%;
+    --primary: 168 74% 17%;             /* --brand-700 #0b4a3e */
     --primary-foreground: 0 0% 100%;
-    --secondary: 43 27% 95%;
-    --secondary-foreground: 60 2% 17%;
-    --muted: 43 27% 95%;
-    --muted-foreground: 40 4% 40%;      /* store muted #6b6862 */
-    --accent: 40 21% 92%;               /* store surface-alt #eeeae5 */
-    --accent-foreground: 60 2% 17%;
+    --secondary: 147 22% 96%;           /* --brand-50 */
+    --secondary-foreground: 140 15% 8%;
+    --muted: 147 22% 96%;
+    --muted-foreground: 150 4% 38%;      /* --text-muted #5e6662 */
+    --accent: 150 30% 94%;               /* --brand-100 #eaf4ef */
+    --accent-foreground: 140 15% 8%;
     --destructive: 4 76% 40%;           /* #b42318 */
     --destructive-foreground: 0 0% 100%;
-    --border: 40 18% 84%;               /* store border #ddd8ce */
-    --input: 40 18% 84%;
-    --ring: 166 39% 20%;                /* live theme green #1f473e */
-    --radius: 0.5rem;
+    /* --border comes from tailwind.config.ts (redesign token, hex). */
+    --ring: 168 74% 17%;                /* --brand-700 */
+    --radius: 1rem;                     /* cards 16px */
 
   }
 
@@ -33,7 +32,6 @@
     @apply border-border;
   }
 
-  /* Live site card titles: Bai Jamjuree 600, -0.01em (system.md §0). */
   h3 {
     font-family: var(--font-display), system-ui, sans-serif;
     letter-spacing: -0.01em;
@@ -46,10 +44,10 @@
   }
 
   body {
-    /* Live site body: linen page, Plus Jakarta Sans 15px weight 500, 1.5 (system.md §0). */
+    /* Redesign: --bg page, Plus Jakarta Sans 15px, 1.5. */
     @apply bg-brand-linen text-text;
     font-size: 15px;
-    font-weight: 500;
+    font-weight: 400;
     line-height: 1.5;
     /* Smooth scrolling for the whole app */
     scroll-behavior: smooth;
@@ -72,8 +70,7 @@
     outline: none;
   }
   :focus-visible {
-    /* The live theme green, 2px outline with a 2px offset (system.md §5). */
-    outline: 2px solid #1f473e;
+    outline: 2px solid var(--brand-700);
     outline-offset: 2px;
   }
 }
@@ -103,6 +100,7 @@
 }
 
 @layer utilities {
+
   /* Text balance for headings */
   .text-balance {
     text-wrap: balance;
@@ -152,4 +150,14 @@
   .home-grid > [data-area] { grid-area: var(--area); }
   .home-grid > [data-area="record"], .home-grid > [data-area="routine"] { align-self: stretch; }
   .home-grid > [data-area="record"] > section, .home-grid > [data-area="routine"] > section { height: 100%; }
+}
+
+/* Redesign: calm motion only, and none for people who ask for less. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

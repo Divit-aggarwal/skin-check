@@ -1,18 +1,10 @@
 import type { Metadata, Viewport } from "next";
-import { Bai_Jamjuree, Plus_Jakarta_Sans } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
 
-// The store theme's fonts (docs/design/system.md §1): Bai Jamjuree headings,
-// Plus Jakarta Sans body.
-const display = Bai_Jamjuree({
-  subsets: ["latin"],
-  variable: "--font-display",
-  display: "swap",
-  weight: ["500", "600", "700"],
-});
-
+// One sans for the whole app (redesign 2026-10-14, docs/lanes/redesign-report.md).
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-jakarta",
@@ -48,7 +40,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#1f473e", // the live site's theme-color
+  themeColor: "#0B4A3E", // --brand-700
 };
 
 export default function RootLayout({
@@ -59,7 +51,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${display.variable} ${jakarta.variable}`}
+      className={jakarta.variable}
       suppressHydrationWarning
     >
       <body className="bg-brand-linen font-body text-text antialiased">

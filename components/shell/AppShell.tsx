@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { Nav } from "./Nav";
+import { Wordmark } from "@/components/ui/kit";
 import { SHELL_COPY as S } from "./copy";
 
 // One shell for every page (G03, docs/design/map.md). Signed in: the main
@@ -27,8 +28,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ) : (
         <header className="border-b border-brand-line">
           <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-4 sm:px-6 lg:px-8">
-            <Link href="/skin-check" className="flex min-h-11 items-center font-display text-xl font-semibold tracking-tight">
-              {S.brand}
+            <Link href="/skin-check" aria-label={S.brand} className="flex min-h-11 items-center">
+              <Wordmark />
             </Link>
             {user === null && !path.startsWith("/account") && (
               <Link href="/account" className="-mr-4 flex min-h-11 items-center rounded-full px-4 font-medium text-brand-forest hover:bg-brand-mist">
@@ -41,7 +42,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <div
         id="content"
         tabIndex={-1}
-        className={user ? "pb-[calc(64px+env(safe-area-inset-bottom))] outline-none sm:pb-0 sm:pl-[88px] lg:pl-[240px]" : "outline-none"}
+        className={user ? "pb-[calc(68px+env(safe-area-inset-bottom))] outline-none sm:pb-0 sm:pl-[88px] lg:pl-[240px]" : "outline-none"}
       >
         {children}
       </div>
