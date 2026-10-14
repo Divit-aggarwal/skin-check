@@ -42,3 +42,26 @@ export function cameraView(isMobile: boolean, status: string, hasCaptured: boole
   if (status === "error") return "failed";
   return "start";
 }
+
+// Redesign 07 (TD-50): the quality gate's own result, shown after capture.
+// Only the three checks the gate measures (C11: no live checks; pose, distance
+// and framing are never measured, so they are never shown as passing). An
+// unchecked photo (the light could not be measured) shows nothing.
+export const GATE_COPY = {
+  title: "Photo check",
+  frameTitle: "Keep your face in the frame",
+  checks: { exposure: "Light", blur: "Sharpness", resolution: "Photo size" },
+  pass: "Fine",
+  fail: "Retake",
+  notMeasured: "Not checked",
+} as const;
+
+type GateCheck = { id: string; status: "pass" | "fail" | "not_measured" };
+export type GateRow = { id: keyof typeof GATE_COPY.checks; label: string; status: GateCheck["status"] };
+export function gateRows(quality: { verdict: string; checks: readonly GateCheck[] } | null | undefined): GateRow[] {
+  if (!quality || quality.verdict === "unchecked") return [];
+  return (Object.keys(GATE_COPY.checks) as GateRow["id"][]).flatMap((id) => {
+    const c = quality.checks.find((x) => x.id === id);
+    return c ? [{ id, label: GATE_COPY.checks[id], status: c.status }] : [];
+  });
+}

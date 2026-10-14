@@ -25,7 +25,7 @@ export function CardSelect({ step, value, onChange, onCommit }: CardSelectProps)
               onCommit();
             }}
             className={cn(
-              "flex items-center justify-between gap-3 rounded-lg border px-4 py-3.5 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-forest focus-visible:ring-offset-2",
+              "flex items-center justify-between gap-3 rounded-tile border px-4 py-3.5 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-forest focus-visible:ring-offset-2",
               selected ? "border-brand-action bg-brand-mist" : "border-brand-line bg-white hover:border-brand-ink/40"
             )}
           >

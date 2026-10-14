@@ -14,9 +14,9 @@ export function ScanningPhoto({ photo }: { photo: Blob | null }) {
   const url = useObjectUrl(photo);
   const { mesh } = useFaceMesh(photo);
 
-  if (!url) return <Skeleton className="aspect-[3/4] w-full max-w-[340px] self-center rounded-media" />;
+  if (!url) return <Skeleton className="aspect-[3/4] w-full max-w-[340px] self-center rounded-card" />;
   return (
-    <div data-testid="scanning-photo" data-mesh={mesh ? "ready" : "none"} className="relative aspect-[3/4] w-full max-w-[340px] self-center overflow-hidden rounded-media bg-surface">
+    <div data-testid="scanning-photo" data-mesh={mesh ? "ready" : "none"} className="relative aspect-[3/4] w-full max-w-[340px] self-center overflow-hidden rounded-card bg-surface">
       {/* eslint-disable-next-line @next/next/no-img-element -- transient object URL */}
       <img src={url} alt="Your photo, being read" className="absolute inset-0 h-full w-full object-cover" />
       {mesh ? <MeshLayer mesh={mesh} scanning /> : <div aria-hidden className="absolute inset-0 animate-pulse bg-white/20 motion-reduce:animate-none" />}
