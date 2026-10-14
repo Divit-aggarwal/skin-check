@@ -58,3 +58,42 @@ panel; E08 names the context screen drops ("Sample Sunscreen SPF 50",
 - Browser-test edits (add-only): `tests/browser/echo-products.spec.ts` (each card has a Product details link to `/products/<id>`), `tests/browser/flows.spec.ts` (routine test: the added product's card links to its product page). `tests/ui-wording.test.ts`: `components/products` and `app/(marketing)/products` added to `DIRS`.
 
 ## Hand-back
+
+### Changelog
+
+| File | Change |
+|---|---|
+| `components/skin-check/ProductCards.tsx` | 14: card = neutral step tile, step tag, name, key ingredient, how to use, Echo's note (12px well), "Product details" link to `/products/<id>`, store link. 16px card, no 20px corners. Same region, list items, heading and store link as before |
+| `app/(marketing)/products/[id]/page.tsx` (new), `components/products/ProductDetail.tsx` (new) | 15: product page for the six own products (static params, `dynamicParams = false`, unknown id 404, own metadata description). Step, name, pack size, when to use, key ingredient, out-of-stock line, how to use, cautions, "See it on the store" (new tab). Body is a client module because `components/ui/page.tsx` class strings are client exports |
+| `components/products/copy.ts`, `ProductTile.tsx` (new) | Products copy module; neutral step tile and `productHref` (E20, kit request C1) |
+| `components/routine/RoutinePage.tsx`, `lib/routine/copy.ts` | 06: "Your products" first, as step cards in step order (tile, step, name, slot tag, days or "Every day", since, chevron to the product page for our products, Change or stop under a rule); "Add a product" with an icon header, one intro line, the chosen step's tile beside the Step select. Slot switch, steps, guided mode and Routine Complete untouched. Copy: `everyDay`, `addIntro` added |
+| `tests/redesign-products.test.ts` (new) | Page per product, 404, no price/cart/buy/₹/MRP number/unapproved description/img, store link only when sold, out-of-stock line, own metadata, products copy word check, card links |
+| `tests/ui-wording.test.ts` | Add-only: `components/products`, `app/(marketing)/products` in `DIRS` |
+| `tests/browser/echo-products.spec.ts`, `tests/browser/flows.spec.ts` | Add-only assertions (see Log) |
+| `tests/design/redesign-products.shots.ts` (new) | 375px shots into `docs/design/redesign/products/` |
+
+### Screenshots (375px), `docs/design/redesign/products/`
+
+`compare-06-routine-setup.png`, `compare-14-product-cards.png`, `compare-15-product-detail.png` (mockup left, app right); full pages `06-routine-setup`, `14-product-cards`, `15-product-detail`, `15-product-out-of-stock`; first-screen views `*-view.png`, `06-routine-add-view.png`.
+
+### Deviations
+
+See the Log: store link says "See it on the store", not "Buy on the store" (TD-34 kept by TD-50 (g)); no price, cart, photos, timings, benefit lines, "Use this routine", recommendation panels, filter chips, before/after or ingredient claims. On `/routine`, "Your products" now comes before the add form on phones (the setup cards lead, as in the mockup).
+
+### Flags
+
+None (no backend gap needs a disabled control).
+
+### Open questions for the owner
+
+1. Is a new page route `/products/[id]` acceptable for screen 15? (Static catalogue, no API, reachable signed out.)
+2. One step source for Active Boba and Clear Seal: catalogue category ("Other products" on `/routine`) or `OWN_PRODUCT_INFO` (Treat / Spot care on the cards and product page)?
+3. Approve `OWN_PRODUCT_INFO.description` for display? It would be the subtitle under the name on 15 and 14.
+4. Kit request C1 (product tile in the kit, `StepRow` taking it).
+
+### Tests
+
+- Baseline before changes: `npx tsc --noEmit && npx vitest run`: 2367 passed, 85 skipped.
+- Final: `npx tsc --noEmit` clean; `npm run lint` no errors (3 existing `<img>` warnings elsewhere); `npx vitest run`: 109 files passed, 18 skipped; 2373 passed, 85 skipped.
+- Browser: `PW_ARGS="tests/browser/echo-products.spec.ts tests/browser/flows.spec.ts" bash scripts/with-stack-slot.sh npm run test:browser`: 28 passed (5.6 min). Run before the ProductDetail client split; that change is presentation only and the cards and `/routine` were unchanged by it.
+- Shots: `PW_ARGS="-c tests/design/playwright.config.ts tests/design/redesign-products.shots.ts --project=390" bash scripts/with-stack-slot.sh npm run test:browser`: 3 passed.
