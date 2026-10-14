@@ -33,15 +33,18 @@ const early = (m: ShownMetric) => (isEarlyEstimate(m) ? C.table.earlyEstimate : 
 /** The five whole-face readings as tiles; each opens that reading at each check (11). */
 function ReadingTiles({ bands }: { bands: Bands }) {
   return (
-    <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      {bands.map((b) => (
-        <li key={b.metric}>
-          <Link href={`/checks?reading=${b.metric}`} className="block h-full rounded-card transition-colors duration-fast [&>div]:h-full hover:[&>div]:bg-brand-50">
-            <MetricTile reading={b.metric} label={b.label} level={b.band} tag={early(b.metric)} context={C.current.wholeFace} />
-          </Link>
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-2">
+      <p className={eyebrow}>{C.current.wholeFace}</p>
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {bands.map((b) => (
+          <li key={b.metric}>
+            <Link href={`/checks?reading=${b.metric}`} className="block h-full rounded-card transition-colors duration-fast [&>div]:h-full hover:[&>div]:bg-brand-50">
+              <MetricTile reading={b.metric} label={b.label} level={b.band} tag={early(b.metric)} />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -193,7 +196,7 @@ export function ReadingView({ uid, metric, dashboard, data }: { uid: string; met
           {dashboard.trend.engineBoundary && <p className="text-sm text-brand-text-muted">{C.trend.boundary}</p>}
           {/* The newest level. Its empty footer is the slot for a change display, if a later decision allows one (TD-50 e). */}
           <MetricTile reading={metric} label={label} level={latest.band ?? C.current.noReading} tag={early(metric)} context={K.readingAt(formatDate(latest.date))} />
-          <ol className={`${card} divide-y divide-brand-border p-0 sm:p-0`}>
+          <ol className={`${card} divide-y divide-brand-border !p-0`}>
             {rows.map((r) => (
               <li key={r.scanId}>
                 <Link href={`/checks/${encodeURIComponent(r.scanId)}`} className="flex min-h-14 items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-brand-50">

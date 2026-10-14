@@ -166,7 +166,7 @@ export function ChecksView({ openId }: { openId: string | null }) {
 /** Date, kind, photo check and a kept photo. Never a reading. */
 function CheckList({ dashboard, data, uid, selected }: { dashboard: Dashboard; data: DashboardData; uid: string; selected: string | null }) {
   return (
-    <section aria-labelledby="list-title" className={`${card} overflow-hidden p-0 sm:p-0`}>
+    <section aria-labelledby="list-title" className={`${card} overflow-hidden !p-0`}>
       <div className="flex items-center justify-between gap-4 border-b border-brand-border px-4 py-4 sm:px-5">
         <h2 id="list-title" className={h2}>
           {C.history.title}
@@ -295,7 +295,7 @@ function TimelineSection({ history }: { history: Dashboard["history"] }) {
   const items = mergeTimeline(history, routine.data?.events ?? [], routine.data?.today ?? dayOf(new Date()));
   const nameOf = (id: string) => routine.data?.products.find((p) => p.id === id)?.name ?? ROUTINE_COPY.otherProduct;
   return (
-    <section aria-label={K.timeline} className={`${card} max-w-3xl py-1 sm:py-1`}>
+    <section aria-label={K.timeline} className={`${card} max-w-3xl !py-1`}>
       {routine.failed && <p role="alert" className="py-3">{ROUTINE_COPY.error}</p>}
       {/* No photos here: a column of faces between routine entries would read as before and after (D-12). Photos stay on the list and the opened check. */}
       <TimelineList items={items} nameOf={nameOf} />
