@@ -16,12 +16,14 @@ import { COPY } from "@/lib/rules/settings";
 import { ECHO_PRODUCTS_INSTRUCTION, ECHO_SAFETY_INSTRUCTION } from "@/lib/gemini";
 import {
   echoProductsOn,
+  APPROVED_DESCRIPTIONS,
   OWN_PRODUCT_INFO,
   OWN_PRODUCTS,
   OWN_PRODUCTS_LINE,
   PRODUCT_DOCTOR_LINE,
   PRODUCT_DOCTOR_LINE_ON,
   productFactText,
+  productQuotes,
   cardsFor,
   RESULT_QUESTION_LINE,
   STEP_LABEL,
@@ -61,11 +63,24 @@ describe("the product list Gemini receives (TD-34, build part 1)", () => {
     expect(pkg.recommendation?.items.map((i) => i.productId).sort()).toEqual(inStock.sort());
   });
 
-  it("each product has an id, name, step, key ingredient, how to use and description, and a store link", () => {
+  it("each product has an id, name, step, key ingredient, how to use, its description once approved, and a store link", () => {
     for (const p of OWN_PRODUCTS) {
       const text = productFactText(p);
-      for (const part of [p.name, p.keyIngredient, p.usage, p.description]) expect(text).toContain(part);
+      for (const part of [p.name, p.keyIngredient, p.usage, ...(p.description ? [p.description] : [])]) expect(text).toContain(part);
       expect(p.url).toMatch(/^https:\/\/theprojectskin\.com\/products\/[a-z0-9-]+$/);
+    }
+  });
+
+  it("an unapproved description never reaches Gemini (owner 2026-10-15, docs/lanes/product-copy-review.md)", () => {
+    const sent = packageJson(pkg);
+    for (const [id, { description }] of Object.entries(OWN_PRODUCT_INFO)) {
+      if (APPROVED_DESCRIPTIONS.has(id)) continue;
+      expect(sent, id).not.toContain(description);
+      const p = OWN_PRODUCTS.find((x) => x.id === id);
+      if (!p) continue;
+      expect(p.description).toBeUndefined();
+      expect(productFactText(p)).not.toContain("About:");
+      expect(productQuotes(p)).not.toContain(description);
     }
   });
 

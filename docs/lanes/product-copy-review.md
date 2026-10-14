@@ -15,24 +15,23 @@ D-12 word check (`tests/echo-products.test.ts`).
 
 Today neither screen shows them; `tests/browser/echo-products.spec.ts` checks that the product page does not.
 
-**Already in use, not on screen:** since TD-34, Echo's product list sends each
-in-stock product's description to Gemini as "About: …" (`lib/context/products.ts`
-`productFactText`), so an Echo reply can repeat it. This is TD-34 behaviour from
-master, which the redesign did not change. Keeping the descriptions away from
-Gemini as well would change the chat logic, so it needs a separate decision.
+**Gemini:** none reaches Gemini until approved (owner 2026-10-15). Before that,
+Echo's product list sent each in-stock description as "About: …" (TD-34). Now
+`lib/context/products.ts` sends only the ids in `APPROVED_DESCRIPTIONS` (empty),
+which `tests/echo-products.test.ts` checks against the package Gemini receives.
+On approval, the approved ids are added there and the texts appear on 14 and 15.
 
 ## The texts
 
-| Product (id) | Text | Echo cards (14) | Product page (15) | Gemini today |
+| Product (id) | Text | Echo cards (14) | Product page (15) | Gemini |
 |---|---|---|---|---|
-| Refreshing Cleanser (`refreshing-cleanser`) | A lightweight face wash for oily and breakout-prone skin, rinsed off after use. | after approval | after approval | yes |
-| 5% Niacinamide Serum (`niacinamide-serum`) | A fast-absorbing, lightweight serum for oily and blemish-prone skin. | after approval | after approval | yes |
-| Calming Moisturiser (`calming-moisturiser`) | A lightweight gel-cream with skin-identical lipids and botanical extracts, for use morning and night. | after approval | after approval | yes |
-| Protecting Sunscreen SPF 50 PA++++ (`protecting-sunscreen`) | A lightweight aqua-gel sunscreen with broad-spectrum UVA and UVB filters, worn as the final morning step. | after approval | after approval | yes |
-| Clear Seal (`clear-seal`) | A quick-drying liquid patch that dries to a thin, nearly invisible film over a single spot. | after approval | after approval | yes |
+| Refreshing Cleanser (`refreshing-cleanser`) | A lightweight face wash for oily and breakout-prone skin, rinsed off after use. | after approval | after approval | after approval |
+| 5% Niacinamide Serum (`niacinamide-serum`) | A fast-absorbing, lightweight serum for oily and blemish-prone skin. | after approval | after approval | after approval |
+| Calming Moisturiser (`calming-moisturiser`) | A lightweight gel-cream with skin-identical lipids and botanical extracts, for use morning and night. | after approval | after approval | after approval |
+| Protecting Sunscreen SPF 50 PA++++ (`protecting-sunscreen`) | A lightweight aqua-gel sunscreen with broad-spectrum UVA and UVB filters, worn as the final morning step. | after approval | after approval | after approval |
+| Clear Seal (`clear-seal`) | A quick-drying liquid patch that dries to a thin, nearly invisible film over a single spot. | after approval | after approval | after approval |
 | Active Boba Encapsulated Cream (`active-boba-cream`) | A lightweight cream with small beads that burst as you apply it. | no (out of stock, no card) | after approval | no (out of stock) |
 
 ## Owner decision
 
 - [ ] Approved as written / edited above (date, name):
-- [ ] Also keep them away from Gemini until approved (changes the chat logic; new tracker row)

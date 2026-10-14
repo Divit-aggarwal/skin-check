@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { devices, expect, test, type Page } from "@playwright/test";
 import { ECHO_COPY as E } from "@/components/skin-check/echoCopy";
-import { OWN_PRODUCTS, OWN_PRODUCTS_LINE, PRODUCT_DOCTOR_LINE, STEP_LABEL } from "@/lib/context/products";
+import { OWN_PRODUCT_INFO, OWN_PRODUCTS, OWN_PRODUCTS_LINE, PRODUCT_DOCTOR_LINE, STEP_LABEL } from "@/lib/context/products";
 import { COPY } from "@/lib/rules/settings";
 import { AI_SHARE_CONSENT_COPY } from "@/lib/consent";
 import { P_SEED } from "./seed-products";
@@ -152,5 +152,5 @@ test("product page (screen 15): an unknown id is a real 404; a known id opens si
   await expect(page.getByRole("heading", { level: 1, name: p.name })).toBeVisible();
   await expect(page.getByText(STEP_LABEL[p.step], { exact: true })).toBeVisible();
   // Descriptions wait for the owner (docs/lanes/product-copy-review.md).
-  await expect(page.getByText(p.description)).toHaveCount(0);
+  await expect(page.getByText(OWN_PRODUCT_INFO[p.id]!.description)).toHaveCount(0);
 });
