@@ -32,8 +32,10 @@ All under `docs/design/redesign/`.
 
 Out of scope: 16 (D-12 LOCKED), 17 (blocked), the Routine Impact tab on 12.
 Full-page shots show the fixed bottom bar part-way down: a screenshot artefact.
-The lane shots were taken before kit batches 1–2 (16px chat bubbles, tile
-links); those batches change corners and wrappers only.
+All shots were retaken on the integrated branch after both kit batches, on one
+fresh stack per run (flags off; then flags on for 05/08 and the `-flags` account
+shots), and every `compare-*.png` (including Phase 2's) was rebuilt by one
+script with one mockup-to-shot table: `python3 -I tests/design/redesign-compare.py <mockups dir>`.
 
 ## 2. Deviations from the mockups, and why
 
@@ -100,15 +102,30 @@ account (typed confirmation), everything else on the other screens.
 - Infra (before the lanes): browser tests in isolated parallel shards,
   `scripts/with-stack-slot.sh` (max 2 stacks), the H33 ping allowed by exact URL.
 
-## 5. Open questions for you
+## 5. Changes to screens you already approved (Phase 2)
 
+- `/routine` (03): lane C put "Your products" before "Add a product" on phones
+  and restyled both as step cards with neutral product tiles and a link to each
+  product page (screen 06). The slot switch, steps, guided mode and Routine
+  Complete are unchanged.
+- Today (01): the latest-check thumbnail corners 8px → 12px (lane A's `Thumb`).
+- The results photo and the opened check's photo: 20px → 16px corners (lane B's
+  `FacePhoto`).
+- Today's routine and hero are otherwise as approved. The refreshed
+  `phase2/compare-*.png` show the integrated state.
+
+## 6. Open questions for you
+
+**Gate the merge to master:**
 1. **15:** a new page route `/products/[id]` (static catalogue, no API, open
    signed out). Acceptable? (I read "no route changes" as no API routes.)
 2. **Step for Active Boba and Clear Seal:** `/routine` uses the catalogue
    category ("Other products"); Echo and the product page use
    `OWN_PRODUCT_INFO` (Treat / Spot care). Which source?
 3. **Product description:** `OWN_PRODUCT_INFO.description` is marked "awaits
-   owner approval". Approve it as the subtitle on 14 and 15?
+   owner approval". Approve it as the subtitle on 14 and 15, or keep it off?
+
+**Wording and layout preferences (no blocker):**
 4. **08:** the real E19 question set; and should 08 come after the photo (needs
    a flow logic change)?
 5. **05:** the choice buttons fall below the fold at 375px on a first visit. OK?
@@ -125,7 +142,28 @@ account (typed confirmation), everything else on the other screens.
     Account's first screen): also show on Profile? Mask the phone number
     ("ending 1234")? H36 draft labels need H29 legal wording.
 
-## 6. Test results
+## 7. Problems found outside the task (proposed tracker rows, not yet added)
+
+1. Two step sources for Active Boba and Clear Seal (`lib/catalog` category vs
+   `lib/context/products.ts` `OWN_PRODUCT_INFO`): the same product is "Other
+   products" on `/routine` and Treat / Spot care in Echo and on its page.
+2. Account shows the full phone number (`PhoneOtpForm`), where "ending 1234"
+   would do.
+3. `npm run test:local` and the two browser shards do not take stack slots, so a
+   lane running at the same time could put three or more stacks on Docker's 8 GB.
+4. Lanes shared one scratchpad folder and two overwrote each other's logs
+   (a lane-only nuisance; each later used its own sub-folder).
+5. Follow-ups from kit batch 2: the check flow's back button and the Photos
+   view's image could move onto `AppHeader` / `PhotoTile`.
+
+## 8. Housekeeping
+
+The five lane worktrees (`../skin-check-rd-*`) and branches
+(`lane/redesign-*`) are still on disk, fully merged into `lane/redesign`.
+Remove them after your review? `docs/redesign-decisions` (TD-50, rows) is a
+separate branch; G30 there is updated with this result.
+
+## 9. Test results
 
 `npm run test:all` on the integrated branch (`3cb3b5a`, all five lanes and both
 kit batches), 17:04–17:22 (18 min), exit 0:
@@ -137,6 +175,11 @@ kit batches), 17:04–17:22 (18 min), exit 0:
 | Stack (rules + end-to-end) | 84/84 |
 | Browser, 2 isolated shards | 115/115 (71 + 44; 113 before + 2 new from lane A) |
 | Build | compiled |
+
+No API, rule, config or logic change, checked on the diff, not taken from the
+lanes' reports: `git diff --stat 4d66a1f..HEAD -- app/api lib firestore.rules firestore.indexes.json next.config.js middleware.ts`
+→ `lib/routine/copy.ts` (+21, copy strings) and `lib/ui-flags.ts` (+18, new, the
+off-by-default flags) only.
 
 Each lane also ran its own screens' browser specs and screenshot spec before
 hand-back (counts in each brief's Hand-back). Browser-test edits across lanes
