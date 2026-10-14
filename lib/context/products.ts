@@ -75,6 +75,13 @@ export const OWN_PRODUCT_INFO: Record<string, { step: ProductStep; keyIngredient
   },
 };
 
+/**
+ * Descriptions the owner approved in docs/lanes/product-copy-review.md, by
+ * product id. Owner 2026-10-15: an unapproved description never reaches
+ * Gemini, so Echo cannot repeat it. Add an id here when its text is approved.
+ */
+export const APPROVED_DESCRIPTIONS: ReadonlySet<string> = new Set<string>();
+
 export const STORE_URL = "https://theprojectskin.com/products/";
 
 export interface ListedProduct {
@@ -83,14 +90,15 @@ export interface ListedProduct {
   step: ProductStep;
   keyIngredient: string;
   usage: string;
-  description: string;
+  /** Only when approved (APPROVED_DESCRIPTIONS). */
+  description?: string;
   url: string;
 }
 
 const listed = (p: Product): ListedProduct[] => {
   const info = OWN_PRODUCT_INFO[p.id];
   if (!info || p.availability !== "available" || p.dataSource !== "owner" || !p.shopifyHandle) return [];
-  return [{ id: p.id, name: p.name, step: info.step, keyIngredient: info.keyIngredient, usage: p.usageText, description: info.description, url: `${STORE_URL}${p.shopifyHandle}` }];
+  return [{ id: p.id, name: p.name, step: info.step, keyIngredient: info.keyIngredient, usage: p.usageText, ...(APPROVED_DESCRIPTIONS.has(p.id) ? { description: info.description } : {}), url: `${STORE_URL}${p.shopifyHandle}` }];
 };
 
 // ponytail: stock is the catalogue snapshot (CATALOG_VERSION); a store stock change needs a catalogue edit and a deploy.
@@ -139,14 +147,15 @@ export const RESULT_QUESTION_LINE = "Echo can't say what a product will do for y
 
 /** The text of one product fact in Gemini's list. Every part is ours. */
 export function productFactText(p: ListedProduct): string {
-  return `${p.name}. Step: ${STEP_FOR_GEMINI[p.step]}. Key ingredient: ${p.keyIngredient}. How to use: ${p.usage} About: ${p.description}`;
+  return `${p.name}. Step: ${STEP_FOR_GEMINI[p.step]}. Key ingredient: ${p.keyIngredient}. How to use: ${p.usage}${p.description ? ` About: ${p.description}` : ""}`;
 }
 
 /** Parts of a product fact Gemini may repeat on their own (the validator strips them before its word checks). Not the key ingredient. */
 export function productQuotes(p: ListedProduct): string[] {
   // Each sentence of the usage and description on its own too: a sentence of ours adds no claim (live run).
   const sentences = (t: string) => t.split(/(?<=[.;])\s+/).map((x) => x.replace(/[.;]$/, "")).filter((x) => x.length > 0);
-  return [p.name, STEP_FOR_GEMINI[p.step], p.usage, p.description, ...sentences(p.usage), ...sentences(p.description)];
+  const about = p.description ? [p.description, ...sentences(p.description)] : [];
+  return [p.name, STEP_FOR_GEMINI[p.step], p.usage, ...sentences(p.usage), ...about];
 }
 
 // ─── Settings ───────────────────────────────────────────────────────────────

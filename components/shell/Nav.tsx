@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Camera, Home, Layers, MessageCircle, Repeat, UserRound, type LucideIcon } from "lucide-react";
 import { SHELL_COPY as S } from "./copy";
+import { Wordmark } from "@/components/ui/kit";
 
 // The app shell's navigation (docs/design/system.md §6): a bottom bar under
 // 640px, an 88px rail from 640px, a 240px side bar from 1024px. Exactly one of
@@ -31,8 +32,8 @@ export function Nav({ phoneLast4 }: { phoneLast4: string | null }) {
     <>
       {/* Desktop side bar */}
       <nav aria-label={S.navLabel} className="fixed inset-y-0 left-0 z-30 hidden w-[240px] flex-col border-r border-brand-line bg-brand-paper px-4 py-6 lg:flex">
-        <Link href="/dashboard" className="mb-8 flex min-h-11 items-center px-3 font-display text-[22px] font-semibold tracking-tight">
-          {S.brand}
+        <Link href="/dashboard" aria-label={S.brand} className="mb-8 flex min-h-11 items-center px-3">
+          <Wordmark />
         </Link>
         <Link
           href={newCheck.href}
@@ -86,28 +87,29 @@ export function Nav({ phoneLast4 }: { phoneLast4: string | null }) {
       {/* Phone bottom bar. Account is the round button in each page header. */}
       <nav
         aria-label={S.navLabel}
-        className="fixed inset-x-0 bottom-0 z-30 border-t border-brand-line bg-brand-paper pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_30px_rgba(20,20,15,0.06)] sm:hidden"
+        data-bottom-nav
+        className="fixed inset-x-0 bottom-0 z-30 border-t border-brand-border bg-brand-surface pb-[env(safe-area-inset-bottom)] sm:hidden"
       >
-        <ul className="mx-auto grid h-16 max-w-md grid-cols-5">
+        <ul className="mx-auto grid h-[68px] max-w-md grid-cols-5">
           {PLACES.map((p) => (
             <li key={p.key} className="flex">
               <Link
                 href={p.href}
                 aria-current={current(p)}
-                className="group flex flex-1 flex-col items-center justify-center gap-1 text-xs font-medium text-brand-muted aria-[current=page]:text-brand-forest"
+                className="group flex flex-1 flex-col items-center justify-center gap-1 text-xs font-medium text-brand-text-muted aria-[current=page]:font-semibold aria-[current=page]:text-brand-700"
               >
                 {p.key === "newCheck" ? (
                   <>
-                    <span className="grid size-9 place-items-center rounded-full bg-brand-action text-white group-aria-[current=page]:ring-2 group-aria-[current=page]:ring-brand-forest group-aria-[current=page]:ring-offset-2">
-                      <p.icon aria-hidden size={20} />
+                    {/* TD-50 (b): a raised camera circle; its name stays "New check" for screen readers. */}
+                    <span className="-mt-7 grid size-16 place-items-center rounded-full border-4 border-brand-surface bg-brand-700 text-white shadow-card-md transition-colors duration-fast group-hover:bg-brand-900 group-aria-[current=page]:ring-2 group-aria-[current=page]:ring-brand-700 group-aria-[current=page]:ring-offset-2">
+                      <p.icon aria-hidden size={26} />
                     </span>
-                    {/* TD-48: the new check is a labelled centre item (the phone Home has no banner). */}
-                    <span className="-mt-0.5 text-brand-forest">{S.nav[p.key]}</span>
+                    <span className="sr-only">{S.nav[p.key]}</span>
                   </>
                 ) : (
                   <>
-                    <span className="grid h-7 w-12 place-items-center rounded-full group-aria-[current=page]:bg-brand-mist">
-                      <p.icon aria-hidden size={20} />
+                    <span className="grid h-7 w-12 place-items-center rounded-full">
+                      <p.icon aria-hidden size={22} strokeWidth={2} className="group-aria-[current=page]:fill-brand-100" />
                     </span>
                     {S.nav[p.key]}
                   </>

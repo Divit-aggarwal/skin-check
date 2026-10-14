@@ -17,7 +17,8 @@ const FS = process.env.PW_FIRESTORE_HOST!;
 const B = Number(process.env.PW_PORT);
 const WEATHER = `.local-stack/fake-weather`;
 const PUSH = `http://127.0.0.1:${B + 10}/push/`;
-const SHOTS = "docs/design/home-v2";
+// Baselines in docs/ are rewritten only on request (AFTER_SHOTS=1), never by a normal run.
+const SHOTS = process.env.AFTER_SHOTS ? "docs/design/home-v2" : ".local-stack/browser-shots/home-v2";
 mkdirSync(SHOTS, { recursive: true });
 const shot = (page: Page, name: string) => page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: true });
 
@@ -226,6 +227,7 @@ test("never asked: no browser prompt can be triggered from Home or Account befor
   await expect(p.getByRole("button", { name: H.weather.useLocation })).toHaveCount(0);
   await expect(p.getByRole("button", { name: H.next.remindersOn })).toHaveCount(0);
   await p.goto("/account");
+  await p.getByRole("link", { name: "Privacy", exact: true }).click(); // redesign 21 (lane E): privacy is a tab
   const box = section(p, H.account.title);
   await expect(box.getByText(H.account.afterCheck)).toBeVisible();
   await box.getByRole("button", { name: H.weather.change }).click();
@@ -451,6 +453,7 @@ test("reminders: Account turns them on; the daily job sends one payload-free, VA
   await fakePush(p, "due-today");
   await signIn(p, U.homeToday!.phoneNumber);
   await p.goto("/account");
+  await p.getByRole("link", { name: "Privacy", exact: true }).click(); // redesign 21 (lane E): privacy is a tab
   const box = section(p, H.account.title);
   await box.getByRole("button", { name: H.account.remindersOn }).click();
   await expect(box.getByText(H.account.reminders(H.account.states.allowed))).toBeVisible();
@@ -484,6 +487,7 @@ test("Ask Echo: a starter opens Echo and sends it; any other ?ask= text is never
 test("Account: change the city and remove it", async ({ page }) => {
   await signIn(page, U.homeErase!.phoneNumber);
   await page.goto("/account");
+  await page.getByRole("link", { name: "Privacy", exact: true }).click(); // redesign 21 (lane E): privacy is a tab
   const box = section(page, H.account.title);
   await expect(box.getByText(H.account.city("Pune"))).toBeVisible();
   await box.getByRole("button", { name: H.weather.change }).click();

@@ -123,6 +123,12 @@ export const HOME_COPY = {
     uvDown: "UV not available right now",
     starting: (n: number, of: number) => `${n} of ${of} starting checks`,
     takeCheck: "Take your check",
+    // TD-50 Phase 2: the dark "next step" card and the two tiles (mockup 01).
+    heroEyebrow: "Your next step",
+    heroCheck: "Time for your check",
+    heroStep: (slot: string) => `${slot} routine`,
+    heroNone: "Nothing to do right now",
+    stepsLeft: (n: number) => `${n} ${n === 1 ? "step" : "steps"} to go`,
     markStep: (step: string) => `Mark ${step} done`,
     allDone: "All done today",
     slotDone: { AM: "Morning steps done", PM: "Evening steps done" },
@@ -176,6 +182,7 @@ export const HOME_COPY = {
 
   account: {
     title: "Location and reminders",
+    remindersTitle: "Daily reminder",
     location: (state: string) => `Location: ${state}`,
     reminders: (state: string) => `Reminders: ${state}`,
     city: (name: string) => `City: ${name}`,

@@ -5,7 +5,7 @@ export const SHELL_COPY = {
   skip: "Skip to content",
   navLabel: "Main",
   nav: {
-    home: "Home",
+    home: "Today", // TD-50 (b)
     checks: "Checks",
     newCheck: "New check",
     routine: "Routine",
@@ -20,6 +20,6 @@ export const SHELL_COPY = {
   errorTitle: "Something went wrong",
   errorBody: "This page could not be shown just now. Nothing you saved is lost.",
   tryAgain: "Try again",
-  goHome: "Go to Home",
+  goHome: "Go to Today",
   startCheck: "Start a check",
 } as const;

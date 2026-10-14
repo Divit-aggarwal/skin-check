@@ -1,0 +1,230 @@
+# Redesign review pack: Phases 3–7 (owner review)
+
+Branch `lane/redesign` (not pushed). Five lanes built in parallel off `8dc77ef`
+and were merged one at a time, smallest first after readiness (C, E, D, B, A),
+each followed by typecheck, lint and unit tests; then two kit batches; then
+one full `npm run test:all` with the browser tests in two isolated shards.
+Lane details, logs and hand-backs: `docs/lanes/redesign-{checks,capture,products,echo,account}.md`.
+
+## 1. Every screen next to its mockup (375px; mockup left, app right)
+
+All under `docs/design/redesign/`.
+
+| Lane | Screen | Comparison |
+|---|---|---|
+| Phase 2 | 01 Today, 02 Environment, 03 Routine | `phase2/compare-01-today.png`, `compare-02-environment.png`, `compare-03-routine.png`; 04 Routine Complete `phase2/p2-04-routine-complete.png` (no mockup) |
+| A checks | 09 opened check | `checks/compare-09-opened-check.png` |
+| | 10 Checks overview ("Skin Twin" home) | `checks/compare-10-checks-overview.png` |
+| | 11 one reading over time | `checks/compare-11-reading.png` |
+| | 12 Readings / Photos tabs | `checks/compare-12-readings.png`, `checks/compare-12-photos.png` |
+| | 13 timeline (no mockup) | restyled; in `checks/` full-page shots |
+| B capture | 05 start of a check | `capture/compare-05-weekly-skin-check.png` |
+| | 07 guided capture | `capture/compare-07-guided-capture.png` |
+| | 08 weekly check-in (flag on) | `capture/compare-08-weekly-checkin.png` |
+| C products | 06 routine set-up | `products/compare-06-routine-setup.png` |
+| | 14 Echo product cards | `products/compare-14-product-cards.png` |
+| | 15 product page | `products/compare-15-product-detail.png` (+ `15-product-out-of-stock.png`) |
+| D Echo | 18 Echo home | `echo/compare-18-echo-home.png` |
+| | 19 conversation | `echo/compare-19-echo-conversation.png` (+ red-flag, consent, no-reading, desktop shots) |
+| E account | 20 notifications (flag on) | `account/compare-20-notifications.png` (+ `20-notifications.png` flag off) |
+| | 21 profile | `account/compare-21-profile.png` (+ `21-skin.png`) |
+| | 22 privacy (flags on) | `account/compare-22-privacy.png` (+ `22-privacy.png` flags off) |
+
+Out of scope: 16 (D-12 LOCKED), 17 (blocked), the Routine Impact tab on 12.
+Full-page shots show the fixed bottom bar part-way down: a screenshot artefact.
+All shots were retaken on the integrated branch after both kit batches, on one
+fresh stack per run (flags off; then flags on for 05/08 and the `-flags` account
+shots), and every `compare-*.png` (including Phase 2's) was rebuilt by one
+script with one mockup-to-shot table: `python3 -I tests/design/redesign-compare.py <mockups dir>`.
+
+## 2. Deviations from the mockups, and why
+
+Common to all lanes (locked decisions, no data):
+- No change between checks anywhere: no deltas, %, arrows, status pills, graphs,
+  sparklines, before/after, "Improving" (TD-24, TD-47(4), D-24, empty noise table).
+  Slots are left empty (`MetricTile.footer`, between the fixed line and the
+  table on 09) so an allowed change display can drop in later.
+- Banned words replaced: "Skin Twin" → Checks; "Progress" → Readings / Checks;
+  "Acne" → the reading's own label (Breakouts); "results", "explain", "better",
+  "calm", "before" phrasings rewritten.
+- No product photos (E20): neutral step tiles. No price, cart or buy (TD-34).
+- No efficacy, attribution or goal % (D-12).
+
+Per lane (full lists in each brief's Log):
+- **A checks:** the opened check keeps the one readings table, not reading
+  tiles (TD-39, pinned by a browser test); 10's newest reading card and routine
+  strip are phone-only (from 1024px the list + opened check layout stays so the
+  routine never sits beside readings, D-12); 11 lists a reading's level per
+  check by date with the software-version line; 12 Photos shows the user's own
+  kept photos by date only; no goals, learnings, insights, "What to do next".
+- **B capture:** one photo (no Front/Left/Right, C10), no live indicators (C11):
+  the existing gate's result after capture (Light, Sharpness, Photo size:
+  Fine / Retake / Not checked); 05 lives on the existing first screens (TD-44,
+  TD-43); 08's questions are placeholders (E19 has no question set; the mockup's
+  are better/worse scales); the 8-part bar stays.
+- **C products:** "See it on the store" (not "Buy"); no filter chips (one card
+  per step), no recommendation panels (TD-29(1)); "Your products" before the add
+  form on `/routine`.
+- **D Echo:** no recent conversations, today's insight, quick actions,
+  timestamps, reasons list, quick tip, attach or carousel (no data, or causal);
+  mockup copy ("AI skin coach", "personalised advice") replaced with
+  "Talks you through your checks" / "Never decides for you"; "View your skin
+  profile" → "Open this check"; new face mark replaces the "+".
+- **E account:** no name, email, gender, birth date, avatar or Edit (phone-only
+  sign-in); no Goals tab; no saved-answers view (answers belong to a check);
+  no reminder times; no "never shared with third parties" (untrue: Gemini, AWS);
+  AI sharing and reminders stay buttons (one-way withdraw; four reminder states).
+
+## 3. Screens behind flags (all off by default; with a flag on, nothing saves)
+
+| Flag (`lib/ui-flags.ts`) | Env var | Screen | What shows with it on | Waits on |
+|---|---|---|---|---|
+| `weeklyCheckinUi()` | `NEXT_PUBLIC_UI_WEEKLY_CHECKIN=on` | 08 | "Weekly check-in" button on 05, three placeholder questions, Save disabled ("Saving your answers comes later.") | E19 |
+| `notificationTypesUi()` | `NEXT_PUBLIC_UI_NOTIFICATION_TYPES=on` | 20 | Seven type switches, disabled, "Comes later" | G31 |
+| `consentsUi()` | `NEXT_PUBLIC_UI_CONSENTS=on` | 22 | "More sharing choices" (Draft): five disabled switches | H36 (+ H29 legal wording) |
+| `dataExportUi()` | `NEXT_PUBLIC_UI_DATA_EXPORT=on` | 22 | "Download my data", not clickable, "Comes later" | H37 |
+
+Live now (real backend): reminders on/off, AI sharing withdraw, city, delete
+account (typed confirmation), everything else on the other screens.
+
+## 4. Kit changes during the build (`docs/lanes/kit-requests.md`)
+
+- **Batch 1:** shared class strings moved out of the `"use client"` `page.tsx`
+  into `components/ui/classes.ts` (a server page got references, not strings:
+  found by lane C); `ProductTile` and `StepRow.media` (C1); `ToggleRow.disabled`
+  (E1); `SettingsRow.disabled` (E2); 16px `ChatBubble`; `TypingIndicator` stops
+  its JS loop under reduced motion, 16px (D).
+- **Batch 2:** `AppHeader` back as a function + `backDisabled` (B1);
+  `PhotoTile` no-referrer + load fallback (A1); `MetricTile.href` (A2, used).
+- **Follow-ups (not migrated):** the check flow's own back button (pinned
+  first-screen state in `questionnaire.spec.ts`) and the Photos view's `Thumb`
+  image could move onto B1/A1.
+- Infra (before the lanes): browser tests in isolated parallel shards,
+  `scripts/with-stack-slot.sh` (max 2 stacks), the H33 ping allowed by exact URL.
+
+## 5. Changes to screens you already approved (Phase 2)
+
+- `/routine` (03): lane C put "Your products" before "Add a product" on phones
+  and restyled both as step cards with neutral product tiles and a link to each
+  product page (screen 06). The slot switch, steps, guided mode and Routine
+  Complete are unchanged.
+- Today (01): the latest-check thumbnail corners 8px → 12px (lane A's `Thumb`).
+- The results photo and the opened check's photo: 20px → 16px corners (lane B's
+  `FacePhoto`).
+- Today's routine and hero are otherwise as approved. The refreshed
+  `phase2/compare-*.png` show the integrated state.
+
+## 6. Open questions for you
+
+**Gate the merge to master:**
+1. **15:** a new page route `/products/[id]` (static catalogue, no API, open
+   signed out). Acceptable? (I read "no route changes" as no API routes.)
+2. **Step for Active Boba and Clear Seal:** `/routine` uses the catalogue
+   category ("Other products"); Echo and the product page use
+   `OWN_PRODUCT_INFO` (Treat / Spot care). Which source?
+3. **Product description:** `OWN_PRODUCT_INFO.description` is marked "awaits
+   owner approval". Approve it as the subtitle on 14 and 15, or keep it off?
+
+**Wording and layout preferences (no blocker):**
+4. **08:** the real E19 question set; and should 08 come after the photo (needs
+   a flow logic change)?
+5. **05:** the choice buttons fall below the fold at 375px on a first visit. OK?
+6. **07:** gate words "Fine / Retake / Not checked": OK?
+7. **11:** checks read by different engine versions: keep the one general line,
+   or mark/hide rows one by one?
+8. **12 Photos:** a grid of the user's own kept photos: OK under D-12, or one per row?
+9. **Fixed line:** it now also shows on the Checks overview, Readings and
+   Photos (every view with level words). Keep?
+10. **10 on desktop:** the newest-reading card and routine strip are phone-only. OK?
+11. **Echo 18:** third tile "Never decides for you" or "Not a medical opinion"?
+    Show the introduction on every empty area thread, or first visit only?
+12. **Account:** questions card only on the Skin tab (TD-33(1) had it on
+    Account's first screen): also show on Profile? Mask the phone number
+    ("ending 1234")? H36 draft labels need H29 legal wording.
+
+## 7. Problems found outside the task (proposed tracker rows, not yet added)
+
+1. Two step sources for Active Boba and Clear Seal (`lib/catalog` category vs
+   `lib/context/products.ts` `OWN_PRODUCT_INFO`): the same product is "Other
+   products" on `/routine` and Treat / Spot care in Echo and on its page.
+2. Account shows the full phone number (`PhoneOtpForm`), where "ending 1234"
+   would do.
+3. `npm run test:local` and the two browser shards do not take stack slots, so a
+   lane running at the same time could put three or more stacks on Docker's 8 GB.
+4. Lanes shared one scratchpad folder and two overwrote each other's logs
+   (a lane-only nuisance; each later used its own sub-folder).
+5. Follow-ups from kit batch 2: the check flow's back button and the Photos
+   view's image could move onto `AppHeader` / `PhotoTile`.
+
+## 8. Housekeeping
+
+The five lane worktrees (`../skin-check-rd-*`) and branches
+(`lane/redesign-*`) are still on disk, fully merged into `lane/redesign`.
+Remove them after your review? `docs/redesign-decisions` (TD-50, rows) is a
+separate branch; G30 there is updated with this result.
+
+## 9. Test results
+
+`npm run test:all` on the integrated branch (`3cb3b5a`, all five lanes and both
+kit batches), 17:04–17:22 (18 min), exit 0:
+
+| Step | Result |
+|---|---|
+| Typecheck, lint | clean (lint: existing `<img>` warnings only) |
+| Unit | 2379 passed, 85 skipped (111 files) |
+| Stack (rules + end-to-end) | 84/84 |
+| Browser, 2 isolated shards | 115/115 (71 + 44; 113 before + 2 new from lane A) |
+| Build | compiled |
+
+No API, rule, config or logic change, checked on the diff, not taken from the
+lanes' reports: `git diff --stat 4d66a1f..HEAD -- app/api lib firestore.rules firestore.indexes.json next.config.js middleware.ts`
+→ `lib/routine/copy.ts` (+21, copy strings) and `lib/ui-flags.ts` (+18, new, the
+off-by-default flags) only.
+
+Each lane also ran its own screens' browser specs and screenshot spec before
+hand-back (counts in each brief's Hand-back). Browser-test edits across lanes
+are add-only (tab clicks, new locators, two new tests); nothing was removed or
+weakened. No API route, Firestore rule or business logic changed.
+
+## 10. Owner answers (2026-10-15) and what was done
+
+1. **`/products/[id]` approved.** An unknown id is a real 404 (`dynamicParams = false`
+   and `notFound()`); catalogue data only, no API. New browser test in
+   `tests/browser/echo-products.spec.ts` checks the 404 status, a known id at 200
+   signed out with its step, and no description.
+2. **Step source.** Switching `/routine` is not display only: `stepOf` also decides
+   which products a step's add form offers and the order of Today's routine, so it
+   changes step assignment (TD-29 (1)). `/routine` is kept as it is; Echo and the
+   product page already show Treat / Spot care. The proper fix is tracker row E21.
+3. **Descriptions.** All six are listed in `docs/lanes/product-copy-review.md`. None is
+   on a screen. Since TD-34 they also go to Gemini, which this file notes for a
+   separate decision.
+
+Tracker rows added on `docs/redesign-decisions`: E21 (step source), H38 (phone
+number), G32 (stack slots), G33 (scratchpad), G34 (kit follow-ups).
+
+### Recommended answers to questions 4–12 (approve or override in one go)
+
+| # | Question | Recommendation |
+|---|---|---|
+| 4 | 08 questions; after the photo? | You write the question set with E19. Keep 08 behind its flag; put it after the photo when E19 is built (a flow change that belongs to E19, not now). |
+| 5 | 05 buttons below the fold at 375px | Move the lighting tip under the choice buttons so Start is on the first screen. Small change, presentation only. |
+| 6 | "Fine / Retake / Not checked" | Keep the words: colour or an icon alone fails people who can't see them. |
+| 7 | Checks read by different software versions | Keep the general line and also mark each row read by a version other than the newest, in words. Don't hide any rows: hiding loses history, and the version is already on each check. |
+| 8 | 12 Photos grid | One photo per row with its date. Two photos side by side reads as before/after (TD-47 (4), D-12). |
+| 9 | Fixed line on every level-word view | Keep it. It is the uncertainty statement, so it goes wherever a level shows. |
+| 10 | 10's phone-only parts on desktop | Keep them phone-only, so the routine never sits beside readings (D-12). |
+| 11 | Echo third tile; introduction | Keep "Never decides for you", because the intro line already says it is not a medical opinion. Show the introduction on every empty area thread: it is that thread's empty state and needs no new storage. |
+| 12 | Account | Also show the questions card on Profile, Account's first screen, as TD-33 (1) says. Mask the phone number ("ending 1234", H38). The H36 labels wait for H29's legal wording. |
+
+### Owner decisions (2026-10-15, second message)
+
+- Step source: `/routine` stays as it is (TD-29 (1) stands); E21 is the fix.
+- Questions 4–12: all recommended answers approved. Built on `lane/redesign`:
+  - 5: the choice card now comes before the last-check card on the start screen. The tip was already under the buttons, so the last-check card was moved instead.
+  - 7: each row on 11 from a software version other than the newest reading's says so in words (`readingHistory().otherVersion`). No row is hidden.
+  - 8: Photos shows one photo per row.
+  - 12: the questions card also shows on Profile; Account shows the phone number's last 4 digits only (H38).
+  - 4, 6, 9, 10, 11: no change.
+- Descriptions to Gemini: stopped in its own commit (`f8a71bd`). Only ids in `APPROVED_DESCRIPTIONS` are sent, and that list is empty.
+- Preview: Preview env vars scoped to `lane/redesign` only; no erase keys (Delete account gets tested after the master merge); Deployment Protection stays on; the preview hostname is removed from Firebase's authorised domains after the master merge.

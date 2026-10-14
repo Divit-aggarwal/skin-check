@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { AnimatePresence } from "framer-motion";
-import { ChevronDown, ChevronLeft, ChevronRight, MessageCircle, SendHorizontal } from "lucide-react";
+import { AnimatePresence, MotionConfig } from "framer-motion";
+import { AlertCircle, BookOpen, ChevronDown, ChevronLeft, ChevronRight, MessageCircle, Sparkles, Stethoscope, UserRound } from "lucide-react";
 import { TypingIndicator } from "@/components/primitives/TypingIndicator";
 import { ECHO_COPY as E } from "./echoCopy";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
@@ -15,7 +15,10 @@ import { newestEchoSession } from "@/components/dashboard/echo-session";
 import { hasQuestionAnswers, safetyQuestionsAnswered } from "@/lib/skin-check-validation";
 import { QUESTIONS_COPY as Q } from "./questionsCopy";
 import { readingsOf, toDate } from "@/components/dashboard/state";
-import { AccountButton, btnPrimary, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
+import { AccountButton, btnGhost, btnPrimary, btnSecondary, card, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton, textLink, tintCard } from "@/components/ui/page";
+import { ChatBubble, ChatInput, Chip, IconWell, SuggestionChips, Wordmark } from "@/components/ui/kit";
+import { EchoMark } from "./EchoMark";
+import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getEchoOpening, getSkinCheckChatReply, ApiError, type ShownProduct } from "@/lib/api";
 import { ProductCards, splitDoctorLine, splitRedFlagNote } from "./ProductCards";
 import { COPY } from "@/lib/rules/settings";
@@ -68,6 +71,10 @@ function greetingFor(region: EchoRegion): string {
 }
 
 let messageSeq = 0;
+
+// Mockup 18's three "what Echo does" tiles, in the order of E.does.
+const DOES_ICONS = [BookOpen, MessageCircle, UserRound] as const;
+const TYPING = "rounded-card rounded-bl-md border border-brand-border bg-brand-surface text-brand-text-muted shadow-none";
 
 // /echo: one thread per face area, switched in place (no remount), each held
 // only in SkinCheckSessionProvider (in memory).
@@ -209,7 +216,8 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
   useEffect(() => {
     // TD-34: before the first question, the opening is read from its first line, not its last card.
     const top = messages.length === 0 && !isThinking && !activeError ? 0 : scrollRef.current?.scrollHeight ?? 0;
-    scrollRef.current?.scrollTo({ top, behavior: "smooth" });
+    const still = typeof window.matchMedia === "function" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    scrollRef.current?.scrollTo({ top, behavior: still ? "auto" : "smooth" });
   }, [messages, isThinking, activeError, shownOpening]);
 
   if (!session) {
@@ -245,10 +253,10 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
         <p className="font-display text-xl font-semibold">{E.checkFrom(date)}</p>
       </div>
       {photoCheck && <PhotoCheckLine text={C.photoCheck[photoCheck]} />}
-      <p className="rounded-2xl bg-brand-mist px-4 py-3 text-sm text-brand-ink">{C.history.pastLine}</p>
+      <p className="rounded-card bg-brand-100 px-4 py-3 text-sm text-brand-text">{C.history.pastLine}</p>
       {/* TD-40: the same table as the results, Home and an opened check. */}
       <ReadingsTable view={readings} />
-      <Link href={`/checks/${encodeURIComponent(session.scanId)}`} className="inline-flex min-h-11 items-center gap-1 font-medium text-brand-forest underline-offset-4 hover:underline">
+      <Link href={`/checks/${encodeURIComponent(session.scanId)}`} className={textLink}>
         {E.openCheck}
         <ChevronRight aria-hidden size={16} />
       </Link>
@@ -351,199 +359,245 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
     }
   }
 
+  // TD-50 (mockups 18, 19): an area with no question yet opens on Echo's
+  // introduction (18); once asked, the compact Echo header and the chat (19).
+  const empty = messages.length === 0;
+  const echoAvatar = <EchoMark className="size-8" />;
+
+  // TD-46: one thread per face area.
+  const areaPicker = (
+    <div className="flex flex-col gap-2">
+      {empty && (
+        <p aria-hidden className={eyebrow}>
+          {E.areaPicker}
+        </p>
+      )}
+      <div role="group" aria-label={E.areaPicker} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0">
+        {ECHO_REGIONS.map((region) => (
+          <Chip key={region} selected={region === activeRegion} onClick={() => setActiveRegion(region)}>
+            {ECHO_REGION_LABELS[region]}
+          </Chip>
+        ))}
+      </div>
+      {empty && <p className="text-sm text-brand-text-muted">{E.areaHint}</p>}
+    </div>
+  );
+
+  const alertBox = `${card} !p-4 flex flex-col items-start gap-2`;
+
   return (
-    // The chat fills the screen above the phone's bottom bar; on a wide screen
-    // the readings sit beside it (TD-25 (1), from direction B).
+    <MotionConfig reducedMotion="user">
+    {/* The chat fills the screen above the phone's bottom bar; on a wide screen
+        the readings sit beside it (TD-25 (1), from direction B). */}
     <main className="mx-auto flex h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] w-full max-w-[1200px] flex-col sm:h-dvh lg:grid lg:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:border-r lg:border-brand-line lg:px-8">
-        <header className="flex shrink-0 items-start gap-2 pt-4 sm:pt-8">
+      <div className="flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:border-r lg:border-brand-border lg:px-8">
+        <header className="grid shrink-0 grid-cols-[44px_1fr_44px] items-center pt-2 sm:pt-6">
           <Link
             // K-1: a hand-off from the dashboard goes back there, not to an old results screen.
             href={session.fromDashboard ? "/dashboard" : "/skin-check"}
             aria-label={session.fromDashboard ? "Back to your skin checks" : "Back to Skin Check"}
-            className="-ml-2 grid size-11 shrink-0 place-items-center rounded-full text-brand-muted hover:bg-brand-linen hover:text-brand-ink"
+            className="-ml-2 grid size-11 place-items-center rounded-full text-brand-text hover:bg-brand-50"
           >
-            <ChevronLeft aria-hidden className="h-5 w-5" />
+            <ChevronLeft aria-hidden size={22} />
           </Link>
-          <div className="min-w-0 flex-1">
-            <h1 className="flex items-center gap-2 font-display text-[30px] font-semibold leading-[1.15] tracking-[-0.025em] text-brand-title sm:text-[40px]">
-              <span aria-hidden className="grid size-9 place-items-center rounded-full bg-brand-mist text-brand-forest">
-                <MessageCircle size={18} />
-              </span>
-              {E.title}
-            </h1>
-            <p className="mt-1 text-sm text-brand-muted">{E.intro(date)}</p>
-          </div>
+          {/* The trailing letter-space would push the word off centre. */}
+          <Wordmark className="justify-self-center pl-[0.35em]" />
           <AccountButton />
         </header>
 
-        {/* TD-33 (1): F11 is kept, so a check without answers gets no Echo answer; say so up front. */}
-        {!hasQuestionAnswers(session.answers) && (
-          <div role="note" className="mt-4 flex shrink-0 flex-col items-start gap-1 rounded-2xl bg-brand-mist px-4 py-3 text-brand-ink">
-            <p>{Q.echoNotice}</p>
-            <Link href="/questions" className={textLink}>
-              {Q.answerLink}
+        {/* Mockup 19: the compact Echo header once a question is asked. */}
+        {!empty && (
+          <div className="flex shrink-0 items-center gap-3 pb-3 pt-2">
+            <EchoMark className="size-11" />
+            <div className="min-w-0 flex-1">
+              <h1 className="flex items-center gap-1 text-2xl font-semibold leading-tight tracking-[-0.02em] text-brand-text">
+                {E.title}
+                <Sparkles aria-hidden size={16} className="text-brand-700" />
+              </h1>
+              <p className="truncate text-sm text-brand-text-muted">{E.checkFrom(date)}</p>
+            </div>
+            <Link href={`/checks/${encodeURIComponent(session.scanId)}`} className={`${btnGhost} shrink-0 bg-brand-50 !px-3 text-sm lg:hidden`}>
+              {E.openCheck}
             </Link>
           </div>
         )}
+        {!empty && <div className="shrink-0 border-b border-brand-border pb-2">{areaPicker}</div>}
 
-        <div role="group" aria-label={E.areaPicker} className="mt-4 flex shrink-0 gap-2 overflow-x-auto pb-1 [scrollbar-width:none]">
-          {ECHO_REGIONS.map((region) => (
-            <button
-              key={region}
-              type="button"
-              aria-pressed={region === activeRegion}
-              onClick={() => setActiveRegion(region)}
-              className="min-h-11 shrink-0 rounded-full border border-brand-line bg-brand-linen px-4 text-sm font-medium aria-pressed:border-brand-action aria-pressed:bg-brand-action aria-pressed:text-white"
-            >
-              {ECHO_REGION_LABELS[region]}
-            </button>
-          ))}
-        </div>
-
-        {/* Phone and tablet: the same readings, folded away until asked for. */}
-        <details className="group mt-3 shrink-0 rounded-2xl border border-brand-card-line bg-brand-paper px-4 py-2 lg:hidden">
-          <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between font-medium [&::-webkit-details-marker]:hidden">
-            {E.readingsSummary}
-            <ChevronDown aria-hidden size={18} className="transition-transform group-open:rotate-180" />
-          </summary>
-          <div className="pb-3 pt-2">{panel}</div>
-        </details>
-
-        <div ref={scrollRef} role="log" aria-live="polite" className="mt-4 min-h-0 flex-1 space-y-4 overflow-y-auto pb-4">
-        {echoOn && messages.length === 0 && (
-          <p className="max-w-[90%] rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">{greetingFor(activeRegion)}</p>
-        )}
-        {echoOn && shownOpening?.status === "done" && (
-          <div className="space-y-3">
-            {splitRedFlagNote(shownOpening.reply).note && (
-              <p role="note" className="max-w-[90%] rounded-xl border border-brand-line px-4 py-2 text-sm text-brand-ink">{COPY.referral}</p>
-            )}
-            <p className="max-w-[90%] whitespace-pre-line rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">{withPhoneLinks(splitDoctorLine(splitRedFlagNote(shownOpening.reply).text).text)}</p>
-            <ProductCards products={shownOpening.products} doctorLine={splitDoctorLine(shownOpening.reply).doctorLine} />
-          </div>
-        )}
-        {echoOn && shownOpening?.status === "error" && (
-          <div className="flex flex-wrap items-center gap-x-2 text-sm text-brand-muted">
-            <p>{E.openingFailed}</p>
-            <button type="button" onClick={() => loadOpening.current?.()} className="inline-flex min-h-11 items-center font-semibold text-brand-forest underline underline-offset-2">
-              {E.tryAgain}
-            </button>
-          </div>
-        )}
-        {echoOn && shownOpening?.status === "loading" && (
-          <TypingIndicator label={E.openingLoading} className="rounded-tl-sm bg-brand-paper text-brand-muted" />
-        )}
-        {messages.map((m) =>
-          m.role === "echo" ? (
-            <div key={m.id} className="space-y-3">
-              <p className="max-w-[90%] whitespace-pre-line rounded-2xl rounded-bl-md bg-brand-paper px-4 py-3 leading-relaxed text-brand-ink">
-                {withPhoneLinks(m.products ? splitDoctorLine(m.text).text : m.text)}
-              </p>
-              {m.products && <ProductCards products={m.products} doctorLine={splitDoctorLine(m.text).doctorLine} />}
-            </div>
-          ) : (
-            <div key={m.id} className="flex justify-end">
-              <div className="max-w-[85%] rounded-2xl rounded-br-md bg-brand-action px-4 py-3">
-                <p className="leading-snug text-white">{m.text}</p>
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto pb-4">
+          {/* Mockup 18: who Echo is and what it does (it explains; it does not decide). */}
+          {empty && (
+            <section className="flex flex-col gap-5 pb-5 pt-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className={`${eyebrow} tracking-[0.3em]`}>{E.meet}</p>
+                  <h1 className="mt-1 flex items-start gap-1 text-[44px] font-semibold leading-none tracking-[-0.03em] text-brand-900">
+                    {E.title}
+                    <Sparkles aria-hidden size={22} className="mt-0.5 text-brand-700" />
+                  </h1>
+                  <p className="mt-2 text-base text-brand-text-muted">{E.tagline}</p>
+                </div>
+                <EchoMark className="mr-2 mt-2 size-20 shadow-[0_0_0_10px_var(--brand-50)]" />
               </div>
-            </div>
-          )
-        )}
-        <AnimatePresence initial={false}>
-          {isThinking && (
-            <TypingIndicator key="thinking" className="rounded-tl-sm bg-brand-paper text-brand-muted" />
+              <p className="text-brand-text-muted">{E.intro(date)}</p>
+              <ul aria-label={E.doesLabel} className="grid grid-cols-3 gap-2">
+                {E.does.map((line, i) => (
+                  <li key={line} className={`${card} flex flex-col items-start gap-2 !p-3 text-[13px] font-medium leading-snug text-brand-text`}>
+                    <IconWell icon={DOES_ICONS[i]!} size={36} />
+                    {line}
+                  </li>
+                ))}
+              </ul>
+              {areaPicker}
+            </section>
           )}
-        </AnimatePresence>
-        {(activeError?.code === "AI_CONSENT_REQUIRED" || (!activeError && echoOn && shownOpening?.status === "consent")) && (
-          <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl border border-brand-line bg-brand-paper px-4 py-3">
-            <p className="text-body text-text">{AI_SHARE_CONSENT_COPY}</p>
-            <button
-              type="button"
-              onClick={() => void grantAiShare()}
-              disabled={consentSaving || sendingRegion !== null}
-              className={btnPrimary}
-            >
-              I agree
-            </button>
-            {consentFailed && (
-              <p className="text-sm text-text/70">We couldn&apos;t save that. Please reload the page and try again.</p>
+
+          {/* TD-33 (1): F11 is kept, so a check without answers gets no Echo answer; say so up front. */}
+          {!hasQuestionAnswers(session.answers) && (
+            <div role="note" className={`${tintCard} mt-3 flex flex-col items-start gap-1 text-brand-text`}>
+              <p>{Q.echoNotice}</p>
+              <Link href="/questions" className={textLink}>
+                {Q.answerLink}
+              </Link>
+            </div>
+          )}
+
+          {/* Phone and tablet: the same readings, folded away until asked for. */}
+          <details className={`group mt-3 rounded-card border border-brand-border bg-brand-surface px-4 py-1 lg:hidden`}>
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between font-medium text-brand-text [&::-webkit-details-marker]:hidden">
+              {E.readingsSummary}
+              <ChevronDown aria-hidden size={18} className="transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="pb-3 pt-2">{panel}</div>
+          </details>
+
+          <div role="log" aria-live="polite" className="mt-4 flex flex-col gap-4">
+            {echoOn && messages.length === 0 && (
+              <ChatBubble from="echo" avatar={echoAvatar}>
+                {greetingFor(activeRegion)}
+              </ChatBubble>
+            )}
+            {echoOn && shownOpening?.status === "done" && (
+              <div className="flex flex-col gap-3">
+                {splitRedFlagNote(shownOpening.reply).note && (
+                  <p role="note" className={`${tintCard} flex items-start gap-2 !py-3 text-sm text-brand-text`}>
+                    <Stethoscope aria-hidden size={18} className="mt-0.5 shrink-0 text-brand-700" />
+                    <span>{COPY.referral}</span>
+                  </p>
+                )}
+                <ChatBubble from="echo" avatar={echoAvatar}>
+                  {withPhoneLinks(splitDoctorLine(splitRedFlagNote(shownOpening.reply).text).text)}
+                </ChatBubble>
+                <div className="pl-10">
+                  <ProductCards products={shownOpening.products} doctorLine={splitDoctorLine(shownOpening.reply).doctorLine} />
+                </div>
+              </div>
+            )}
+            {echoOn && shownOpening?.status === "error" && (
+              <div className="flex flex-wrap items-center gap-x-2 pl-10 text-sm text-brand-text-muted">
+                <p>{E.openingFailed}</p>
+                <button type="button" onClick={() => loadOpening.current?.()} className={textLink}>
+                  {E.tryAgain}
+                </button>
+              </div>
+            )}
+            {echoOn && shownOpening?.status === "loading" && (
+              <div className="flex items-end gap-2">
+                {echoAvatar}
+                <TypingIndicator label={E.openingLoading} className={TYPING} />
+              </div>
+            )}
+            {messages.map((m) =>
+              m.role === "echo" ? (
+                <div key={m.id} className="flex flex-col gap-3">
+                  <ChatBubble from="echo" avatar={echoAvatar}>
+                    {withPhoneLinks(m.products ? splitDoctorLine(m.text).text : m.text)}
+                  </ChatBubble>
+                  {m.products && (
+                    <div className="pl-10">
+                      <ProductCards products={m.products} doctorLine={splitDoctorLine(m.text).doctorLine} />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <ChatBubble key={m.id} from="user">
+                  {m.text}
+                </ChatBubble>
+              )
+            )}
+            <AnimatePresence initial={false}>
+              {isThinking && (
+                <div key="thinking" className="flex items-end gap-2">
+                  {echoAvatar}
+                  <TypingIndicator className={TYPING} />
+                </div>
+              )}
+            </AnimatePresence>
+            {(activeError?.code === "AI_CONSENT_REQUIRED" || (!activeError && echoOn && shownOpening?.status === "consent")) && (
+              <div role="alert" className={alertBox}>
+                <p className="text-brand-text">{AI_SHARE_CONSENT_COPY}</p>
+                <button
+                  type="button"
+                  onClick={() => void grantAiShare()}
+                  disabled={consentSaving || sendingRegion !== null}
+                  className={btnPrimary}
+                >
+                  I agree
+                </button>
+                {consentFailed && (
+                  <p className="text-sm text-brand-text-muted">We couldn&apos;t save that. Please reload the page and try again.</p>
+                )}
+              </div>
+            )}
+            {activeError && activeError.code !== "AI_CONSENT_REQUIRED" && (
+              <div role="alert" className={alertBox}>
+                <p className="flex items-start gap-2 text-brand-text">
+                  <AlertCircle aria-hidden size={20} className="mt-0.5 shrink-0 text-brand-error" />
+                  <span>{withPhoneLinks(GATE_MESSAGES[activeError.code ?? ""] ?? (activeError.retryable ? RETRYABLE_ERROR_MESSAGE : CONFIG_ERROR_MESSAGE))}</span>
+                </p>
+                {activeError.retryable && (
+                  <button
+                    type="button"
+                    onClick={handleRetry}
+                    disabled={sendingRegion !== null}
+                    className={`${btnSecondary} disabled:opacity-50`}
+                  >
+                    Retry
+                  </button>
+                )}
+              </div>
             )}
           </div>
-        )}
-        {activeError && activeError.code !== "AI_CONSENT_REQUIRED" && (
-          <div role="alert" className="flex flex-col items-start gap-2 rounded-2xl border border-brand-line bg-brand-paper px-4 py-3">
-            <p className="text-body text-text">
-              {withPhoneLinks(GATE_MESSAGES[activeError.code ?? ""] ?? (activeError.retryable ? RETRYABLE_ERROR_MESSAGE : CONFIG_ERROR_MESSAGE))}
-            </p>
-            {activeError.retryable && (
-              <button
-                type="button"
-                onClick={handleRetry}
-                disabled={sendingRegion !== null}
-                className="inline-flex min-h-11 items-center font-semibold text-brand-forest underline underline-offset-2 disabled:opacity-50"
-              >
-                Retry
-              </button>
-            )}
-          </div>
-        )}
         </div>
 
         {/* Hidden whenever Echo cannot answer: Echo off, the questions not answered (F11), the day's limit. */}
         {echoOn && starters.length > 0 && safetyQuestionsAnswered(session.answers) && activeError?.code !== "ECHO_DAILY_LIMIT" && activeError?.code !== "ECHO_OFF" && (
-          <ul aria-label={E.startersLabel} className="flex shrink-0 gap-2 overflow-x-auto pb-2 pt-1 [scrollbar-width:none]">
-            {starters.map((q) => (
-              <li key={q} className="shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleSend(q)}
-                  disabled={sendingRegion !== null}
-                  className="min-h-11 max-w-[16rem] rounded-2xl border border-brand-line bg-brand-paper px-4 py-2 text-left text-sm font-medium text-brand-forest hover:border-brand-action disabled:opacity-50"
-                >
-                  {q}
-                </button>
-              </li>
-            ))}
-          </ul>
+          <div className="shrink-0 pt-2">
+            <SuggestionChips label={E.startersLabel} items={starters} onPick={(q) => handleSend(q)} disabled={sendingRegion !== null} />
+          </div>
         )}
 
         {/* TD-29 (5): with Echo switched off, a plain notice replaces the input. */}
         {!echoOn ? (
-          <div role="status" className="shrink-0 space-y-2 border-t border-brand-line py-4 text-sm text-brand-muted">
+          <div role="status" className="my-3 shrink-0 space-y-2 rounded-card bg-brand-50 px-4 py-3 text-sm text-brand-text-muted">
             <p>{E.off}</p>
             <p>{withPhoneLinks(REFERRAL_LINE)}</p>
           </div>
         ) : (
-        <form
-          className="flex shrink-0 items-center gap-2 border-t border-brand-line py-3"
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-        >
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder={E.placeholder(areaLabel)}
-            aria-label={E.placeholder(areaLabel)}
-            // Matches ChatMessageSchema's text bound (app/api/skin-check/chat/
-            // route.ts) — caps client-side so a too-long message fails to type
-            // rather than failing at send with a 400 the UI can't usefully retry.
-            maxLength={2000}
-            // TD-29 (5): after the day's limit, every question would fail the same way.
-            disabled={sendingRegion !== null || activeError?.code === "ECHO_DAILY_LIMIT"}
-            className="h-12 min-w-0 flex-1 rounded-full border border-brand-line bg-brand-paper px-4 text-base text-brand-ink disabled:opacity-60"
-          />
-          <button
-            type="submit"
-            disabled={sendingRegion !== null || !draft.trim() || activeError?.code === "ECHO_DAILY_LIMIT"}
-            aria-label={E.send}
-            className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-action text-white hover:bg-brand-action-hover disabled:bg-brand-linen2 disabled:text-brand-muted"
-          >
-            <SendHorizontal aria-hidden size={20} />
-          </button>
-        </form>
+          <div className="shrink-0 py-3">
+            <ChatInput
+              label={E.placeholder(areaLabel)}
+              sendLabel={E.send}
+              value={draft}
+              onChange={setDraft}
+              onSend={() => handleSend()}
+              // Matches ChatMessageSchema's text bound (app/api/skin-check/chat/
+              // route.ts) — caps client-side so a too-long message fails to type
+              // rather than failing at send with a 400 the UI can't usefully retry.
+              maxLength={2000}
+              // TD-29 (5): after the day's limit, every question would fail the same way.
+              disabled={sendingRegion !== null || activeError?.code === "ECHO_DAILY_LIMIT"}
+            />
+          </div>
         )}
       </div>
 
@@ -551,5 +605,6 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
         {panel}
       </aside>
     </main>
+    </MotionConfig>
   );
 }

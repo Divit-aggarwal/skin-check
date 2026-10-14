@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useReducer, useRef, useState, type ChangeEvent } from "react";
-import { AlertCircle, Camera, RotateCcw } from "lucide-react";
-import { CAPTURE_COPY as K, cameraView } from "../captureStates";
+import { AlertCircle, Camera, Check, RotateCcw, ScanFace } from "lucide-react";
+import { CAPTURE_COPY as K, GATE_COPY as G, cameraView, gateRows } from "../captureStates";
 import { useCameraStream } from "@/hooks/useCameraStream";
 import { useAuth } from "@/lib/auth-context";
 import { isAuthError, isUploadError, isUploadTooLarge, runSkinScan, UPLOAD_TOO_LARGE_MESSAGE } from "@/lib/api";
@@ -22,7 +22,8 @@ import { frameFromBlob } from "@/lib/capture-quality/frame";
 import { canAnalyze, canOverride, captureFlowReducer, initialCaptureFlow, runCaptureGate } from "@/lib/capture-quality/gate";
 import { isRetakeError, RETAKE_COPY, retakeReasonFromServerCode } from "@/lib/capture-quality/retake";
 import { Button } from "@/components/ui/button";
-import { btnPrimary, btnSecondary } from "@/components/ui/page";
+import { btnPrimary, btnSecondary, card, eyebrow } from "@/components/ui/page";
+import { TintCard } from "@/components/ui/kit";
 import type { PhotoCaptureStep } from "@/types/skin-check";
 import type { CaptureMethod, SkinScanState } from "@/types/skin-scan";
 
@@ -343,7 +344,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   // Firebase hasn't reported yet — holding the frame is the difference
   // between "we don't know" and "you're signed out" (failure case 6).
   if (authLoading) {
-    return <div className="h-40 w-full max-w-[280px] animate-pulse rounded-lg bg-canvas" />;
+    return <div className="h-40 w-full max-w-[280px] animate-pulse rounded-card bg-brand-50" />;
   }
 
   // Unreachable through the normal flow — the "verify" section sits directly
@@ -352,7 +353,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   // the verify section, a signOut in another tab, an expired session.
   if (!user) {
     return (
-      <div className="flex flex-col gap-2 rounded-2xl border border-brand-card-line bg-brand-paper p-4">
+      <div className={`${card} flex flex-col gap-2`}>
         <p className="text-sm text-brand-muted">
           Verify your phone number before taking your photo.
         </p>
@@ -366,11 +367,11 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   if (value === "done") {
     const thumbSrc = previewUrl ?? donePreviewUrl;
     return (
-      <div className="flex flex-col gap-3 rounded-2xl border border-brand-line bg-brand-paper p-4 sm:flex-row sm:items-center">
+      <div className={`${card} flex flex-col gap-3 sm:flex-row sm:items-center`}>
         <div className="flex items-center gap-3">
           {thumbSrc && (
             // eslint-disable-next-line @next/next/no-img-element -- transient object URL, not a static asset
-            <img src={thumbSrc} alt="Captured photo" className="h-14 w-14 rounded-md object-cover" />
+            <img src={thumbSrc} alt="Captured photo" className="size-14 rounded-tile object-cover" />
           )}
           <p className="text-sm text-brand-muted">
             {scan.status === "loading"
@@ -383,7 +384,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
         <button
           type="button"
           onClick={handleRetakeFromDone}
-          className="inline-flex min-h-11 items-center gap-2 text-sm font-medium text-brand-forest underline-offset-4 hover:underline sm:ml-auto"
+          className="inline-flex min-h-11 items-center gap-2 text-sm font-semibold text-brand-700 underline-offset-4 hover:underline sm:ml-auto"
         >
           <RotateCcw aria-hidden className="h-4 w-4" />
           {K.retake}
@@ -414,7 +415,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
       {/* The video stays mounted on the laptop from "start" to "ready": the
           stream attaches to it while the browser asks (useCameraStream). */}
       {/* A phone has no live preview, so its start box is small: "Open camera" stays above the fold at 390px. */}
-      <div className={`relative w-full overflow-hidden rounded-2xl bg-brand-ink ${isMobile && !hasCaptured ? "aspect-square max-w-[200px]" : "aspect-[3/4] max-w-[320px]"}`}>
+      <div className={`relative w-full self-center overflow-hidden rounded-card bg-brand-900 ${isMobile && !hasCaptured ? "aspect-square max-w-[200px]" : "aspect-[3/4] max-w-[320px]"}`}>
         {!isMobile && !hasCaptured && (
           <video
             ref={videoRef}
@@ -433,9 +434,16 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
         {!isMobile && <canvas ref={canvasRef} className="hidden" />}
         {(view === "start" || blocked) && (
           <div aria-hidden className="absolute inset-0 flex items-center justify-center">
-            <div className="flex h-[58%] w-[62%] items-center justify-center rounded-[50%] border-2 border-dashed border-white/40">
-              <Camera className="h-10 w-10 text-white/60" />
-            </div>
+            <Camera className="h-10 w-10 text-white/60" />
+          </div>
+        )}
+        {/* Framing guide (mockup 07): corners only, no live checks (C11). */}
+        {(view === "start" || view === "ready" || blocked) && (
+          <div aria-hidden className="pointer-events-none absolute inset-[14%]">
+            <span className="absolute left-0 top-0 size-7 rounded-tl-lg border-l-2 border-t-2 border-white/80" />
+            <span className="absolute right-0 top-0 size-7 rounded-tr-lg border-r-2 border-t-2 border-white/80" />
+            <span className="absolute bottom-0 left-0 size-7 rounded-bl-lg border-b-2 border-l-2 border-white/80" />
+            <span className="absolute bottom-0 right-0 size-7 rounded-br-lg border-b-2 border-r-2 border-white/80" />
           </div>
         )}
         {view === "loading" && (
@@ -456,7 +464,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
         />
       )}
 
-      <p className="max-w-sm text-sm text-brand-muted">{step.note}</p>
+      <TintCard icon={ScanFace} title={G.frameTitle} body={step.note} className="max-w-md" />
 
       {/* Loading is announced here; "ready" is heard through the focus move to Take photo (its description). */}
       <div role="status" className="max-w-sm text-sm">
@@ -469,7 +477,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
       )}
 
       {blocked && (
-        <div className="flex max-w-md flex-col gap-3 rounded-2xl border border-brand-line bg-brand-paper p-4 text-brand-ink">
+        <div className={`${card} flex max-w-md flex-col gap-3 text-brand-text`}>
           {/* Only the title is announced; the how-to is read on demand. */}
           <p role="alert" className="flex items-start gap-2 font-semibold">
             <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-brand-error" />
@@ -509,9 +517,16 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
       )}
 
       {view === "ready" && (
-        <button ref={takeRef} type="button" onClick={handleCapture} aria-describedby="camera-ready" className={`${btnPrimary} w-full sm:w-fit`}>
-          <Camera aria-hidden className="h-5 w-5" />
-          {K.take}
+        // The shutter (mockup 07): a round button, named by its hidden text.
+        <button
+          ref={takeRef}
+          type="button"
+          onClick={handleCapture}
+          aria-describedby="camera-ready"
+          className="grid size-[76px] place-items-center self-center rounded-full border-4 border-brand-700 bg-brand-surface transition-colors duration-fast hover:bg-brand-50"
+        >
+          <span aria-hidden className="size-14 rounded-full bg-brand-700" />
+          <span className="sr-only">{K.take}</span>
         </button>
       )}
 
@@ -570,11 +585,31 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
             </span>
           </label>
 
+          {/* Redesign 07: the gate's own result for this photo, words only (no number). */}
+          {flow.gate === "done" && gateRows(flow.quality).length > 0 && (
+            <section aria-labelledby="photo-check-title" className={`${card} max-w-md`}>
+              <h2 id="photo-check-title" className={eyebrow}>
+                {G.title}
+              </h2>
+              <ul className="mt-2 flex flex-col divide-y divide-brand-border">
+                {gateRows(flow.quality).map((row) => (
+                  <li key={row.id} className="flex min-h-11 items-center justify-between gap-3 text-sm">
+                    <span className="text-brand-text">{row.label}</span>
+                    <span className={`inline-flex items-center gap-1.5 font-semibold ${row.status === "fail" ? "text-brand-error" : row.status === "pass" ? "text-brand-700" : "text-brand-text-muted"}`}>
+                      {row.status === "pass" ? <Check aria-hidden size={16} /> : row.status === "fail" ? <AlertCircle aria-hidden size={16} /> : null}
+                      {row.status === "pass" ? G.pass : row.status === "fail" ? G.fail : G.notMeasured}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           {/* Gate status (C01). Instruction only: no score or number. */}
           <div aria-live="polite" className="max-w-sm text-sm">
             {flow.gate === "pending" && <p className="text-brand-muted">Checking your photo…</p>}
             {flow.gate === "done" && flow.quality && flow.quality.retakeReasons.length > 0 && (
-              <p role="alert" className="flex items-start gap-2 rounded-xl border border-brand-line bg-brand-paper px-4 py-3 text-brand-ink">
+              <p role="alert" className="flex items-start gap-2 rounded-tile border border-brand-border bg-brand-surface px-4 py-3 text-brand-text">
                 <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-brand-error" />
                 <span>{RETAKE_COPY[flow.quality.retakeReasons[0]!]}</span>
               </p>

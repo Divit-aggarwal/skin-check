@@ -1,5 +1,6 @@
 import { RoutinePage } from "@/components/routine/RoutinePage";
 import { PageHeader, page } from "@/components/ui/page";
+import { AppHeader } from "@/components/ui/kit";
 import { ROUTINE_COPY as C } from "@/lib/routine/copy";
 
 // description and openGraph are set here so the root description, which links
@@ -14,6 +15,10 @@ export const metadata = {
 export default function RoutineRoute() {
   return (
     <main className={page}>
+      {/* Phones: the wordmark bar (redesign); the rail and side bar carry it from 640px. */}
+      <div className="sm:hidden">
+        <AppHeader back="/dashboard" backLabel="Back to Today" />
+      </div>
       <PageHeader title={C.title} intro={C.purpose} />
       <RoutinePage />
     </main>

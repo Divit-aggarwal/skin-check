@@ -155,7 +155,7 @@ export function PhoneAuthStep({
             Excluded on the `savesScan` step, whose own already-signed-in
             branch below is the deliberate submit action. */}
         {!step.savesScan && (
-          <Button variant="ink" size="sm" onClick={onCommit} className="w-fit">
+          <Button variant="ink" size="lg" onClick={onCommit} className="w-fit">
             Continue
           </Button>
         )}
@@ -190,7 +190,7 @@ export function PhoneAuthStep({
         </p>
         <Button
           variant="ink"
-          size="sm"
+          size="lg"
           disabled={blocked || saving}
           onClick={() => handleAuthenticated(activeUser)}
           className="w-fit"

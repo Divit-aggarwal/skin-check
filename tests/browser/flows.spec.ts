@@ -6,6 +6,7 @@ import { CAPTURE_QUALITY_SETTINGS } from "@/lib/capture-quality/settings";
 import { RETAKE_COPY } from "@/lib/capture-quality/retake";
 import { AI_SHARE_CONSENT_COPY, ERASE_CONFIRMATION } from "@/lib/consent";
 import { ROUTINE_COPY as R } from "@/lib/routine/copy";
+import { PRODUCTS_COPY } from "@/components/products/copy";
 import { CATALOGUE } from "@/lib/catalog/catalogue";
 import { TIMELINE_COPY as T } from "@/components/timeline/copy";
 import { ECHO_COPY as E } from "@/components/skin-check/echoCopy";
@@ -149,7 +150,7 @@ test("returning user: 'New check' to the results without meeting a question", as
   await page.getByRole("link", { name: C.entryLink }).first().click();
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { level: 1, name: H.permissions.title })).toBeVisible();
-  await page.screenshot({ path: "docs/design/home-v2/permissions-after-check-390.png", fullPage: true });
+  await page.screenshot({ path: `${process.env.AFTER_SHOTS ? "docs/design/home-v2" : ".local-stack/browser-shots"}/permissions-after-check-390.png`, fullPage: true });
   await page.getByRole("button", { name: H.permissions.continue }).click();
   await expect(page.getByRole("heading", { level: 1, name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
   await page.reload();
@@ -183,6 +184,7 @@ test("Echo asks for AI-share consent first", async ({ page }) => {
   await signIn(page, U.echo!.phoneNumber);
   // TD-47: the privacy card is on Account.
   await page.goto("/account");
+  await page.getByRole("link", { name: "Privacy", exact: true }).click(); // redesign 21 (lane E): privacy is a tab
   await expect(page.getByText(C.privacy.aiNotAsked)).toBeVisible();
   await desktop(page); // TD-48: the Home v2 content is the desktop Home
   await page.goto("/dashboard");
@@ -194,6 +196,7 @@ test("Echo asks for AI-share consent first", async ({ page }) => {
 test("withdraw AI-share consent on Account, then Echo asks again", async ({ page }) => {
   await signIn(page, U.withdraw!.phoneNumber);
   await page.goto("/account");
+  await page.getByRole("link", { name: "Privacy", exact: true }).click(); // redesign 21 (lane E): privacy is a tab
   await page.getByRole("button", { name: C.privacy.stop }).click();
   await expect(page.getByText(C.privacy.aiOff)).toBeVisible();
   await page.getByRole("heading", { name: C.privacy.title }).scrollIntoViewIfNeeded();
@@ -210,8 +213,11 @@ test("routine: the four steps, an empty step invites an add, used and skipped in
   await expect(page.getByText(R.empty)).toBeVisible();
   const morning = page.getByRole("region", { name: R.slot.AM, exact: true });
   const evening = page.getByRole("region", { name: R.slot.PM, exact: true });
-  for (const step of Object.values(R.steps)) await expect(morning.getByText(step, { exact: true })).toBeVisible();
+  // Redesign Phase 2: one time of day at a time; it opens on the current one.
+  await page.getByRole("radio", { name: R.slot.PM }).click();
   await expect(evening.getByText(R.eveningProtect)).toBeVisible();
+  await page.getByRole("radio", { name: R.slot.AM }).click();
+  for (const step of Object.values(R.steps)) await expect(morning.getByText(step, { exact: true })).toBeVisible();
 
   // An empty step opens the add form for that step and slot. The real
   // catalogue (TD-29 (1)) has a serum, so the form offers it.
@@ -228,6 +234,8 @@ test("routine: the four steps, an empty step invites an add, used and skipped in
   await addSection.getByRole("button", { name: R.addButton, exact: true }).click();
   const entry = (name: string) => morning.locator("[data-routine-entry]").filter({ has: page.getByText(name, { exact: true }) });
   await expect(entry(first!)).toBeVisible();
+  // Redesign lane C (screen 06 to 15): an own product's card links to its product page.
+  await expect(page.locator("article[data-routine-card]").filter({ hasText: first! }).getByRole("link", { name: PRODUCTS_COPY.detailsLabel(first!) })).toHaveAttribute("href", /^\/products\/[a-z0-9-]+$/);
   await entry(first!).getByRole("button", { name: R.logAs(R.status.used, first!, R.slot.AM.toLowerCase()) }).click();
   await expect(entry(first!).getByText(R.todayStatus(R.status.used))).toBeVisible();
 
@@ -246,6 +254,8 @@ test("routine: the four steps, an empty step invites an add, used and skipped in
   await skipped.focus();
   await entry(first!).getByRole("button", { name: R.logAs(R.status.used, first!, R.slot.AM.toLowerCase()) }).click();
   await page.reload();
+  // The page reopens on the current time of day (after 15:00, Evening).
+  await page.getByRole("radio", { name: R.slot.AM }).click();
   await expect(entry(first!).getByText(R.todayStatus(R.status.used))).toBeVisible();
   await expect(entry(R.otherProduct).getByText(R.todayStatus(R.status.skipped))).toBeVisible();
   // No reading or photo next to a routine entry.
@@ -334,6 +344,7 @@ test("account: sign-in lands on Home; the account page has the sign-in, privacy 
   await signIn(page, U.withdraw!.phoneNumber); // the helper asserts the sign-in went to /dashboard (TD-24 (3))
   await page.goto("/account");
   await expect(page.getByText(/Signed in as/)).toBeVisible();
+  await page.getByRole("link", { name: "Privacy", exact: true }).click(); // redesign 21 (lane E): privacy is a tab
   await expect(page.getByRole("heading", { name: C.privacy.title })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Delete your account" })).toBeVisible();
   await expect(page.getByText(C.history.kind.reading)).toHaveCount(0);
@@ -390,6 +401,7 @@ for (const key of ["noreading", "legacy", "building"] as const) {
     await expect(list.getByText(label).first()).toBeVisible();
     expect(await list.getByText(label).allTextContents()).toHaveLength(user.checks.length);
     await page.goto("/account");
+    await page.getByRole("link", { name: "Privacy", exact: true }).click(); // redesign 21 (lane E): privacy is a tab
     await expect(page.getByRole("heading", { name: C.privacy.title })).toBeVisible();
     await expect(page.getByRole("main").getByText(label)).toHaveCount(0);
   });

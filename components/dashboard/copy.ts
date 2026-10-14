@@ -6,7 +6,7 @@
 export const DASHBOARD_COPY = {
   title: "Your skin checks",
   // O-D3: the link to /dashboard from the results screen, /account and the signed-in start page.
-  entryLink: "Go to Home",
+  entryLink: "Go to Today",
   signedOut: "Sign in to see your skin checks.",
   signIn: "Sign in",
   loading: "Loading your checks…",
@@ -93,6 +93,7 @@ export const DASHBOARD_COPY = {
       questions: "Questions only",
     },
     openLabel: (date: string) => `Open the check from ${date}`,
+    otherVersion: "Read by a different version of the analysis software",
     checkFrom: (date: string) => `Check from ${date}`,
     back: "Back to your dashboard",
     // TD-24 (1): on every opened check, always visible. Fixed owner wording.

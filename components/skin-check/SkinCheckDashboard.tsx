@@ -87,7 +87,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
             there is no summary to write — the photo still renders because
             it's real; the reading isn't. */}
         <FacePhoto photo={photo} mesh={false} />
-        <div role="alert" className="flex flex-col items-start gap-3 rounded-2xl border border-brand-line bg-brand-paper p-5">
+        <div role="alert" className="flex flex-col items-start gap-3 rounded-card border border-brand-border bg-brand-surface p-5">
           <p>{message}</p>
           {canRetrySamePhoto(scan) ? (
             // Resends the same photo, so it must not promise a new one.
@@ -110,13 +110,13 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
   // score, no Dryness ("a photo cannot measure it"); the readings table is the
   // same component the dashboard and an opened check use.
   const readings = readingsOf(scan.result as unknown as Record<string, unknown>);
-  const view = { scanId, date: null, source: "measured" as const, bands: readings.bands, areas: readings.areas, hardToRead: readings.hardToRead, photoCheck: null };
+  const view = { scanId, date: null, source: "measured" as const, bands: readings.bands, areas: readings.areas, hardToRead: readings.hardToRead, photoCheck: null, pipelineVersion: null };
 
   return (
     <div className="flex flex-col gap-10">
       {/* TD-39: one photo with the mesh and both overlays, the table below it. Nothing to choose. */}
-      <section aria-labelledby="readings-title" className="flex w-full max-w-3xl flex-col gap-5 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
-        <h2 id="readings-title" className="font-display text-xl font-semibold uppercase leading-tight tracking-[0.04em] text-brand-title sm:text-[22px]">
+      <section aria-labelledby="readings-title" className="flex w-full max-w-3xl flex-col gap-5 rounded-card border border-brand-border bg-brand-surface p-4 shadow-card sm:p-5">
+        <h2 id="readings-title" className="text-lg font-semibold leading-tight text-brand-text sm:text-xl">
           What this photo shows
         </h2>
         {view.bands ? (
@@ -127,11 +127,11 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
             <p>The readings of this check could not be shown.</p>
           </>
         )}
-        <p className="text-sm text-brand-muted">
+        <p className="text-sm text-brand-text-muted">
           Each reading is relative to this one photo. It is not a medical opinion and does not set you against other people or other checks.
         </p>
         {view.bands && (
-          <div className="border-t border-brand-line pt-5">
+          <div className="border-t border-brand-border pt-5">
             <KnownAndNotKnown />
           </div>
         )}
@@ -147,9 +147,9 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
           breaks `position: fixed`. */}
       {/* TD-29 (5): no way into Echo while it is switched off. */}
       {echoOn() && (
-      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-raised -mx-4 -mt-6 border-t border-brand-line bg-brand-linen/95 px-4 py-3 backdrop-blur sm:bottom-0 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:mt-0 lg:rounded-2xl lg:border lg:px-6">
+      <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] z-raised -mx-4 -mt-6 border-t border-brand-border bg-brand-surface/95 px-4 py-3 backdrop-blur sm:bottom-0 sm:-mx-6 sm:px-6 lg:static lg:mx-0 lg:mt-0 lg:rounded-card lg:border lg:px-6">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-3 lg:max-w-none">
-          <p className="text-sm text-brand-muted">Questions about this check?</p>
+          <p className="text-sm text-brand-text-muted">Questions about this check?</p>
           <Button asChild variant="ink" size="lg" className="shrink-0 px-5">
             <Link href="/echo">Chat with Echo</Link>
           </Button>

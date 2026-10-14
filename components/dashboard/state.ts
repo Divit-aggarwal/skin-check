@@ -46,6 +46,8 @@ export interface CheckView {
   hardToRead: string[];
   /** null for a legacy check: it predates the photo checks. */
   photoCheck: PhotoCheck | null;
+  /** The analysis software that read it; null for a legacy check. */
+  pipelineVersion: string | null;
 }
 
 export interface HistoryRow {
@@ -168,6 +170,7 @@ function measuredView(m: Measured): CheckView {
     areas: areasOf(m.record.region_scores),
     hardToRead: hardToRead(m.record.region_low_confidence),
     photoCheck: photoCheckOf(m.record),
+    pipelineVersion: m.state.engine.pipelineVersion,
   };
 }
 
@@ -180,6 +183,7 @@ function legacyView(check: Doc, result: Obj): CheckView {
     areas: areasOf(result.region_scores),
     hardToRead: hardToRead(result.region_low_confidence),
     photoCheck: null,
+    pipelineVersion: null,
   };
 }
 

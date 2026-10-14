@@ -10,7 +10,7 @@ import { CAUSE, CHANGE, DIAGNOSIS, FORECAST, MEDICAL } from "@/lib/context/lexic
 // tests/dashboard-copy.test.ts covers) pass the same D-12 checks, and TD-25 (6):
 // the word "check" on screen, never "scan".
 
-const DIRS = ["components/checks", "components/timeline", "components/shell", "components/ui/page.tsx", "app/(marketing)/checks", "components/skin-check/echoCopy.ts", "app/(marketing)/account/AccountView.tsx", "app/(marketing)/account/copy.ts", "app/not-found.tsx", "app/(marketing)/error.tsx", "app/(marketing)/page.tsx", "app/(marketing)/echo/page.tsx", "components/skin-check/SkinCheckDashboard.tsx", "components/mesh", "components/routine", "components/dashboard/FaceDrawing.tsx", "components/skin-check/questionsCopy.ts", "components/skin-check/QuestionsChoice.tsx", "components/skin-check/LaterQuestions.tsx", "components/skin-check/captureStates.ts", "components/skin-check/inputs/ProductNameBox.tsx", "app/(marketing)/questions", "components/skin-check/ProductCards.tsx"];
+const DIRS = ["components/checks", "components/timeline", "components/shell", "components/ui/page.tsx", "app/(marketing)/checks", "components/skin-check/echoCopy.ts", "app/(marketing)/account/AccountView.tsx", "app/(marketing)/account/copy.ts", "app/not-found.tsx", "app/(marketing)/error.tsx", "app/(marketing)/page.tsx", "app/(marketing)/echo/page.tsx", "components/skin-check/SkinCheckDashboard.tsx", "components/mesh", "components/routine", "components/dashboard/FaceDrawing.tsx", "components/skin-check/questionsCopy.ts", "components/skin-check/QuestionsChoice.tsx", "components/skin-check/LaterQuestions.tsx", "components/skin-check/captureStates.ts", "components/skin-check/inputs/ProductNameBox.tsx", "app/(marketing)/questions", "components/skin-check/ProductCards.tsx", "components/products", "app/(marketing)/products", "components/skin-check/flowCopy.ts", "components/skin-check/WeeklyCheckin.tsx", "components/skin-check/CheckStart.tsx"];
 
 function sourceText(src: string): string[] {
   const code = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/(^|[^:"'`])\/\/.*$/gm, "$1");
@@ -147,5 +147,14 @@ describe("G23: phone number on the check flow", () => {
     const src = readFileSync("components/skin-check/inputs/PhoneAuthStep.tsx", "utf8");
     expect(src).not.toMatch(/\{activeUser\.phoneNumber\}/);
     expect(src).toMatch(/phone ending <span[^>]*>\{activeUser\.phoneNumber\?\.slice\(-4\)\}<\/span>/);
+  });
+});
+
+// H38: the Account page shows only the last 4 digits too.
+describe("H38: phone number on Account", () => {
+  it("never renders the full number", () => {
+    const src = readFileSync("components/auth/PhoneOtpForm.tsx", "utf8");
+    expect(src).not.toMatch(/\{user\.phoneNumber\}/);
+    expect(src).toMatch(/phone ending <span[^>]*>\{user\.phoneNumber\?\.slice\(-4\)\}<\/span>/);
   });
 });

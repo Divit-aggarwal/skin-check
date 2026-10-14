@@ -4,8 +4,9 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
-import { Check, ChevronDown, CloudSun, Flame, MapPin } from "lucide-react";
+import { Check, ChevronDown, Droplet, Flame, MapPin, Sun, Wind } from "lucide-react";
 import { btnPrimary, btnSecondary, card, h2, LoadingState, ReloadButton, textLink } from "@/components/ui/page";
+import { IconWell } from "@/components/ui/kit";
 import { Thumb } from "@/components/checks/Thumb";
 import { useRoutine } from "@/components/routine/useRoutine";
 import { stepOf, STEPS } from "@/components/routine/RoutineSteps";
@@ -68,7 +69,7 @@ export function NextCheckCard({ dashboard, user, settings, onSettings }: { dashb
   const act = due || next.kind === "first";
   return (
     <Card id="next" title={H.next.title}>
-      <p className="font-display text-xl font-semibold text-brand-title" data-testid="next-check">
+      <p className="text-xl font-semibold text-brand-title" data-testid="next-check">
         {line}
       </p>
       <div className="flex flex-col gap-1 text-sm text-brand-muted">
@@ -165,14 +166,14 @@ export function LatestCheckCard({ dashboard, onArea }: { dashboard: Dashboard; o
       ) : (
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
           {(shownRow?.photoClaimed || drawing) && (
-            <div className="mx-auto flex w-40 shrink-0 justify-center rounded-2xl bg-brand-linen p-3 sm:mx-0 sm:w-48">
+            <div className="mx-auto flex w-40 shrink-0 justify-center rounded-card bg-brand-50 p-3 sm:mx-0 sm:w-48">
               {shownRow?.photoClaimed ? <Thumb scanId={view.scanId} date={formatDate(date)} size={112} fallback={drawing} /> : drawing}
             </div>
           )}
           <div className="flex min-w-0 flex-1 flex-col gap-3">
             {view.bands ? (
               <table className="w-full text-left text-sm">
-                <caption className="pb-1 text-left font-display text-base font-semibold text-brand-title">{H.latest.readingsTitle}</caption>
+                <caption className="pb-1 text-left text-base font-semibold text-brand-title">{H.latest.readingsTitle}</caption>
                 <tbody className="divide-y divide-brand-line">
                   {view.bands.map((b) => (
                     <tr key={b.metric} className="h-11">
@@ -277,7 +278,7 @@ export function RoutineCard({ routine }: { routine: Routine }) {
             if (items.length === 0) return null;
             return (
               <div key={slot} className="flex flex-col gap-2">
-                <h3 className="font-display text-base font-semibold text-brand-title">{ROUTINE_COPY.slot[slot]}</h3>
+                <h3 className="text-base font-semibold text-brand-title">{ROUTINE_COPY.slot[slot]}</h3>
                 <ul className="flex flex-col gap-2">
                   {items.map((d) => {
                     const step = stepOf(d.productId);
@@ -372,20 +373,25 @@ export function WeatherCard({ user, settings, onSettings }: { user: User; settin
       {weather.kind === "unavailable" && <p className="text-brand-muted">{H.weather.unavailable}</p>}
       {(weather.kind === "ready" || weather.kind === "stale") && (
         <>
+          {/* Mockup 02, from the data that exists: UV (today's peak), humidity, air. No temperature, UV curve or forecast. */}
+          <div className="flex items-start gap-4 rounded-card bg-brand-50 p-4">
+            <IconWell icon={Sun} size={56} className="bg-brand-surface text-severity-moderate" />
+            <dl className="min-w-0">
+              <dt className="text-sm text-brand-text-muted">{H.weather.uv}</dt>
+              <dd className="text-[40px] font-semibold leading-none text-brand-text">{Math.round(weather.c.uv)}</dd>
+              <dd className={`mt-1 font-semibold ${SEVERITY[uvLevel(uvCategory(weather.c.uv))]}`}>{H.weather.uvNote(uvCategory(weather.c.uv))}</dd>
+              <dd className="mt-2 text-sm text-brand-text">{UV_ADVICE[uvCategory(weather.c.uv)]}</dd>
+            </dl>
+          </div>
+          <dl className="grid grid-cols-2 gap-3">
+            <Tile icon={Droplet} label={H.weather.humidity} value={H.weather.humidityValue(weather.c.humidity)} />
+            <Tile icon={Wind} label={H.weather.air} value={String(Math.round(weather.c.usAqi))} note={H.weather.airNote(aqiCategory(weather.c.usAqi))} noteClass={SEVERITY[aqiLevel(aqiCategory(weather.c.usAqi))]} />
+          </dl>
           <p className="flex items-center gap-1.5 text-sm text-brand-muted">
             <MapPin aria-hidden size={16} />
             {H.weather.updated(city.name, time(weather.c.observedAt))}
           </p>
           {weather.kind === "stale" && <p className="text-sm text-brand-muted">{H.weather.lastKnown(time(weather.c.observedAt))}</p>}
-          <dl className="grid grid-cols-3 gap-2">
-            <Tile label={H.weather.uv} value={String(Math.round(weather.c.uv))} note={H.weather.uvNote(uvCategory(weather.c.uv))} />
-            <Tile label={H.weather.humidity} value={H.weather.humidityValue(weather.c.humidity)} />
-            <Tile label={H.weather.air} value={String(Math.round(weather.c.usAqi))} note={H.weather.airNote(aqiCategory(weather.c.usAqi))} />
-          </dl>
-          <p className="flex items-start gap-2">
-            <CloudSun aria-hidden size={18} className="mt-0.5 shrink-0 text-brand-muted" />
-            <span>{UV_ADVICE[uvCategory(weather.c.uv)]}</span>
-          </p>
         </>
       )}
       <div className="flex flex-wrap items-center justify-between gap-x-4">
@@ -408,15 +414,25 @@ export function WeatherCard({ user, settings, onSettings }: { user: User; settin
   );
 }
 
-function Tile({ label, value, note }: { label: string; value: string; note?: string }) {
+function Tile({ icon, label, value, note, noteClass = "text-brand-ink" }: { icon: typeof Sun; label: string; value: string; note?: string; noteClass?: string }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-lg bg-brand-linen p-3">
-      <dt className="text-xs font-semibold text-brand-muted">{label}</dt>
-      <dd className="font-display text-xl font-semibold text-brand-title">{value}</dd>
-      {note && <dd className="text-xs text-brand-ink">{note}</dd>}
+    <div className="flex min-w-0 items-start gap-3 rounded-card border border-brand-border p-3">
+      <IconWell icon={icon} size={36} />
+      <div className="min-w-0">
+        <dt className="text-xs font-semibold text-brand-muted">{label}</dt>
+        <dd className="text-xl font-semibold text-brand-title">{value}</dd>
+        {note && <dd className={`text-xs font-semibold ${noteClass}`}>{note}</dd>}
+      </div>
     </div>
   );
 }
+
+// Brief §1: weather severity in words and a text colour (the words carry it; every colour is AA on white).
+// Weather only: never on a reading.
+type Level = "none" | "moderate" | "warm" | "high";
+const SEVERITY: Record<Level, string> = { none: "text-brand-ink", moderate: "text-severity-moderate", warm: "text-severity-warm", high: "text-severity-high" };
+const uvLevel = (c: string): Level => (c === "Low" ? "none" : c === "Moderate" ? "moderate" : c === "High" ? "warm" : "high");
+const aqiLevel = (c: string): Level => (c === "Good" ? "none" : c === "Moderate" ? "moderate" : c === "Unhealthy for sensitive groups" ? "warm" : "high");
 
 /** No city yet (or changing it): why it helps, "Use my location" while the browser can ask, and always "Type my city". */
 /**
@@ -604,7 +620,7 @@ export function AskEchoCard({ uid, dashboard, data, productsOn }: { uid: string;
               <ul className="flex flex-col gap-2">
                 {starters.map((q) => (
                   <li key={q}>
-                    <button type="button" onClick={() => openEcho({ ask: q })} className="min-h-11 w-full rounded-2xl border border-brand-line bg-brand-paper px-4 py-2 text-left text-sm font-medium text-brand-forest hover:border-brand-action">
+                    <button type="button" onClick={() => openEcho({ ask: q })} className="min-h-11 w-full rounded-card border border-brand-border bg-brand-surface px-4 py-2 text-left text-sm font-medium text-brand-700 transition-colors duration-fast hover:bg-brand-50">
                       {q}
                     </button>
                   </li>
@@ -627,7 +643,7 @@ export function AskEchoCard({ uid, dashboard, data, productsOn }: { uid: string;
 
 export function NewCheckBanner() {
   return (
-    <section aria-label={H.banner.start} className="flex flex-col items-start justify-between gap-3 rounded-2xl border border-brand-line p-5 sm:flex-row sm:items-center sm:p-6">
+    <section aria-label={H.banner.start} className="flex flex-col items-start justify-between gap-3 rounded-card border border-brand-border p-5 sm:flex-row sm:items-center sm:p-6">
       <p>{H.banner.line}</p>
       <Link href="/skin-check" className={`${btnSecondary} shrink-0`}>
         {H.banner.start}

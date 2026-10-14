@@ -36,8 +36,8 @@ export function FaceDrawing({
 }) {
   return (
     <svg role={onArea ? "group" : "img"} aria-label="A drawing of a face with its four areas: forehead, nose, cheeks and chin" viewBox="0 0 280 330" className="mx-auto block h-auto w-full max-w-[240px] select-none font-body sm:max-w-[300px]">
-      <g aria-hidden fill="none" stroke="#B0AAA2" strokeLinecap="round" strokeWidth="1.5">
-        <path d="M140 16C78 16 40 62 40 130c0 88 46 186 100 186s100-98 100-186C240 62 202 16 140 16Z" fill="#FFFFFF" stroke="#2C2C2A" />
+      <g aria-hidden fill="none" stroke="var(--text-subtle)" strokeOpacity={0.6} strokeLinecap="round" strokeWidth="1.5">
+        <path d="M140 16C78 16 40 62 40 130c0 88 46 186 100 186s100-98 100-186C240 62 202 16 140 16Z" fill="var(--surface)" stroke="var(--text)" />
         <path d="M58 88c16-34 46-52 82-52s66 18 82 52" />
         <path d="M80 128q14-7 28 0M172 128q14-7 28 0" />
         <path d="M124 236q16 9 32 0" />
@@ -46,7 +46,7 @@ export function FaceDrawing({
         const { shapes, text } = AREAS[r];
         if (!available.includes(r)) {
           return (
-            <g key={r} aria-hidden fill="none" stroke="#B0AAA2" strokeDasharray="3 5">
+            <g key={r} aria-hidden fill="none" stroke="var(--text-subtle)" strokeOpacity={0.6} strokeDasharray="3 5">
               {shapes}
             </g>
           );

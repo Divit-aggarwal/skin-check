@@ -43,6 +43,10 @@ const BAND = /(Low|Moderate|Elevated)/;
 
 // Firebase Auth's phone sign-in loads its own helper from Google (before TD-37, unchanged).
 const SIGN_IN_HOSTS = new Set(["apis.google.com"]);
+// H33: the Firestore SDK's own connectivity ping, a 1x1 image with no app data
+// (recorded in the tracker). Intermittent, so it is allowed by exact URL only;
+// any other request to google.com still fails the check.
+const SDK_PINGS = new Set(["https://www.google.com/images/cleardot.gif"]);
 
 /** Every other request stays on this machine: the mesh files are ours, and the photo never leaves. */
 function watchHosts(page: Page): string[] {
@@ -50,7 +54,7 @@ function watchHosts(page: Page): string[] {
   page.on("request", (r) => {
     const url = new URL(r.url());
     if (url.protocol === "data:" || url.protocol === "blob:" || ["localhost", "127.0.0.1"].includes(url.hostname)) return;
-    if (!SIGN_IN_HOSTS.has(url.hostname)) outside.push(r.url());
+    if (!SIGN_IN_HOSTS.has(url.hostname) && !SDK_PINGS.has(`${url.origin}${url.pathname}`)) outside.push(r.url());
   });
   return outside;
 }

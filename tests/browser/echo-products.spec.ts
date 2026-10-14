@@ -1,12 +1,13 @@
 import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { devices, expect, test, type Page } from "@playwright/test";
 import { ECHO_COPY as E } from "@/components/skin-check/echoCopy";
-import { OWN_PRODUCTS, OWN_PRODUCTS_LINE, PRODUCT_DOCTOR_LINE, STEP_LABEL } from "@/lib/context/products";
+import { OWN_PRODUCT_INFO, OWN_PRODUCTS, OWN_PRODUCTS_LINE, PRODUCT_DOCTOR_LINE, STEP_LABEL } from "@/lib/context/products";
 import { COPY } from "@/lib/rules/settings";
 import { AI_SHARE_CONSENT_COPY } from "@/lib/consent";
 import { P_SEED } from "./seed-products";
 import { STARTER_POOL } from "@/components/skin-check/echoStarters";
 import { signIn } from "./helpers";
+import { PRODUCTS_COPY } from "@/components/products/copy";
 
 // TD-34 (docs/design/echo-own-products.md): Echo's opening suggestion and the
 // product cards, at a phone (390), a tablet (768) and a laptop (1280). The
@@ -58,6 +59,8 @@ for (const width of ["390", "768", "1280"] as const) {
         await expect(card).toContainText(p.usage);
         await expect(card).toContainText(`${E.echoNote}:`);
         await expect(card.getByRole("link", { name: new RegExp(E.onStore) })).toHaveAttribute("href", p.url);
+        // Redesign lane C (screen 15): each card links to our product page.
+        await expect(card.getByRole("link", { name: PRODUCTS_COPY.detailsLabel(p.name) })).toHaveAttribute("href", `/products/${p.id}`);
       }
       expect(SHOWN.map((p) => STEP_LABEL[p.step])).toEqual(["Cleanse", "Treat", "Moisturise", "Protect"]);
       // No price, no buy button.
@@ -140,4 +143,14 @@ test.describe("TD-34 guards and flows (390px)", () => {
     await page.waitForTimeout(400);
     await page.screenshot({ path: `${DIR}/echo-product-cards-390.png` });
   });
+});
+
+test("product page (screen 15): an unknown id is a real 404; a known id opens signed out, with its step and no description", async ({ page }) => {
+  expect((await page.goto("/products/no-such-product"))?.status()).toBe(404);
+  const p = OWN_PRODUCTS[0]!;
+  expect((await page.goto(`/products/${p.id}`))?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: p.name })).toBeVisible();
+  await expect(page.getByText(STEP_LABEL[p.step], { exact: true })).toBeVisible();
+  // Descriptions wait for the owner (docs/lanes/product-copy-review.md).
+  await expect(page.getByText(OWN_PRODUCT_INFO[p.id]!.description)).toHaveCount(0);
 });
