@@ -1,9 +1,11 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 export function TypingIndicator({ className, label = "Echo is typing" }: { className?: string; label?: string }) {
+  // Kit request D2: the dots loop in JS, which the CSS reduced-motion rule cannot stop.
+  const still = useReducedMotion();
   return (
     <motion.div
       initial={{ opacity: 0, y: 8 }}
@@ -16,7 +18,7 @@ export function TypingIndicator({ className, label = "Echo is typing" }: { class
     >
       <div
         className={cn(
-          "flex items-center justify-center rounded-2xl px-3 py-2 shadow-sm",
+          "flex items-center justify-center rounded-card px-3 py-2",
           className
         )}
       >
@@ -25,8 +27,8 @@ export function TypingIndicator({ className, label = "Echo is typing" }: { class
             <motion.span
               key={i}
               className="h-1.5 w-1.5 rounded-full bg-current"
-              animate={{ scale: [1, 1.3, 1], opacity: [0.3, 1, 0.3] }}
-              transition={{ duration: 1, repeat: Infinity, delay: i * 0.15 }}
+              animate={still ? { opacity: 0.6 } : { scale: [1, 1.3, 1], opacity: [0.3, 1, 0.3] }}
+              transition={still ? { duration: 0 } : { duration: 1, repeat: Infinity, delay: i * 0.15 }}
             />
           ))}
         </div>

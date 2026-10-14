@@ -162,7 +162,7 @@ export function AccountView() {
                   {dataExportUi() && (
                     <section aria-label={P.exportRow} className={`${card} !py-2`}>
                       {/* H37: no export flow yet, so a plain row, not a link or button. */}
-                      <SettingsRow icon={Download} label={P.exportRow} value={N.later} />
+                      <SettingsRow icon={Download} label={P.exportRow} value={N.later} disabled />
                     </section>
                   )}
                 </>
@@ -181,7 +181,7 @@ export function AccountView() {
 }
 
 /** Switches that wait on a backend: never on, never saved, "Comes later". */
-const later = (label: string) => <ToggleRow key={label} label={label} description={N.later} checked={false} busy onChange={() => undefined} />;
+const later = (label: string) => <ToggleRow key={label} label={label} description={N.later} checked={false} disabled onChange={() => undefined} />;
 
 /** Redesign 20: the live daily reminder (TD-47), then the G31 types behind their flag. */
 function Notifications() {

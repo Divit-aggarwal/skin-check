@@ -3,9 +3,9 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId } from "react";
-import { ArrowRight, ArrowUp, Check, ChevronLeft, ChevronRight, CircleDot, Contrast, Droplet, Flame, Waves, type LucideIcon } from "lucide-react";
+import { ArrowRight, Dot, Hand, Package, Pipette, ShowerHead, Sun, ArrowUp, Check, ChevronLeft, ChevronRight, CircleDot, Contrast, Droplet, Flame, Waves, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { card, heroCard, tintCard } from "./page";
+import { card, heroCard, tintCard } from "./classes";
 
 // The redesign kit (TD-50, docs/lanes/redesign-report.md). Pieces that page.tsx
 // does not already have. Every piece here renders only what it is given: no
@@ -259,11 +259,11 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
 export type StepStatus = "used" | "skipped" | "unknown";
 
 /** Number badge, optional product photo, name, subtitle, optional chip, description, status, chevron. */
-export function StepRow({ n, name, subtitle, chip, description, image, status, statusLabel, href, action }: { n: number; name: string; subtitle?: string | undefined; chip?: string | undefined; description?: string | undefined; image?: string | undefined; status?: StepStatus | undefined; statusLabel?: string | undefined; href?: string | undefined; action?: React.ReactNode }) {
+export function StepRow({ n, name, subtitle, chip, description, image, media, status, statusLabel, href, action }: { n: number; name: string; subtitle?: string | undefined; chip?: string | undefined; description?: string | undefined; image?: string | undefined; media?: React.ReactNode; status?: StepStatus | undefined; statusLabel?: string | undefined; href?: string | undefined; action?: React.ReactNode }) {
   const body = (
     <>
       <span aria-hidden className="grid size-7 shrink-0 place-items-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">{n}</span>
-      {image && <img src={image} alt="" className="size-14 shrink-0 rounded-tile bg-brand-50 object-cover" />}
+      {media ?? (image && <img src={image} alt="" className="size-14 shrink-0 rounded-tile bg-brand-50 object-cover" />)}
       <span className="min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-2">
           <span className="font-semibold text-brand-text">{name}</span>
@@ -303,8 +303,10 @@ export function StatusMark({ status, label }: { status: StepStatus; label?: stri
 }
 
 /** A switch. Busy keeps it focusable (aria-disabled), as the rest of the app does. */
-export function ToggleRow({ label, description, checked, onChange, busy }: { label: string; description?: string | undefined; checked: boolean; onChange: (v: boolean) => void; busy?: boolean }) {
+export function ToggleRow({ label, description, checked, onChange, busy, disabled }: { label: string; description?: string | undefined; checked: boolean; onChange: (v: boolean) => void; busy?: boolean; disabled?: boolean }) {
+  // disabled: a switch whose backend does not exist yet (kit request E1). Focusable, never changes.
   const id = useId();
+  const off = busy || disabled;
   return (
     <div className="flex items-start gap-3 py-3">
       <div className="min-w-0 flex-1">
@@ -317,11 +319,11 @@ export function ToggleRow({ label, description, checked, onChange, busy }: { lab
         aria-checked={checked}
         aria-labelledby={`${id}-l`}
         aria-describedby={description ? `${id}-d` : undefined}
-        aria-disabled={busy || undefined}
-        onClick={() => !busy && onChange(!checked)}
+        aria-disabled={off || undefined}
+        onClick={() => !off && onChange(!checked)}
         className="relative h-11 w-14 shrink-0"
       >
-        <span aria-hidden className={cn("absolute inset-x-0 top-1/2 h-7 -translate-y-1/2 rounded-full transition-colors duration-fast", checked ? "bg-brand-700" : "bg-brand-border", busy && "opacity-60")} />
+        <span aria-hidden className={cn("absolute inset-x-0 top-1/2 h-7 -translate-y-1/2 rounded-full transition-colors duration-fast", checked ? "bg-brand-700" : "bg-brand-border", off && "opacity-60")} />
         <span aria-hidden className={cn("absolute top-1/2 size-6 -translate-y-1/2 rounded-full bg-white shadow-card transition-[left] duration-fast", checked ? "left-[calc(100%-1.625rem)]" : "left-0.5")} />
       </button>
     </div>
@@ -329,7 +331,9 @@ export function ToggleRow({ label, description, checked, onChange, busy }: { lab
 }
 
 /** Icon, label, value, chevron. A link, a button, or plain. */
-export function SettingsRow({ icon, label, value, href, onClick, danger }: { icon?: LucideIcon | undefined; label: string; value?: string | undefined; href?: string | undefined; onClick?: () => void | undefined; danger?: boolean }) {
+export function SettingsRow({ icon, label, value, href, onClick, danger, disabled }: { icon?: LucideIcon | undefined; label: string; value?: string | undefined; href?: string | undefined; onClick?: () => void | undefined; danger?: boolean; disabled?: boolean }) {
+  // disabled: a row that is not available yet (kit request E2): dimmed, not a link or button.
+  if (disabled) ({ href, onClick } = { href: undefined, onClick: undefined });
   const inner = (
     <>
       {icon && <IconWell icon={icon} size={36} className={danger ? "bg-brand-error-soft text-brand-error" : undefined} />}
@@ -338,13 +342,28 @@ export function SettingsRow({ icon, label, value, href, onClick, danger }: { ico
       {(href || onClick) && <ChevronRight aria-hidden size={20} className="shrink-0 text-brand-text-muted" />}
     </>
   );
-  const cls = "flex min-h-14 w-full items-center gap-3 py-2";
+  const cls = cn("flex min-h-14 w-full items-center gap-3 py-2", disabled && "opacity-60");
   if (href) return <Link href={href} className={cls}>{inner}</Link>;
   if (onClick) return <button type="button" onClick={onClick} className={cls}>{inner}</button>;
   return <div className={cls}>{inner}</div>;
 }
 
 /* ─── Media ──────────────────────────────────────────────────────────── */
+
+// E20: the catalogue has no product photos, so a product shows as a neutral
+// 12px tile with its step's icon, never a stock image (kit request C1, from
+// lane C). Step icons are not the reading icons. Keys cover the routine's step
+// names ("serum") and Echo's ("treat", "spot").
+const STEP_ICON: Record<string, LucideIcon> = { cleanse: ShowerHead, serum: Pipette, treat: Pipette, moisturise: Hand, protect: Sun, spot: Dot };
+
+export function ProductTile({ step, size = 56, className }: { step: string | null | undefined; size?: number; className?: string | undefined }) {
+  const Icon = (step && STEP_ICON[step]) || Package;
+  return (
+    <span aria-hidden style={{ width: size, height: size }} className={cn("grid shrink-0 place-items-center rounded-tile bg-brand-50 text-brand-700", className)}>
+      <Icon size={Math.round(size * 0.42)} strokeWidth={1.75} />
+    </span>
+  );
+}
 
 /** The user's own photo with a label pill ("Today", a date) and an optional check. */
 export function PhotoTile({ src, alt, label, checked, className }: { src: string; alt: string; label?: string | undefined; checked?: boolean | undefined; className?: string }) {
@@ -387,11 +406,11 @@ export function ProgressRing({ done, total, label, size = 72 }: { done: number; 
 /** User: green, right. Echo: white, left, with its mark. */
 export function ChatBubble({ from, avatar, children }: { from: "user" | "echo"; avatar?: React.ReactNode | undefined; children: React.ReactNode }) {
   return from === "user" ? (
-    <div className="ml-auto max-w-[85%] whitespace-pre-line rounded-2xl rounded-br-md bg-brand-700 px-4 py-3 leading-relaxed text-white">{children}</div>
+    <div className="ml-auto max-w-[85%] whitespace-pre-line rounded-card rounded-br-md bg-brand-700 px-4 py-3 leading-relaxed text-white">{children}</div>
   ) : (
     <div className="flex max-w-[92%] items-end gap-2">
       {avatar}
-      <div className="min-w-0 whitespace-pre-line rounded-2xl rounded-bl-md border border-brand-border bg-brand-surface px-4 py-3 leading-relaxed text-brand-text">{children}</div>
+      <div className="min-w-0 whitespace-pre-line rounded-card rounded-bl-md border border-brand-border bg-brand-surface px-4 py-3 leading-relaxed text-brand-text">{children}</div>
     </div>
   );
 }
