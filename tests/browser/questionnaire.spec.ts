@@ -179,6 +179,7 @@ for (const width of WIDTHS) {
       await expect(page.getByRole("heading", { name: H.latest.title })).toBeVisible();
       await shot(page, "home-questions-card", width);
       await page.goto("/account");
+      await page.getByRole("link", { name: "Skin", exact: true }).click(); // redesign 21 (lane E): the questions card is on the Skin tab
       await expect(page.getByRole("heading", { name: Q.cardTitle })).toBeVisible();
       await shot(page, "account-questions-card", width);
       await page.goto("/echo");

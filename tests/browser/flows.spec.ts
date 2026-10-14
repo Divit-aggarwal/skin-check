@@ -183,6 +183,7 @@ test("Echo asks for AI-share consent first", async ({ page }) => {
   await signIn(page, U.echo!.phoneNumber);
   // TD-47: the privacy card is on Account.
   await page.goto("/account");
+  await page.getByRole("link", { name: "Privacy", exact: true }).click(); // redesign 21 (lane E): privacy is a tab
   await expect(page.getByText(C.privacy.aiNotAsked)).toBeVisible();
   await desktop(page); // TD-48: the Home v2 content is the desktop Home
   await page.goto("/dashboard");
@@ -194,6 +195,7 @@ test("Echo asks for AI-share consent first", async ({ page }) => {
 test("withdraw AI-share consent on Account, then Echo asks again", async ({ page }) => {
   await signIn(page, U.withdraw!.phoneNumber);
   await page.goto("/account");
+  await page.getByRole("link", { name: "Privacy", exact: true }).click(); // redesign 21 (lane E): privacy is a tab
   await page.getByRole("button", { name: C.privacy.stop }).click();
   await expect(page.getByText(C.privacy.aiOff)).toBeVisible();
   await page.getByRole("heading", { name: C.privacy.title }).scrollIntoViewIfNeeded();
@@ -339,6 +341,7 @@ test("account: sign-in lands on Home; the account page has the sign-in, privacy 
   await signIn(page, U.withdraw!.phoneNumber); // the helper asserts the sign-in went to /dashboard (TD-24 (3))
   await page.goto("/account");
   await expect(page.getByText(/Signed in as/)).toBeVisible();
+  await page.getByRole("link", { name: "Privacy", exact: true }).click(); // redesign 21 (lane E): privacy is a tab
   await expect(page.getByRole("heading", { name: C.privacy.title })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Delete your account" })).toBeVisible();
   await expect(page.getByText(C.history.kind.reading)).toHaveCount(0);
@@ -395,6 +398,7 @@ for (const key of ["noreading", "legacy", "building"] as const) {
     await expect(list.getByText(label).first()).toBeVisible();
     expect(await list.getByText(label).allTextContents()).toHaveLength(user.checks.length);
     await page.goto("/account");
+    await page.getByRole("link", { name: "Privacy", exact: true }).click(); // redesign 21 (lane E): privacy is a tab
     await expect(page.getByRole("heading", { name: C.privacy.title })).toBeVisible();
     await expect(page.getByRole("main").getByText(label)).toHaveCount(0);
   });
