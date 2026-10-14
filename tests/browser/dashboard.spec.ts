@@ -295,3 +295,53 @@ test("privacy: saving, failed and out-of-date withdrawal states", async ({ page 
   await expect(page.getByText(C.privacy.aiOn)).toBeVisible();
   await shot(page, "privacy-stale");
 });
+
+// TD-50 screens 10, 11, 12 on a phone (lane redesign-checks, add-only): the
+// Overview, Readings, one reading at each check and Photos. Level words only,
+// always with the fixed line; nothing that shows a change between checks.
+test.describe("checks views on a phone (TD-50)", () => {
+  test.use({ viewport: { width: 390, height: 844 } });
+
+  test("overview, readings, one reading at each check and photos: level words with the fixed line, no change shown", async ({ page }) => {
+    await signIn(page, U.set!.phoneNumber);
+    await page.goto("/checks");
+    const latest = page.locator("section", { has: page.getByRole("heading", { name: /^Checked on/ }) });
+    await expect(latest.getByText(C.history.pastLine)).toBeVisible();
+    await expect(latest.getByRole("link", { name: /^Redness/ })).toHaveAttribute("href", "/checks?reading=redness");
+    const list = page.locator("section", { has: page.getByRole("heading", { name: C.history.title }) });
+    await expect(list.getByRole("link", { name: /Open the check from/ })).toHaveCount(5);
+    await expect(list).not.toContainText(/\b(Low|Moderate|Elevated)\b/);
+    await expect(page.getByRole("heading", { name: C.routine.title })).toBeVisible();
+    await expect(page.getByRole("main")).not.toContainText(/\/100|%|↑|↓|▲|▼|Dryness/);
+    await expect(page.getByRole("link", { name: K.overview })).toHaveAttribute("aria-current", "page");
+
+    await page.getByRole("link", { name: K.readings }).click();
+    await expect(page).toHaveURL(/\/checks\?view=readings$/);
+    await expect(page.getByRole("link", { name: K.readings })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByText(C.history.pastLine)).toBeVisible();
+    await page.getByRole("link", { name: /^Breakouts/ }).click();
+
+    await expect(page).toHaveURL(/\/checks\?reading=blemishes$/);
+    const one = page.locator("section", { has: page.getByRole("heading", { name: "Breakouts", exact: true }) });
+    await expect(one.getByText(C.history.pastLine)).toBeVisible();
+    const rows = one.locator("ol > li");
+    await expect(rows).toHaveCount(5);
+    for (const r of await rows.allTextContents()) expect(r).toMatch(/(Low|Moderate|Elevated|No reading)$/);
+    await expect(one).not.toContainText(/\/100|%|↑|↓|▲|▼/);
+
+    await page.goto("/checks?view=photos");
+    await expect(page.getByText(K.photosNone)).toBeVisible();
+  });
+
+  test("photos: a kept photo opens its check; a check without one is not shown", async ({ page }) => {
+    await signIn(page, U.kept!.phoneNumber);
+    await page.goto("/checks?view=photos");
+    await expect(page.getByText(C.history.pastLine)).toBeVisible();
+    const tiles = page.getByRole("main").getByRole("link", { name: /Open the check from/ });
+    await expect(tiles).toHaveCount(1);
+    const photo = tiles.getByRole("img", { name: /Your kept photo from/ });
+    await expect.poll(() => photo.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
+    await tiles.click();
+    await expect(page).toHaveURL(/\/checks\/seed-dash-kept-1$/);
+  });
+});
