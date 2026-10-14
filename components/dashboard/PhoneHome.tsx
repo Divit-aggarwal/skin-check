@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { User } from "firebase/auth";
-import { Check, ChevronRight, CloudSun, X } from "lucide-react";
-import { AccountButton, btnPrimary, card, eyebrow } from "@/components/ui/page";
+import { Check, ChevronRight, MessageCircle, Sun, X } from "lucide-react";
+import { AccountButton, card, heroCard } from "@/components/ui/page";
+import { btnOnDark, IconWell, Wordmark } from "@/components/ui/kit";
 import { Thumb } from "@/components/checks/Thumb";
 import { stepOf, STEPS } from "@/components/routine/RoutineSteps";
 import type { useRoutine } from "@/components/routine/useRoutine";
@@ -35,11 +36,14 @@ import { lastWeather, weatherAt } from "./homeSettings";
 // greeting, Today, the routine row, the latest check row and the Echo chips
 // fit one 390 x 844 screen. Same data, routes and rules as Home v2 (TD-47);
 // the desktop Home is unchanged. Nothing here compares checks or links the
-// weather to the skin.
+// weather to the skin. TD-50 (Phase 2): laid out as mockup 01 (wordmark,
+// greeting, dark "next step" hero, conditions row, ring and next-check tiles);
+// the mockup's insight card is left out (no such data; the latest check row
+// is the real item there).
 
 type Routine = ReturnType<typeof useRoutine>;
 const tz = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata";
-const row = `${card} !p-4 sm:!p-5`;
+const row = `${card} !p-4`;
 
 export function PhoneHome({
   user,
@@ -85,14 +89,15 @@ export function PhoneHome({
   const date = now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
   return (
-    <main className="mx-auto flex w-full max-w-[600px] flex-col gap-3 px-4 pb-28 pt-5 sm:px-6 sm:pt-8">
-      {/* 1. Greeting: date and city on one small line; the Account button sits top right (shell). */}
-      <header className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className={`${eyebrow} truncate`}>{city ? `${date} · ${city.name}` : date}</p>
-          <h1 className="font-display text-[26px] font-semibold leading-tight tracking-[-0.025em] text-brand-title sm:text-[32px]">{hello}</h1>
+    <main className="mx-auto flex w-full max-w-[600px] flex-col gap-2.5 px-4 pb-28 pt-1 sm:px-6 sm:pt-6">
+      {/* 1. Wordmark and Account (mockup 01), then the greeting with date and city. */}
+      <header className="flex flex-col gap-1">
+        <div className="flex min-h-11 items-center justify-between gap-3">
+          <Wordmark />
+          <AccountButton />
         </div>
-        <AccountButton />
+        <p className="truncate text-sm text-brand-text-muted">{city ? `${date} · ${city.name}` : date}</p>
+        <h1 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-brand-text sm:text-[32px]">{hello}</h1>
       </header>
 
       {/* 2. Today */}
@@ -122,9 +127,9 @@ export function PhoneHome({
 
 function Tile({ title, value, note }: { title: string; value: string; note?: string }) {
   return (
-    <div className="flex flex-col gap-0.5 rounded-2xl border border-brand-card-line bg-brand-paper p-4">
+    <div className={`${card} flex flex-col gap-0.5 !p-4`}>
       <p className="text-xs font-semibold text-brand-muted">{title}</p>
-      <p className="font-display text-lg font-semibold text-brand-title">{value}</p>
+      <p className="text-lg font-semibold text-brand-title">{value}</p>
       {note && <p className="text-xs text-brand-muted">{note}</p>}
     </div>
   );
@@ -132,19 +137,19 @@ function Tile({ title, value, note }: { title: string; value: string; note?: str
 
 // ─── Today ──────────────────────────────────────────────────────────────────
 
-function Ring({ done, total }: { done: number; total: number }) {
+function Ring({ done, total, dark = false }: { done: number; total: number; dark?: boolean }) {
   const r = 30;
   const c = 2 * Math.PI * r;
   const part = total > 0 ? done / total : 0;
   return (
-    <div role="img" aria-label={H.today.ringLabel(done, total)} className="relative size-[76px] shrink-0">
+    <div role="img" aria-label={H.today.ringLabel(done, total)} className="relative size-16 shrink-0">
       <svg viewBox="0 0 76 76" className="size-full -rotate-90" aria-hidden>
-        <circle cx="38" cy="38" r={r} fill="none" strokeWidth="7" className="stroke-brand-line" />
-        <circle cx="38" cy="38" r={r} fill="none" strokeWidth="7" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - part)} className="stroke-brand-action motion-safe:transition-[stroke-dashoffset] motion-safe:duration-500" />
+        <circle cx="38" cy="38" r={r} fill="none" strokeWidth="8" className={dark ? "stroke-white/20" : "stroke-brand-100"} />
+        <circle cx="38" cy="38" r={r} fill="none" strokeWidth="8" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - part)} className={`${dark ? "stroke-white" : "stroke-brand-700"} motion-safe:transition-[stroke-dashoffset] motion-safe:duration-base`} />
       </svg>
       <span aria-hidden className="absolute inset-0 flex flex-col items-center justify-center text-center leading-none">
-        <span className="font-display text-lg font-semibold text-brand-title">{H.today.ringCount(done, total)}</span>
-        <span className="mt-0.5 text-xs font-medium text-brand-muted">{H.today.ringToday}</span>
+        <span className={`text-base font-semibold ${dark ? "text-white" : "text-brand-text"}`}>{H.today.ringCount(done, total)}</span>
+        <span className={`mt-0.5 text-xs font-medium ${dark ? "text-white/80" : "text-brand-muted"}`}>{H.today.ringToday}</span>
       </span>
     </div>
   );
@@ -180,47 +185,74 @@ function TodayCard({
   useEffect(() => setIos(needsHomeScreen(navigator.userAgent, window.matchMedia("(display-mode: standalone)").matches)), []);
   const dialog = useRef<HTMLDialogElement>(null);
 
+  const slotName = ROUTINE_COPY.slot[action.kind === "step" ? action.step.slot : "AM"];
+  const left = action.kind === "step" ? steps.filter((d) => d.slot === action.step.slot && d.status !== "used").length : 0;
+
   return (
-    <section aria-labelledby="today-title" className={`${row} flex flex-col gap-3`}>
+    <section aria-labelledby="today-title" className="flex flex-col gap-3">
       <h2 id="today-title" className="sr-only">
         {H.today.title}
       </h2>
-      <div className="flex items-center gap-4">
-        <Ring done={done} total={total} />
-        <ul className="flex min-w-0 flex-col gap-0.5 text-sm">
-          <li>{H.today.streak(streak)}</li>
-          <li data-testid="next-check" className="font-semibold">
-            {nextLine}
-          </li>
-          {/* Third line: UV when weather is on and a city is set; else the starting checks. */}
-          <li>{weatherOn() && settings?.city ? <UvLine user={user} settings={settings} open={() => dialog.current?.showModal()} /> : H.today.starting(dashboard.trend.count, dashboard.trend.needed)}</li>
-        </ul>
+
+      {/* Your next step: the one main action (lib/home/today.ts mainAction). No product picture: none exists. */}
+      <div className={`${heroCard} flex flex-col gap-1 !p-4`}>
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/80">{H.today.heroEyebrow}</p>
+        {action.kind === "allDone" || action.kind === "slotDone" ? (
+          <p role="status" className="flex items-center gap-2 text-2xl font-semibold leading-tight">
+            <Check aria-hidden size={22} />
+            {action.kind === "allDone" ? H.today.allDone : H.today.slotDone[steps.find((s) => s.status === "used")?.slot ?? "AM"]}
+          </p>
+        ) : (
+          <p className="text-2xl font-semibold leading-tight">{action.kind === "check" ? H.today.heroCheck : action.kind === "step" ? H.today.heroStep(slotName) : H.today.heroNone}</p>
+        )}
+        {action.kind === "step" && <p className="text-[15px] text-white/85">{H.today.stepsLeft(left)}</p>}
+        {action.kind === "check" ? (
+          <Link href="/skin-check" className={`${btnOnDark} mt-2 self-start`}>
+            {H.today.takeCheck}
+          </Link>
+        ) : action.kind === "step" ? (
+          <button type="button" className={`${btnOnDark} mt-2 self-start`} aria-disabled={routine.busy} onClick={() => !routine.busy && send(action.step, "used")}>
+            {H.today.markStep(stepLabel(action.step.productId))}
+          </button>
+        ) : null}
+        {/* Today's ring with the run of days, and the next check, in the hero's
+            footer: TD-48's fold (one screen at 390 x 844) has no room for a tile row. */}
+        <div className="mt-3 flex items-center gap-3 border-t border-white/15 pt-3">
+          <Ring done={done} total={total} dark />
+          <div className="min-w-0 text-sm leading-snug">
+            <p data-testid="next-check" className="font-semibold text-white">
+              {nextLine}
+            </p>
+            <p className="text-white/85">
+              {H.today.streak(streak)} · {H.today.starting(dashboard.trend.count, dashboard.trend.needed)}
+            </p>
+          </div>
+        </div>
       </div>
-      {weatherOn() && !settings?.city && (
-        <button type="button" onClick={() => dialog.current?.showModal()} className="-my-2 inline-flex min-h-11 items-center gap-1.5 self-start text-sm font-medium text-brand-forest underline-offset-4 hover:underline">
-          <CloudSun aria-hidden size={16} />
-          {H.today.addCity}
-        </button>
+
+      {/* Today's conditions: UV once a city is set, or the way to add one. Hidden while weather is off. */}
+      {weatherOn() && (
+        <div className={`${card} relative flex items-center gap-3 !px-3 !py-2`}>
+          <IconWell icon={Sun} size={36} className="bg-brand-50 text-severity-moderate" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm text-brand-text-muted">{H.weather.title}</p>
+            {settings?.city ? (
+              <UvLine user={user} settings={settings} open={() => dialog.current?.showModal()} />
+            ) : (
+              <button type="button" onClick={() => dialog.current?.showModal()} className="flex min-h-8 items-center text-left text-lg font-semibold text-brand-text after:absolute after:inset-0 after:rounded-card">
+                {H.today.addCity}
+              </button>
+            )}
+          </div>
+          <ChevronRight aria-hidden size={20} className="shrink-0 text-brand-muted" />
+        </div>
       )}
-      {action.kind === "check" ? (
-        <Link href="/skin-check" className={btnPrimary}>
-          {H.today.takeCheck}
-        </Link>
-      ) : action.kind === "step" ? (
-        <button type="button" className={btnPrimary} aria-disabled={routine.busy} onClick={() => !routine.busy && send(action.step, "used")}>
-          {H.today.markStep(stepLabel(action.step.productId))}
-        </button>
-      ) : action.kind === "allDone" || action.kind === "slotDone" ? (
-        <p role="status" className="flex min-h-11 items-center justify-center gap-2 rounded-full bg-brand-linen text-sm font-semibold text-brand-forest">
-          <Check aria-hidden size={16} />
-          {action.kind === "allDone" ? H.today.allDone : H.today.slotDone[steps.find((s) => s.status === "used")?.slot ?? "AM"]}
-        </p>
-      ) : null}
+
       {pushOn() && ios && <p className="text-xs text-brand-muted">{H.today.iosHint}</p>}
       {weatherOn() && (
-        <dialog ref={dialog} aria-label={H.today.weatherSheet} className="m-0 mt-auto w-full max-w-none rounded-t-2xl bg-transparent p-0 backdrop:bg-black/30 sm:m-auto sm:max-w-md sm:rounded-2xl" onClick={(e) => e.target === dialog.current && dialog.current?.close()}>
+        <dialog ref={dialog} aria-label={H.today.weatherSheet} className="m-0 mt-auto w-full max-w-none rounded-t-card bg-transparent p-0 backdrop:bg-black/30 sm:m-auto sm:max-w-md sm:rounded-card" onClick={(e) => e.target === dialog.current && dialog.current?.close()}>
           <div className="relative">
-            <button type="button" aria-label={H.today.close} onClick={() => dialog.current?.close()} className="absolute right-3 top-3 z-10 grid size-11 place-items-center rounded-full text-brand-muted hover:bg-brand-linen">
+            <button type="button" aria-label={H.today.close} onClick={() => dialog.current?.close()} className="absolute right-3 top-3 z-10 grid size-11 place-items-center rounded-full text-brand-muted hover:bg-brand-50">
               <X aria-hidden size={20} />
             </button>
             <WeatherCard user={user} settings={settings} onSettings={onSettings} />
@@ -248,8 +280,8 @@ function UvLine({ user, settings, open }: { user: User; settings: HomeSettings |
   }, [user, city?.latE1, city?.lonE1]); // eslint-disable-line react-hooks/exhaustive-deps
   const text = !city ? "" : w === "down" ? H.today.uvDown : w ? H.today.uv(Math.round(w.uv), uvCategory(w.uv)) : "…";
   return (
-    <button type="button" onClick={open} className="inline-flex min-h-11 items-center gap-1.5 text-left font-medium text-brand-forest underline-offset-4 hover:underline">
-      <CloudSun aria-hidden size={16} />
+    // The whole row opens the sheet (after: covers the card); the name stays the UV text.
+    <button type="button" onClick={open} className="flex min-h-8 items-center text-left text-lg font-semibold text-brand-text after:absolute after:inset-0 after:rounded-card">
       {text}
     </button>
   );
@@ -273,7 +305,7 @@ function RoutineRow({ routine, steps, slot, stepLabel, nameOf, send }: { routine
   return (
     <section aria-labelledby="routine-row-title" className={`${row} flex flex-col gap-2`}>
       <div className="flex items-baseline justify-between gap-2">
-        <h2 id="routine-row-title" className="font-display text-base font-semibold text-brand-title">
+        <h2 id="routine-row-title" className="text-base font-semibold text-brand-text">
           {slotName}
         </h2>
         <p className="text-xs text-brand-muted">{slot === "AM" ? H.routineRow.eveningFrom : H.routineRow.morningTomorrow}</p>
@@ -286,17 +318,17 @@ function RoutineRow({ routine, steps, slot, stepLabel, nameOf, send }: { routine
             const isDone = d.status === "used";
             const name = nameOf(d.productId);
             return (
-              <li key={d.productId} className="w-[84px]">
+              <li key={d.productId} className="max-w-full">
                 <button
                   type="button"
                   aria-pressed={isDone}
                   aria-disabled={routine.busy}
                   aria-label={isDone ? H.routineRow.undo(name, slotName.toLowerCase()) : H.routine.markDoneLabel(name, slotName.toLowerCase())}
                   onClick={() => !routine.busy && send(d, isDone ? UNDO_STATUS : "used")}
-                  className="flex min-h-[56px] w-full flex-col items-center justify-center gap-1 rounded-xl border border-brand-line px-1 text-xs font-semibold text-brand-ink aria-pressed:border-brand-forest aria-pressed:bg-brand-forest aria-pressed:text-white"
+                  className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border border-brand-border px-3 text-sm font-semibold text-brand-text transition-colors duration-fast aria-pressed:border-brand-700 aria-pressed:bg-brand-700 aria-pressed:text-white"
                 >
-                  {isDone ? <Check aria-hidden size={16} /> : <span aria-hidden className="size-4 rounded-full border-2 border-brand-line" />}
-                  <span className="w-full truncate text-center">{stepLabel(d.productId)}</span>
+                  {isDone ? <Check aria-hidden size={16} /> : <span aria-hidden className="size-4 rounded-full border-2 border-dashed border-brand-text-subtle" />}
+                  <span className="truncate">{stepLabel(d.productId)}</span>
                 </button>
               </li>
             );
@@ -332,7 +364,7 @@ function LatestRow({ dashboard }: { dashboard: Dashboard }) {
     ) : null;
   return (
     <Link href={href} aria-label={H.latestRow.open(date)} className={`${row} flex items-center gap-3`}>
-      <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-lg bg-brand-linen [&_svg]:max-w-[48px]">
+      <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-tile bg-brand-50 [&_svg]:max-w-[48px]">
         {shown?.photoClaimed && view ? <Thumb scanId={view.scanId} date={date} fallback={picture} /> : picture}
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
@@ -361,7 +393,7 @@ function EchoChips({ uid, dashboard, data, productsOn }: { uid: string; dashboar
   if (!scanId) return null;
   if (!answered)
     return (
-      <button type="button" onClick={() => openEcho()} className="flex min-h-11 w-full items-center justify-between rounded-2xl border border-brand-line bg-brand-paper px-3 text-sm font-semibold text-brand-forest hover:border-brand-action">
+      <button type="button" onClick={() => openEcho()} className="flex min-h-11 w-full items-center justify-between rounded-card border border-brand-border bg-brand-surface px-3 text-sm font-semibold text-brand-700 hover:bg-brand-50">
         {H.echo.open}
         <ChevronRight aria-hidden size={16} />
       </button>
@@ -371,7 +403,8 @@ function EchoChips({ uid, dashboard, data, productsOn }: { uid: string; dashboar
       <ul className="grid grid-cols-2 gap-2">
         {starters.map((q) => (
           <li key={q} className="min-w-0">
-            <button type="button" onClick={() => openEcho({ ask: q })} className="flex h-full min-h-11 w-full items-center rounded-2xl border border-brand-line bg-brand-paper px-3 py-2 text-left text-sm font-medium leading-snug text-brand-forest hover:border-brand-action">
+            <button type="button" onClick={() => openEcho({ ask: q })} className="flex h-full min-h-11 w-full items-center gap-2 rounded-card border border-brand-border bg-brand-surface px-3 py-2 text-left text-sm font-medium leading-snug text-brand-text transition-colors duration-fast hover:bg-brand-50">
+              <IconWell icon={MessageCircle} size={28} />
               <span className="line-clamp-2">{q}</span>
             </button>
           </li>

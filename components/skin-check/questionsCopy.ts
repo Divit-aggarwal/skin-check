@@ -54,7 +54,7 @@ export const QUESTIONS_COPY = {
   continue: "Continue",
   answerAll: "Answer every question in this part to go on.",
   notNow: "Not now, go to Home",
-  home: "Go to Home",
+  home: "Go to Today",
   back: "Back",
   save: "Save my answers",
   saving: "Saving…",

@@ -97,7 +97,7 @@ function SkipConfirm({ onChoose, onClose }: { onChoose: (choice: "answer" | "ski
 /** Results screen after a skip: what it means and the way back in. */
 export function SkippedNote({ echoCheck }: { echoCheck: boolean }) {
   return (
-    <div role="note" className="flex max-w-prose flex-col items-start gap-1 rounded-2xl bg-brand-mist p-4 text-brand-ink">
+    <div role="note" className="flex max-w-prose flex-col items-start gap-1 rounded-card bg-brand-mist p-4 text-brand-ink">
       {/* A check with no reading is never one Echo talks about (flow review M3). */}
       <p>{echoOn() && echoCheck ? Q.skippedNote : Q.skippedNoteNoEcho}</p>
       <Link href="/questions" className={textLink}>

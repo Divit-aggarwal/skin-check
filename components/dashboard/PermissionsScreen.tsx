@@ -50,7 +50,7 @@ export function PermissionsScreen({ user, settings, onDone }: { user: User; sett
     c === "allowed" ? P.allowed : c === "refused" ? P.refused : c === "unsupported" ? P.unsupported : c === "not_now" ? P.notNowDone : null;
 
   const item = (kind: "location" | "reminders", icon: React.ReactNode, title: string, why: string, choice: Choice, allow: () => Promise<void>, notNow: () => void, extra?: React.ReactNode) => (
-    <li className="flex flex-col gap-3 rounded-2xl border border-brand-card-line p-4 sm:p-5">
+    <li className="flex flex-col gap-3 rounded-card border border-brand-card-line p-4 sm:p-5">
       <div className="flex items-start gap-3">
         <span aria-hidden className="mt-0.5 text-brand-forest">
           {icon}

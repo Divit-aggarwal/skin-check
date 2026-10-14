@@ -174,7 +174,86 @@ layouts change in Phases 2–7).
 
 No API route, data fetching, Firestore rule or business logic changed.
 
-## 6. Decision
+## 6. Phase 1 review follow-ups and Phase 2 (owner, 2026-10-14)
+
+### Phase 1 follow-ups
+
+1. **Reading colours reworked.** No green, no pure red; found by search so
+   every pair stays at least 20 ΔE apart (CIE76, Lab) for normal, protan,
+   deutan and tritan vision (Machado 2009 matrices); the icon colour is the ink
+   (≥ 4.5:1 on its well and on white). Pinned in `tests/brand-contrast.test.ts`
+   ("reading identity colours": hue bans, contrast, ΔE per vision type).
+
+   | Reading | Colour | Well | Icon (shape tells it apart without colour) |
+   |---|---|---|---|
+   | Redness | wine `#6B2D43` | `#FEF0F4` | Flame |
+   | Oiliness | teal-blue `#227788` | `#EAF6F9` | Droplet |
+   | Texture | navy `#0A3E68` | `#EFF4FD` | Waves |
+   | Breakouts | orchid `#AA3DB8` | `#FCF0FD` | CircleDot |
+   | Dark marks | ochre `#896733` | `#FBF2E9` | Contrast (half-filled circle) |
+
+2. **test:all on 8e08c18:** exit 0 (unit 2334, stack 84/84, browser 113/113, build OK), run in a separate worktree at that commit.
+3. **Baselines opt-in.** `home-v2.spec.ts`, `home-v3.spec.ts` and the one line in `flows.spec.ts` now write into `docs/design/` only with `AFTER_SHOTS=1` (the flag the other specs already used); otherwise into `.local-stack/browser-shots/`. `tests/browser-shots-opt-in.test.ts` fails if any line in `tests/browser/` names a `docs/` path without `AFTER_SHOTS`.
+4. **Corners:** see the Phase 2 list below.
+5. Priorities confirmed (H36, H37 top).
+
+### Phase 2 changelog
+
+| File | Change |
+|---|---|
+| `components/dashboard/PhoneHome.tsx`, `HomeCards.tsx`, `homeCopy.ts`, `PermissionsScreen.tsx`, `components/checks/Thumb.tsx` | 01 Today: wordmark + avatar header, date · city, greeting; dark "Your next step" hero from `mainAction` (check due / next step / all done / nothing to do; no product image); "Today's conditions" row opening the weather sheet (hidden while weather is off); the ring (today's done/total), next check, run of days and starting checks in the hero's footer; latest check row; Ask Echo chips. 02 Environment (`WeatherCard`, the phone sheet and desktop): UV block (number, category, advice), Humidity and Air tiles, city + updated time, Change city, credits. All existing states kept |
+| `components/routine/RoutinePage.tsx`, `RoutineSteps.tsx`, `RoutineFlow.tsx` (new), `lib/routine/copy.ts`, `app/(marketing)/routine/page.tsx` | 03: Morning / Evening switch (opens on the current time of day), numbered step cards with Done / Skipped / Not logged marks, Used / Skipped buttons (tapping the pressed one undoes it, the existing `cleared` event), sticky "Start routine" / "Continue routine"; guided mode shows one step at a time with everything else hidden and the bottom bar hidden; "Your last 7 days" shows Used, Skipped and Not logged as three counts. 04 Routine Complete (see below). Add / swap / stop kept |
+| `components/shell/Nav.tsx`, `app/globals.css` | Bottom bar hides while a page sets `body[data-flow]` (guided routine now; capture and check-in later) |
+| `components/shell/copy.ts`, `components/dashboard/copy.ts`, `components/skin-check/questionsCopy.ts` | "Go to Home" → "Go to Today" |
+| `tests/browser/flows.spec.ts` | Add-only: the routine test picks Evening, then Morning, before its checks (one time of day shows at a time) |
+| `tests/design/redesign.shots.ts` | Phase 2 shots |
+
+No API, route, data fetching, Firestore rule or business logic changed.
+
+### 04 Routine Complete (no mockup): for owner review
+
+Shown when every step due in the chosen time of day is logged. A pale green
+card above the steps: a check in a soft circle, "Morning routine logged",
+then **Used** and **Skipped** as two separate lists, one line for what comes
+next ("Your evening steps start from 3 pm." or "Nothing else on your routine
+is due today."), a primary "Back to Today" and, after the morning, "See
+evening steps". No streak, no celebration, no animation. The steps stay below,
+so any step can still be changed or undone. Screenshot:
+`p2-04-routine-complete.png`.
+
+### Screenshots (375px), `docs/design/redesign/phase2/`
+
+`compare-01-today.png`, `compare-02-environment.png`, `compare-03-routine.png`
+(mockup left, app right), and `p2-01-today`, `p2-02-environment`,
+`p2-03-routine`, `p2-03-routine-guided`, `p2-04-routine-complete` (full pages).
+
+### Deviations from the mockups
+
+- **Today:** no "Skin Twin insight" (no backend insight; the banned word); no bell (no notification inbox); no "Your skin looks relatively stable" line (change claim, TD-47(4)); no product image in the hero (no product photography); no trailing → on the hero button (`tests/dashboard-copy.test.ts` rejects `Arrow` in dashboard files); no "This week" / "Next skin check" tile row: TD-48's fold (greeting, Today, routine row, latest check and Echo chips on one 390 × 844 screen, `home-v3.spec.ts`) has no room for it, so today's ring, the next check, the run of days and the starting checks sit in the hero's footer; the ring is today's done/total, not "This week 5/7" (the 7-day count stays in the "Your progress" tile below the fold); routine steps on Today are 44px pills; the hero says "Time for your check" when a check is due, since `mainAction` puts the check first.
+- **Environment:** a sheet over Today, not its own page (it was already a sheet; no route added). Temperature, the UV curve and the forecast are not shown (no data; TD-50 f). The UV block uses the brand tint, not a warm yellow. **Severity colours** (`severity.*`) are on the UV category and the air category only, as the brief §1 asks; never on a reading. Please confirm this reading of TD-47(4) ("no better or worse colours"), or they go back to plain text.
+- **Routine:** no product images, no "30 seconds" / "~3 minutes" (no timing data), no benefit lines (efficacy; "acne" banned), no "for better results" footer (banned words). Status words stay "Used" / "Skipped" / "Not logged" (existing copy and tests); the page title stays "My routine" with the routine purpose copy, the slot heading is "Morning routine".
+
+### 20px corners
+
+None left in the screens Phase 2 touched. Left on purpose, outside Phase 2:
+`components/skin-check/QuestionsChoice.tsx:72` (the check-flow skip pop-up,
+Phase 3) and `components/dashboard/CheckReadings.tsx` (the opened check,
+Phases 3–4).
+
+### Tests
+
+`npm run test:all` on the final Phase 2 tree: typecheck and lint clean; unit
+2363 passed; stack 84/84; browser 112/113. The one failure was
+`mesh.spec.ts:205` (light skin, kept photo, 390px): the page made one request
+to `google.com/images/cleardot.gif`, the Firestore SDK's connectivity ping
+(tracker H33; the same intermittent failure is recorded in the G29 and TD-44
+runs). Rerun of the kept-photo tests at all widths: 9/9. `next build`: compiled.
+Before the fold fix, an earlier full run failed `home-v3.spec.ts` fold (Echo
+chips 48px below the bar); after it, `home-v3.spec.ts` 6/6 and the fold test
+also passed in the full run. The only edit to an existing test is the add-only
+Morning/Evening click in `flows.spec.ts`.
+
+## 7. Decision
 
 TD-50 (owner, 2026-10-14) records the answers to section 4; see the
 `docs/redesign-decisions` branch.

@@ -210,8 +210,11 @@ test("routine: the four steps, an empty step invites an add, used and skipped in
   await expect(page.getByText(R.empty)).toBeVisible();
   const morning = page.getByRole("region", { name: R.slot.AM, exact: true });
   const evening = page.getByRole("region", { name: R.slot.PM, exact: true });
-  for (const step of Object.values(R.steps)) await expect(morning.getByText(step, { exact: true })).toBeVisible();
+  // Redesign Phase 2: one time of day at a time; it opens on the current one.
+  await page.getByRole("radio", { name: R.slot.PM }).click();
   await expect(evening.getByText(R.eveningProtect)).toBeVisible();
+  await page.getByRole("radio", { name: R.slot.AM }).click();
+  for (const step of Object.values(R.steps)) await expect(morning.getByText(step, { exact: true })).toBeVisible();
 
   // An empty step opens the add form for that step and slot. The real
   // catalogue (TD-29 (1)) has a serum, so the form offers it.

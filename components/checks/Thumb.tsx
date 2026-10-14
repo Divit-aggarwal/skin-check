@@ -37,7 +37,7 @@ export function Thumb({ scanId, date, size = 48, fallback = null }: { scanId: st
     };
   }, [user, scanId]);
 
-  const box = size === 48 ? "size-12 rounded-lg" : "size-28 rounded-2xl";
+  const box = size === 48 ? "size-12 rounded-lg" : "size-28 rounded-tile";
   if (state.kind === "none") return <>{fallback}</>;
   if (state.kind === "loading") return <span role="img" aria-label={K.photoLoading} className={`${box} shrink-0 animate-pulse bg-brand-linen2`} />;
   return (

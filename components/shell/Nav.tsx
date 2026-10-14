@@ -87,6 +87,7 @@ export function Nav({ phoneLast4 }: { phoneLast4: string | null }) {
       {/* Phone bottom bar. Account is the round button in each page header. */}
       <nav
         aria-label={S.navLabel}
+        data-bottom-nav
         className="fixed inset-x-0 bottom-0 z-30 border-t border-brand-border bg-brand-surface pb-[env(safe-area-inset-bottom)] sm:hidden"
       >
         <ul className="mx-auto grid h-[68px] max-w-md grid-cols-5">

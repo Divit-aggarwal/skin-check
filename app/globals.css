@@ -160,3 +160,8 @@
     scroll-behavior: auto !important;
   }
 }
+
+/* Redesign: capture, check-in and the active routine flow hide the bottom bar (they set body[data-flow]). */
+body[data-flow] [data-bottom-nav] {
+  display: none;
+}

@@ -67,4 +67,22 @@ export const ROUTINE_COPY = {
   since: (date: string) => `Since ${date}`,
   counts: (c: { used: number; skipped: number; unknown: number }) =>
     `${c.used} used · ${c.skipped} skipped · ${c.unknown} not logged`,
+  // Redesign Phase 2 (TD-50): the slot switch, the one-step-at-a-time mode and
+  // the logged state. Counts and names only; no time estimates (none are stored).
+  slotSwitch: "Time of day",
+  slotTitle: { AM: "Morning routine", PM: "Evening routine" },
+  dueCount: (n: number) => (n === 1 ? "1 step today" : `${n} steps today`),
+  nothingInSlot: "Nothing on this part of your routine today.",
+  start: "Start routine",
+  continue: "Continue routine",
+  stepOfTotal: (n: number, total: number) => `Step ${n} of ${total}`,
+  exit: "Show all steps",
+  // Routine Complete (screen 04, no mockup): what was logged, then the next useful action. No streak.
+  logged: { AM: "Morning routine logged", PM: "Evening routine logged" },
+  usedList: "Used",
+  skippedList: "Skipped",
+  nextEvening: "Your evening steps start from 3 pm.",
+  seeEvening: "See evening steps",
+  nextNone: "Nothing else on your routine is due today.",
+  backToday: "Back to Today",
 } as const;

@@ -20,6 +20,6 @@ export const SHELL_COPY = {
   errorTitle: "Something went wrong",
   errorBody: "This page could not be shown just now. Nothing you saved is lost.",
   tryAgain: "Try again",
-  goHome: "Go to Home",
+  goHome: "Go to Today",
   startCheck: "Start a check",
 } as const;
