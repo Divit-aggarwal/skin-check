@@ -31,7 +31,7 @@ export function ReadingsTable({ view }: { view: Pick<CheckView, "bands" | "areas
   const rows = [{ key: "whole", label: C.current.wholeFace, bands: view.bands }, ...view.areas.map((a) => ({ key: a.region, label: a.label, bands: a.bands }))];
   return (
     <div className="flex flex-col gap-2">
-      <h3 aria-hidden className="font-display text-base font-semibold tracking-[-0.01em] text-brand-title">{C.table.caption}</h3>
+      <h3 aria-hidden className="text-base font-semibold text-brand-text">{C.table.caption}</h3>
       <div className="max-w-full overflow-x-auto">
         <table className="w-full text-left text-xs sm:text-sm">
           <caption className="sr-only">{C.table.caption}</caption>
@@ -76,7 +76,7 @@ export function CheckReadings({ view, photo = null, picture, onArea }: { view: C
   return (
     <div className="flex flex-col gap-5">
       {own && (
-        <div className="flex flex-col items-center gap-3 rounded-2xl bg-brand-linen p-4">
+        <div className="flex flex-col items-center gap-3 rounded-card bg-brand-50 p-4">
           {own}
           {!picture && photo && view.bands && <p className="text-center text-sm text-brand-muted">{C.photo.mapsOnResults}</p>}
         </div>
