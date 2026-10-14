@@ -178,7 +178,7 @@ export function SkinCheckFlow() {
           <div className="justify-self-end">
             {/* O-D3: the signed-in start page links to /dashboard. */}
             {isFirst && !complete && (
-              <DashboardLink />
+              <DashboardLink className="text-sm" />
             )}
           </div>
         </div>
@@ -295,7 +295,7 @@ export function SkinCheckFlow() {
                   <Link href="/checks">All your checks</Link>
                 </Button>
                 {/* O-D3: the results screen links to /dashboard. */}
-                <DashboardLink />
+                <DashboardLink className="text-sm" />
               </div>
             </div>
           </motion.div>
