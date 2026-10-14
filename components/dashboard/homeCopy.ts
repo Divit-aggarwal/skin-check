@@ -182,6 +182,7 @@ export const HOME_COPY = {
 
   account: {
     title: "Location and reminders",
+    remindersTitle: "Daily reminder",
     location: (state: string) => `Location: ${state}`,
     reminders: (state: string) => `Reminders: ${state}`,
     city: (name: string) => `City: ${name}`,

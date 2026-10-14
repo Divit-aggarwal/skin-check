@@ -30,6 +30,7 @@ async function dashboardAs(page: Page, phone: string) {
 const accountAs = async (page: Page, phone: string) => {
   await signIn(page, phone);
   await page.goto("/account");
+  await page.getByRole("link", { name: "Privacy", exact: true }).click(); // redesign 21 (lane E): privacy is a tab
 };
 
 test("signed out: a sign-in link only", async ({ page }) => {
@@ -139,6 +140,7 @@ test("empty", async ({ page }) => {
   await shot(page, "empty");
   // The privacy card is on Account (TD-47).
   await page.goto("/account");
+  await page.getByRole("link", { name: "Privacy", exact: true }).click(); // redesign 21 (lane E): privacy is a tab
   await expect(page.getByText(C.privacy.aiNotAsked)).toBeVisible();
 });
 
