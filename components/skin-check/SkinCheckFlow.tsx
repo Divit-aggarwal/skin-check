@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion, type Variants } from "framer-motion";
 import { ChevronLeft } from "lucide-react";
@@ -16,7 +16,12 @@ import { SkinCheckDashboard } from "./SkinCheckDashboard";
 import { DashboardLink } from "@/components/dashboard/DashboardLink";
 import { QuestionsChoice, SkippedNote } from "./QuestionsChoice";
 import { hasQuestionAnswers, QUESTION_SECTION_IDS } from "@/lib/skin-check-validation";
-import { textLink } from "@/components/ui/page";
+import { btnSecondary, card, eyebrow, textLink } from "@/components/ui/page";
+import { Wordmark } from "@/components/ui/kit";
+import { weeklyCheckinUi } from "@/lib/ui-flags";
+import { LastCheckCard, PhotoTip } from "./CheckStart";
+import { WeeklyCheckin } from "./WeeklyCheckin";
+import { START_COPY } from "./flowCopy";
 
 // Section-to-section only — individual questions within a section never
 // slide, they fade in and accumulate on the growing page.
@@ -66,6 +71,18 @@ export function SkinCheckFlow() {
     productNames,
     setProductName,
   } = useSkinCheckFlow();
+
+  // Screen 08 (E19): a view state only, reached from the start when the flag is on; nothing saves.
+  const [checkin, setCheckin] = useState(false);
+  // Capture, the wait while the photo is read, and the check-in hide the
+  // bottom bar (globals.css, body[data-flow]); the start and the results keep it.
+  const overlay = complete || blocked || confirmingUnder18 || choosingQuestions;
+  const focused = checkin || (!overlay && (section.id === "skin-photo" || section.id === "get-your-results"));
+  useEffect(() => {
+    if (!focused) return;
+    document.body.dataset.flow = "check";
+    return () => void delete document.body.dataset.flow;
+  }, [focused]);
 
   // Keyed by step id so a freshly revealed question can be scrolled into
   // view without assuming it's the next DOM sibling — entries clean
@@ -130,35 +147,48 @@ export function SkinCheckFlow() {
   // restored position a tick later would be a visible flash, so hold the
   // frame — this resolves synchronously off localStorage in practice.
   if (!restored || waitingForSaved) {
-    return <div className="min-h-dvh bg-brand-linen" />;
+    return <div className="min-h-dvh bg-brand-bg" />;
+  }
+
+  if (checkin && weeklyCheckinUi()) {
+    return (
+      <div className="min-h-dvh bg-brand-bg">
+        <WeeklyCheckin onClose={() => setCheckin(false)} />
+      </div>
+    );
   }
 
   return (
-    <div className="min-h-dvh bg-brand-linen">
+    <div className="min-h-dvh bg-brand-bg">
       {/* Back and the Home link share a row above the progress bar, so the bar
           and every question start on the same edge (design review G03). */}
       <div ref={headerRef} className={`mx-auto flex flex-col gap-2 px-4 pt-4 sm:px-6 sm:pt-6 ${complete ? "max-w-6xl lg:px-8" : "max-w-2xl"}`}>
-        <div className="flex min-h-11 items-center justify-between">
+        <div className="grid min-h-11 grid-cols-[1fr_auto_1fr] items-center">
           <button
             type="button"
             onClick={back}
             disabled={isFirst}
             aria-label="Go back"
-            className="-ml-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-brand-muted hover:bg-brand-linen hover:text-brand-ink disabled:invisible"
+            className="-ml-3 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-brand-text hover:bg-brand-50 disabled:invisible"
           >
-            <ChevronLeft className="h-5 w-5" />
+            <ChevronLeft className="h-[22px] w-[22px]" />
           </button>
-          {/* O-D3: the signed-in start page links to /dashboard. */}
-          {isFirst && !complete && (
-            <DashboardLink />
-          )}
+          {/* The trailing letter-space would push the word off centre (kit AppHeader). */}
+          <Wordmark className="pl-[0.35em]" />
+          <div className="justify-self-end">
+            {/* O-D3: the signed-in start page links to /dashboard. */}
+            {isFirst && !complete && (
+              <DashboardLink className="text-sm" />
+            )}
+          </div>
         </div>
         {!complete && (
           <ProgressHeader
             sectionLabels={ALL_SECTION_LABELS}
             activeSectionIndex={sectionIndex}
             activeSectionFill={sectionFill}
-            activeSectionLabel={choosingQuestions ? "ABOUT THE QUESTIONS" : section.label}
+            activeSectionLabel={choosingQuestions ? START_COPY.title : section.label}
+            showBar={!choosingQuestions}
           />
         )}
       </div>
@@ -173,7 +203,7 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto flex max-w-2xl flex-col gap-5 px-4 pb-10 pt-10 sm:px-6"
+            className="mx-auto flex max-w-2xl flex-col gap-5 px-4 pb-10 pt-6 sm:px-6"
           >
             <EchoBubble message="You chose under 18. Is that right?" />
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -194,9 +224,23 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto max-w-2xl px-4 pb-10 pt-10 sm:px-6"
+            className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pb-10 pt-2 sm:px-6"
           >
+            {/* Screen 05: what this check is, the last check, the choice (TD-44), a tip. */}
+            <p className="text-brand-text-muted">{START_COPY.intro}</p>
+            <LastCheckCard />
             <QuestionsChoice answers={answers} onChoose={chooseQuestions} />
+            <PhotoTip />
+            {weeklyCheckinUi() && (
+              <button type="button" onClick={() => setCheckin(true)} aria-describedby="checkin-open-note" className={btnSecondary}>
+                {START_COPY.checkinOpen}
+              </button>
+            )}
+            {weeklyCheckinUi() && (
+              <p id="checkin-open-note" className="-mt-2 text-center text-sm text-brand-text-muted">
+                {START_COPY.checkinOpenNote}
+              </p>
+            )}
           </motion.div>
         ) : blocked ? (
           <motion.div
@@ -207,9 +251,9 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto max-w-2xl px-4 pb-10 pt-10 sm:px-6"
+            className="mx-auto max-w-2xl px-4 pb-10 pt-6 sm:px-6"
           >
-            <div role="status" className="flex flex-col items-start gap-4 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
+            <div role="status" className={`${card} flex flex-col items-start gap-4`}>
               <p>This experience isn&apos;t available yet for users under 18. If that&apos;s not right, change your answer.</p>
               <Button type="button" variant="ink" size="lg" onClick={back}>
                 Change my answer
@@ -229,8 +273,8 @@ export function SkinCheckFlow() {
           >
             <div className="flex flex-col gap-10">
               <div className="flex flex-col gap-3">
-                <p className="text-xs font-bold uppercase tracking-[0.08em] text-brand-eyebrow">Your check</p>
-                <h1 className="font-display text-[30px] font-semibold leading-[1.15] tracking-[-0.025em] text-brand-title sm:text-[40px]">Your photo reading</h1>
+                <p className={eyebrow}>Your check</p>
+                <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text sm:text-[32px]">Your photo reading</h1>
                 <p className="max-w-prose text-brand-muted">
                   {formatPrompt("Thanks, {name}. Here is how each area of your face showed up in this one photo.", answers)}
                 </p>
@@ -251,7 +295,7 @@ export function SkinCheckFlow() {
                   <Link href="/checks">All your checks</Link>
                 </Button>
                 {/* O-D3: the results screen links to /dashboard. */}
-                <DashboardLink />
+                <DashboardLink className="text-sm" />
               </div>
             </div>
           </motion.div>
@@ -264,8 +308,10 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto flex max-w-2xl flex-col gap-10 px-4 pb-10 pt-10 sm:px-6"
+            className="mx-auto flex max-w-2xl flex-col gap-10 px-4 pb-10 pt-6 sm:px-6"
           >
+            {/* Screen 05 for a returning user (TD-43): the photo step is the start. */}
+            {section.id === "skin-photo" && reusingSaved && !updating && <LastCheckCard />}
             {visibleSteps.map((step) => (
               <motion.div
                 key={step.id}

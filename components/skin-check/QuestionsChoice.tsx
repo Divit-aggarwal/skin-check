@@ -25,11 +25,11 @@ export function QuestionsChoice({ answers, onChoose }: { answers: SkinCheckAnswe
       </h2>
       <p className="max-w-prose">{Q.howMany(count, questionMinutes(count), upTo)}</p>
       <div className="flex flex-col gap-1.5">
-        <h3 className="font-display text-base font-semibold tracking-[-0.01em]">{Q.whyTitle}</h3>
+        <h3 className="text-base font-semibold text-brand-text">{Q.whyTitle}</h3>
         <p className="max-w-prose text-brand-muted">{echoOn() ? Q.why : Q.whyNoEcho}</p>
       </div>
       <div className="flex flex-col gap-1.5">
-        <h3 className="font-display text-base font-semibold tracking-[-0.01em]">{Q.skipTitle}</h3>
+        <h3 className="text-base font-semibold text-brand-text">{Q.skipTitle}</h3>
         <ul className="flex max-w-prose list-disc flex-col gap-1 pl-5 text-brand-muted">
           {(echoOn() ? Q.skip : Q.skipNoEcho).map((line) => (
             <li key={line}>{line}</li>
@@ -69,7 +69,7 @@ function SkipConfirm({ onChoose, onClose }: { onChoose: (choice: "answer" | "ski
       aria-describedby="skip-confirm-lines"
       // StrictMode's dev remount closes and reopens it; that late close event is not the user's.
       onClose={() => !ref.current?.open && onClose()}
-      className="w-[calc(100%-32px)] max-w-md rounded-2xl border border-brand-card-line bg-brand-paper p-5 text-brand-ink shadow-card-lg backdrop:bg-black/40 sm:p-6"
+      className="w-[calc(100%-32px)] max-w-md rounded-card border border-brand-border bg-brand-surface p-5 text-brand-text shadow-card-lg backdrop:bg-black/40 sm:p-6"
     >
       <div className="flex flex-col gap-5">
         <h2 id="skip-confirm-title" className={h2}>

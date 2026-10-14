@@ -40,7 +40,7 @@ export function BodyZoneChecklist({ step, value, onChange, onCommit }: BodyZoneC
               onClick={() => toggle(opt.value)}
               disabled={disabled}
               className={cn(
-                "flex items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-forest focus-visible:ring-offset-2",
+                "flex items-center justify-between gap-3 rounded-tile border px-4 py-3 text-left transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-forest focus-visible:ring-offset-2",
                 selected
                   ? "border-brand-action bg-brand-mist"
                   : disabled

@@ -12,7 +12,7 @@ interface SegmentedSliderProps {
 
 export function SegmentedSlider({ step, value, onChange, onCommit }: SegmentedSliderProps) {
   return (
-    <div className="flex max-w-sm overflow-hidden rounded-lg border border-brand-line">
+    <div className="flex max-w-sm overflow-hidden rounded-tile border border-brand-line">
       {step.options.map((opt, i) => {
         const selected = value === opt.value;
         return (
