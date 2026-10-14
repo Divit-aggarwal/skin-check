@@ -16,3 +16,5 @@ under reduced motion and drops its 20px corner. Also from lane C's report: the
 shared class strings moved from the `"use client"` `components/ui/page.tsx` to
 `components/ui/classes.ts` (page.tsx re-exports them), so a server page gets
 the strings.
+| 1 | D echo | `ChatBubble`: 16px corners (`rounded-card`, tail corner `rounded-br-md` / `rounded-bl-md` kept) instead of `rounded-2xl` (20px), for both sides | Rule 10 (no 20px on touched screens); 19, also the opening on 18 | done (batch 1) |
+| 2 | D echo | `TypingIndicator` (`components/primitives`): honour reduced motion itself (the dots loop in JS; framer ignores the CSS rule) and drop its own `rounded-2xl` | Rule 10; 18/19. EchoPage wraps itself in `MotionConfig reducedMotion="user"` and overrides the corner by class meanwhile | done (batch 1) |

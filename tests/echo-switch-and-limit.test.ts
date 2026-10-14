@@ -144,7 +144,9 @@ describe("the Echo switch (ECHO_SWITCH)", () => {
     expect(page).not.toMatch(/NOT_RETRYABLE = new Set\([^)]*ECHO_LIMIT_UNAVAILABLE/);
     // No greeting inviting a question while Echo is off.
     expect(page).toContain("{echoOn && messages.length === 0 && (");
-    expect(page.indexOf("{!echoOn ? (")).toBeLessThan(page.indexOf("<form"));
+    // TD-50 (redesign lane D): the input is the kit's ChatInput (a form inside the kit), still after the notice.
+    expect(page).toContain("<ChatInput");
+    expect(page.indexOf("{!echoOn ? (")).toBeLessThan(page.indexOf("<ChatInput"));
   });
 });
 
