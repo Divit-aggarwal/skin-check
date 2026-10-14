@@ -11,7 +11,8 @@ import { CHECKS_COPY as K } from "./copy";
 type State = { kind: "loading" } | { kind: "none" } | { kind: "ready"; url: string };
 
 // TD-47: `fallback` (Home's face drawing) shows instead of nothing when no photo comes back.
-export function Thumb({ scanId, date, size = 48, fallback = null }: { scanId: string; date: string; size?: 48 | 112; fallback?: React.ReactNode }) {
+// "tile": full width at 3:4, for the Photos tab (screen 12).
+export function Thumb({ scanId, date, size = 48, fallback = null }: { scanId: string; date: string; size?: 48 | 112 | "tile"; fallback?: React.ReactNode }) {
   const { user } = useAuth();
   const [state, setState] = useState<State>({ kind: "loading" });
 
@@ -37,19 +38,20 @@ export function Thumb({ scanId, date, size = 48, fallback = null }: { scanId: st
     };
   }, [user, scanId]);
 
-  const box = size === 48 ? "size-12 rounded-lg" : "size-28 rounded-tile";
+  const box = size === 48 ? "size-12 rounded-tile" : size === 112 ? "size-28 rounded-tile" : "block aspect-[3/4] w-full rounded-tile";
+  const px = size === "tile" ? undefined : size;
   if (state.kind === "none") return <>{fallback}</>;
-  if (state.kind === "loading") return <span role="img" aria-label={K.photoLoading} className={`${box} shrink-0 animate-pulse bg-brand-linen2`} />;
+  if (state.kind === "loading") return <span role="img" aria-label={K.photoLoading} className={`${box} shrink-0 animate-pulse bg-brand-linen2 motion-reduce:animate-none`} />;
   return (
     // eslint-disable-next-line @next/next/no-img-element -- a short-lived signed URL, not a static asset
     <img
       src={state.url}
       alt={K.photoAlt(date)}
-      width={size}
-      height={size}
+      width={px}
+      height={px}
       referrerPolicy="no-referrer"
       onError={() => setState({ kind: "none" })}
-      className={`${box} shrink-0 border border-brand-line object-cover`}
+      className={`${box} shrink-0 border border-brand-border object-cover`}
     />
   );
 }

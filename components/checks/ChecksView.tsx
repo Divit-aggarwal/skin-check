@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Camera, ChevronRight } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
 import { CheckReadings, KnownAndNotKnown, PhotoCheckLine } from "@/components/dashboard/CheckReadings";
@@ -17,23 +17,33 @@ import { useRoutine } from "@/components/routine/useRoutine";
 import { mergeTimeline, dayOf } from "@/components/timeline/timeline";
 import { TimelineList } from "@/components/timeline/TimelineList";
 import { ROUTINE_COPY } from "@/lib/routine/copy";
-import { AccountButton, btnPrimary, btnSecondary, EmptyState, SignedOutCard, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";
+import { AccountButton, btnPrimary, btnSecondary, card, EmptyState, SignedOutCard, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";
+import { AppHeader, IconWell, TabBar } from "@/components/ui/kit";
+import { isShownMetric, type ShownMetric } from "@/lib/skin-check-skus";
 import { CHECKS_COPY as K } from "./copy";
 import { Thumb } from "./Thumb";
+import { fixedLine, LatestReading, PhotosView, ReadingsView, ReadingView, RoutineStrip } from "./ChecksTabs";
 import { echoOn } from "@/lib/echo-limits";
 
-// G03 3.3 / 3.4. /checks: every check by date (date, kind, photo check, kept
-// photo), or the timeline of checks and routine entries. /checks/[scanId]: one
-// opened check with its OWN readings and the fixed line (TD-24 (1)).
-// Phone: the list, or the opened check. From 1024px: the list on the left and
-// the opened check on the right (TD-25 (1), from direction B).
+// G03 3.3 / 3.4, TD-50 screens 09–13. /checks views by query (no new route):
+// Overview (10: the newest reading, the routine strip, every check by date),
+// ?view=readings (12), ?reading=<key> (11: one reading at each check),
+// ?view=photos (12: kept photos), ?view=timeline (13). /checks/[scanId] (09):
+// one opened check with its OWN readings and the fixed line (TD-24 (1)).
+// Phone: one view at a time. From 1024px the Overview is the list on the left
+// and the opened check on the right (TD-25 (1), from direction B).
 
 type Load = { kind: "loading" } | { kind: "error" } | { kind: "ready"; data: DashboardData };
+type View = "overview" | "readings" | "photos" | "timeline";
 
 export function ChecksView({ openId }: { openId: string | null }) {
   const { user, loading } = useAuth();
   const [load, setLoad] = useState<Load>({ kind: "loading" });
-  const timeline = useSearchParams().get("view") === "timeline" && !openId;
+  const params = useSearchParams();
+  const asked = params.get("reading");
+  const reading: ShownMetric | null = !openId && asked && isShownMetric(asked) ? asked : null;
+  const v = params.get("view");
+  const view: View = openId ? "overview" : reading ? "readings" : v === "timeline" || v === "readings" || v === "photos" ? v : "overview";
 
   useEffect(() => {
     if (!user) return;
@@ -58,8 +68,17 @@ export function ChecksView({ openId }: { openId: string | null }) {
   // the list is still on the left (flow review G03).
   const header = (
     <PageHeader kicker={K.kicker} title={K.title} phoneCompact={Boolean(openId)}>
-      <div className={openId ? "hidden lg:block" : undefined}>
-        <ViewSwitch timeline={timeline} />
+      <div className={`mt-5 ${openId ? "hidden lg:block" : ""}`}>
+        <TabBar
+          label={K.views}
+          current={view}
+          tabs={[
+            { key: "overview", label: K.overview, href: "/checks" },
+            { key: "readings", label: K.readings, href: "/checks?view=readings" },
+            { key: "photos", label: K.photos, href: "/checks?view=photos" },
+            { key: "timeline", label: K.timeline, href: "/checks?view=timeline" },
+          ]}
+        />
       </div>
     </PageHeader>
   );
@@ -94,11 +113,19 @@ export function ChecksView({ openId }: { openId: string | null }) {
       </main>
     );
 
-  if (timeline)
+  if (!openId && view !== "overview")
     return (
       <main className={page}>
         {header}
-        <TimelineSection history={dashboard.history} />
+        {view === "timeline" ? (
+          <TimelineSection history={dashboard.history} />
+        ) : reading ? (
+          <ReadingView uid={user.uid} metric={reading} dashboard={dashboard} data={load.data} />
+        ) : view === "readings" ? (
+          <ReadingsView dashboard={dashboard} />
+        ) : (
+          <PhotosView history={dashboard.history} />
+        )}
       </main>
     );
 
@@ -107,18 +134,26 @@ export function ChecksView({ openId }: { openId: string | null }) {
   return (
     <main className={page}>
       {openId ? (
-        <div className="flex items-center justify-between pt-6 lg:hidden">
-          <Link href="/checks" className={textLink}>
-            <ChevronLeft aria-hidden size={16} />
-            {K.back}
-          </Link>
-          <AccountButton />
+        <div className="pt-2 lg:hidden">
+          <AppHeader back="/checks" backLabel={K.back} right={<AccountButton />} />
         </div>
       ) : null}
       {header}
+      {/* 10 on a phone: the newest reading first. From 1024px the opened newest check is on the right instead. */}
+      {!openId && (
+        <div className="mb-4 lg:hidden">
+          <LatestReading dashboard={dashboard} />
+        </div>
+      )}
       <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-6">
-        <div className={`lg:col-span-5 ${openId ? "hidden lg:block" : ""}`}>
+        <div className={`flex flex-col gap-4 lg:col-span-5 ${openId ? "hidden lg:flex" : ""}`}>
           <CheckList dashboard={dashboard} data={load.data} uid={user.uid} selected={selected} />
+          {/* D-12: a card of its own, below the list, never beside the readings. */}
+          {!openId && (
+            <div className="lg:hidden">
+              <RoutineStrip />
+            </div>
+          )}
         </div>
         <div className={`lg:sticky lg:top-6 lg:col-span-7 ${openId ? "" : "hidden lg:block"}`}>
           <CheckDetail uid={user.uid} scanId={selected} data={load.data} dashboard={dashboard} />
@@ -128,31 +163,17 @@ export function ChecksView({ openId }: { openId: string | null }) {
   );
 }
 
-function ViewSwitch({ timeline }: { timeline: boolean }) {
-  const tab = "flex min-h-11 items-center rounded-full px-5 font-medium aria-[current=page]:bg-brand-action aria-[current=page]:text-white";
-  return (
-    <nav aria-label={K.views} className="mt-5 inline-flex rounded-full border border-brand-line bg-brand-paper p-1">
-      <Link href="/checks" aria-current={timeline ? undefined : "page"} className={tab}>
-        {K.list}
-      </Link>
-      <Link href="/checks?view=timeline" aria-current={timeline ? "page" : undefined} className={tab}>
-        {K.timeline}
-      </Link>
-    </nav>
-  );
-}
-
 /** Date, kind, photo check and a kept photo. Never a reading. */
 function CheckList({ dashboard, data, uid, selected }: { dashboard: Dashboard; data: DashboardData; uid: string; selected: string | null }) {
   return (
-    <section aria-labelledby="list-title" className="overflow-hidden rounded-2xl border border-brand-line">
-      <div className="flex items-center justify-between gap-4 border-b border-brand-line px-5 py-4">
-        <h2 id="list-title" className={eyebrow}>
+    <section aria-labelledby="list-title" className={`${card} overflow-hidden p-0 sm:p-0`}>
+      <div className="flex items-center justify-between gap-4 border-b border-brand-border px-4 py-4 sm:px-5">
+        <h2 id="list-title" className={h2}>
           {C.history.title}
         </h2>
-        <p className="text-sm text-brand-muted">{K.count(dashboard.history.length)}</p>
+        <p className="text-sm text-brand-text-muted">{K.count(dashboard.history.length)}</p>
       </div>
-      <ul className="divide-y divide-brand-line">
+      <ul className="divide-y divide-brand-border">
         {dashboard.history.map((row) => {
           const check = pastCheck(uid, row.scanId, data.checks, data.analyses);
           const date = formatDate(row.date);
@@ -162,15 +183,16 @@ function CheckList({ dashboard, data, uid, selected }: { dashboard: Dashboard; d
                 href={`/checks/${encodeURIComponent(row.scanId)}`}
                 aria-label={C.history.openLabel(date)}
                 aria-current={selected === row.scanId ? "page" : undefined}
-                className="group flex min-h-16 items-center gap-4 px-5 py-4 hover:bg-brand-linen aria-[current=page]:bg-brand-linen"
+                className="group flex min-h-16 items-center gap-3 px-4 py-3 transition-colors duration-fast hover:bg-brand-50 aria-[current=page]:bg-brand-50 sm:px-5"
               >
+                <IconWell icon={Camera} />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="font-semibold">{date}</span>
-                  <span className="text-sm text-brand-muted">{C.history.kind[row.kind]}</span>
-                  {check?.photoCheck && <span className="text-sm text-brand-muted">{C.photoCheck[check.photoCheck]}</span>}
+                  <span className="font-semibold text-brand-text">{date}</span>
+                  <span className="text-sm text-brand-text-muted">{C.history.kind[row.kind]}</span>
+                  {check?.photoCheck && <span className="text-sm text-brand-text-muted">{C.photoCheck[check.photoCheck]}</span>}
                 </span>
                 {row.photoClaimed && <Thumb key={row.scanId} scanId={row.scanId} date={date} />}
-                <ChevronRight aria-hidden size={18} className="shrink-0 text-brand-muted group-hover:text-brand-ink" />
+                <ChevronRight aria-hidden size={18} className="shrink-0 text-brand-text-muted group-hover:text-brand-text" />
               </Link>
             </li>
           );
@@ -196,14 +218,14 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
   const skipped = record?.data.questionnaire === "skipped" && !questionsDone(record, data.laterAnswers);
   const canAnswer = questionsTarget(uid, data.checks, data.analyses, data.laterAnswers)?.id === check.scanId;
   return (
-    <section aria-labelledby="check-title" className="flex flex-col gap-5 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
+    <section aria-labelledby="check-title" className={`${card} flex flex-col gap-5`}>
       <div className="flex items-start justify-between gap-4">
         <div>
           <p className={`${eyebrow} mb-1`}>{K.opened}</p>
           <h2 id="check-title" className={h2}>
             {C.history.checkFrom(date)}
           </h2>
-          <p className="mt-1 text-brand-muted">{C.history.kind[check.kind]}</p>
+          <p className="mt-1 text-brand-text-muted">{C.history.kind[check.kind]}</p>
         </div>
         {/* TD-39: one photo. The thumbnail only until the large photo below can be shown. */}
         {check.photoClaimed && !photo && <Thumb key={check.scanId} scanId={check.scanId} date={date} size={112} />}
@@ -212,11 +234,11 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
       {check.view ? (
         <>
           {/* TD-24 (1): on every opened check with readings, never behind a toggle. */}
-          <p className="rounded-2xl bg-brand-mist px-5 py-4 text-brand-ink">{C.history.pastLine}</p>
+          <p className={fixedLine}>{C.history.pastLine}</p>
           {/* TD-46: on the newest check, a face area opens Echo on it (Echo talks about the newest check only). */}
           <CheckReadings view={{ ...check.view, photoCheck: null }} photo={photo} onArea={newest && echoOn() ? (r) => router.push(`/echo?region=${r}`) : undefined} />
           {check.view.bands && (
-            <div className="border-t border-brand-line pt-5">
+            <div className="border-t border-brand-border pt-5">
               <KnownAndNotKnown />
             </div>
           )}
@@ -225,31 +247,31 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
         <p>{K.noReadings}</p>
       )}
       {skipped && (
-        <div className="flex flex-col items-start gap-1 border-t border-brand-line pt-5">
-          <p className="text-brand-muted">{Q.checkSkipped}</p>
+        <div className="flex flex-col items-start gap-1 border-t border-brand-border pt-5">
+          <p className="text-brand-text-muted">{Q.checkSkipped}</p>
           {canAnswer ? (
             <Link href="/questions" className={textLink}>
               {Q.answerLink}
             </Link>
           ) : (
-            <p className="text-sm text-brand-muted">{Q.checkSkippedClosed}</p>
+            <p className="text-sm text-brand-text-muted">{Q.checkSkippedClosed}</p>
           )}
         </div>
       )}
       {Object.keys(names).length > 0 && (
-        <div className="flex flex-col gap-2 border-t border-brand-line pt-5">
-          <h3 className="font-display text-base font-semibold tracking-[-0.01em]">{Q.namedTitle}</h3>
+        <div className="flex flex-col gap-2 border-t border-brand-border pt-5">
+          <h3 className="text-base font-semibold text-brand-text">{Q.namedTitle}</h3>
           <dl className="flex flex-col gap-2">
             {(Object.entries(names) as [ProductNameKey, string][]).map(([key, text]) => (
               <div key={key}>
-                <dt className="text-sm text-brand-muted">{productNameLabel(key)}</dt>
+                <dt className="text-sm text-brand-text-muted">{productNameLabel(key)}</dt>
                 <dd className="whitespace-pre-wrap break-words">{text}</dd>
               </div>
             ))}
           </dl>
         </div>
       )}
-      <div className="flex flex-wrap gap-3 border-t border-brand-line pt-5">
+      <div className="flex flex-wrap gap-3 border-t border-brand-border pt-5">
         {/* TD-29 (5): no way into Echo while it is switched off. */}
         {newest ? (
           echoOn() && (
@@ -258,7 +280,7 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
             </Link>
           )
         ) : (
-          check.view && <p className="w-full text-sm text-brand-muted">{K.echoNewestOnly}</p>
+          check.view && <p className="w-full text-sm text-brand-text-muted">{K.echoNewestOnly}</p>
         )}
         <Link href="/skin-check" className={btnSecondary}>
           {C.newCheck}
@@ -273,7 +295,7 @@ function TimelineSection({ history }: { history: Dashboard["history"] }) {
   const items = mergeTimeline(history, routine.data?.events ?? [], routine.data?.today ?? dayOf(new Date()));
   const nameOf = (id: string) => routine.data?.products.find((p) => p.id === id)?.name ?? ROUTINE_COPY.otherProduct;
   return (
-    <section aria-label={K.timeline} className="max-w-4xl rounded-2xl border border-brand-line px-5">
+    <section aria-label={K.timeline} className={`${card} max-w-3xl py-1 sm:py-1`}>
       {routine.failed && <p role="alert" className="py-3">{ROUTINE_COPY.error}</p>}
       {/* No photos here: a column of faces between routine entries would read as before and after (D-12). Photos stay on the list and the opened check. */}
       <TimelineList items={items} nameOf={nameOf} />
