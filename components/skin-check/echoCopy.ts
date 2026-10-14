@@ -9,6 +9,12 @@ export const ECHO_COPY = {
   talkingAbout: "Talking about",
   checkFrom: (date: string) => `Check from ${date}`,
   readingsSummary: "The readings of this check",
+  // TD-50 (mockup 18): what Echo does. It talks through your checks; it never decides.
+  meet: "Meet",
+  tagline: "Talks you through your checks",
+  does: ["Goes through your readings", "Answers in plain words", "Never decides for you"],
+  doesLabel: "What Echo does",
+  areaHint: "Each area has its own conversation.",
   areaPicker: "Ask about one area of your face",
   openCheck: "Open this check",
   placeholder: (area: string) => `Ask Echo about your ${area}`,
