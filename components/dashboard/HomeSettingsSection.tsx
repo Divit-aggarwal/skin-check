@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { btnSecondary, card, h2 } from "@/components/ui/page";
+import { Bell, MapPin } from "lucide-react";
+import { btnSecondary, card, h2, LoadingState } from "@/components/ui/page";
+import { IconWell } from "@/components/ui/kit";
 import type { HomeSettings } from "@/lib/home/permissions";
 import { weatherOn, pushOn } from "@/lib/home/switches";
 import { HOME_COPY } from "./homeCopy";
@@ -12,8 +14,10 @@ import { disableReminders, enableReminders, loadHomeSettings, saveHomeSettings }
 const A = HOME_COPY.account;
 
 // TD-47: Account's place to change the location and reminder choices and the
-// city. Only the parts whose switch is on are shown.
-export function HomeSettingsSection() {
+// city. Only the parts whose switch is on are shown. part="reminders" is the
+// Notifications screen (redesign 20): the same reminder control, alone, and the
+// "not available yet" line instead of nothing when reminders are off.
+export function HomeSettingsSection({ part = "all" }: { part?: "all" | "reminders" }) {
   const { user } = useAuth();
   const [settings, setSettings] = useState<HomeSettings | null | undefined>(undefined);
   const [message, setMessage] = useState<string | null>(null);
@@ -25,7 +29,9 @@ export function HomeSettingsSection() {
     loadHomeSettings(user.uid).then(setSettings, () => setSettings(null));
   }, [user]);
 
-  if (!user || settings === undefined || (!weatherOn() && !pushOn())) return null;
+  const onlyReminders = part === "reminders";
+  if (onlyReminders && user && settings === undefined) return <LoadingState label={A.remindersTitle} blocks={["h-28"]} />;
+  if (!user || settings === undefined || (!onlyReminders && !weatherOn() && !pushOn())) return null;
 
   const save = async (patch: HomeSettings) => {
     setBusy(true);
@@ -45,10 +51,13 @@ export function HomeSettingsSection() {
 
   return (
     <section aria-labelledby="home-settings-title" className={`${card} flex flex-col items-start gap-3`}>
-      <h2 id="home-settings-title" className={h2}>
-        {A.title}
-      </h2>
-      {weatherOn() && (
+      <div className="flex items-center gap-3">
+        <IconWell icon={onlyReminders ? Bell : MapPin} />
+        <h2 id="home-settings-title" className={h2}>
+          {onlyReminders ? A.remindersTitle : A.title}
+        </h2>
+      </div>
+      {weatherOn() && !onlyReminders && (
         <div className="flex w-full flex-col items-start gap-2">
           <p>{A.location(state(settings?.location))}</p>
           <p>{settings?.city ? A.city(settings.city.name) : A.noCity}</p>
@@ -69,7 +78,7 @@ export function HomeSettingsSection() {
         </div>
       )}
       {pushOn() ? (
-        <div className="flex w-full flex-col items-start gap-2 border-t border-brand-line pt-3">
+        <div className={`flex w-full flex-col items-start gap-2 ${onlyReminders ? "" : "border-t border-brand-line pt-3"}`}>
           <p>{A.reminders(state(settings?.reminders))}</p>
           {/* TD-47 (3): no browser prompt before the permissions screen has been shown. */}
           {!settings?.askedAt && settings?.reminders !== "allowed" ? (

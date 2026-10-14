@@ -4,7 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth-context";
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
+import { ShieldCheck } from "lucide-react";
 import { btnSecondary, card, h2 } from "@/components/ui/page";
+import { IconWell } from "@/components/ui/kit";
 import { DASHBOARD_COPY } from "./copy";
 import { loadLedger } from "./data";
 import { aiShareStatus, photoKeptFrom, withdrawalOutcome, type AiShareStatus, type Dashboard } from "./state";
@@ -63,9 +65,12 @@ export function ConsentSection({ photo = null, deleteLink = false }: { photo?: D
 
   return (
     <section aria-labelledby="privacy-title" className={`${card} flex flex-col items-start gap-3`}>
-      <h2 id="privacy-title" className={h2}>
-        {C.title}
-      </h2>
+      <div className="flex items-center gap-3">
+        <IconWell icon={ShieldCheck} />
+        <h2 id="privacy-title" className={h2}>
+          {C.title}
+        </h2>
+      </div>
       {status === "on" && (
         <>
           <p>{C.aiOn}</p>
@@ -84,7 +89,7 @@ export function ConsentSection({ photo = null, deleteLink = false }: { photo?: D
       )}
       {photoKept !== null && <p className="text-brand-muted">{photoKept ? C.photoKept : C.photoNotKept}</p>}
       {deleteLink && (
-        <Link href="/account#delete-account" className="inline-flex min-h-11 items-center font-medium text-brand-forest underline-offset-4 hover:underline">
+        <Link href="/account?tab=privacy#delete-account" className="inline-flex min-h-11 items-center font-medium text-brand-forest underline-offset-4 hover:underline">
           {C.delete}
         </Link>
       )}

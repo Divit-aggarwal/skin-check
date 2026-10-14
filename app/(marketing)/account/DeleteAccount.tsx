@@ -5,6 +5,8 @@ import { useAuth } from "@/lib/auth-context";
 import { clearDraft } from "@/lib/skin-check-draft";
 import { clearUnder18Chosen, ERASE_CONFIRMATION, ERASE_COPY, ERASE_MAX_AUTH_AGE_SECONDS } from "@/lib/consent";
 import Link from "next/link";
+import { Trash2 } from "lucide-react";
+import { IconWell } from "@/components/ui/kit";
 import { btnPrimary, btnSecondary, h2 } from "@/components/ui/page";
 import { ACCOUNT_COPY as A } from "./copy";
 import { forgetHomeDevice } from "@/components/dashboard/homeSettings";
@@ -28,7 +30,7 @@ export function DeleteAccount() {
 
   if (state.kind === "done") {
     return (
-      <div role="status" className="flex flex-col items-start gap-3 rounded-2xl border border-brand-card-line bg-brand-paper p-5 sm:p-6">
+      <div role="status" className="flex flex-col items-start gap-3 rounded-card border border-brand-border bg-brand-surface p-4 sm:p-5">
         <p className="font-semibold">{ERASE_COPY.done}</p>
         <p className="text-brand-muted">{ERASE_COPY.doneLate}</p>
         <Link href="/skin-check" className={btnPrimary}>
@@ -73,15 +75,18 @@ export function DeleteAccount() {
   }
 
   return (
-    <section aria-labelledby="delete-title" className="flex flex-col items-start gap-3 rounded-2xl border border-brand-error p-5 sm:p-6">
-      <h2 id="delete-title" className={h2}>
-        {A.deleteTitle}
-      </h2>
+    <section aria-labelledby="delete-title" className="flex flex-col items-start gap-3 rounded-card border border-brand-error bg-brand-surface p-4 sm:p-5">
+      <div className="flex items-center gap-3">
+        <IconWell icon={Trash2} className="bg-brand-error-soft text-brand-error" />
+        <h2 id="delete-title" className={h2}>
+          {A.deleteTitle}
+        </h2>
+      </div>
       <p>{ERASE_COPY.explain}</p>
       <p className="text-brand-muted">{ERASE_COPY.gemini}</p>
       <p className="text-brand-muted">{ERASE_COPY.otherBrowsers}</p>
       {state.kind === "idle" && (
-        <button type="button" className={`${btnSecondary} border-brand-error text-brand-error hover:bg-brand-accent-soft`} onClick={() => setState({ kind: "confirming", typed: "" })}>
+        <button type="button" className={`${btnSecondary} border-brand-error text-brand-error hover:bg-brand-error-soft`} onClick={() => setState({ kind: "confirming", typed: "" })}>
           {A.deleteButton}
         </button>
       )}
@@ -92,7 +97,7 @@ export function DeleteAccount() {
           </label>
           <input
             id="erase-confirm"
-            className="h-12 w-full rounded-lg border border-brand-line bg-brand-paper px-3 text-base text-brand-ink"
+            className="h-12 w-full rounded-tile border border-brand-border bg-brand-surface px-3 text-base text-brand-text"
             value={state.typed}
             autoComplete="off"
             onChange={(e) => setState({ kind: "confirming", typed: e.target.value })}
@@ -100,7 +105,7 @@ export function DeleteAccount() {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              className="inline-flex min-h-12 items-center justify-center rounded-full bg-brand-error px-6 font-medium text-white hover:opacity-90 border border-transparent disabled:border-brand-line disabled:bg-brand-paper disabled:text-brand-muted sm:min-h-11"
+              className="inline-flex min-h-12 items-center justify-center rounded-full border border-transparent bg-brand-error px-6 font-semibold text-white transition-colors duration-fast hover:opacity-90 disabled:border-brand-border disabled:bg-brand-50 disabled:text-brand-text-muted"
               disabled={state.typed !== ERASE_CONFIRMATION}
               onClick={() => void erase()}
             >
