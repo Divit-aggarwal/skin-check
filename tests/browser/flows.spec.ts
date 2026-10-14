@@ -249,6 +249,8 @@ test("routine: the four steps, an empty step invites an add, used and skipped in
   await skipped.focus();
   await entry(first!).getByRole("button", { name: R.logAs(R.status.used, first!, R.slot.AM.toLowerCase()) }).click();
   await page.reload();
+  // The page reopens on the current time of day (after 15:00, Evening).
+  await page.getByRole("radio", { name: R.slot.AM }).click();
   await expect(entry(first!).getByText(R.todayStatus(R.status.used))).toBeVisible();
   await expect(entry(R.otherProduct).getByText(R.todayStatus(R.status.skipped))).toBeVisible();
   // No reading or photo next to a routine entry.

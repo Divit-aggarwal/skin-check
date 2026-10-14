@@ -16,7 +16,8 @@
     "dev:local": "bash scripts/local-stack.sh up",
     "test:local": "bash scripts/local-stack.sh test",
     "test:browser": "bash scripts/local-stack.sh browser",
-    "test:all": "npm run typecheck && npm run lint && npm run test:local && npm run test:browser && npm run build"
+    "test:browser:parallel": "bash scripts/browser-shards.sh",
+    "test:all": "npm run typecheck && npm run lint && npm run test:local && npm run test:browser:parallel && npm run build"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1127.0",

@@ -21,7 +21,7 @@ done
 # end-to-end test (tests/*.e2e.test.ts), so a lane adds its own files instead
 # of editing this one.
 if [ "${1:-}" = browser ]; then
-  npx playwright test
+  npx playwright test ${PW_ARGS:-}
 else
   npx vitest run firestore-rules e2e.test
 fi
