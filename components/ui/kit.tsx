@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId } from "react";
+import { useId, useState } from "react";
 import { ArrowRight, Dot, Hand, Package, Pipette, ShowerHead, Sun, ArrowUp, Check, ChevronLeft, ChevronRight, CircleDot, Contrast, Droplet, Flame, Waves, type LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { card, heroCard, tintCard } from "./classes";
@@ -21,14 +21,16 @@ export function Wordmark({ className }: { className?: string }) {
 }
 
 /** Back (link or history), centred wordmark, optional right action. */
-export function AppHeader({ back, right, backLabel = "Back" }: { back?: string | true | undefined; right?: React.ReactNode | undefined; backLabel?: string }) {
+export function AppHeader({ back, right, backLabel = "Back", backDisabled }: { back?: string | true | (() => void) | undefined; right?: React.ReactNode | undefined; backLabel?: string; backDisabled?: boolean | undefined }) {
+  // back: a link, true (browser history) or a function (kit request B1). backDisabled keeps the
+  // button in the tree, disabled and invisible, so nothing shifts (B1).
   const router = useRouter();
   const cls = "grid size-11 place-items-center rounded-full text-brand-text hover:bg-brand-50";
   const icon = <ChevronLeft aria-hidden size={22} />;
   return (
     <header className="grid h-14 grid-cols-[44px_1fr_44px] items-center">
-      {back === true ? (
-        <button type="button" aria-label={backLabel} onClick={() => router.back()} className={cls}>{icon}</button>
+      {back === true || typeof back === "function" ? (
+        <button type="button" aria-label={backLabel} disabled={backDisabled} onClick={() => (back === true ? router.back() : back())} className={cn(cls, backDisabled && "invisible")}>{icon}</button>
       ) : back ? (
         <Link href={back} aria-label={backLabel} className={cls}>{icon}</Link>
       ) : (
@@ -108,10 +110,11 @@ export const READING_ICON: Record<Reading, { icon: LucideIcon; well: string }> =
  * optional tag ("early estimate") and context line (area, date). `footer` is
  * the slot for anything a later decision allows; nothing fills it today.
  */
-export function MetricTile({ reading, label, level, tag, context, footer }: { reading: Reading; label: string; level: string; tag?: string | undefined; context?: string | undefined; footer?: React.ReactNode }) {
+export function MetricTile({ reading, label, level, tag, context, footer, href }: { reading: Reading; label: string; level: string; tag?: string | undefined; context?: string | undefined; footer?: React.ReactNode ; href?: string | undefined }) {
+  // href: the whole tile opens that page (kit request A2).
   const { icon, well } = READING_ICON[reading];
-  return (
-    <div className={cn(card, "flex flex-col gap-2 p-4 sm:p-4")}>
+  const tile = (
+    <div className={cn(card, "flex h-full flex-col gap-2 p-4 sm:p-4", href && "transition-colors duration-fast hover:bg-brand-50")}>
       <div className="flex items-center gap-2">
         <IconWell icon={icon} size={32} className={well} />
         <span className="text-sm font-medium text-brand-text-muted">{label}</span>
@@ -126,6 +129,7 @@ export function MetricTile({ reading, label, level, tag, context, footer }: { re
       {footer}
     </div>
   );
+  return href ? <Link href={href} className="block h-full rounded-card">{tile}</Link> : tile;
 }
 
 /** Icon, title, description, optional trailing slot. No status pill (TD-47(4)). */
@@ -366,10 +370,17 @@ export function ProductTile({ step, size = 56, className }: { step: string | nul
 }
 
 /** The user's own photo with a label pill ("Today", a date) and an optional check. */
-export function PhotoTile({ src, alt, label, checked, className }: { src: string; alt: string; label?: string | undefined; checked?: boolean | undefined; className?: string }) {
+export function PhotoTile({ src, alt, label, checked, className, fallback }: { src: string; alt: string; label?: string | undefined; checked?: boolean | undefined; className?: string ; fallback?: string | undefined }) {
+  // Kit request A1: never sends a referrer (kept photos are short-lived signed links) and shows
+  // the fallback text when the image cannot be loaded.
+  const [failed, setFailed] = useState(false);
   return (
     <figure className={cn("relative overflow-hidden rounded-tile bg-brand-50", className)}>
-      <img src={src} alt={alt} className="aspect-[3/4] w-full object-cover" />
+      {failed ? (
+        <div role="img" aria-label={alt} className="grid aspect-[3/4] w-full place-items-center p-3 text-center text-sm text-brand-text-muted">{fallback ?? alt}</div>
+      ) : (
+        <img src={src} alt={alt} referrerPolicy="no-referrer" onError={() => setFailed(true)} className="aspect-[3/4] w-full object-cover" />
+      )}
       {label && <figcaption className="absolute bottom-2 left-2 rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold text-brand-text">{label}</figcaption>}
       {checked && (
         <span aria-hidden className="absolute right-2 top-2 grid size-6 place-items-center rounded-full bg-brand-700 text-white">

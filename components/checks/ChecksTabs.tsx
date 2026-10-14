@@ -38,9 +38,7 @@ function ReadingTiles({ bands }: { bands: Bands }) {
       <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {bands.map((b) => (
           <li key={b.metric}>
-            <Link href={`/checks?reading=${b.metric}`} className="block h-full rounded-card transition-colors duration-fast [&>div]:h-full hover:[&>div]:bg-brand-50">
-              <MetricTile reading={b.metric} label={b.label} level={b.band} tag={early(b.metric)} />
-            </Link>
+            <MetricTile reading={b.metric} label={b.label} level={b.band} tag={early(b.metric)} href={`/checks?reading=${b.metric}`} />
           </li>
         ))}
       </ul>
