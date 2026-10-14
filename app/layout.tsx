@@ -1,15 +1,20 @@
 import type { Metadata, Viewport } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { AuthProvider } from "@/lib/auth-context";
 import "./globals.css";
 
 // One sans for the whole app (redesign 2026-10-14, docs/lanes/redesign-report.md).
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ["latin"],
+// Served from the repo, so a build never fetches Google Fonts (G35): the
+// Google Fonts variable font (google/fonts ofl/plusjakartasans, v2.071, the
+// same outlines gstatic serves, every character kept), one file for 400-700.
+// Licence: app/fonts/plus-jakarta-sans/OFL.txt.
+const jakarta = localFont({
+  src: "./fonts/plus-jakarta-sans/PlusJakartaSans-Variable.woff2",
+  weight: "400 700",
+  style: "normal",
   variable: "--font-jakarta",
   display: "swap",
-  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
