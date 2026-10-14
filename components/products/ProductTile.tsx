@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 // 12px tile with its step's icon, never a stock image. Step icons are not the
 // reading icons (Flame, Droplet, Waves, CircleDot, Contrast). Keys cover both
 // step names: the routine's ("serum") and Echo's ("treat", "spot").
-// ponytail: lives here until kit request 1 (docs/lanes/kit-requests.md) moves a tile into the kit.
+// ponytail: lives here until kit request C1 (docs/lanes/kit-requests.md) moves a tile into the kit.
 const STEP_ICON: Record<string, LucideIcon> = { cleanse: ShowerHead, serum: Pipette, treat: Pipette, moisturise: Hand, protect: Sun, spot: Dot };
 
 export function ProductTile({ step, size = 56, className }: { step: string | null | undefined; size?: number; className?: string }) {
