@@ -7,6 +7,7 @@ import { AI_SHARE_CONSENT_COPY } from "@/lib/consent";
 import { P_SEED } from "./seed-products";
 import { STARTER_POOL } from "@/components/skin-check/echoStarters";
 import { signIn } from "./helpers";
+import { PRODUCTS_COPY } from "@/components/products/copy";
 
 // TD-34 (docs/design/echo-own-products.md): Echo's opening suggestion and the
 // product cards, at a phone (390), a tablet (768) and a laptop (1280). The
@@ -58,6 +59,8 @@ for (const width of ["390", "768", "1280"] as const) {
         await expect(card).toContainText(p.usage);
         await expect(card).toContainText(`${E.echoNote}:`);
         await expect(card.getByRole("link", { name: new RegExp(E.onStore) })).toHaveAttribute("href", p.url);
+        // Redesign lane C (screen 15): each card links to our product page.
+        await expect(card.getByRole("link", { name: PRODUCTS_COPY.detailsLabel(p.name) })).toHaveAttribute("href", `/products/${p.id}`);
       }
       expect(SHOWN.map((p) => STEP_LABEL[p.step])).toEqual(["Cleanse", "Treat", "Moisturise", "Protect"]);
       // No price, no buy button.

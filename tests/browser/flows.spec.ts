@@ -6,6 +6,7 @@ import { CAPTURE_QUALITY_SETTINGS } from "@/lib/capture-quality/settings";
 import { RETAKE_COPY } from "@/lib/capture-quality/retake";
 import { AI_SHARE_CONSENT_COPY, ERASE_CONFIRMATION } from "@/lib/consent";
 import { ROUTINE_COPY as R } from "@/lib/routine/copy";
+import { PRODUCTS_COPY } from "@/components/products/copy";
 import { CATALOGUE } from "@/lib/catalog/catalogue";
 import { TIMELINE_COPY as T } from "@/components/timeline/copy";
 import { ECHO_COPY as E } from "@/components/skin-check/echoCopy";
@@ -231,6 +232,8 @@ test("routine: the four steps, an empty step invites an add, used and skipped in
   await addSection.getByRole("button", { name: R.addButton, exact: true }).click();
   const entry = (name: string) => morning.locator("[data-routine-entry]").filter({ has: page.getByText(name, { exact: true }) });
   await expect(entry(first!)).toBeVisible();
+  // Redesign lane C (screen 06 to 15): an own product's card links to its product page.
+  await expect(page.locator("article[data-routine-card]").filter({ hasText: first! }).getByRole("link", { name: PRODUCTS_COPY.detailsLabel(first!) })).toHaveAttribute("href", /^\/products\/[a-z0-9-]+$/);
   await entry(first!).getByRole("button", { name: R.logAs(R.status.used, first!, R.slot.AM.toLowerCase()) }).click();
   await expect(entry(first!).getByText(R.todayStatus(R.status.used))).toBeVisible();
 
