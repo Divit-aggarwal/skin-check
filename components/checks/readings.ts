@@ -13,12 +13,21 @@ export interface ReadingRow {
   legacy: boolean;
   /** null when the stored scores could not be read. */
   band: Band | null;
+  /** Read by a different software version than the newest reading (comparability gate, owner answer 7). */
+  otherVersion: boolean;
 }
 
 export function readingHistory(uid: string, history: readonly HistoryRow[], checks: readonly Doc[], analyses: readonly Doc[], metric: ShownMetric): ReadingRow[] {
-  return history.flatMap((row) => {
+  const views = history.flatMap((row) => {
     const view = pastCheck(uid, row.scanId, checks, analyses)?.view;
-    if (!view) return [];
-    return [{ scanId: row.scanId, date: row.date, legacy: view.source === "legacy", band: view.bands?.find((b) => b.metric === metric)?.band ?? null }];
+    return view ? [{ row, view }] : [];
   });
+  const newest = views.find((v) => v.view.pipelineVersion !== null)?.view.pipelineVersion ?? null;
+  return views.map(({ row, view }) => ({
+    scanId: row.scanId,
+    date: row.date,
+    legacy: view.source === "legacy",
+    band: view.bands?.find((b) => b.metric === metric)?.band ?? null,
+    otherVersion: view.pipelineVersion !== null && view.pipelineVersion !== newest,
+  }));
 }

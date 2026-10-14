@@ -93,6 +93,7 @@ export const DASHBOARD_COPY = {
       questions: "Questions only",
     },
     openLabel: (date: string) => `Open the check from ${date}`,
+    otherVersion: "Read by a different version of the analysis software",
     checkFrom: (date: string) => `Check from ${date}`,
     back: "Back to your dashboard",
     // TD-24 (1): on every opened check, always visible. Fixed owner wording.

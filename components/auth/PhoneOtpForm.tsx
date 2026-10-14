@@ -20,7 +20,8 @@ export function PhoneOtpForm() {
     return (
       <div className="flex flex-col items-start gap-3">
         <p>
-          Signed in as <span className="font-semibold">{user.phoneNumber}</span>.
+          {/* H38: the last 4 digits only, as on the check flow (G23). */}
+          Signed in as phone ending <span className="font-semibold">{user.phoneNumber?.slice(-4)}</span>.
         </p>
         <button type="button" className={btnSecondary} aria-disabled={leaving} onClick={async () => {
             if (leaving) return;

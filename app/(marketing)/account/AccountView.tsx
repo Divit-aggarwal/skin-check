@@ -111,6 +111,8 @@ export function AccountView() {
               />
               {tab === "profile" && (
                 <>
+                  {/* TD-33 (1): waiting questions on Account's first screen too (owner answer 12). */}
+                  {questionsWaiting && <QuestionsCard isEcho={questionsWaiting.isEcho} date={questionsWaiting.date} />}
                   <section aria-labelledby="signed-in-title" className={`${tintCard} flex flex-col gap-4`}>
                     <div className="flex items-center gap-3">
                       <IconWell icon={UserRound} size={48} className="bg-brand-surface" />

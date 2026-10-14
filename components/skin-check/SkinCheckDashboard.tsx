@@ -110,7 +110,7 @@ export function SkinCheckDashboard({ scan, scanId, onScanChange, onRetake, answe
   // score, no Dryness ("a photo cannot measure it"); the readings table is the
   // same component the dashboard and an opened check use.
   const readings = readingsOf(scan.result as unknown as Record<string, unknown>);
-  const view = { scanId, date: null, source: "measured" as const, bands: readings.bands, areas: readings.areas, hardToRead: readings.hardToRead, photoCheck: null };
+  const view = { scanId, date: null, source: "measured" as const, bands: readings.bands, areas: readings.areas, hardToRead: readings.hardToRead, photoCheck: null, pipelineVersion: null };
 
   return (
     <div className="flex flex-col gap-10">

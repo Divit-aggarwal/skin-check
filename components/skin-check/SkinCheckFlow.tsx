@@ -228,8 +228,9 @@ export function SkinCheckFlow() {
           >
             {/* Screen 05: what this check is, the last check, the choice (TD-44), a tip. */}
             <p className="text-brand-text-muted">{START_COPY.intro}</p>
-            <LastCheckCard />
+            {/* The choice first, so its buttons are on the first screen at 375px (owner answer 5). */}
             <QuestionsChoice answers={answers} onChoose={chooseQuestions} />
+            <LastCheckCard />
             <PhotoTip />
             {weeklyCheckinUi() && (
               <button type="button" onClick={() => setCheckin(true)} aria-describedby="checkin-open-note" className={btnSecondary}>

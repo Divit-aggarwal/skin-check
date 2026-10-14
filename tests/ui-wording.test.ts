@@ -149,3 +149,12 @@ describe("G23: phone number on the check flow", () => {
     expect(src).toMatch(/phone ending <span[^>]*>\{activeUser\.phoneNumber\?\.slice\(-4\)\}<\/span>/);
   });
 });
+
+// H38: the Account page shows only the last 4 digits too.
+describe("H38: phone number on Account", () => {
+  it("never renders the full number", () => {
+    const src = readFileSync("components/auth/PhoneOtpForm.tsx", "utf8");
+    expect(src).not.toMatch(/\{user\.phoneNumber\}/);
+    expect(src).toMatch(/phone ending <span[^>]*>\{user\.phoneNumber\?\.slice\(-4\)\}<\/span>/);
+  });
+});

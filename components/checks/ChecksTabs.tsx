@@ -201,6 +201,7 @@ export function ReadingView({ uid, metric, dashboard, data }: { uid: string; met
                   <span className="flex min-w-0 flex-1 flex-col">
                     <span className="font-semibold text-brand-text">{formatDate(r.date)}</span>
                     {r.legacy && <span className="text-sm text-brand-text-muted">{C.history.kind.legacy}</span>}
+                    {r.otherVersion && <span className="text-sm text-brand-text-muted">{C.history.otherVersion}</span>}
                   </span>
                   <span className="font-semibold text-brand-text">{r.band ?? C.current.noReading}</span>
                   <ChevronRight aria-hidden size={18} className="shrink-0 text-brand-text-muted" />
@@ -227,7 +228,8 @@ export function PhotosView({ history }: { history: readonly HistoryRow[] }) {
       <h2 id="photos-title" className="sr-only">{K.photos}</h2>
       <p className="text-brand-text-muted">{K.photosIntro}</p>
       <p className={fixedLine}>{C.history.pastLine}</p>
-      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+      {/* One per row: two photos side by side read as before/after (TD-47 (4), D-12; owner answer 8). */}
+      <ul className="flex max-w-sm flex-col gap-4">
         {kept.map((r) => {
           const date = formatDate(r.date);
           return (

@@ -216,3 +216,15 @@ number), G32 (stack slots), G33 (scratchpad), G34 (kit follow-ups).
 | 10 | 10's phone-only parts on desktop | Keep them phone-only, so the routine never sits beside readings (D-12). |
 | 11 | Echo third tile; introduction | Keep "Never decides for you", because the intro line already says it is not a medical opinion. Show the introduction on every empty area thread: it is that thread's empty state and needs no new storage. |
 | 12 | Account | Also show the questions card on Profile, Account's first screen, as TD-33 (1) says. Mask the phone number ("ending 1234", H38). The H36 labels wait for H29's legal wording. |
+
+### Owner decisions (2026-10-15, second message)
+
+- Step source: `/routine` stays as it is (TD-29 (1) stands); E21 is the fix.
+- Questions 4–12: all recommended answers approved. Built on `lane/redesign`:
+  - 5: the choice card now comes before the last-check card on the start screen. The tip was already under the buttons, so the last-check card was moved instead.
+  - 7: each row on 11 from a software version other than the newest reading's says so in words (`readingHistory().otherVersion`). No row is hidden.
+  - 8: Photos shows one photo per row.
+  - 12: the questions card also shows on Profile; Account shows the phone number's last 4 digits only (H38).
+  - 4, 6, 9, 10, 11: no change.
+- Descriptions to Gemini: stopped in its own commit (`f8a71bd`). Only ids in `APPROVED_DESCRIPTIONS` are sent, and that list is empty.
+- Preview: Preview env vars scoped to `lane/redesign` only; no erase keys (Delete account gets tested after the master merge); Deployment Protection stays on; the preview hostname is removed from Firebase's authorised domains after the master merge.
