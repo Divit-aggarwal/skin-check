@@ -1,14 +1,19 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { ChevronRight, Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { ROUTINE_COPY as C } from "@/lib/routine/copy";
 import { OTHER_PRODUCT_ID as OTHER, type Schedule } from "@/lib/routine/events";
 import { btnPrimary, btnSecondary, card, ErrorState, h2, LoadingState, ReloadButton, SignedOutCard } from "@/components/ui/page";
-import { Arrow, SegmentedControl } from "@/components/ui/kit";
+import { Arrow, IconWell, SegmentedControl } from "@/components/ui/kit";
 import { slotNow } from "@/lib/home/today";
 import { dueEntries, SlotSteps, STEPS, stepOf, type Slot, type Step } from "./RoutineSteps";
 import { GuidedStep, RoutineLogged } from "./RoutineFlow";
+import { getProduct } from "@/lib/catalog/catalogue";
+import { PRODUCTS_COPY as P } from "@/components/products/copy";
+import { ProductTile, productHref } from "@/components/products/ProductTile";
 import { timeZone, useRoutine } from "./useRoutine";
 
 // The user's own routine record (R-1 A): today's four steps for morning and
@@ -20,6 +25,11 @@ import { timeZone, useRoutine } from "./useRoutine";
 // evening), "Start routine" one step at a time, and the logged state (04).
 
 const prettyDate = (date: string) => new Date(`${date}T12:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+/** The four steps in order, then products outside them (as the step list above). */
+const rank = (id: string) => {
+  const s = stepOf(id);
+  return s ? STEPS.indexOf(s) : STEPS.length;
+};
 const field = "h-12 w-full min-w-0 max-w-full rounded-lg border border-brand-border bg-brand-surface px-3 text-base text-brand-text";
 
 export function RoutinePage() {
@@ -76,33 +86,37 @@ export function RoutinePage() {
         )}
       </div>
 
+      {/* Redesign screen 06 as the routine set-up: the user's own products as step cards, then the add form (R-2 B: no recommendation here). */}
       <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start">
-        <div className="lg:col-span-5">
-          <AddProduct
-            choices={choices.filter((c) => !data.routine.some((i) => i.productId === c.id))}
-            busy={busy}
-            onAdd={(productId, schedule) => void send({ type: "start", productId, schedule })}
-          />
-        </div>
-
-        <section aria-labelledby="products-title" className="flex flex-col gap-4 lg:col-span-7">
+        <section aria-labelledby="products-title" className="flex flex-col gap-3 lg:col-span-7">
           <h2 id="products-title" className={h2}>
             {C.yourProducts}
           </h2>
           {data.routine.length === 0 && <p className={`${card} text-brand-text-muted`}>{C.empty}</p>}
-          {data.routine.map((item) => {
+          {[...data.routine].sort((a, b) => rank(a.productId) - rank(b.productId)).map((item) => {
             const others = choices.filter((c) => c.id !== item.productId);
             const name = nameOf(item.productId);
             const step = stepOf(item.productId);
+            const listed = item.productId !== OTHER && getProduct(item.productId) !== undefined;
             return (
               <article key={item.productId} data-routine-card className={`${card} flex min-w-0 flex-col gap-3`}>
-                <div className="min-w-0">
-                  <h3 className="break-words text-base font-semibold">{name}</h3>
-                  <p className="text-sm text-brand-text-muted">
-                    {step ? C.steps[step] : C.otherGroup} · {C.slot[item.schedule.slot]} · {item.schedule.days.map((d) => C.weekdays[d]).join(", ")} · {C.since(prettyDate(item.since))}
-                  </p>
+                <div className="flex min-w-0 items-start gap-3">
+                  <ProductTile step={step} />
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-brand-text">{step ? C.steps[step] : C.otherGroup}</p>
+                    <h3 className="break-words text-brand-text-muted">{name}</h3>
+                    <p className="mt-2 inline-flex rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-semibold text-brand-700">{C.slot[item.schedule.slot]}</p>
+                    <p className="mt-1 text-sm text-brand-text-muted">
+                      {item.schedule.days.length === 7 ? C.everyDay : item.schedule.days.map((d) => C.weekdays[d]).join(", ")} · {C.since(prettyDate(item.since))}
+                    </p>
+                  </div>
+                  {listed && (
+                    <Link href={productHref(item.productId)} aria-label={P.detailsLabel(name)} className="-mr-2 grid size-11 shrink-0 place-items-center rounded-full text-brand-text-muted hover:bg-brand-50">
+                      <ChevronRight aria-hidden size={20} />
+                    </Link>
+                  )}
                 </div>
-                <details className="group">
+                <details className="group border-t border-brand-border pt-1">
                   <summary className="inline-flex min-h-11 cursor-pointer items-center font-semibold text-brand-700">{C.manage}</summary>
                   <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:items-end">
                     {/* R-6: a long product name in the list must not widen the card past a phone screen. */}
@@ -132,6 +146,14 @@ export function RoutinePage() {
             );
           })}
         </section>
+
+        <div className="lg:col-span-5">
+          <AddProduct
+            choices={choices.filter((c) => !data.routine.some((i) => i.productId === c.id))}
+            busy={busy}
+            onAdd={(productId, schedule) => void send({ type: "start", productId, schedule })}
+          />
+        </div>
       </div>
 
       <section aria-labelledby="week-title" className={`${card} flex flex-col gap-3`}>
@@ -202,20 +224,30 @@ function AddProduct({
 
   return (
     <section ref={section} id="add" aria-labelledby="add-title" className={`${card} flex scroll-mt-6 flex-col gap-4`}>
-      <h2 id="add-title" className={h2}>
-        {C.add}
-      </h2>
-      <label className="flex flex-col gap-1 text-sm font-medium">
-        {C.stepLabel}
-        <select className={field} value={step} onChange={(e) => (setStep(e.target.value as Step | ""), setProductId(""))}>
-          <option value="">{C.allSteps}</option>
-          {STEPS.map((s) => (
-            <option key={s} value={s}>
-              {C.steps[s]}
-            </option>
-          ))}
-        </select>
-      </label>
+      <div className="flex items-center gap-3">
+        <IconWell icon={Plus} />
+        <div className="min-w-0">
+          <h2 id="add-title" className={h2}>
+            {C.add}
+          </h2>
+          <p className="text-sm text-brand-text-muted">{C.addIntro}</p>
+        </div>
+      </div>
+      {/* The chosen step's tile beside its select, so the form reads as a step card (screen 06). */}
+      <div className="flex min-w-0 items-end gap-3">
+        <ProductTile step={step || null} size={48} />
+        <label className="flex min-w-0 flex-1 flex-col gap-1 text-sm font-medium">
+          {C.stepLabel}
+          <select className={field} value={step} onChange={(e) => (setStep(e.target.value as Step | ""), setProductId(""))}>
+            <option value="">{C.allSteps}</option>
+            {STEPS.map((s) => (
+              <option key={s} value={s}>
+                {C.steps[s]}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
       {step && !shown.some((c) => c.id !== OTHER) && <p className="text-sm text-brand-text-muted">{C.noProductForStep}</p>}
       <label className="flex flex-col gap-1 text-sm font-medium">
         {C.product}

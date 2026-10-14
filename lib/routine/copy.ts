@@ -85,4 +85,7 @@ export const ROUTINE_COPY = {
   seeEvening: "See evening steps",
   nextNone: "Nothing else on your routine is due today.",
   backToday: "Back to Today",
+  // Redesign lane C (screen 06): the routine set-up cards.
+  everyDay: "Every day",
+  addIntro: "Pick a step, then one of our products or your own.",
 } as const;
