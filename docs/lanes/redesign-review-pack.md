@@ -185,3 +185,34 @@ Each lane also ran its own screens' browser specs and screenshot spec before
 hand-back (counts in each brief's Hand-back). Browser-test edits across lanes
 are add-only (tab clicks, new locators, two new tests); nothing was removed or
 weakened. No API route, Firestore rule or business logic changed.
+
+## 10. Owner answers (2026-10-15) and what was done
+
+1. **`/products/[id]` approved.** An unknown id is a real 404 (`dynamicParams = false`
+   and `notFound()`); catalogue data only, no API. New browser test in
+   `tests/browser/echo-products.spec.ts` checks the 404 status, a known id at 200
+   signed out with its step, and no description.
+2. **Step source.** Switching `/routine` is not display only: `stepOf` also decides
+   which products a step's add form offers and the order of Today's routine, so it
+   changes step assignment (TD-29 (1)). `/routine` is kept as it is; Echo and the
+   product page already show Treat / Spot care. The proper fix is tracker row E21.
+3. **Descriptions.** All six are listed in `docs/lanes/product-copy-review.md`. None is
+   on a screen. Since TD-34 they also go to Gemini, which this file notes for a
+   separate decision.
+
+Tracker rows added on `docs/redesign-decisions`: E21 (step source), H38 (phone
+number), G32 (stack slots), G33 (scratchpad), G34 (kit follow-ups).
+
+### Recommended answers to questions 4–12 (approve or override in one go)
+
+| # | Question | Recommendation |
+|---|---|---|
+| 4 | 08 questions; after the photo? | You write the question set with E19. Keep 08 behind its flag; put it after the photo when E19 is built (a flow change that belongs to E19, not now). |
+| 5 | 05 buttons below the fold at 375px | Move the lighting tip under the choice buttons so Start is on the first screen. Small change, presentation only. |
+| 6 | "Fine / Retake / Not checked" | Keep the words: colour or an icon alone fails people who can't see them. |
+| 7 | Checks read by different software versions | Keep the general line and also mark each row read by a version other than the newest, in words. Don't hide any rows: hiding loses history, and the version is already on each check. |
+| 8 | 12 Photos grid | One photo per row with its date. Two photos side by side reads as before/after (TD-47 (4), D-12). |
+| 9 | Fixed line on every level-word view | Keep it. It is the uncertainty statement, so it goes wherever a level shows. |
+| 10 | 10's phone-only parts on desktop | Keep them phone-only, so the routine never sits beside readings (D-12). |
+| 11 | Echo third tile; introduction | Keep "Never decides for you", because the intro line already says it is not a medical opinion. Show the introduction on every empty area thread: it is that thread's empty state and needs no new storage. |
+| 12 | Account | Also show the questions card on Profile, Account's first screen, as TD-33 (1) says. Mask the phone number ("ending 1234", H38). The H36 labels wait for H29's legal wording. |

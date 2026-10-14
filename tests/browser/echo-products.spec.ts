@@ -144,3 +144,13 @@ test.describe("TD-34 guards and flows (390px)", () => {
     await page.screenshot({ path: `${DIR}/echo-product-cards-390.png` });
   });
 });
+
+test("product page (screen 15): an unknown id is a real 404; a known id opens signed out, with its step and no description", async ({ page }) => {
+  expect((await page.goto("/products/no-such-product"))?.status()).toBe(404);
+  const p = OWN_PRODUCTS[0]!;
+  expect((await page.goto(`/products/${p.id}`))?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1, name: p.name })).toBeVisible();
+  await expect(page.getByText(STEP_LABEL[p.step], { exact: true })).toBeVisible();
+  // Descriptions wait for the owner (docs/lanes/product-copy-review.md).
+  await expect(page.getByText(p.description)).toHaveCount(0);
+});
