@@ -34,3 +34,5 @@ patterns.
 
 | # | Agent | Request | Why / screen | Status |
 |---|---|---|---|---|
+| BE2-1 | BE2 | `tests/store-products.test.ts` line 4 imports `@/lib/contracts/store-products`, which moved to `@/lib/feature-contracts/store-products` in the base (4e61bf7). Fix the import. | Base `npx tsc --noEmit` fails and `npm run test:local` stops at its unit step (set -e) before the stack starts, for every lane. BE2 ran its stack test with the one-line fix applied locally and reverted, uncommitted. No screen | open |
+| BE2-2 | BE2 | `lib/feature-contracts/data-export.ts`: decide whether the export also carries the profile doc `users/{uid}` (phoneNumber, lastSeenAt) and `pushSubscriptions`. Today they are not in `EXPORT_COLLECTIONS`, and the file names them in `notIncluded`. | H37 completeness: both are our data about the user. Owner decision; BE2 left the contract as is. No screen | open |
