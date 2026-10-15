@@ -40,3 +40,12 @@ Paused by the owner (usage limit). Resume from here.
 8. Deliverable: overlay diffs for all 19 screens (`tests/design/overlay.py`), the status of 04/13/17, flags, the reversals, ASSETS.md, contract changes, test results, the preview host and a phone checklist. Then STOP. No production until the owner's explicit "go".
 
 Do not merge anything to master during the build: every master merge deploys production.
+
+## Update 2026-10-15, late
+- **Lanes:** all eight are merged into build/mockup-match. The bottom bar is switched.
+- **Tests at c853e4b:** test:all exit 0 (unit 2551, stack 101/101, browser 72 + 50, build OK). Emulator rules tests 87/87.
+- **Preview:** lane/redesign fast-forwarded to c853e4b, deployment dpl_CqzkiXtiU1nf1rUnBbNDyXKMTPyp, Ready.
+  - Preview-only flags on, scoped to lane/redesign: WEEKLY_CHECKIN, NOTIFICATION_TYPES, CONSENTS, DATA_EXPORT, CART.
+  - THREE_ANGLE is off (waiting on IAM).
+- **Review pack:** https://claude.ai/artifact/CosgCmsjCFtrGP2ByXiyhC
+- **Waiting on the owner:** rules approval (not deployed), IAM, A34, G36, the export question, mockup-derived content, and the phone check, then an explicit "go" for production.
