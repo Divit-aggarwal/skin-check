@@ -14,6 +14,8 @@ import { GuidedStep, RoutineLogged } from "./RoutineFlow";
 import { getProduct } from "@/lib/catalog/catalogue";
 import { PRODUCTS_COPY as P } from "@/components/products/copy";
 import { ProductTile, productHref } from "@/components/products/ProductTile";
+import { ProductPhoto } from "@/components/products/ProductPhoto";
+import { useStoreProducts } from "@/components/products/useStoreProducts";
 import { timeZone, useRoutine } from "./useRoutine";
 
 // The user's own routine record (R-1 A): today's four steps for morning and
@@ -37,6 +39,7 @@ export function RoutinePage() {
   const { data, failed, busy, send } = useRoutine();
   const [slot, setSlot] = useState<Slot>(() => slotNow(new Date(), timeZone()));
   const [guided, setGuided] = useState(false);
+  const store = useStoreProducts();
   // The brief hides the bottom bar during the active routine flow (globals.css, body[data-flow]).
   useEffect(() => {
     if (!guided) return;
@@ -93,7 +96,7 @@ export function RoutinePage() {
             {C.yourProducts}
           </h2>
           {data.routine.length === 0 && <p className={`${card} text-brand-text-muted`}>{C.empty}</p>}
-          {[...data.routine].sort((a, b) => rank(a.productId) - rank(b.productId)).map((item) => {
+          {[...data.routine].sort((a, b) => rank(a.productId) - rank(b.productId)).map((item, i) => {
             const others = choices.filter((c) => c.id !== item.productId);
             const name = nameOf(item.productId);
             const step = stepOf(item.productId);
@@ -101,7 +104,9 @@ export function RoutinePage() {
             return (
               <article key={item.productId} data-routine-card className={`${card} flex min-w-0 flex-col gap-3`}>
                 <div className="flex min-w-0 items-start gap-3">
-                  <ProductTile step={step} />
+                  {/* Screen 06: the step number, then the store's photo (TD-52), or the step tile when the store is not read. */}
+                  <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">{i + 1}</span>
+                  <ProductPhoto image={store?.find((s) => s.productId === item.productId)?.images[0]} step={step} width={64} height={80} />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-brand-text">{step ? C.steps[step] : C.otherGroup}</p>
                     <h3 className="break-words text-brand-text-muted">{name}</h3>

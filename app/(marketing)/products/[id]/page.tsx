@@ -2,14 +2,14 @@ import { notFound } from "next/navigation";
 import { CATALOGUE, getProduct } from "@/lib/catalog/catalogue";
 import { PRODUCTS_COPY as C } from "@/components/products/copy";
 import { ProductDetail } from "@/components/products/ProductDetail";
+import { storeProduct } from "@/lib/store/products";
 
-// Redesign screen 15: one own product, read from the static catalogue (no API,
-// no user data). Shown: name, step, pack size, when to use, key ingredient,
-// how to use, cautions, stock, and a link to the store page. Never the price
-// (TD-34, TD-50 (g)), no cart, no other users' photos (D-12), no benefit list
-// (the catalogue's claims whitelist is empty), no product photo (E20).
-// The page body is components/products/ProductDetail.tsx (a client module, as
-// the shared class strings in components/ui/page.tsx are).
+// Screen 15: one own product from the static catalogue (step, pack size, when
+// to use, key ingredient, how to use, cautions, stock), plus the store's live
+// data read here on the server (TD-52, 10-minute cache): photos, price, the
+// store action, and the store's own description (this page only). Store not
+// read: the catalogue facts and the store link, as before. No other users'
+// photos (D-12), no benefit list (the catalogue's claims whitelist is empty).
 
 export const dynamicParams = false;
 export const generateStaticParams = () => CATALOGUE.products.filter((p) => p.dataSource === "owner").map((p) => ({ id: p.id }));
@@ -22,8 +22,8 @@ export function generateMetadata({ params }: { params: { id: string } }) {
   return { title, description: DESCRIPTION, openGraph: { title, description: DESCRIPTION } };
 }
 
-export default function ProductRoute({ params }: { params: { id: string } }) {
+export default async function ProductRoute({ params }: { params: { id: string } }) {
   const p = getProduct(params.id);
   if (!p || p.dataSource !== "owner") notFound();
-  return <ProductDetail id={p.id} />;
+  return <ProductDetail id={p.id} store={await storeProduct(p.id)} />;
 }

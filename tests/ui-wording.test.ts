@@ -37,6 +37,9 @@ const problems = (text: string) => isClassList(text) ? [] : [
 /** "scan" as a word a user reads; paths, imports and identifiers (scanId) are not on screen. */
 export const saysScan = (s: string) => !/^[@./]/.test(s.trim()) && !/[={}()]/.test(s) && /(^|[^\w/-])scans?\b/i.test(s);
 
+/** TD-53 (G37 lane C): screen 16's title and route, exactly; any other "since" is still checked. */
+const TD53_EXACT = ["Since you started ${name}", "/products/${id}/since"];
+
 describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
   it("self-check: the checks catch planted words", () => {
     expect(problems("your redness improved")).not.toEqual([]);
@@ -63,6 +66,7 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
     expect(files.length).toBeGreaterThanOrEqual(8);
     for (const f of files) {
       for (const s of sourceText(readFileSync(f, "utf8"))) {
+        if (TD53_EXACT.includes(s)) continue;
         expect(problems(s), `${f}: ${s}`).toEqual([]);
         expect(saysScan(s), `${f}: ${s}`).toBe(false);
       }

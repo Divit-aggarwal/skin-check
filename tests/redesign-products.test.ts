@@ -11,6 +11,9 @@ vi.mock("next/navigation", () => ({
     throw new Error("NOT_FOUND");
   },
 }));
+// G37 lane C: the page reads the store on the server and links screen 16 from the routine; here, neither.
+vi.mock("@/lib/store/products", () => ({ storeProduct: async () => null }));
+vi.mock("@/components/routine/useRoutine", () => ({ useRoutine: () => ({ data: null }) }));
 
 import ProductRoute, { generateMetadata, generateStaticParams } from "@/app/(marketing)/products/[id]/page";
 import { ProductCards } from "@/components/skin-check/ProductCards";
@@ -23,19 +26,19 @@ import { OWN_PRODUCT_INFO, OWN_PRODUCTS } from "@/lib/context/products";
 // Never the price (TD-34, TD-50 (g)), no cart or buy wording, no unapproved
 // description, a store link only for a product the store sells.
 
-const render = (id: string) => renderToStaticMarkup(createElement(ProductRoute, { params: { id } }));
+const render = async (id: string) => renderToStaticMarkup(await ProductRoute({ params: { id } }));
 const strings = (v: unknown): string[] =>
   typeof v === "string" ? [v] : typeof v === "function" ? [String(v("Niacinamide", 5))] : v && typeof v === "object" ? Object.values(v).flatMap(strings) : [];
 
 describe("product page (screen 15)", () => {
-  it("has a page for each of the six own products, and no other", () => {
+  it("has a page for each of the six own products, and no other", async () => {
     expect(generateStaticParams().map((p) => p.id)).toEqual(CATALOGUE.products.map((p) => p.id));
-    expect(() => render("made-up")).toThrow("NOT_FOUND");
+    await expect(render("made-up")).rejects.toThrow("NOT_FOUND");
   });
 
-  it("shows name, pack size, how to use and cautions; never the price, a cart, a buy word or the unapproved description", () => {
+  it("store not read: name, pack size, how to use and cautions; no price, cart, buy word, photo or unapproved description", async () => {
     for (const p of CATALOGUE.products) {
-      const html = render(p.id).replaceAll("&#x27;", "'");
+      const html = (await render(p.id)).replaceAll("&#x27;", "'");
       for (const part of [p.name, p.price.packSize, p.usageText, ...p.warnings]) expect(html, `${p.id}: ${part}`).toContain(part);
       expect(html, p.id).not.toMatch(/₹|\bRs\b|\bINR\b|mrp|price|cart|checkout|\bbuy\b/i);
       expect(html, p.id).not.toContain(String(p.price.mrpInr));
@@ -44,12 +47,12 @@ describe("product page (screen 15)", () => {
     }
   });
 
-  it("links to the store only for a product it sells; an out-of-stock one says so", () => {
-    const sold = render("niacinamide-serum");
+  it("links to the store only for a product it sells; an out-of-stock one says so", async () => {
+    const sold = await render("niacinamide-serum");
     expect(sold).toContain('href="https://theprojectskin.com/products/5-niacinamide-serum-acne-prone-skin"');
     expect(sold).toContain('rel="noopener noreferrer"');
     expect(sold).not.toContain(PRODUCTS_COPY.outOfStock);
-    expect(render("active-boba-cream")).toContain(PRODUCTS_COPY.outOfStock);
+    expect(await render("active-boba-cream")).toContain(PRODUCTS_COPY.outOfStock);
   });
 
   it("sets its own description, so the root one is not inherited", () => {
@@ -59,8 +62,9 @@ describe("product page (screen 15)", () => {
     expect(bannedWordsIn(m.description)).toEqual([]);
   });
 
-  it("every products string passes the D-12 word check", () => {
-    const all = strings(PRODUCTS_COPY);
+  it("every products string passes the D-12 word check (sinceTitle: TD-53, tested in mm-c-products.test.ts)", () => {
+    const { sinceTitle: _, ...rest } = PRODUCTS_COPY;
+    const all = strings(rest);
     expect(all.length).toBeGreaterThan(10);
     for (const s of all) expect(bannedWordsIn(s), s).toEqual([]);
   });
