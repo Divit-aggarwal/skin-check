@@ -156,3 +156,21 @@ describe("since you started (screen 16)", () => {
     ]);
   });
 });
+
+describe("H36: products follow the personalisation consent", async () => {
+  const { personalisationOn } = await import("@/components/products/PersonalisedProducts");
+  const answer = (body: unknown, ok = true) => vi.fn(async () => ({ ok, json: async () => body }) as Response);
+  const token = async () => "t";
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("on only when the newest answer grants it; withdrawn, a failed read or no answer is off", async () => {
+    vi.stubGlobal("fetch", answer({ consents: [{ purpose: "personalisation", granted: true }] }));
+    expect(await personalisationOn("a", token)).toBe(true);
+    vi.stubGlobal("fetch", answer({ consents: [{ purpose: "personalisation", granted: false }] }));
+    expect(await personalisationOn("b", token)).toBe(false);
+    vi.stubGlobal("fetch", answer({}, false));
+    expect(await personalisationOn("c", token)).toBe(false);
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("offline"); }));
+    expect(await personalisationOn("d", token)).toBe(false);
+  });
+});
