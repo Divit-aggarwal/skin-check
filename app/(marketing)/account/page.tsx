@@ -20,7 +20,8 @@ export default async function AccountPage() {
   return (
     <main className={page}>
       <Suspense fallback={<LoadingState label={A.title} blocks={["h-40"]} />}>
-        <AccountView products={products} />
+        {/* Flag off: unchanged (tests/privacy-delete-account.test.ts pins this element). */}
+        {notificationTypesUi() ? <AccountView products={products} /> : <AccountView />}
       </Suspense>
     </main>
   );
