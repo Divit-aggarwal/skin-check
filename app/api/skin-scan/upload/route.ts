@@ -4,6 +4,7 @@ import { AdminNotConfiguredError, bearerToken, verifyFirebaseIdToken } from "@/l
 import { isValidScanId, ORIGINAL_CONTENT_TYPE, scanImageKey } from "@/lib/s3-key";
 import { IMAGE_RETENTION_CONSENT_COPY, IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
 import { appendConsent, scanAgeGate, withLedgerTimeout } from "@/app/api/account/_ledger";
+import { sideImageKey, SIDE_ANGLES, type SideAngle } from "@/lib/feature-contracts/check-photos";
 import { MAX_ORIGINAL_BYTES, presignOriginalUpload, S3NotConfiguredError, UPLOAD_URL_TTL_SECONDS } from "@/lib/s3";
 
 // firebase-admin and the AWS SDK both need Node APIs.
@@ -58,12 +59,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON body.", code: "BAD_REQUEST" }, { status: 400 });
   }
 
-  // scanId, the size and the consent fields are the ONLY things read from the body.
+  // scanId, the angle, the size and the consent fields are the ONLY things read from the body.
   // Anything else it carries — a uid, a key, a bucket — is ignored by
   // construction, not by filtering.
   const scanId = (body as { scanId?: unknown } | null)?.scanId;
   if (!isValidScanId(scanId)) {
     return NextResponse.json({ error: "Invalid scan id.", code: "INVALID_SCAN_ID" }, { status: 400 });
+  }
+
+  // C10 (TD-54 (2)): which photo of the check this is. Absent means the front,
+  // so every existing caller is unchanged. Left and right are stored only,
+  // never analysed; their key comes from the same uid and scanId.
+  const sent = (body as { angle?: unknown } | null)?.angle;
+  const angle = sent === undefined ? "front" : sent;
+  if (angle !== "front" && !SIDE_ANGLES.includes(angle as SideAngle)) {
+    return NextResponse.json({ error: "Invalid angle.", code: "INVALID_ANGLE" }, { status: 400 });
   }
 
   // Image-retention consent is a REQUIRED part of the request contract: this
@@ -111,7 +121,7 @@ export async function POST(request: NextRequest) {
   // stays as the fallback record.
   await recordRetentionConsent(uid, scanId);
 
-  const key = scanImageKey(uid, scanId);
+  const key = angle === "front" ? scanImageKey(uid, scanId) : sideImageKey(uid, scanId, angle as SideAngle);
 
   let uploadUrl: string;
   try {

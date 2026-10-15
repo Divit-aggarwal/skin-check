@@ -2,6 +2,7 @@ import { collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestam
 import { db } from "@/lib/firebase/client";
 import type { SkinCheckAnswers } from "@/types/skin-check";
 import { scanImageKey } from "@/lib/s3-key";
+import { sideImageKey, SIDE_ANGLES, type SideAngle, type SideImage } from "@/lib/feature-contracts/check-photos";
 import { IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
 import { hasQuestionAnswers, keptProductNames, questionAnswersOnly, type ProductNames } from "@/lib/skin-check-validation";
 import type { SkinScanResult, SkinScanState } from "@/types/skin-scan";
@@ -58,7 +59,12 @@ export async function saveSkinCheck(
   answers: SkinCheckAnswers,
   scan: SkinScanState,
   /** TD-33 (2): kept apart from answers; nothing that reads answers sees them. */
-  productNames: ProductNames = {}
+  productNames: ProductNames = {},
+  /**
+   * C10: which side photos (three-angle capture) the client watched land in
+   * S3. Absent for a front-only check, and then no sideImages field is written.
+   */
+  sidesStored?: Record<SideAngle, boolean>
 ): Promise<void> {
   const status: SkinCheckStatus =
     scan.status === "success"
@@ -66,6 +72,13 @@ export async function saveSkinCheck(
       : scan.status === "error"
         ? "analysis_failed"
         : "questionnaire_only";
+
+  // Same consent test as the `consent` block below: a side is kept only with
+  // retention consent at the current version (firestore.rules checks it too).
+  const retained =
+    (scan.status === "success" || scan.status === "error") && scan.retentionConsentVersion === IMAGE_RETENTION_CONSENT_VERSION;
+  const side = (angle: SideAngle): SideImage =>
+    retained && sidesStored?.[angle] ? { stored: true, storage: "s3", key: sideImageKey(uid, scanId, angle) } : { stored: false };
 
   try {
     await setDoc(doc(db(), "users", uid, "skinChecks", scanId), {
@@ -121,6 +134,9 @@ export async function saveSkinCheck(
             }
           : { imageRetention: false },
       result: scan.status === "success" ? persistableResult(scan.result) : null,
+      // C10: stored only, never analysed. Same never-over-claim rule as `image`:
+      // stored: true only for an object the client watched land.
+      ...(sidesStored ? { sideImages: Object.fromEntries(SIDE_ANGLES.map((a) => [a, side(a)])) } : {}),
       createdAt: serverTimestamp(),
     });
   } catch (error) {
