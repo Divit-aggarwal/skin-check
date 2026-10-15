@@ -6,9 +6,9 @@ export const SHELL_COPY = {
   navLabel: "Main",
   nav: {
     home: "Today", // TD-50 (b)
-    checks: "Checks",
+    checks: "Skin Twin", // TD-51, mockup bottom bar
     newCheck: "New check",
-    routine: "Routine",
+    progress: "Progress", // TD-51; /routine stays reachable from Today and Skin Twin
     echo: "Echo",
     account: "Account",
   },
