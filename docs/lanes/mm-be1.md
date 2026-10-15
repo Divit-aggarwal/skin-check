@@ -34,4 +34,53 @@ Unit tests for the route (auth, validation, 409s, defaults, computed `routine_mo
 
 ## Log
 
+- 2026-10-15 Base check: `npx tsc --noEmit` failed on `tests/store-products.test.ts` (moved contract import), so `test:local` stopped at its unit step. Filed as BE1-2 (commit 2211c1b's message still names it), dropped at rebase as a duplicate of BE2-1; fixed by the main session in d1c2af3; rebased onto `build/mockup-match`. One earlier stack attempt ran with a temporary, uncommitted one-line patch to that file; it was stopped while still waiting for a slot, the file reverted, nothing committed.
+- Found: `CONSENT_TEXTS.product_improvement` (title and copy) hits `BANNED_WORDS` (`improve*`). Kit request BE1-1; pinned with `it.fails` in `tests/mm-be1-account.test.ts`.
+- Open (rule 10, not built): "personalisation off hides the routine". No recommended routine exists outside `app/dev`; the only routine is the user's own record (`/api/routine/events`, chosen by the user, reads no scans, used by 8 components on other lanes' screens). Hiding a user's own record on a guess was not done. Question below.
+- Browser-test edits: none. Existing test files: none edited.
+
 ## Hand-back
+
+### Changelog
+- `GET/PATCH /api/account/notifications` (`app/api/account/notifications/route.ts`): `_auth` helpers (rate limit, `verifiedUid`, per-uid cap, small JSON). Strict zod body (known types only, `HH:MM`, day 0..6 integer, catalogue product ids). No doc: defaults, `routine_morning` = `settings/home.reminders === "allowed"` (computed, nothing written), `updatedAt: ""`. PATCH merges onto what GET shows (so a first save keeps the computed `routine_morning`); `products` merge per id. 409 `NEEDS_CONSENT` is checked before `NOT_SENDABLE`; switching off is always allowed. 403 `NOT_ALLOWED` on PATCH for an erased account, and for an under-18 account switching a type on; an under-18 account can always switch off (as `DELETE /api/home/reminders`). GET stays readable. `types.marketing` reads off without the marketing grant (read-time AND; nothing rewritten on withdrawal).
+- `lib/home/push.ts` `sendReminders`: also reads `settings/notifications`. No doc: today's rule. With a doc: sends when `routine_morning` and a routine step is due, or `weekly_checkin` and today (subscription's time zone) is `weeklyCheckinDay`. `home.reminders === "allowed"` stays the master gate. New pure `wanted()`.
+- `GET/POST /api/account/consents` (`app/api/account/consents/route.ts`): GET returns the five switches in screen order (ai_share read at `AI_SHARE_CONSENT_VERSION`, default false). POST strict, `NewConsentPurpose` only, 409 `VERSION_STALE`, 403 for an erased account or an under-18 grant (an under-18 account can always withdraw; personalisation starts on), 500 `LEDGER_UNAVAILABLE`; one `appendConsent` entry per change with the contract copy (hashed). Newest entry at the current version wins; older versions give the default with `version: null`.
+- `lib/consent.ts`: `ConsentPurpose` gains `personalisation`, `product_improvement`, `research`, `marketing`. `_ledger.ts`: `latestEntry()` (grant + ISO time); `latestGrant` now uses it (same behaviour).
+- Personalisation withdrawn: `handleContextChat({ personalised })` drops own products (no product list to Gemini, `products: []`), Echo still answers; the opening (new or stored) returns 404 `ECHO_PRODUCTS_OFF` before anything is spent. Read via `latestGrant ?? default (on)`; an unreadable ledger means no products (fails closed), the answer still goes out.
+- Marketing withdrawn: the marketing type reads off (above). product_improvement / research: recorded only, as the contract says.
+
+### Rules change (`firestore.rules`, inside `// ── mm:be1 ──` only)
+```
+match /settings/notifications {
+  allow get: if request.auth != null && request.auth.uid == uid;
+}
+```
+Owner get only. Writes stay denied: the existing `settings/{name}` rule allows writes to `home` only (proved by tests). Nothing outside the block changed.
+
+### Migration
+None. `routine_morning` for existing reminder users is computed on read.
+
+### Erase
+`settings/notifications` is under `users/{uid}`, removed by the erase's recursive delete; proved on the stack (`tests/mm-be1.e2e.test.ts`: doc exists, erase, doc gone).
+
+### Flags
+`NEXT_PUBLIC_UI_NOTIFICATION_TYPES`, `NEXT_PUBLIC_UI_CONSENTS` untouched (off).
+
+### Contract requests
+BE1-1 (product_improvement copy hits `improve*`). No contract file edited.
+
+### Assets / screens / overlays
+None (backend lane).
+
+### Open questions
+1. "personalisation off hides the routine": which routine? The only one is the user's own record. Options: (a) leave it (consent copy is about our suggestions; Echo products already off), (b) `/api/routine/events` returns an empty `routine` plus a flag and the UI shows a designed state. BE1 did (a) pending a decision.
+2. `weekly_checkin` sends on the chosen weekday whether or not a check is due (nextCheck "today" is one exact day, so ANDing would almost never fire). Confirm.
+3. Marketing: with the grant it is still `NOT_SENDABLE` (not in `SENDABLE_TYPES`), so it can never be stored on today. Intended?
+4. Defaults carry `updatedAt: ""` (the type needs a string).
+5. `app/(marketing)/echo/page.tsx` and `app/(marketing)/dashboard/page.tsx` pass `productsOn={echoProductsOn()}` from the switch alone. With personalisation withdrawn an entry to the opening may still show, and the opening now answers 404 `ECHO_PRODUCTS_OFF`. UI follow-up: pass the personalisation state (from `GET /api/account/consents`) to those screens.
+
+### Tests (all pass)
+- `npx tsc --noEmit`: clean (after rebase onto d1c2af3).
+- `npx vitest run`: 117 files passed, 21 skipped; 2445 tests passed. New: `tests/mm-be1-account.test.ts` (28), `tests/mm-be1-echo-personalisation.test.ts` (5).
+- `bash scripts/with-stack-slot.sh npm run test:local`: unit step as above; stack step 20 files, 89 tests passed, including `tests/firestore-rules-notifications.test.ts` (3) and `tests/mm-be1.e2e.test.ts` (1: grant then withdraw marketing, read back, NEEDS_CONSENT, save switches, erase removes the doc). Stack stopped. This stack run was at 58f7a86, before the under-18 withdrawal fix (the e2e does not touch the markers; the fix is covered by unit tests).
+- `npx next lint` on touched files: clean.

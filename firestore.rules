@@ -289,6 +289,16 @@ service cloud.firestore {
                && c.source in ['device', 'typed'];
       }
 
+      // ── mm:be1 ──
+      // G31 notification switches (settings/notifications). Written ONLY by
+      // /api/account/notifications through the Admin SDK, which bypasses these
+      // rules. The owner may read; no client write (the settings/{name} rule
+      // above allows writes to settings/home only).
+      match /settings/notifications {
+        allow get: if request.auth != null && request.auth.uid == uid;
+      }
+      // ── end mm:be1 ──
+
       // TD-47: web push subscriptions, written and read only by the server
       // (Admin SDK). No client may read or write one.
       match /pushSubscriptions/{id} {
