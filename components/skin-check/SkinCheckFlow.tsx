@@ -77,6 +77,8 @@ export function SkinCheckFlow() {
   // Capture, the wait while the photo is read, and the check-in hide the
   // bottom bar (globals.css, body[data-flow]); the start and the results keep it.
   const overlay = complete || blocked || confirmingUnder18 || choosingQuestions;
+  // C10 (flag on): the guided photo step has its own stepper and title (mockup 07); the part bar and title stay for screen readers.
+  const guidedPhoto = threeAngleUi() && !overlay && section.id === "skin-photo";
   const focused = checkin !== null || (!overlay && (section.id === "skin-photo" || section.id === "get-your-results"));
   useEffect(() => {
     if (!focused) return;
@@ -183,13 +185,15 @@ export function SkinCheckFlow() {
           </div>
         </div>
         {!complete && (
-          <ProgressHeader
-            sectionLabels={ALL_SECTION_LABELS}
-            activeSectionIndex={sectionIndex}
-            activeSectionFill={sectionFill}
-            activeSectionLabel={choosingQuestions ? START_COPY.title : section.label}
-            showBar={!choosingQuestions}
-          />
+          <div className={guidedPhoto ? "sr-only" : undefined}>
+            <ProgressHeader
+              sectionLabels={ALL_SECTION_LABELS}
+              activeSectionIndex={sectionIndex}
+              activeSectionFill={sectionFill}
+              activeSectionLabel={choosingQuestions ? START_COPY.title : section.label}
+              showBar={!choosingQuestions}
+            />
+          </div>
         )}
       </div>
 
@@ -325,7 +329,7 @@ export function SkinCheckFlow() {
                 transition={{ duration: 0.3, ease: [0.19, 1, 0.22, 1] }}
                 className="flex flex-col gap-5"
               >
-                <EchoBubble message={formatPrompt(step.prompt, answers)} />
+                {!(guidedPhoto && step.type === "photo-capture") && <EchoBubble message={formatPrompt(step.prompt, answers)} />}
                 <StepAnswer
                   step={step}
                   value={answers[step.id] ?? defaultAnswerFor(step)}

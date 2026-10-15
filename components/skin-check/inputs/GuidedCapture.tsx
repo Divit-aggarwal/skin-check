@@ -14,8 +14,8 @@ import { cn } from "@/lib/utils";
 import { CAPTURE_COPY as K, GATE_COPY as G, GUIDED_COPY as C, type GuidedFallback } from "../captureStates";
 
 const ANGLES: readonly CaptureAngle[] = ["front", "left", "right"];
-/** The preview box (3:4): the live checks measure what the user sees in it. */
-const VIEW_RATIO = 3 / 4;
+/** The preview box (5:6, mockup 07): the live checks measure what the user sees in it. */
+const VIEW_RATIO = 5 / 6;
 /** Width of the small copy of the frame the light check reads; enough for a mean and clip fractions. */
 const LIGHT_SAMPLE_PX = 160;
 
@@ -183,7 +183,7 @@ export function GuidedCapture({ onDone, onFallback }: { onDone: (photos: GuidedP
         <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-brand-text">{C.title[angle]}</h2>
         <p className="mt-1 text-[17px] leading-snug text-brand-text-muted">{C.intro}</p>
       </div>
-      <div className="relative aspect-[3/4] w-full overflow-hidden rounded-card bg-brand-900">
+      <div className="relative aspect-[5/6] w-full overflow-hidden rounded-card bg-brand-900">
         <video ref={videoRef} aria-label={K.previewLabel} aria-hidden={!ready} className="absolute inset-0 h-full w-full object-cover" playsInline muted autoPlay />
         <canvas ref={canvasRef} className="hidden" />
         {!ready && (

@@ -20,13 +20,18 @@ test.use({
 const choice = (page: Page) => page.getByRole("heading", { name: Q.title, exact: true });
 const settle = (page: Page) => page.waitForTimeout(700); // entrance animations
 
+// A returning user who answered starts at the photo step (TD-43); the choice screen (05) is for one who skipped.
+// No seeded user has both skipped questions and a kept photo, so the photos strip shows its empty state here.
+const START_USER = MESH_SEED.skipped["768"];
+
 test("05 start with the three angles and the user's own photos", async ({ page }, info) => {
-  await signIn(page, MESH_SEED.kept.phoneNumber);
+  await signIn(page, START_USER.phoneNumber);
   await page.goto("/skin-check");
   await expect(choice(page)).toBeVisible({ timeout: 60_000 });
   await expect(page.getByText(S.introThree)).toBeVisible();
   await expect(page.getByText(S.lastTitle)).toBeVisible({ timeout: 30_000 });
   await expect(page.getByRole("heading", { name: S.progressTitle })).toBeVisible();
+  await expect(page.getByText(S.noPhotos)).toBeVisible({ timeout: 30_000 });
   await settle(page);
   await matchShot(page, info, "05-start");
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
@@ -37,7 +42,7 @@ test("05 start with the three angles and the user's own photos", async ({ page }
 test("08 check-in: answers, saved, already this week (BE3's real route)", async ({ page }, info) => {
   const posts: unknown[] = [];
   page.on("request", (r) => r.method() === "POST" && new URL(r.url()).pathname === "/api/checkins" && posts.push(r.postDataJSON()));
-  await signIn(page, MESH_SEED.kept.phoneNumber);
+  await signIn(page, START_USER.phoneNumber);
   await page.goto("/skin-check");
   await expect(choice(page)).toBeVisible({ timeout: 60_000 });
   await page.getByRole("button", { name: S.checkinOpen }).click();
