@@ -106,7 +106,7 @@ export function AccountView({ products = {} }: { products?: ProductInfo }) {
           <div className="sm:hidden">
             <AppHeader back="/dashboard" backLabel={R.back} />
           </div>
-          <PageHeader title={R.title} intro={R.intro} />
+          <ScreenTitle title={R.title} intro={R.intro} />
         </>
       ) : (
         <PageHeader title={A.title} intro={A.signedOutIntro} />
@@ -205,13 +205,13 @@ const FIELD_ICON: Record<ProfileField, LucideIcon> = { name: UserRound, age: Cak
 function InfoRow({ icon, label, value, href }: { icon: LucideIcon; label: string; value: string; href?: string }) {
   const inner = (
     <>
-      <IconWell icon={icon} size={36} />
-      <span className="w-[40%] max-w-[180px] shrink-0 font-medium text-brand-text">{label}</span>
-      <span className="min-w-0 flex-1 break-words text-brand-text-muted">{value}</span>
+      <IconWell icon={icon} size={32} />
+      <span className="w-[38%] max-w-[180px] shrink-0 text-[15px] font-medium text-brand-text">{label}</span>
+      <span className="min-w-0 flex-1 break-words text-sm text-brand-text-muted">{value}</span>
       {href && <ChevronRight aria-hidden size={18} className="shrink-0 text-brand-text-muted" />}
     </>
   );
-  const cls = "flex min-h-[52px] items-center gap-3 py-2";
+  const cls = "flex min-h-11 items-center gap-3 py-1.5";
   return href ? <Link href={href} className={`${cls} hover:bg-brand-50`}>{inner}</Link> : <div className={cls}>{inner}</div>;
 }
 
@@ -225,12 +225,12 @@ function ProfileCard({ profile }: { profile: Profile | "failed" | undefined }) {
     <section aria-labelledby="signed-in-title" className={`${tintCard} flex flex-col gap-4`}>
       <div className="flex items-center gap-4">
         {mark ? (
-          <span aria-hidden className="grid size-[72px] shrink-0 place-items-center rounded-full bg-brand-surface text-2xl font-semibold text-brand-700">{mark}</span>
+          <span aria-hidden className="grid size-16 shrink-0 place-items-center rounded-full bg-brand-surface text-[22px] font-semibold text-brand-700">{mark}</span>
         ) : (
-          <IconWell icon={UserRound} size={72} className="bg-brand-surface" />
+          <IconWell icon={UserRound} size={64} className="bg-brand-surface" />
         )}
         <div className="min-w-0">
-          <h2 id="signed-in-title" className="break-words text-2xl font-semibold leading-tight text-brand-text">
+          <h2 id="signed-in-title" className="break-words text-[22px] font-semibold leading-tight text-brand-text">
             {name || A.signedIn}
           </h2>
           {meta && <p className="mt-1 text-brand-text-muted">{meta}</p>}
@@ -273,14 +273,14 @@ function SkinAnswers({ profile }: { profile: Profile | "failed" | undefined }) {
 }
 
 /** Mockups 20 and 22: big title and intro with a decorative icon. */
-function ScreenTitle({ title, intro, icon }: { title: string; intro: string; icon: LucideIcon }) {
+function ScreenTitle({ title, intro, icon }: { title: string; intro: string; icon?: LucideIcon }) {
   return (
-    <header className="flex items-start gap-3 pb-6 pt-2">
+    <header className="flex items-start gap-3 pb-4 sm:pt-8">
       <div className="min-w-0 flex-1">
-        <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text text-balance sm:text-[32px]">{title}</h1>
-        <p className="mt-2 text-brand-muted">{intro}</p>
+        <h1 className="text-[26px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text text-balance sm:text-[32px]">{title}</h1>
+        <p className="mt-2 text-[15px] text-brand-muted">{intro}</p>
       </div>
-      <IconWell icon={icon} size={88} className="mt-1" />
+      {icon && <IconWell icon={icon} size={72} />}
     </header>
   );
 }

@@ -38,7 +38,7 @@ const failLine = (r: Result<unknown>) =>
   !r.ok && r.code === "NOT_SENDABLE" ? N.notSendable : !r.ok && r.code === "NEEDS_CONSENT" ? N.needsConsent : !r.ok && r.status === 403 ? N.notAllowed : !r.ok && r.status === 429 ? N.tooMany : N.saveFailed;
 
 const Chip = ({ children }: { children: React.ReactNode }) => (
-  <span className="mt-1.5 shrink-0 self-start whitespace-nowrap rounded-full bg-brand-50 px-3 py-1.5 text-center text-[13px] leading-tight text-brand-text">{children}</span>
+  <span className="mt-1.5 shrink-0 self-start whitespace-nowrap rounded-full bg-brand-50 px-2.5 py-1.5 text-center text-xs leading-tight text-brand-text">{children}</span>
 );
 
 /** Mockup 20 (G31): the per-type switches. Behind notificationTypesUi(); the live daily reminder (TD-47) stays on top. */
@@ -91,7 +91,6 @@ export function NotificationsScreen({ products }: { products: ProductInfo }) {
 
   return (
     <>
-      <HomeSettingsSection part="reminders" />
       {prefs === null ? (
         <div role="status" aria-label={N.loading} className="flex flex-col gap-4">
           <Skel.Hero />
@@ -113,10 +112,10 @@ export function NotificationsScreen({ products }: { products: ProductInfo }) {
           )}
           {SECTIONS.map(({ key, types }) => (
             <section key={key} aria-labelledby={`n-${key}`} className={`${card} !pb-1`}>
-              <h2 id={`n-${key}`} className="text-[19px] font-semibold leading-tight text-brand-text">
+              <h2 id={`n-${key}`} className="text-[17px] font-semibold leading-tight text-brand-text">
                 {N.sections[key].title}
               </h2>
-              <p className="mt-1 text-sm text-brand-text-muted">{N.sections[key].note}</p>
+              <p className="mt-0.5 text-[13px] text-brand-text-muted">{N.sections[key].note}</p>
               <div className="mt-1 divide-y divide-brand-border">
                 {key === "products" ? <ProductRows prefs={prefs} products={products} /> : types.map((t) => row(t, prefs))}
               </div>
@@ -124,6 +123,8 @@ export function NotificationsScreen({ products }: { products: ProductInfo }) {
           ))}
         </>
       )}
+      {/* The live daily reminder on this device (TD-47): the only thing that sends today. */}
+      <HomeSettingsSection part="reminders" />
     </>
   );
 }
