@@ -99,10 +99,10 @@ export function SinceStarted({ id }: { id: string }) {
               <Link
                 href={sinceHref(r.productId)}
                 aria-current={on ? "page" : undefined}
-                className={cn("flex h-full w-[104px] flex-col items-center gap-1.5 rounded-tile border bg-brand-surface p-2 text-center", on ? "border-2 border-brand-700" : "border-brand-border hover:bg-brand-50")}
+                className={cn("flex h-full min-h-11 w-[84px] flex-col items-center gap-1 rounded-tile border bg-brand-surface p-2 text-center", on ? "border-2 border-brand-700" : "border-brand-border hover:bg-brand-50")}
               >
-                <ProductPhoto image={store?.find((s) => s.productId === r.productId)?.images[0]} step={OWN_PRODUCT_INFO[r.productId]?.step} width={56} />
-                <span className={cn("line-clamp-2 text-xs leading-tight", on ? "font-semibold text-brand-700" : "text-brand-text")}>{n}</span>
+                <ProductPhoto image={store?.find((s) => s.productId === r.productId)?.images[0]} step={OWN_PRODUCT_INFO[r.productId]?.step} width={48} />
+                <span className={cn("line-clamp-2 text-[11px] leading-tight", on ? "font-semibold text-brand-700" : "text-brand-text")}>{n}</span>
               </Link>
             </li>
           );

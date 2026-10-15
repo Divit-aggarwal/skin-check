@@ -41,6 +41,7 @@ test("14 Echo cards", async ({ page }, info) => {
 
 test("15 product detail", async ({ page }, info) => {
   test.setTimeout(120_000);
+  await signIn(page, MMC_SINCE.phoneNumber); // the mockup is the signed-in app (no marketing header)
   await page.goto("/products/protecting-sunscreen");
   await settle(page);
   await matchShot(page, info, "15-detail");
