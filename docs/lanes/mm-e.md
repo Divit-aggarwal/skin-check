@@ -39,6 +39,7 @@ Read `docs/lanes/mm-README.md` first. Contracts: `lib/feature-contracts/notifica
 - 20 decisions: the per-type screen replaces the old flagged "Comes later" list; the live daily reminder (TD-47) stays, after the types. Custom reminder and row chevrons left out (no backend, no detail screens). Weekly chip shows the day only (the contract has no weekly time). Product rows are the `prefs.products` keys joined to store titles and first photos (read on the server in `page.tsx`, only with the flag on); no photo → kit `ProductTile`.
 - 22 decisions: mockup lines "We use your information only to…", "encrypted … never shared with third parties" and "Learn more about our privacy practices" left out (untrue or nowhere to link; H36). "Your data" rows only with real destinations; "Lifestyle information" became "Your answers" → `/account?tab=skin`. Consents: the four `CONSENT_TEXTS` switches, each with "Draft wording" (H29); ai_share stays in `ConsentSection` below.
 - BE2 note (orchestrator): export fetches with the ID token and saves a blob; 429 shows when to try again from Retry-After; 403 NOT_ALLOWED named.
+- Follow-ups (orchestrator, after merge 7afc581): 20 shows no clock time ("Once a day" for the routine types, "Sundays" for the weekly check-in; stored times stay in the data only); product reminder rows are the current routine's products (`useRoutine`, the existing `/api/routine/events` read, which returns `currentRoutine`), each on/off from `prefs.products` (default off), disabled with `WAITS_ON.product_usage`; the name stays as typed (owner answer: their own input). Open questions 1-3 are answered by this.
 
 ## Hand-back
 
@@ -85,3 +86,9 @@ None to existing specs. New: `tests/design/e.match.ts` (shots; with flags on it 
 - Flags off, existing account specs: `PW_ARGS="tests/browser/flows.spec.ts tests/browser/dashboard.spec.ts tests/browser/home-v2.spec.ts" bash scripts/with-stack-slot.sh npm run test:browser`: 63 passed.
 - After those runs, `page.tsx` changed only to keep `<AccountView />` as the flag-off element (`tests/privacy-delete-account.test.ts` pins it); unit tests re-run green. Stacks were stopped after each run (the script tears down).
 - Overlays: `python3 -I tests/design/overlay.py /Users/divit/Projects/frontend/skin-check/design/mockups 20 21 22` → `docs/design/mockup-match/{20-notifications,21-profile,22-privacy}.png`.
+
+Follow-up run (commit 175eb30, rebased on 7afc581):
+- `npx tsc --noEmit` pass; `npm run lint` no errors; `npx vitest run` 120 files passed, 23 skipped; 2489 tests passed, 102 skipped.
+- Flags-on `tests/design/e.match.ts` (now also asserts "Once a day" and no clock time): 4 passed.
+- Flags-off `flows.spec.ts`, `dashboard.spec.ts`, `home-v2.spec.ts` (after the `page.tsx` change): 63 passed.
+- Overlay mean diff: 20 = 23.9, 21 = 20.8, 22 = 21.5. Screen 20's remaining differences now also include "Once a day" / "Sundays" in place of the mockup's clock times (no promise the push cannot keep), and product rows from the routine.
