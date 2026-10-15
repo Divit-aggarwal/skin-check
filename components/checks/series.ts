@@ -47,8 +47,9 @@ export function seriesChecks(uid: string, data: DashboardData, history: readonly
     const record = view.source === "measured" ? echoRecord(uid, row.scanId, data.analyses) : null;
     const doc = record ? data.analyses.find((a) => a.data === record) : undefined;
     const state = doc ? toSkinState2(doc.data, `users/${uid}/scanAnalyses/${doc.id}`, uid) : null;
-    // C10 (side photos) has not landed: the front photo is the only one a check can keep.
-    return [{ view, state, photos: { front: row.photoClaimed, left: false, right: false } }];
+    // C10: side photos as the record says they were kept (as components/dashboard/state.ts reads them).
+    const sides = data.checks.find((c) => c.id === row.scanId)?.data.sideImages as Record<string, { stored?: unknown } | undefined> | undefined;
+    return [{ view, state, photos: { front: row.photoClaimed, left: sides?.left?.stored === true, right: sides?.right?.stored === true } }];
   });
 }
 

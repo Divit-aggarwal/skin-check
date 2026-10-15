@@ -6,7 +6,7 @@ import { signIn } from "./helpers";
 import { MMA_SEED as U } from "./seed-mm-a";
 
 // Lane mm/a (G37): screens 10 Skin Twin, 11 one reading, 12 Progress and 09 an
-// opened check, with 0, 1 and 4 checks (scripts/seed-lane-mm-a.ts). Level
+// opened check, with 0, 1 and 4 checks (scripts/seed-mm-a.ts). Level
 // words, timelines of levels and the change slot ("Needs more checks") only;
 // the user's own kept photos only; never a percentage, arrow or score.
 //   PW_ARGS="tests/browser/mm-a.spec.ts" bash scripts/with-stack-slot.sh npm run test:browser

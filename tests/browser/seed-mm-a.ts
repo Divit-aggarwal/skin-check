@@ -1,4 +1,4 @@
-// Lane mm/a browser test users (scripts/seed-lane-mm-a.ts writes them).
+// Lane mm/a browser test users (scripts/seed-mm-a.ts writes them).
 // Phone numbers +9199999043xx. Screens 09-12 with 0, 1 and 4 checks.
 
 export type MmaUser = { uid: string; phoneNumber: string; checksDaysAgo: number[]; routine: boolean };

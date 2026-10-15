@@ -21,14 +21,14 @@ import { MMA_SEED } from "../tests/browser/seed-mm-a";
 
 const PROJECT = process.env.FIREBASE_PROJECT_ID ?? "";
 if (!process.env.FIRESTORE_EMULATOR_HOST || !process.env.FIREBASE_AUTH_EMULATOR_HOST || !PROJECT.startsWith("demo-")) {
-  console.error("seed-lane-mm-a: refusing to run outside the emulators with a demo- project.");
+  console.error("seed-mm-a: refusing to run outside the emulators with a demo- project.");
   process.exit(1);
 }
 
 async function putKeptPhoto(key: string) {
   const endpoint = process.env.S3_SKIN_IMAGES_ENDPOINT;
-  if (!endpoint || !/^http:\/\/127\.0\.0\.1:/.test(endpoint)) throw new Error("seed-lane-mm-a: kept photos go to the local S3 stand-in only.");
-  if (!existsSync(FACE_DARK)) throw new Error(`seed-lane-mm-a: no test face at ${FACE_DARK}`);
+  if (!endpoint || !/^http:\/\/127\.0\.0\.1:/.test(endpoint)) throw new Error("seed-mm-a: kept photos go to the local S3 stand-in only.");
+  if (!existsSync(FACE_DARK)) throw new Error(`seed-mm-a: no test face at ${FACE_DARK}`);
   const s3 = new S3Client({ region: "ap-south-1", endpoint, forcePathStyle: true, credentials: { accessKeyId: "local-dev", secretAccessKey: "local-dev" } });
   await s3.send(new PutObjectCommand({ Bucket: process.env.S3_SKIN_IMAGES_BUCKET ?? "skin-originals-dev", Key: key, Body: readFileSync(FACE_DARK), ContentType: "image/png" }));
 }
@@ -107,9 +107,9 @@ async function main() {
 }
 
 main().then(
-  () => console.log(`seed-lane-mm-a: ${Object.keys(MMA_SEED).length} users (project ${PROJECT}).`),
+  () => console.log(`seed-mm-a: ${Object.keys(MMA_SEED).length} users (project ${PROJECT}).`),
   (err) => {
-    console.error("seed-lane-mm-a failed:", (err as Error)?.message);
+    console.error("seed-mm-a failed:", (err as Error)?.message);
     process.exit(1);
   }
 );
