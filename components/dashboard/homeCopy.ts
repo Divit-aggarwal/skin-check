@@ -84,6 +84,13 @@ export const HOME_COPY = {
     unavailable: "The weather is not available right now.",
     change: "Change city",
     source: "Weather data by Open-Meteo.com",
+    // G37 (mockup 02): the temperature tile, today's UV by the hour, and the last high hour.
+    intro: "UV, temperature, humidity and air for your city today.",
+    temperature: "Temperature",
+    temperatureValue: (n: number) => `${Math.round(n)}°C`,
+    uvDay: "UV through the day",
+    uvDayLabel: (points: string) => `UV index by hour today: ${points}`,
+    uvHighUntil: (time: string) => `UV is high until ${time} today.`,
     places: "Places from GeoNames.org",
   },
 
@@ -135,6 +142,10 @@ export const HOME_COPY = {
     weatherSheet: "Weather and air details",
     iosHint: "On iPhone, add this site to your Home Screen for reminders.",
     close: "Close",
+    // G37 (mockup 01): the two tiles and the Skin Twin card (the latest check's level words, no comparison).
+    todayTile: "Today",
+    nextTile: "Next check",
+    skinTwin: "Skin Twin",
   },
   routineRow: {
     eveningFrom: "Evening steps from 3 pm",

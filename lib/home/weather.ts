@@ -11,6 +11,38 @@ export interface WeatherReading {
   usAqi: number;
   /** ISO time of the reading. */
   observedAt: string;
+  /** °C now (G37, screen 02). Optional: an older saved reading, or a source that left it out. */
+  temperature?: number;
+  /** Today's hourly UV in the place's own time (G37, screen 02). */
+  hourly?: UvHour[];
+  /** The last hour today with UV of 6 or more, while still ahead (uvHighUntil); null when none. */
+  uvHighUntil?: number | null;
+}
+
+/** One hour of today's UV: hour 0-23 in the place's own time. */
+export interface UvHour {
+  hour: number;
+  uv: number;
+}
+
+/** Open-Meteo's hourly arrays (local "YYYY-MM-DDTHH:MM") → the hours of `day` that have a number. */
+export function hoursOf(times: unknown, values: unknown, day: string): UvHour[] {
+  if (!Array.isArray(times) || !Array.isArray(values)) return [];
+  return times.flatMap((t, i) => {
+    const v = values[i];
+    return typeof t === "string" && t.startsWith(`${day}T`) && typeof v === "number" && Number.isFinite(v) ? [{ hour: Number(t.slice(11, 13)), uv: v }] : [];
+  });
+}
+
+/**
+ * "UV high until <hour>": the last hour today with UV of 6 or more (WHO High,
+ * rounded like uvCategory), only while that hour is not yet past. `nowHour`
+ * is the place's own hour from the reading, not this machine's clock.
+ */
+export function uvHighUntil(hours: readonly UvHour[], nowHour: number): number | null {
+  const high = hours.filter((h) => Math.round(h.uv) >= 6);
+  const last = high[high.length - 1];
+  return last && last.hour >= nowHour ? last.hour : null;
 }
 
 /** WHO UV index categories. */

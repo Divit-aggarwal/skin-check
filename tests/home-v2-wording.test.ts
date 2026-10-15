@@ -12,8 +12,8 @@ import { CAUSE, CHANGE, DIAGNOSIS, FORECAST, MEDICAL } from "@/lib/context/lexic
 
 const BANNED_WORDS = /\b(improve\w*|worse|better|reduc\w*|increas\w*|decreas\w*|because|caused|due to|effect\w*|works)\b/i;
 const problems = (text: string) => {
-  // TD-49: the three owner-approved labels, exact whole text only.
-  if (labelIsExcepted(text)) return [];
+  // TD-49: the three owner-approved labels, exact whole text only. TD-51: "Skin Twin" (G37, Home's card title) is allowed again.
+  if (labelIsExcepted(text) || text === "Skin Twin") return [];
   const out = bannedWordsIn(text);
   for (const [name, re] of Object.entries({ BANNED_WORDS, CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST })) if (re.test(text)) out.push(name);
   return out;

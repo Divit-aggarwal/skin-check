@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Info, Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { ROUTINE_COPY as C } from "@/lib/routine/copy";
 import { OTHER_PRODUCT_ID as OTHER, type Schedule } from "@/lib/routine/events";
-import { btnPrimary, btnSecondary, card, ErrorState, h2, LoadingState, ReloadButton, SignedOutCard } from "@/components/ui/page";
+import { btnPrimary, btnSecondary, card, ErrorState, h2, LoadingState, PageHeader, ReloadButton, SignedOutCard } from "@/components/ui/page";
 import { Arrow, IconWell, SegmentedControl } from "@/components/ui/kit";
 import { slotNow } from "@/lib/home/today";
 import { dueEntries, SlotSteps, STEPS, stepOf, type Slot, type Step } from "./RoutineSteps";
@@ -17,6 +17,7 @@ import { ProductTile, productHref } from "@/components/products/ProductTile";
 import { ProductPhoto } from "@/components/products/ProductPhoto";
 import { useStoreProducts } from "@/components/products/useStoreProducts";
 import { timeZone, useRoutine } from "./useRoutine";
+import type { StoreImage } from "@/lib/feature-contracts/store-products";
 
 // The user's own routine record (R-1 A): today's four steps for morning and
 // evening, adding a product (an empty step links here with its step and slot),
@@ -34,7 +35,7 @@ const rank = (id: string) => {
 };
 const field = "h-12 w-full min-w-0 max-w-full rounded-lg border border-brand-border bg-brand-surface px-3 text-base text-brand-text";
 
-export function RoutinePage() {
+export function RoutinePage({ photos = {} }: { photos?: Record<string, StoreImage> }) {
   const { user, loading } = useAuth();
   const { data, failed, busy, send } = useRoutine();
   const [slot, setSlot] = useState<Slot>(() => slotNow(new Date(), timeZone()));
@@ -47,9 +48,16 @@ export function RoutinePage() {
     return () => void delete document.body.dataset.flow;
   }, [guided]);
 
-  if (loading) return <LoadingState label={C.loading} blocks={["h-40", "h-40"]} />;
-  if (!user) return <SignedOutCard body={C.signIn} />;
-  if (!data) return failed ? <ErrorState body={C.error} action={<ReloadButton label={C.tryAgain} />} /> : <LoadingState label={C.loading} blocks={["h-40", "h-40"]} />;
+  // Before the routine loads, the page's own title (the slot title replaces it once loaded, screen 03).
+  const titled = (body: React.ReactNode) => (
+    <>
+      <PageHeader title={C.title} intro={C.purpose} phoneCompact />
+      {body}
+    </>
+  );
+  if (loading) return titled(<LoadingState label={C.loading} blocks={["h-40", "h-40"]} />);
+  if (!user) return titled(<SignedOutCard body={C.signIn} />);
+  if (!data) return titled(failed ? <ErrorState body={C.error} action={<ReloadButton label={C.tryAgain} />} /> : <LoadingState label={C.loading} blocks={["h-40", "h-40"]} />);
 
   const nameOf = (id: string) => (id === OTHER ? C.otherProduct : data.products.find((p) => p.id === id)?.name ?? id);
   const choices = [...data.products.filter((p) => p.available).map((p) => ({ id: p.id, name: p.name })), { id: OTHER, name: C.otherProduct }];
@@ -66,17 +74,18 @@ export function RoutinePage() {
       {failed && <div data-keep><ErrorState body={C.error} action={<ReloadButton label={C.tryAgain} />} /></div>}
 
       <div data-keep className="flex flex-col gap-4">
+        {/* Screen 03: the time of day's title and how many steps are due; no time estimates (none are stored). */}
+        <div className="pt-1 sm:pt-12">
+          <h1 className="text-[32px] font-semibold leading-[1.1] tracking-[-0.02em] text-brand-text">{C.slotTitle[slot]}</h1>
+          <p className="mt-1.5 text-lg text-brand-text-muted">{entries.length > 0 ? C.dueCount(entries.length) : C.nothingInSlot}</p>
+        </div>
         <SegmentedControl label={C.slotSwitch} value={slot} onChange={choose} options={[{ value: "AM", label: C.slot.AM }, { value: "PM", label: C.slot.PM }]} />
         {allLogged && <RoutineLogged entries={entries} slot={slot} eveningWaits={eveningWaits} onSeeEvening={() => choose("PM")} />}
         <section aria-label={C.slot[slot]} className="flex flex-col gap-4">
-          <div>
-            <h2 className="text-[22px] font-semibold leading-tight text-brand-text">{C.slotTitle[slot]}</h2>
-            <p className="mt-1 text-brand-text-muted">{entries.length > 0 ? C.dueCount(entries.length) : C.nothingInSlot}</p>
-          </div>
           {guided && pending.length > 0 ? (
             <GuidedStep entries={entries} slot={slot} busy={busy} send={send} onExit={() => setGuided(false)} />
           ) : (
-            <SlotSteps data={data} slot={slot} busy={busy} send={send} />
+            <SlotSteps data={data} slot={slot} busy={busy} send={send} photos={photos} />
           )}
         </section>
         {!guided && pending.length > 0 && (
@@ -88,6 +97,12 @@ export function RoutinePage() {
           </div>
         )}
       </div>
+
+      {/* The routine record's purpose (R-1 A), where screen 03 has its footer note. */}
+      <p className="-mt-3 flex items-start gap-3 rounded-card bg-brand-50 px-4 py-3 text-sm text-brand-text-muted">
+        <Info aria-hidden size={20} className="mt-0.5 shrink-0 text-brand-text" />
+        {C.purpose}
+      </p>
 
       {/* Redesign screen 06 as the routine set-up: the user's own products as step cards, then the add form (R-2 B: no recommendation here). */}
       <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start">
