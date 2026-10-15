@@ -9,47 +9,30 @@ export const START_COPY = {
   firstTitle: "No check yet",
   tipLabel: "Tip",
   checkinOpen: "Weekly check-in",
-  checkinOpenNote: "Preview: answers are not saved yet.",
 } as const;
 
-// E19: there is no weekly check-in question set or storage yet. These three
-// questions are a PLACEHOLDER for the screen only (owner to replace with E19);
-// none asks the user to compare weeks (TD-47(4)). Nothing is saved.
+// E19 (TD-51 (2)): the check-in's own sentences. The questions and answer
+// labels come from lib/feature-contracts/checkin.ts (the user's own words
+// about their week; the app never says them about the user).
 export const CHECKIN_COPY = {
   title: "Weekly check-in",
-  intro: "A few quick questions about your week.",
-  back: "Back to the start of your check",
+  intro: "A few quick questions about your skin this week.",
+  back: "Back",
   skip: "Skip",
-  save: "Save answers",
-  saveLater: "Saving your answers comes later.",
-  questions: [
-    {
-      id: "new_breakouts",
-      text: "Any new breakouts this week?",
-      options: [
-        { value: "none", label: "None" },
-        { value: "1-2", label: "1–2" },
-        { value: "3-5", label: "3–5" },
-        { value: "6-plus", label: "6 or more" },
-      ],
-    },
-    {
-      id: "routine_edit",
-      text: "Did you start or stop a product this week?",
-      options: [
-        { value: "no", label: "No" },
-        { value: "yes", label: "Yes" },
-      ],
-    },
-    {
-      id: "skin_feel",
-      text: "How has your skin felt this week?",
-      options: [
-        { value: "balanced", label: "Balanced" },
-        { value: "dry", label: "Dry" },
-        { value: "oily", label: "Oily" },
-        { value: "sensitive", label: "Sensitive" },
-      ],
-    },
-  ],
+  steps: ["Photos", "Weekly check-in", "Complete"],
+  save: "Continue",
+  saving: "Saving…",
+  pickOne: "Answer at least one question to save.",
+  signedOut: "Sign in to save your check-in.",
+  savedTitle: "Check-in saved",
+  savedBody: "Thanks. Your answers are kept with this week's check.",
+  alreadyTitle: "Already done this week",
+  alreadyBody: "You have saved a check-in for this week. You can answer again from Monday.",
+  done: "Done",
+  outcome: {
+    signed_out: "Your session has ended. Sign in again, then save.",
+    not_allowed: "This account cannot save a check-in.",
+    too_many: "Too many tries just now. Wait a minute, then save again.",
+    failed: "We couldn't save your answers. Check your connection and try again.",
+  },
 } as const;

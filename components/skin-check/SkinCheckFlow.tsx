@@ -72,12 +72,12 @@ export function SkinCheckFlow() {
     setProductName,
   } = useSkinCheckFlow();
 
-  // Screen 08 (E19): a view state only, reached from the start when the flag is on; nothing saves.
-  const [checkin, setCheckin] = useState(false);
+  // Screen 08 (E19), flag on: opened from the start (no check yet) or after a check's results (its scanId).
+  const [checkin, setCheckin] = useState<{ scanId: string | null } | null>(null);
   // Capture, the wait while the photo is read, and the check-in hide the
   // bottom bar (globals.css, body[data-flow]); the start and the results keep it.
   const overlay = complete || blocked || confirmingUnder18 || choosingQuestions;
-  const focused = checkin || (!overlay && (section.id === "skin-photo" || section.id === "get-your-results"));
+  const focused = checkin !== null || (!overlay && (section.id === "skin-photo" || section.id === "get-your-results"));
   useEffect(() => {
     if (!focused) return;
     document.body.dataset.flow = "check";
@@ -153,7 +153,7 @@ export function SkinCheckFlow() {
   if (checkin && weeklyCheckinUi()) {
     return (
       <div className="min-h-dvh bg-brand-bg">
-        <WeeklyCheckin onClose={() => setCheckin(false)} />
+        <WeeklyCheckin scanId={checkin.scanId} onClose={() => setCheckin(null)} />
       </div>
     );
   }
@@ -233,14 +233,9 @@ export function SkinCheckFlow() {
             <LastCheckCard />
             <PhotoTip />
             {weeklyCheckinUi() && (
-              <button type="button" onClick={() => setCheckin(true)} aria-describedby="checkin-open-note" className={btnSecondary}>
+              <button type="button" onClick={() => setCheckin({ scanId: null })} className={btnSecondary}>
                 {START_COPY.checkinOpen}
               </button>
-            )}
-            {weeklyCheckinUi() && (
-              <p id="checkin-open-note" className="-mt-2 text-center text-sm text-brand-text-muted">
-                {START_COPY.checkinOpenNote}
-              </p>
             )}
           </motion.div>
         ) : blocked ? (
@@ -289,6 +284,12 @@ export function SkinCheckFlow() {
               {/* A new check starts here without a reload; every past check is on
                   /checks (one history list, TD-25 (6)); Home is one tap away. */}
               <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+                {/* Screen 08 after a check (flag on): the check-in belongs to this check. */}
+                {weeklyCheckinUi() && (
+                  <button type="button" onClick={() => setCheckin({ scanId })} className={btnSecondary}>
+                    {START_COPY.checkinOpen}
+                  </button>
+                )}
                 <Button type="button" variant="ink" size="lg" onClick={startNewScan}>
                   Take a new check
                 </Button>
