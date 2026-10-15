@@ -441,7 +441,7 @@ function EchoChips({ uid, dashboard, data, productsOn }: { uid: string; dashboar
     );
   return (
     // Mockup 01's Ask Echo card: the header opens Echo; the two starters are the region (home-v3 counts its buttons).
-    <div className={`${card} flex flex-col gap-1 !p-2.5`}>
+    <div className={`${card} flex flex-col gap-1 !p-2`}>
       <button type="button" onClick={() => openEcho()} className="flex min-h-11 items-center gap-2.5 rounded-tile p-1 text-left text-sm text-brand-text hover:bg-brand-50">
         <IconWell icon={MessageCircle} size={28} />
         <span className="flex-1">{H.echo.title}</span>
@@ -451,7 +451,7 @@ function EchoChips({ uid, dashboard, data, productsOn }: { uid: string; dashboar
         <ul className="grid grid-cols-2 gap-2">
           {starters.map((q) => (
             <li key={q} className="min-w-0">
-              <button type="button" onClick={() => openEcho({ ask: q })} className="flex h-full min-h-11 w-full items-center gap-2 rounded-tile border border-brand-border bg-brand-surface px-2.5 py-2 text-left text-[13px] font-medium leading-snug text-brand-text transition-colors duration-fast hover:bg-brand-50">
+              <button type="button" onClick={() => openEcho({ ask: q })} className="flex h-full min-h-11 w-full items-center gap-2 rounded-tile border border-brand-border bg-brand-surface px-2.5 py-1 text-left text-[13px] font-medium leading-snug text-brand-text transition-colors duration-fast hover:bg-brand-50">
                 <IconWell icon={MessageCircle} size={28} className="bg-brand-50" />
                 <span className="line-clamp-2">{q}</span>
               </button>
