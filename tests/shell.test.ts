@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { SHELL_COPY } from "@/components/shell/copy";
 import { bannedWordsIn } from "@/lib/catalog/wording";
@@ -42,8 +42,20 @@ describe("app shell", () => {
   it("the redesign font is loaded and the old ones are gone", () => {
     const layout = readFileSync("app/layout.tsx", "utf8");
     expect(layout).not.toMatch(/Bai_Jamjuree/);
-    expect(layout).toMatch(/Plus_Jakarta_Sans/);
     expect(layout).not.toMatch(/Fraunces/);
     expect(readFileSync("app/(marketing)/layout.tsx", "utf8")).not.toMatch(/Space_Grotesk|Inter\b/);
   });
+
+  // G35: Plus Jakarta Sans is served from the repo (no Google Fonts fetch at build), same weights, display and variable.
+  it("Plus Jakarta Sans comes from the repo: one variable file for 400-700, swap, --font-jakarta, with its licence", () => {
+    const layout = readFileSync("app/layout.tsx", "utf8");
+    expect(layout).not.toMatch(/next\/font\/google/);
+    expect(layout).toMatch(/localFont\(\{\s*src: "\.\/fonts\/plus-jakarta-sans\/PlusJakartaSans-Variable\.woff2",\s*weight: "400 700",/);
+    expect(layout).toMatch(/variable: "--font-jakarta"/);
+    expect(layout).toMatch(/display: "swap"/);
+    const dir = "app/fonts/plus-jakarta-sans";
+    expect(readdirSync(dir).sort()).toEqual(["OFL.txt", "PlusJakartaSans-Variable.woff2"]);
+    expect(readFileSync(`${dir}/PlusJakartaSans-Variable.woff2`).subarray(0, 4).toString("latin1")).toBe("wOF2");
+    expect(readFileSync(`${dir}/OFL.txt`, "utf8")).toMatch(/SIL Open Font License, Version 1\.1/);
+  });;
 });
