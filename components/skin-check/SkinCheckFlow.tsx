@@ -18,8 +18,8 @@ import { QuestionsChoice, SkippedNote } from "./QuestionsChoice";
 import { hasQuestionAnswers, QUESTION_SECTION_IDS } from "@/lib/skin-check-validation";
 import { btnSecondary, card, eyebrow, textLink } from "@/components/ui/page";
 import { Wordmark } from "@/components/ui/kit";
-import { weeklyCheckinUi } from "@/lib/ui-flags";
-import { LastCheckCard, PhotoTip } from "./CheckStart";
+import { threeAngleUi, weeklyCheckinUi } from "@/lib/ui-flags";
+import { LastCheckCard, StartOverview } from "./CheckStart";
 import { WeeklyCheckin } from "./WeeklyCheckin";
 import { START_COPY } from "./flowCopy";
 
@@ -72,12 +72,14 @@ export function SkinCheckFlow() {
     setProductName,
   } = useSkinCheckFlow();
 
-  // Screen 08 (E19): a view state only, reached from the start when the flag is on; nothing saves.
-  const [checkin, setCheckin] = useState(false);
+  // Screen 08 (E19), flag on: opened from the start (no check yet) or after a check's results (its scanId).
+  const [checkin, setCheckin] = useState<{ scanId: string | null } | null>(null);
   // Capture, the wait while the photo is read, and the check-in hide the
   // bottom bar (globals.css, body[data-flow]); the start and the results keep it.
   const overlay = complete || blocked || confirmingUnder18 || choosingQuestions;
-  const focused = checkin || (!overlay && (section.id === "skin-photo" || section.id === "get-your-results"));
+  // C10 (flag on): the guided photo step has its own stepper and title (mockup 07); the part bar and title stay for screen readers.
+  const guidedPhoto = threeAngleUi() && !overlay && section.id === "skin-photo";
+  const focused = checkin !== null || (!overlay && (section.id === "skin-photo" || section.id === "get-your-results"));
   useEffect(() => {
     if (!focused) return;
     document.body.dataset.flow = "check";
@@ -153,7 +155,7 @@ export function SkinCheckFlow() {
   if (checkin && weeklyCheckinUi()) {
     return (
       <div className="min-h-dvh bg-brand-bg">
-        <WeeklyCheckin onClose={() => setCheckin(false)} />
+        <WeeklyCheckin scanId={checkin.scanId} onClose={() => setCheckin(null)} />
       </div>
     );
   }
@@ -162,8 +164,9 @@ export function SkinCheckFlow() {
     <div className="min-h-dvh bg-brand-bg">
       {/* Back and the Home link share a row above the progress bar, so the bar
           and every question start on the same edge (design review G03). */}
-      <div ref={headerRef} className={`mx-auto flex flex-col gap-2 px-4 pt-4 sm:px-6 sm:pt-6 ${complete ? "max-w-6xl lg:px-8" : "max-w-2xl"}`}>
-        <div className="grid min-h-11 grid-cols-[1fr_auto_1fr] items-center">
+      <div ref={headerRef} className={`mx-auto flex flex-col gap-2 px-4 sm:px-6 sm:pt-2 ${complete ? "max-w-6xl lg:px-8" : "max-w-2xl"}`}>
+        {/* The kit header's height (AppHeader, h-14), so every screen's wordmark sits in one place. */}
+        <div className="grid h-14 grid-cols-[1fr_auto_1fr] items-center">
           <button
             type="button"
             onClick={back}
@@ -183,13 +186,15 @@ export function SkinCheckFlow() {
           </div>
         </div>
         {!complete && (
-          <ProgressHeader
-            sectionLabels={ALL_SECTION_LABELS}
-            activeSectionIndex={sectionIndex}
-            activeSectionFill={sectionFill}
-            activeSectionLabel={choosingQuestions ? START_COPY.title : section.label}
-            showBar={!choosingQuestions}
-          />
+          <div className={guidedPhoto ? "sr-only" : undefined}>
+            <ProgressHeader
+              sectionLabels={ALL_SECTION_LABELS}
+              activeSectionIndex={sectionIndex}
+              activeSectionFill={sectionFill}
+              activeSectionLabel={choosingQuestions ? START_COPY.title : section.label}
+              showBar={!choosingQuestions}
+            />
+          </div>
         )}
       </div>
 
@@ -227,20 +232,14 @@ export function SkinCheckFlow() {
             className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pb-10 pt-2 sm:px-6"
           >
             {/* Screen 05: what this check is, the last check, the choice (TD-44), a tip. */}
-            <p className="text-brand-text-muted">{START_COPY.intro}</p>
+            <p className="text-base leading-snug text-brand-text-muted">{threeAngleUi() ? START_COPY.introThree : START_COPY.intro}</p>
             {/* The choice first, so its buttons are on the first screen at 375px (owner answer 5). */}
             <QuestionsChoice answers={answers} onChoose={chooseQuestions} />
-            <LastCheckCard />
-            <PhotoTip />
+            <StartOverview />
             {weeklyCheckinUi() && (
-              <button type="button" onClick={() => setCheckin(true)} aria-describedby="checkin-open-note" className={btnSecondary}>
+              <button type="button" onClick={() => setCheckin({ scanId: null })} className={btnSecondary}>
                 {START_COPY.checkinOpen}
               </button>
-            )}
-            {weeklyCheckinUi() && (
-              <p id="checkin-open-note" className="-mt-2 text-center text-sm text-brand-text-muted">
-                {START_COPY.checkinOpenNote}
-              </p>
             )}
           </motion.div>
         ) : blocked ? (
@@ -289,6 +288,12 @@ export function SkinCheckFlow() {
               {/* A new check starts here without a reload; every past check is on
                   /checks (one history list, TD-25 (6)); Home is one tap away. */}
               <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center">
+                {/* Screen 08 after a check (flag on): the check-in belongs to this check. */}
+                {weeklyCheckinUi() && (
+                  <button type="button" onClick={() => setCheckin({ scanId })} className={btnSecondary}>
+                    {START_COPY.checkinOpen}
+                  </button>
+                )}
                 <Button type="button" variant="ink" size="lg" onClick={startNewScan}>
                   Take a new check
                 </Button>
@@ -309,7 +314,7 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto flex max-w-2xl flex-col gap-10 px-4 pb-10 pt-6 sm:px-6"
+            className={`mx-auto flex max-w-2xl flex-col gap-10 px-4 pb-10 sm:px-6 ${guidedPhoto ? "pt-1" : "pt-6"}`}
           >
             {/* Screen 05 for a returning user (TD-43): the photo step is the start. */}
             {section.id === "skin-photo" && reusingSaved && !updating && <LastCheckCard />}
@@ -325,7 +330,7 @@ export function SkinCheckFlow() {
                 transition={{ duration: 0.3, ease: [0.19, 1, 0.22, 1] }}
                 className="flex flex-col gap-5"
               >
-                <EchoBubble message={formatPrompt(step.prompt, answers)} />
+                {!(guidedPhoto && step.type === "photo-capture") && <EchoBubble message={formatPrompt(step.prompt, answers)} />}
                 <StepAnswer
                   step={step}
                   value={answers[step.id] ?? defaultAnswerFor(step)}

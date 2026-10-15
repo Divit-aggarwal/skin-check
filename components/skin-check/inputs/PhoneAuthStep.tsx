@@ -97,7 +97,11 @@ export function PhoneAuthStep({
     // permission-denied rule on retry.
     setSaving(true);
     setSaveFailed(false);
-    withTimeout(saveSkinCheck(user.uid, scanId, { ...answers, [step.id]: verified }, scan, productNames), SAVE_TIMEOUT_MS)
+    withTimeout(
+      // C10: the cheek photos' uploads, only when this check took them (three-angle capture).
+      saveSkinCheck(user.uid, scanId, { ...answers, [step.id]: verified }, scan, productNames, scan.status === "success" || scan.status === "error" ? scan.sidesStored : undefined),
+      SAVE_TIMEOUT_MS
+    )
       .then(() => {
         // The draft has served its purpose once the scan belongs to a real
         // uid. Cleared only on success, so a failed write leaves the user's

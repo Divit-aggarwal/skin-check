@@ -8,14 +8,18 @@ import { CHECK_ORDER, notMeasured, type CaptureQuality, type CheckResult, type F
 /**
  * Runs every check on the exact image the engine will receive. `frame` is
  * null when the image would not decode. Pose, expression, distance and
- * framing need a landmark model (O-3 = C: none), so they are not_measured.
+ * framing need a landmark model, so they are not_measured, unless `live`
+ * carries them: the three-angle capture measures distance, framing and pose
+ * on the camera stream (C11, live.ts liveGateChecks). Expression stays unmeasured.
  */
 export function runCaptureGate(
   frame: Frame | null,
   ctx: { captureMethod: CaptureMethod; retakeCount: number },
-  settings: CaptureQualitySettings = CAPTURE_QUALITY_SETTINGS
+  settings: CaptureQualitySettings = CAPTURE_QUALITY_SETTINGS,
+  live?: Partial<Record<"distance" | "framing" | "pose", CheckResult>>
 ): CaptureQuality {
   const byId: Record<string, CheckResult> = {
+    ...live,
     exposure: checkExposure(frame, settings),
     blur: checkBlur(frame, ctx.captureMethod, settings),
     resolution: checkResolution(frame, settings),

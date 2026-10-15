@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useReducer, useRef, useState, type ChangeEvent } from "react";
 import { AlertCircle, Camera, Check, RotateCcw, ScanFace } from "lucide-react";
-import { CAPTURE_COPY as K, GATE_COPY as G, cameraView, gateRows } from "../captureStates";
+import { CAPTURE_COPY as K, GATE_COPY as G, GUIDED_COPY, cameraView, gateRows, type GuidedFallback } from "../captureStates";
+import { GuidedCapture, type GuidedPhotos } from "./GuidedCapture";
+import { uploadSides } from "./sideUploads";
+import { threeAngleUi } from "@/lib/ui-flags";
+import { liveGateChecks } from "@/lib/capture-quality/live";
+import type { CheckResult } from "@/lib/capture-quality/types";
+import type { SideAngle } from "@/lib/feature-contracts/check-photos";
 import { useCameraStream } from "@/hooks/useCameraStream";
 import { useAuth } from "@/lib/auth-context";
 import { isAuthError, isUploadError, isUploadTooLarge, runSkinScan, UPLOAD_TOO_LARGE_MESSAGE } from "@/lib/api";
@@ -111,6 +117,13 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
   // real camera File on mobile, or the getUserMedia+canvas blob on desktop.
   const originalBlobRef = useRef<Blob | null>(null);
   const hasCaptured = previewUrl !== null;
+  // C10/C11, threeAngleUi(): "on" shows the guided three-photo capture; a fallback reason shows today's
+  // one-photo capture with that reason; "off" (flag off) is today's capture, unchanged.
+  const [guided, setGuided] = useState<"on" | "off" | GuidedFallback>(() => (threeAngleUi() ? "on" : "off"));
+  // The two cheek photos (guided capture only) and each one's own gate result. Stored, never analysed.
+  const [sides, setSides] = useState<Record<SideAngle, { blob: Blob; url: string; retake: string | null }> | null>(null);
+  // The guided capture is a canvas frame on every device; today's paths keep their own method.
+  const captureMethodRef = useRef<CaptureMethod>(isMobile ? "native" : "canvas");
 
   // The retake loop (C01) and both consents in one reducer
   // (lib/capture-quality/gate.ts): a retake clears the gate result and both
@@ -167,13 +180,41 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
 
   // Checks the exact bytes the engine will receive (capturedBlobRef), so the
   // result describes the image whose hash becomes inputSha256.
-  const startGate = useCallback((blob: Blob, captureMethod: CaptureMethod) => {
+  // `live`: distance, framing and pose measured on the stream at the shutter (guided capture only).
+  const startGate = useCallback((blob: Blob, captureMethod: CaptureMethod, live?: Record<"distance" | "framing" | "pose", CheckResult>) => {
     const photoId = ++photoSeqRef.current;
+    captureMethodRef.current = captureMethod;
     dispatch({ type: "captured", photoId });
     void frameFromBlob(blob).then((frame) =>
-      dispatch({ type: "gateResult", photoId, quality: runCaptureGate(frame, { captureMethod, retakeCount: 0 }) })
+      dispatch({
+        type: "gateResult",
+        photoId,
+        // Without live checks (flag off, or today's capture) the call is today's.
+        quality: live ? runCaptureGate(frame, { captureMethod, retakeCount: 0 }, undefined, live) : runCaptureGate(frame, { captureMethod, retakeCount: 0 }),
+      })
     );
   }, []);
+
+  const handleGuidedDone = useCallback(
+    ({ front, left, right, frontFace }: GuidedPhotos) => {
+      capturedBlobRef.current = front;
+      originalBlobRef.current = front;
+      startGate(front, "canvas", liveGateChecks(frontFace));
+      setPreviewUrl(URL.createObjectURL(front));
+      const side = (blob: Blob) => ({ blob, url: URL.createObjectURL(blob), retake: null });
+      setSides({ left: side(left), right: side(right) });
+      // The after-capture gate runs on each cheek photo too; its result is shown, never blocks (they are not read).
+      for (const angle of ["left", "right"] as const) {
+        const blob = angle === "left" ? left : right;
+        void frameFromBlob(blob).then((frame) => {
+          const q = runCaptureGate(frame, { captureMethod: "canvas", retakeCount: 0 });
+          const reason = q.verdict === "retake" ? RETAKE_COPY[q.retakeReasons[0]!] : null;
+          setSides((prev) => (prev && prev[angle].blob === blob ? { ...prev, [angle]: { ...prev[angle], retake: reason } } : prev));
+        });
+      }
+    },
+    [startGate]
+  );
 
   const handleCapture = useCallback(() => {
     const video = videoRef.current;
@@ -228,12 +269,18 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     scanRequestedRef.current = false;
     // Clears both consents and the gate result; a late result for the old photo is ignored.
     dispatch({ type: "retake" });
-    if (isMobile) {
+    if (guided === "on") {
+      // ponytail: a retake starts all three photos again; per-angle retake if users ask for it.
+      setSides((prev) => {
+        if (prev) for (const a of ["left", "right"] as const) URL.revokeObjectURL(prev[a].url);
+        return null;
+      });
+    } else if (isMobile) {
       fileInputRef.current?.click();
     } else {
       requestCamera();
     }
-  }, [isMobile, requestCamera]);
+  }, [guided, isMobile, requestCamera]);
 
   // handleRetake, plus reopening a committed step and clearing its old scan result.
   const handleRetakeFromDone = useCallback(() => {
@@ -254,8 +301,10 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     const original = originalBlobRef.current;
     if (!blob || !original) return;
     scanRequestedRef.current = true;
-    const captureMethod: CaptureMethod = isMobile ? "native" : "canvas";
+    const captureMethod: CaptureMethod = captureMethodRef.current;
     const quality = flow.quality ?? undefined;
+    // C10: the cheek photos upload beside the front (same retention consent) and are never sent for reading.
+    const sidesDone = sides ? uploadSides(scanId, { left: sides.left.blob, right: sides.right.blob }, hasRetentionConsent) : Promise.resolve(undefined);
 
     // Move on now; the scan runs in the background.
     onChange("done");
@@ -292,7 +341,8 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
       // canAnalyze() above requires the processing checkbox.
       processingConsentVersion: PROCESSING_CONSENT_VERSION,
     })
-      .then(({ result, originalStored }) =>
+      .then(async ({ result, originalStored }) => {
+        const sidesStored = await sidesDone;
         onScanChange(
           {
             status: "success",
@@ -304,11 +354,13 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
             retentionConsentVersion,
             quality,
             processingConsentVersion: PROCESSING_CONSENT_VERSION,
+            ...(sidesStored ? { sidesStored } : {}),
           },
           scanId
-        )
-      )
-      .catch((err) => {
+        );
+      })
+      .catch(async (err) => {
+        const sidesStored = await sidesDone;
         console.error("Skin scan failed:", err);
         // The engine refused the photo for a reason a retake fixes (O-5).
         const retakeReason = isRetakeError(err) ? retakeReasonFromServerCode(err.code) ?? undefined : undefined;
@@ -337,9 +389,10 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           quality,
           retakeReason,
           processingConsentVersion: PROCESSING_CONSENT_VERSION,
+          ...(sidesStored ? { sidesStored } : {}),
         }, scanId);
       });
-  }, [flow, hasRetentionConsent, onChange, onCommit, onScanChange, isMobile, user, scanId]);
+  }, [flow, hasRetentionConsent, onChange, onCommit, onScanChange, user, scanId, sides]);
 
   // Firebase hasn't reported yet — holding the frame is the difference
   // between "we don't know" and "you're signed out" (failure case 6).
@@ -393,6 +446,8 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     );
   }
 
+  if (guided === "on" && !hasCaptured) return <GuidedCapture onDone={handleGuidedDone} onFallback={setGuided} />;
+
   const view = cameraView(isMobile, status, hasCaptured);
   const blocked = view === "refused" || view === "unavailable" || view === "failed";
   const openCamera = () => {
@@ -412,10 +467,17 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
 
   return (
     <div className="flex flex-col gap-4">
+      {guided !== "on" && guided !== "off" && (
+        <p role="note" className="flex max-w-md items-start gap-2 rounded-tile bg-brand-50 px-4 py-3 text-sm text-brand-text">
+          <AlertCircle aria-hidden className="mt-0.5 h-4 w-4 shrink-0 text-brand-text-muted" />
+          {GUIDED_COPY.fallback[guided]}
+        </p>
+      )}
       {/* The video stays mounted on the laptop from "start" to "ready": the
           stream attaches to it while the browser asks (useCameraStream). */}
       {/* A phone has no live preview, so its start box is small: "Open camera" stays above the fold at 390px. */}
-      <div className={`relative w-full self-center overflow-hidden rounded-card bg-brand-900 ${isMobile && !hasCaptured ? "aspect-square max-w-[200px]" : "aspect-[3/4] max-w-[320px]"}`}>
+      {/* The guided capture shows its three photos below instead. */}
+      <div className={`relative w-full self-center overflow-hidden rounded-card bg-brand-900 ${isMobile && !hasCaptured ? "aspect-square max-w-[200px]" : "aspect-[3/4] max-w-[320px]"}${sides ? " hidden" : ""}`}>
         {!isMobile && !hasCaptured && (
           <video
             ref={videoRef}
@@ -532,6 +594,24 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
 
       {hasCaptured && (
         <div className="flex flex-col gap-4">
+          {sides && (
+            <section aria-labelledby="three-photos-title" className="flex max-w-md flex-col gap-2">
+              <h2 id="three-photos-title" className={eyebrow}>
+                {GUIDED_COPY.review}
+              </h2>
+              <ul className="grid grid-cols-3 gap-2">
+                {[{ url: previewUrl, retake: null }, sides.left, sides.right].map((p, i) => (
+                  <li key={GUIDED_COPY.steps[i]} className="flex flex-col gap-1">
+                    {/* eslint-disable-next-line @next/next/no-img-element -- the user's own photo, a transient object URL */}
+                    <img src={p.url ?? ""} alt={GUIDED_COPY.steps[i]} className="aspect-[3/4] w-full rounded-tile object-cover" />
+                    <span className="text-sm font-medium text-brand-text">{GUIDED_COPY.steps[i]}</span>
+                    {p.retake && <span className="text-xs text-brand-error">{p.retake}</span>}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-sm text-brand-text-muted">{GUIDED_COPY.sidesNote}</p>
+            </section>
+          )}
           {/* Required consent gate — the scan request below never fires
               until this is checked (PART 13). Unchecked by default, real
               <input type="checkbox">, keyboard- and screen-reader-visible. */}
@@ -635,7 +715,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
               className="gap-2"
             >
               <RotateCcw aria-hidden className="h-4 w-4" />
-              {K.retake}
+              {sides ? GUIDED_COPY.retakeAll : K.retake}
             </Button>
             <Button
               type="button"
