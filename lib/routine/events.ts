@@ -134,3 +134,14 @@ export function currentRoutine(events: readonly RoutineEvent[], onDate: string):
   }
   return Array.from(active.values());
 }
+
+/**
+ * Screen 16 (TD-53): the catalogue products in a routine, in `order`, each with
+ * the day it was started (`since`, YYYY-MM-DD). "Other product" entries are left out.
+ */
+export function startedProducts(routine: readonly RoutineItem[], order: readonly string[]): { productId: string; startedOn: string }[] {
+  return routine
+    .filter((r) => order.includes(r.productId))
+    .sort((a, b) => order.indexOf(a.productId) - order.indexOf(b.productId))
+    .map((r) => ({ productId: r.productId, startedOn: r.since }));
+}

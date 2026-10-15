@@ -1,7 +1,9 @@
-// Redesign lane C (screens 06, 14, 15): every new products string in one place,
+// Lane C (screens 06, 14, 15, 16): every products string in one place,
 // checked by tests/ui-wording.test.ts and tests/redesign-products.test.ts.
-// No price, no cart, no buy wording (TD-34, TD-50 (g)); no result or benefit
-// claim (D-12): the catalogue's claims whitelist is empty for all six products.
+// TD-52: the store's live price, and Add to cart only behind cartUi(). No
+// result or benefit claim (D-12): the catalogue's claims whitelist is empty.
+// TD-53: screen 16 says at most "since you started <name>" (sinceTitle, the one
+// string the D-12 phrase check is waived for; kit request C-mm-2).
 
 export const PRODUCTS_COPY = {
   details: "Product details",
@@ -19,4 +21,38 @@ export const PRODUCTS_COPY = {
   discontinued: "No longer sold on the store.",
   ownLine: "A Project Skin product.",
   back: "Back",
+  // TD-52 store data (14, 15)
+  addToCart: "Add to cart",
+  addToCartLabel: (name: string) => `Add ${name} to cart on the store`,
+  viewInStore: "View in store",
+  viewInStoreLabel: (name: string) => `View ${name} in the store`,
+  soldOut: "Out of stock",
+  fromStore: "From the store",
+  fromStoreNote: "The store's own words about this product.",
+  gallery: (name: string) => `Photos of ${name} from the store`,
+  photoAlt: (name: string, n: number) => `${name}, store photo ${n}`,
+  // Screen 16 (TD-53)
+  sinceTitle: (name: string) => `Since you started ${name}`,
+  sinceIntro: "Your readings and photos from the checks you took after this start date.",
+  startedOn: (date: string) => `Started on ${date}`,
+  yourProducts: "Products in your routine",
+  readings: "Your readings",
+  readingsIntro: "The level of each reading at every check from the start date on.",
+  latest: "Latest check",
+  noReading: "No reading",
+  timelines: "Each reading, check by check",
+  photos: "Your photos",
+  photosLoading: "Loading your photos",
+  ownPhotoAlt: (date: string) => `Your photo from ${date}`,
+  photosNone: "No kept photos from checks after this start date.",
+  noChecks: "No checks after this start date yet. Take a check to see your readings here.",
+  takeCheck: "Take a check",
+  emptyTitle: "No products started yet",
+  empty: "Add a product to your routine, with the day you started it, to see your checks from then on.",
+  notStarted: (name: string) => `${name} is not in your routine. Add it with the day you started it to see your checks from then on.`,
+  toRoutine: "Go to your routine",
+  signIn: "Sign in to see your readings from the day you started a product.",
+  loading: "Loading your checks",
+  error: "Your checks could not be loaded. Check your connection and try again.",
+  tryAgain: "Try again",
 } as const;

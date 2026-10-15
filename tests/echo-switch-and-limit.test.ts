@@ -126,7 +126,9 @@ describe("the Echo switch (ECHO_SWITCH)", () => {
 
   it("/echo reads the switch and, when off, shows the notice in place of the input", async () => {
     const { readFileSync } = await import("node:fs");
-    expect(readFileSync("app/(marketing)/echo/page.tsx", "utf8")).toContain("<EchoPage echoOn={echoOn()} productsOn={echoProductsOn()} />"); // TD-34: the product switch is passed beside it
+    expect(readFileSync("app/(marketing)/echo/page.tsx", "utf8")).toContain("<EchoWithConsent echoOn={echoOn()} productsOn={echoProductsOn()} />");
+    // H36 (lane C): the wrapper passes the Echo switch through unchanged and only narrows products.
+    expect(readFileSync("components/products/PersonalisedProducts.tsx", "utf8")).toContain("<EchoPage echoOn={echoOn} productsOn={productsOn && personal} />"); // TD-34: the product switch is passed beside it
     const page = readFileSync("components/skin-check/EchoPage.tsx", "utf8");
     // The notice, then the help line (safety review: a user who cannot write still sees it).
     expect(page).toMatch(/\{!echoOn \? \(\s*<div role="status"[^>]*>\s*<p>\{E\.off\}<\/p>\s*<p>\{withPhoneLinks\(REFERRAL_LINE\)\}<\/p>/);

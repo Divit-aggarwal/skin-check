@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { EchoPage } from "@/components/skin-check/EchoPage";
+import { EchoWithConsent } from "@/components/products/PersonalisedProducts";
 import { LoadingState, page } from "@/components/ui/page";
 import { echoOn } from "@/lib/context/switch";
 import { echoProductsOn } from "@/lib/context/products";
@@ -23,8 +23,8 @@ export default function EchoRoute() {
         </main>
       }
     >
-      {/* Read at build time: a Vercel setting change takes effect with the next deployment (TD-29 (5)). */}
-      <EchoPage echoOn={echoOn()} productsOn={echoProductsOn()} />
+      {/* H36: also off when the user withdrew personalisation (PersonalisedProducts). Read at build time: a Vercel setting change takes effect with the next deployment (TD-29 (5)). */}
+      <EchoWithConsent echoOn={echoOn()} productsOn={echoProductsOn()} />
     </Suspense>
   );
 }
