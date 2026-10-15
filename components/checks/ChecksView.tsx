@@ -1,15 +1,16 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Camera, ChevronRight } from "lucide-react";
+import { Activity, CalendarCheck, Camera, ChevronRight, ClipboardList, MessageCircle } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
 import { CheckReadings, KnownAndNotKnown, PhotoCheckLine } from "@/components/dashboard/CheckReadings";
 import { useKeptPhoto } from "@/components/mesh/useKeptPhoto";
 import { formatDate } from "@/components/dashboard/format";
-import { loadDashboard, type DashboardData } from "@/components/dashboard/data";
+import type { DashboardData } from "@/components/dashboard/data";
+import { READING_ORDER, seriesChecks, useChecksData } from "./series";
 import { deriveDashboard, pastCheck, productNamesOf, questionsDone, questionsTarget, type Dashboard } from "@/components/dashboard/state";
 import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
 import { productNameLabel, type ProductNameKey } from "@/lib/skin-check-validation";
@@ -18,11 +19,13 @@ import { mergeTimeline, dayOf } from "@/components/timeline/timeline";
 import { TimelineList } from "@/components/timeline/TimelineList";
 import { ROUTINE_COPY } from "@/lib/routine/copy";
 import { AccountButton, btnPrimary, btnSecondary, card, EmptyState, SignedOutCard, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";
-import { AppHeader, IconWell, TabBar } from "@/components/ui/kit";
+import { AppHeader, Arrow, IconWell, TabBar } from "@/components/ui/kit";
+import { readingsOverTime } from "@/lib/readings/series";
+import { LevelTile } from "./OverTime";
 import { isShownMetric, type ShownMetric } from "@/lib/skin-check-skus";
 import { CHECKS_COPY as K } from "./copy";
 import { Thumb } from "./Thumb";
-import { fixedLine, LatestReading, PhotosView, ReadingsView, ReadingView, RoutineStrip } from "./ChecksTabs";
+import { fixedLine, LatestReading, NextRow, PhotosView, ReadingsView, ReadingView, RoutineStrip } from "./ChecksTabs";
 import { echoOn } from "@/lib/echo-limits";
 
 // G03 3.3 / 3.4, TD-50 screens 09–13. /checks views by query (no new route):
@@ -33,54 +36,62 @@ import { echoOn } from "@/lib/echo-limits";
 // Phone: one view at a time. From 1024px the Overview is the list on the left
 // and the opened check on the right (TD-25 (1), from direction B).
 
-type Load = { kind: "loading" } | { kind: "error" } | { kind: "ready"; data: DashboardData };
 type View = "overview" | "readings" | "photos" | "timeline";
 
 export function ChecksView({ openId }: { openId: string | null }) {
   const { user, loading } = useAuth();
-  const [load, setLoad] = useState<Load>({ kind: "loading" });
+  const load = useChecksData(user);
   const params = useSearchParams();
   const asked = params.get("reading");
   const reading: ShownMetric | null = !openId && asked && isShownMetric(asked) ? asked : null;
   const v = params.get("view");
   const view: View = openId ? "overview" : reading ? "readings" : v === "timeline" || v === "readings" || v === "photos" ? v : "overview";
 
-  useEffect(() => {
-    if (!user) return;
-    let active = true;
-    setLoad({ kind: "loading" });
-    loadDashboard(user.uid).then(
-      (data) => active && setLoad({ kind: "ready", data }),
-      (error) => {
-        console.error("[checks] load failed", error instanceof Error ? error.name : error);
-        if (active) setLoad({ kind: "error" });
-      }
-    );
-    return () => {
-      active = false;
-    };
-  }, [user]);
-
   const dashboard = useMemo(() => (user && load.kind === "ready" ? deriveDashboard(user.uid, load.data.checks, load.data.analyses) : null), [user, load]);
 
   // An opened check on a phone has its own back row; the page title stays for
   // screen readers, and the List/Timeline tabs stay on a wide screen, where
   // the list is still on the left (flow review G03).
-  const header = (
-    <PageHeader kicker={K.kicker} title={K.title} phoneCompact={Boolean(openId)}>
-      <div className={`mt-5 ${openId ? "hidden lg:block" : ""}`}>
-        <TabBar
-          label={K.views}
-          current={view}
-          tabs={[
-            { key: "overview", label: K.overview, href: "/checks" },
-            { key: "readings", label: K.readings, href: "/checks?view=readings" },
-            { key: "photos", label: K.photos, href: "/checks?view=photos" },
-            { key: "timeline", label: K.timeline, href: "/checks?view=timeline" },
-          ]}
-        />
-      </div>
+  const tabs = (
+    <TabBar
+      label={K.views}
+      current={view}
+      tabs={[
+        { key: "overview", label: K.overview, href: "/checks" },
+        { key: "readings", label: K.readings, href: "/checks?view=readings" },
+        { key: "timeline", label: K.timeline, href: "/checks?view=timeline" },
+      ]}
+    />
+  );
+  const newest = dashboard?.history[0];
+  // G37 screen 10: wordmark, "Your Skin Twin", the last check's date, the tabs.
+  const header = openId ? (
+    <PageHeader kicker={K.kicker} title={K.title} phoneCompact>
+      <div className="mt-5 hidden lg:block">{tabs}</div>
     </PageHeader>
+  ) : (
+    <>
+      <div className="pt-2">
+        <AppHeader right={<AccountButton />} />
+      </div>
+      <header className="flex items-start justify-between gap-3 pb-4 pt-3">
+        <div className="min-w-0">
+          <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text sm:text-[32px]">{K.twinTitle}</h1>
+          <p className="mt-1 text-[15px] leading-snug text-brand-text-muted">{K.twinIntro}</p>
+        </div>
+        {newest && (
+          <Link href={`/checks/${encodeURIComponent(newest.scanId)}`} className="flex shrink-0 items-center gap-2 rounded-card bg-brand-100 py-2 pl-2 pr-1.5">
+            <IconWell icon={Activity} size={36} className="bg-brand-surface" />
+            <span className="flex flex-col">
+              <span className="text-xs text-brand-text-muted">{K.lastCheck}</span>
+              <span className="text-sm font-semibold text-brand-text">{formatDate(newest.date)}</span>
+            </span>
+            <ChevronRight aria-hidden size={16} className="text-brand-text-muted" />
+          </Link>
+        )}
+      </header>
+      <div className="mb-4">{tabs}</div>
+    </>
   );
 
   if (loading || (user && load.kind === "loading"))
@@ -113,14 +124,20 @@ export function ChecksView({ openId }: { openId: string | null }) {
       </main>
     );
 
+  // 11: its own back row and title (the reading's name is the page's one h1).
+  if (reading)
+    return (
+      <main className={page}>
+        <ReadingView uid={user.uid} metric={reading} dashboard={dashboard} data={load.data} />
+      </main>
+    );
+
   if (!openId && view !== "overview")
     return (
       <main className={page}>
         {header}
         {view === "timeline" ? (
           <TimelineSection history={dashboard.history} />
-        ) : reading ? (
-          <ReadingView uid={user.uid} metric={reading} dashboard={dashboard} data={load.data} />
         ) : view === "readings" ? (
           <ReadingsView dashboard={dashboard} />
         ) : (
@@ -139,21 +156,16 @@ export function ChecksView({ openId }: { openId: string | null }) {
         </div>
       ) : null}
       {header}
-      {/* 10 on a phone: the newest reading first. From 1024px the opened newest check is on the right instead. */}
+      {/* 10 on a phone: the newest reading, then the routine strip (a card of its own, D-12). From 1024px the opened newest check is on the right instead. */}
       {!openId && (
-        <div className="mb-4 lg:hidden">
+        <div className="mb-6 flex flex-col gap-6 lg:hidden">
           <LatestReading dashboard={dashboard} />
+          <RoutineStrip />
         </div>
       )}
       <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-6">
         <div className={`flex flex-col gap-4 lg:col-span-5 ${openId ? "hidden lg:flex" : ""}`}>
           <CheckList dashboard={dashboard} data={load.data} uid={user.uid} selected={selected} />
-          {/* D-12: a card of its own, below the list, never beside the readings. */}
-          {!openId && (
-            <div className="lg:hidden">
-              <RoutineStrip />
-            </div>
-          )}
         </div>
         <div className={`lg:sticky lg:top-6 lg:col-span-7 ${openId ? "" : "hidden lg:block"}`}>
           <CheckDetail uid={user.uid} scanId={selected} data={load.data} dashboard={dashboard} />
@@ -208,6 +220,11 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
   const router = useRouter();
   // TD-37 (2): the mesh over this check's kept photo; the face drawing without one.
   const photo = useKeptPhoto(check?.scanId ?? null, check?.photoClaimed ?? false);
+  // G37 screen 09: each reading's level with the change slot, over the checks up to this one (lib/readings/series.ts).
+  const over = useMemo(() => {
+    const at = check?.date;
+    return at ? readingsOverTime(seriesChecks(uid, data, dashboard.history), "all", at) : null;
+  }, [uid, data, dashboard.history, check?.date]);
   // The back link above (phone) and the list beside it (desktop) are the ways on.
   if (!check) return <EmptyState title={C.history.notFound} body={K.notFoundBody} />;
   const date = formatDate(check.date);
@@ -217,19 +234,27 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
   const names = productNamesOf(record, data.laterAnswers);
   const skipped = record?.data.questionnaire === "skipped" && !questionsDone(record, data.laterAnswers);
   const canAnswer = questionsTarget(uid, data.checks, data.analyses, data.laterAnswers)?.id === check.scanId;
+  const n = dashboard.history.length - dashboard.history.findIndex((h) => h.scanId === check.scanId);
   return (
-    <section aria-labelledby="check-title" className={`${card} flex flex-col gap-5`}>
-      <div className="flex items-start justify-between gap-4">
-        <div>
+    <section aria-labelledby="check-title" className="flex flex-col gap-5 lg:rounded-card lg:border lg:border-brand-border lg:bg-brand-surface lg:p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <p className={`${eyebrow} mb-1`}>{K.opened}</p>
-          <h2 id="check-title" className={h2}>
+          <h2 id="check-title" className="text-[26px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text">
             {C.history.checkFrom(date)}
           </h2>
           <p className="mt-1 text-brand-text-muted">{C.history.kind[check.kind]}</p>
         </div>
-        {/* TD-39: one photo. The thumbnail only until the large photo below can be shown. */}
-        {check.photoClaimed && !photo && <Thumb key={check.scanId} scanId={check.scanId} date={date} size={112} />}
+        <div className="flex shrink-0 items-center gap-2 rounded-card bg-brand-100 px-3 py-2">
+          <CalendarCheck aria-hidden size={22} className="text-brand-700" />
+          <span className="flex flex-col text-sm">
+            <span className="font-semibold text-brand-700">{date}</span>
+            <span className="text-brand-text-muted">{K.checkNumber(n, dashboard.history.length)}</span>
+          </span>
+        </div>
       </div>
+      {/* TD-39: one photo. The thumbnail only until the large photo below can be shown. */}
+      {check.photoClaimed && !photo && <Thumb key={check.scanId} scanId={check.scanId} date={date} size={112} />}
       {check.photoCheck && <PhotoCheckLine text={C.photoCheck[check.photoCheck]} />}
       {check.view ? (
         <>
@@ -237,6 +262,15 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
           <p className={fixedLine}>{C.history.pastLine}</p>
           {/* TD-46: on the newest check, a face area opens Echo on it (Echo talks about the newest check only). */}
           <CheckReadings view={{ ...check.view, photoCheck: null }} photo={photo} onArea={newest && echoOn() ? (r) => router.push(`/echo?region=${r}`) : undefined} />
+          {check.view.bands && over && (
+            <ul aria-label={K.wholeFace} className="-mx-4 grid auto-cols-[calc((100%-2rem-24px)/4)] grid-flow-col gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:auto-cols-fr sm:px-0">
+              {READING_ORDER.map((m) => (
+                <li key={m} className="min-w-[84px]">
+                  <LevelTile metric={m} level={check.view!.bands!.find((b) => b.metric === m)!.band} slot={over.series.find((s) => s.metric === m)!.change} />
+                </li>
+              ))}
+            </ul>
+          )}
           {check.view.bands && (
             <div className="border-t border-brand-border pt-5">
               <KnownAndNotKnown />
@@ -271,21 +305,23 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
           </dl>
         </div>
       )}
-      <div className="flex flex-wrap gap-3 border-t border-brand-border pt-5">
-        {/* TD-29 (5): no way into Echo while it is switched off. */}
-        {newest ? (
-          echoOn() && (
-            <Link href="/echo" className={btnPrimary}>
-              {K.askEcho}
-            </Link>
-          )
-        ) : (
-          check.view && <p className="w-full text-sm text-brand-text-muted">{K.echoNewestOnly}</p>
-        )}
-        <Link href="/skin-check" className={btnSecondary}>
-          {C.newCheck}
-        </Link>
+      <div className="flex flex-col gap-3">
+        <h3 className={h2}>{K.nextTitle}</h3>
+        <div className={`${card} flex flex-col divide-y divide-brand-border !py-1`}>
+          <NextRow href="/routine" icon={ClipboardList} title={K.keepRoutine} body={K.keepRoutineBody} />
+          <NextRow href="/skin-check" icon={CalendarCheck} title={K.weekly} body={K.weeklyBody} />
+          {/* TD-29 (5): no way into Echo while it is switched off; Echo talks about the newest check only. */}
+          {newest && echoOn() && <NextRow href="/echo" icon={MessageCircle} title={K.askEcho} body={K.askEchoBody} />}
+        </div>
+        {!newest && check.view && <p className="text-sm text-brand-text-muted">{K.echoNewestOnly}</p>}
       </div>
+      <Link href="/routine" className={`${btnPrimary} w-full`}>
+        {ROUTINE_COPY.open}
+        <Arrow />
+      </Link>
+      <Link href="/skin-check" className={`${btnSecondary} w-full`}>
+        {C.newCheck}
+      </Link>
     </section>
   );
 }

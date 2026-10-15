@@ -29,9 +29,12 @@ export function uiFiles(dirs: string[]): string[] {
 /** A Tailwind class list, not words a user reads ("animate-in fade-in" is not the banned "fade"). */
 const isClassList = (s: string) => /(^|\s)(flex|grid|rounded|text-|bg-|border|px-|py-|inset-|object-|animate-|absolute|relative|h-|w-)/.test(s);
 
+// TD-51 (owner 2026-10-15): the names "Skin Twin" and "Progress" are allowed on screen; Echo's
+// lexicon still refuses them in Gemini's words, so only these exact names are taken out first.
+const TD51 = /\bSkin Twin\b|\bProgress\b/g;
 const problems = (text: string) => isClassList(text) ? [] : [
   ...bannedWordsIn(text),
-  ...Object.entries({ CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST }).filter(([, re]) => re.test(text)).map(([n]) => n),
+  ...Object.entries({ CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST }).filter(([, re]) => re.test(text.replace(TD51, ""))).map(([n]) => n),
 ];
 
 /** "scan" as a word a user reads; paths, imports and identifiers (scanId) are not on screen. */
