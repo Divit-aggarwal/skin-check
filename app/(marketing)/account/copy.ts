@@ -30,26 +30,105 @@ export const ACCOUNT_COPY = {
     back: "Back to your account",
     title: "Notifications",
     intro: "What we may send you, and when you get it.",
-    // G31: per-type choices are shown, never saved, until the backend exists.
-    typesTitle: "Reminder types",
-    typesNote: "These choices come later. Nothing here is saved yet.",
+    // Matches the WAITS_ON lines of types that wait (tests/design/redesign-account.shots.ts).
     later: "Comes later",
-    groups: [
-      { title: "Routine", items: ["Morning routine", "Evening routine"] },
-      { title: "Checks", items: ["Weekly check"] },
-      { title: "Products", items: ["Product reminders"] },
-      { title: "Updates", items: ["Weekly summary", "Tips from Echo"] },
-      { title: "Offers (optional)", items: ["Product launches and offers"] },
-    ],
   },
 
-  // Redesign 22: privacy and data.
-  privacy: {
-    // H36: DRAFT wording; legal review (H29) before any of this goes live.
-    choicesTitle: "More sharing choices",
-    choicesTag: "Draft",
-    choices: ["Processing my photos", "Personalising my routine and Echo", "Echo using my past checks", "Research without my name", "Product news and offers"],
-    // H37
-    exportRow: "Download my data",
+  // Mockup 21 (G37): the profile from stored fields only (H38 phone, city, the newest check's answers).
+  profile: {
+    title: "Profile and settings",
+    intro: "What we have stored about you, from your sign-in and your checks.",
+    back: "Back to Today",
+    personalTitle: "About you",
+    personalNote: "From your sign-in and the answers in your newest check.",
+    skinNote: "From your newest check with answers. Each check keeps its own answers; you can give new ones at your next check.",
+    skinEmpty: "No answers stored yet. You can answer the questions at your next check.",
+    loading: "Loading your profile…",
+    loadFailed: "Your answers could not be loaded. Refresh the page to try again.",
+    appTitle: "App settings",
+    phone: "Phone",
+    phoneEnding: (last4: string) => `Ending ${last4}`,
+    fields: {
+      name: "Name",
+      age: "Age",
+      gender: "Gender",
+      skin_type: "Skin type",
+      primary_concerns: "Main concerns",
+      skin_tone: "Sun response",
+      skin_factors: "Lifestyle factors",
+    },
   },
+
+  // Mockup 20 (G31, behind notificationTypesUi()): per-type switches from lib/feature-contracts/notifications.ts.
+  notify: {
+    title: "Notifications and reminders",
+    intro: "Choose what we may remind you about.",
+    loading: "Loading your choices…",
+    loadFailed: "Your choices could not be loaded.",
+    retry: "Try again",
+    saveFailed: "That did not save. Please try again.",
+    notSendable: "This one cannot be switched on yet.",
+    needsConsent: "Turn on marketing messages under Privacy first.",
+    notAllowed: "This account cannot change reminders.",
+    tooMany: "Too many changes at once. Please wait a minute and try again.",
+    everyDay: (day: string) => `Every ${day}`,
+    days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
+    sections: {
+      routine: { title: "Daily routine reminders", note: "A reminder to follow your routine." },
+      checkin: { title: "Weekly check-in", note: "A reminder to take your weekly check." },
+      products: { title: "Product usage reminders", note: "A reminder for one product." },
+      updates: { title: "Insights and updates", note: "News about your checks and the app." },
+      marketing: { title: "Marketing and offers (optional)", note: "New products and offers." },
+    },
+    types: {
+      routine_morning: { label: "Morning routine", note: "Your morning steps." },
+      routine_evening: { label: "Evening routine", note: "Your evening steps." },
+      weekly_checkin: { label: "Weekly skin check-in", note: "Take your photos for the week." },
+      product_usage: { label: "Product reminders", note: "" },
+      weekly_summary: { label: "Weekly summary", note: "" },
+      recommendations: { label: "Routine and product suggestions", note: "" },
+      echo_tips: { label: "Tips from Echo", note: "" },
+      marketing: { label: "Product launches and offers", note: "" },
+    },
+    noProducts: "No product reminders stored.",
+  },
+
+  // Mockup 22 (H36 behind consentsUi(), H37 behind dataExportUi()).
+  data: {
+    title: "Privacy and data controls",
+    intro: "What we keep, how it is used, and how to get a copy or delete it.",
+    yoursTitle: "Your data",
+    yoursNote: "Where to see what is stored.",
+    manage: "Manage",
+    rows: [
+      { key: "photos", label: "Skin photos", note: "Photos you chose to keep.", href: "/checks?view=photos" },
+      { key: "checks", label: "Skin check readings", note: "The readings from each check.", href: "/checks" },
+      { key: "routine", label: "Routine", note: "The steps you logged.", href: "/routine" },
+      { key: "answers", label: "Your answers", note: "Skin type, concerns and lifestyle.", href: "/account?tab=skin" },
+      { key: "echo", label: "Echo conversations", note: "Your questions and Echo's replies.", href: "/echo" },
+    ],
+    controlsTitle: "Data controls",
+    controlsNote: "Choose how your data is used.",
+    draft: "Draft wording",
+    loading: "Loading your choices…",
+    loadFailed: "Your choices could not be loaded.",
+    retry: "Try again",
+    saveFailed: "That did not save. Please try again.",
+    stale: "This wording has changed. The page has been refreshed; please choose again.",
+    downloadTitle: "Download or delete your data",
+    downloadNote: "Get a copy of your data, or delete it.",
+    exportNote: "A file with your checks, answers and choices. Photo links in it work for one hour.",
+    exporting: "Preparing your file…",
+    exportDone: "Your file has been saved.",
+    exportTooMany: "You can download your data 3 times a day.",
+    tryAgainIn: (n: number, unit: "hour" | "minute") => `Please try again in about ${n} ${unit}${n === 1 ? "" : "s"}.`,
+    tryAgainLater: "Please try again later.",
+    exportNotAllowed: "This account is being deleted, so there is nothing to download.",
+    exportFailed: "Your file could not be made. Please try again.",
+    deleteRow: "Delete my data",
+    deleteNote: "Remove your account and data for good.",
+  },
+
+  // Redesign 22: privacy and data (H37).
+  privacy: { exportRow: "Download my data" },
 } as const;
