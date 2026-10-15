@@ -17,7 +17,6 @@ import { ProductTile, productHref } from "@/components/products/ProductTile";
 import { ProductPhoto } from "@/components/products/ProductPhoto";
 import { useStoreProducts } from "@/components/products/useStoreProducts";
 import { timeZone, useRoutine } from "./useRoutine";
-import type { StoreImage } from "@/lib/feature-contracts/store-products";
 
 // The user's own routine record (R-1 A): today's four steps for morning and
 // evening, adding a product (an empty step links here with its step and slot),
@@ -35,7 +34,7 @@ const rank = (id: string) => {
 };
 const field = "h-12 w-full min-w-0 max-w-full rounded-lg border border-brand-border bg-brand-surface px-3 text-base text-brand-text";
 
-export function RoutinePage({ photos = {} }: { photos?: Record<string, StoreImage> }) {
+export function RoutinePage() {
   const { user, loading } = useAuth();
   const { data, failed, busy, send } = useRoutine();
   const [slot, setSlot] = useState<Slot>(() => slotNow(new Date(), timeZone()));
@@ -85,7 +84,7 @@ export function RoutinePage({ photos = {} }: { photos?: Record<string, StoreImag
           {guided && pending.length > 0 ? (
             <GuidedStep entries={entries} slot={slot} busy={busy} send={send} onExit={() => setGuided(false)} />
           ) : (
-            <SlotSteps data={data} slot={slot} busy={busy} send={send} photos={photos} />
+            <SlotSteps data={data} slot={slot} busy={busy} send={send} store={store} />
           )}
         </section>
         {!guided && pending.length > 0 && (

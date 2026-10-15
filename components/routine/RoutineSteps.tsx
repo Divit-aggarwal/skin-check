@@ -1,13 +1,13 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { Check, Plus } from "lucide-react";
 import { getProduct } from "@/lib/catalog/catalogue";
 import { ROUTINE_COPY as C } from "@/lib/routine/copy";
 import { OTHER_PRODUCT_ID as OTHER, UNDO_STATUS } from "@/lib/routine/events";
-import { ProductTile, StatusMark, type StepStatus } from "@/components/ui/kit";
-import type { StoreImage } from "@/lib/feature-contracts/store-products";
+import { StatusMark, type StepStatus } from "@/components/ui/kit";
+import { ProductPhoto } from "@/components/products/ProductPhoto";
+import type { StoreCard } from "@/components/products/useStoreProducts";
 import type { RoutineData } from "./useRoutine";
 
 // The store's four steps, shown for one time of day at a time (redesign
@@ -80,15 +80,8 @@ export function LogButtons({ productId, name, slot, status, busy, send, large = 
 
 const badge = "grid size-9 shrink-0 place-items-center rounded-full bg-brand-100 text-base font-semibold text-brand-700";
 
-/** Screen 03: the product's store photo (TD-52), else its step tile. Decorative: the name is beside it. */
-function ProductPhoto({ productId, photos }: { productId: string; photos: Record<string, StoreImage> }) {
-  const photo = photos[productId];
-  if (!photo) return <ProductTile step={stepOf(productId)} size={64} />;
-  return <Image src={photo.src} width={photo.width} height={photo.height} alt="" sizes="64px" className="size-16 shrink-0 rounded-tile bg-brand-50 object-contain" />;
-}
-
 /** One slot: the four steps in order, then products not in a step. */
-export function SlotSteps({ data, slot, busy, send, photos = {} }: { data: RoutineData; slot: Slot; busy: boolean; send: Send; photos?: Record<string, StoreImage> }) {
+export function SlotSteps({ data, slot, busy, send, store }: { data: RoutineData; slot: Slot; busy: boolean; send: Send; store?: StoreCard[] | null | undefined }) {
   const nameOf = nameIn(data);
   const statusOf = statusIn(data, slot);
   const inSlot = data.routine.filter((i) => i.schedule.slot === slot || i.schedule.slot === "AM_PM");
@@ -102,7 +95,8 @@ export function SlotSteps({ data, slot, busy, send, photos = {} }: { data: Routi
     return (
       <div key={productId} data-routine-entry className="flex flex-col gap-3">
         <div className="flex items-start gap-3">
-          <ProductPhoto productId={productId} photos={photos} />
+          {/* Screen 03: the store photo (TD-52, lane C's ProductPhoto), else the step tile. */}
+          <ProductPhoto image={store?.find((p) => p.productId === productId)?.images[0]} step={stepOf(productId)} width={64} />
           <div className="min-w-0 flex-1">
             {head}
             <p className="break-words text-brand-text-muted">{name}</p>
