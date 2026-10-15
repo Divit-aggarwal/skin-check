@@ -29,3 +29,8 @@ the check flow's own back button (lane B) stays as built, because
 `questionnaire.spec.ts` pins its disabled-and-hidden first-screen state; the
 Photos view keeps `Thumb`'s image (lane A). Both are follow-ups, not new local
 patterns.
+
+## Mockup-match (G37)
+
+| # | Agent | Request | Why / screen | Status |
+|---|---|---|---|---|
