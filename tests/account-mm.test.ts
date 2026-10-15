@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { exportFileName, fetchExport, retryIn, getConsents, getPrefs, optimistic, patchType, postConsent, rowState, timeLabel } from "@/app/(marketing)/account/accountApi";
+import { exportFileName, fetchExport, retryIn, getConsents, getPrefs, optimistic, patchType, postConsent, rowState } from "@/app/(marketing)/account/accountApi";
 import { answerText, initials, profileFrom } from "@/app/(marketing)/account/profile";
 import { ACCOUNT_COPY } from "@/app/(marketing)/account/copy";
 import { consentsFixture, dataExportFixture, notificationPrefsFixture } from "@/lib/feature-contracts/fixtures";
@@ -49,11 +49,10 @@ describe("notifications (20)", () => {
     expect(ok).toEqual([true]);
   });
 
-  it("shows times as on a phone", () => {
-    expect(timeLabel("08:00")).toBe("8:00 AM");
-    expect(timeLabel("21:00")).toBe("9:00 PM");
-    expect(timeLabel("00:05")).toBe("12:05 AM");
-    expect(timeLabel("12:30")).toBe("12:30 PM");
+  it("never shows a clock time: the daily push picks its own hour", () => {
+    const src = readFileSync("app/(marketing)/account/NotificationsScreen.tsx", "utf8");
+    expect(src).not.toMatch(/morningTime|eveningTime|AM"|PM"/);
+    expect(ACCOUNT_COPY.notify.weekly("Sunday")).toBe("Sundays");
   });
 });
 

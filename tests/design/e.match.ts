@@ -42,7 +42,9 @@ test("account screens 20, 21, 22", async ({ page }, info) => {
   if (FLAGS) {
     await expect(page.getByRole("switch", { name: A.notify.types.weekly_checkin.label })).toHaveAttribute("aria-checked", "true");
     await expect(page.getByRole("switch", { name: A.notify.types.routine_evening.label })).toHaveAttribute("aria-disabled", "true");
-    await expect(page.getByText(A.notify.everyDay("Sunday"))).toBeVisible();
+    await expect(page.getByText(A.notify.weekly("Sunday"))).toBeVisible();
+    await expect(page.getByText(A.notify.onceADay).first()).toBeVisible();
+    await expect(page.getByText(/\d:\d\d (AM|PM)/)).toHaveCount(0);
   }
   await settle(page);
   await matchShot(page, info, "20-notifications");
