@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { checkRequestRate, type PublicRouteLimits } from "@/lib/rate-limit";
 import { adminDb, AdminNotConfiguredError, bearerToken, verifyFirebaseIdToken } from "@/lib/firebase/admin";
 import { isPlainUid, isValidScanId, scanImageKey } from "@/lib/s3-key";
+import { sideImageKey, SIDE_ANGLES, type SideAngle } from "@/lib/feature-contracts/check-photos";
 import { originalExists, presignOriginalRead, READ_URL_TTL_SECONDS, S3NotConfiguredError } from "@/lib/s3";
 
 // firebase-admin and the AWS SDK both need Node APIs.
@@ -13,6 +14,7 @@ export const dynamic = "force-dynamic";
 // kept photo, as a small image on the Checks list and the opened check.
 //
 //   GET /api/checks/photo?scanId=<id>   Authorization: Bearer <Firebase ID token>
+//   GET /api/checks/photo?scanId=<id>&angle=left|right   a side photo (C10); front when absent
 //   200 { url, expiresIn }   a presigned GET for 60 seconds
 //   404 { code: "NO_PHOTO" } nothing kept (or not this user's, or erased): the screen shows nothing
 //
@@ -60,15 +62,20 @@ export async function GET(request: NextRequest) {
 
   const scanId = request.nextUrl.searchParams.get("scanId");
   if (!isValidScanId(scanId) || !isPlainUid(uid)) return noPhoto();
+  // C10: an unknown angle is the same "no" as everything else.
+  const angle = request.nextUrl.searchParams.get("angle") ?? "front";
+  if (angle !== "front" && !SIDE_ANGLES.includes(angle as SideAngle)) return noPhoto();
 
   try {
     const user = adminDb().collection("users").doc(uid);
     const [erased, check] = await Promise.all([adminDb().collection("erasedAccounts").doc(uid).get(), user.collection("skinChecks").doc(scanId).get()]);
     if (erased.exists) return noPhoto();
-    const image = check.exists ? (check.get("image") as { stored?: unknown } | null | undefined) : null;
+    // A side photo counts only when the record's own sideImages says it was kept.
+    const field = angle === "front" ? "image" : `sideImages.${angle}`;
+    const image = check.exists ? (check.get(field) as { stored?: unknown } | null | undefined) : null;
     if (!image || image.stored !== true) return noPhoto();
 
-    const key = scanImageKey(uid, scanId);
+    const key = angle === "front" ? scanImageKey(uid, scanId) : sideImageKey(uid, scanId, angle as SideAngle);
     if (!(await originalExists(key))) return noPhoto();
     const url = await presignOriginalRead(key);
     // The URL is never logged: it is a bearer capability until it expires.
