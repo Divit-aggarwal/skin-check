@@ -2,9 +2,23 @@
 // weekly check-in preview, in one place for tests/ui-wording.test.ts.
 
 export const START_COPY = {
-  title: "Take your skin check",
-  // One photo per check (C10 parked); the questions stay optional (TD-33, TD-44).
+  title: "Take your weekly skin check",
+  // One photo per check unless the three-angle capture is on (C10); the questions stay optional (TD-33, TD-44).
   intro: "One photo of your face, then a few questions if you choose to answer them.",
+  introThree: "Just 3 photos, then a few questions if you choose to answer them.",
+  tipThree: "Use natural light and a bare face, in the same place each week.",
+  anglesTitle: "The photos in this check",
+  angles: [
+    { id: "front", label: "Front" },
+    { id: "left", label: "Left cheek" },
+    { id: "right", label: "Right cheek" },
+  ],
+  // Mockup: "Your progress". TD-51 allows the word, but the D-12 test still applies the CHANGE lexicon here (hand-back question).
+  progressTitle: "Your photos",
+  history: "View history",
+  noPhotos: "Photos you choose to keep show here.",
+  justNow: "Just now",
+  photoAlt: (date: string) => `Your photo from ${date}`,
   lastTitle: "Last check",
   firstTitle: "No check yet",
   tipLabel: "Tip",

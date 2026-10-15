@@ -18,8 +18,8 @@ import { QuestionsChoice, SkippedNote } from "./QuestionsChoice";
 import { hasQuestionAnswers, QUESTION_SECTION_IDS } from "@/lib/skin-check-validation";
 import { btnSecondary, card, eyebrow, textLink } from "@/components/ui/page";
 import { Wordmark } from "@/components/ui/kit";
-import { weeklyCheckinUi } from "@/lib/ui-flags";
-import { LastCheckCard, PhotoTip } from "./CheckStart";
+import { threeAngleUi, weeklyCheckinUi } from "@/lib/ui-flags";
+import { LastCheckCard, StartOverview } from "./CheckStart";
 import { WeeklyCheckin } from "./WeeklyCheckin";
 import { START_COPY } from "./flowCopy";
 
@@ -227,11 +227,10 @@ export function SkinCheckFlow() {
             className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pb-10 pt-2 sm:px-6"
           >
             {/* Screen 05: what this check is, the last check, the choice (TD-44), a tip. */}
-            <p className="text-brand-text-muted">{START_COPY.intro}</p>
+            <p className="text-[17px] leading-snug text-brand-text-muted">{threeAngleUi() ? START_COPY.introThree : START_COPY.intro}</p>
             {/* The choice first, so its buttons are on the first screen at 375px (owner answer 5). */}
             <QuestionsChoice answers={answers} onChoose={chooseQuestions} />
-            <LastCheckCard />
-            <PhotoTip />
+            <StartOverview />
             {weeklyCheckinUi() && (
               <button type="button" onClick={() => setCheckin({ scanId: null })} className={btnSecondary}>
                 {START_COPY.checkinOpen}
