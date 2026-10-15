@@ -41,7 +41,7 @@ export function ProgressHeader({
       )}
       {/* The page's one h1: the part of the check the user is in. */}
       {/* The start of a check (05) has the mockup's larger title. */}
-      <h1 className={showBar ? "text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text text-balance sm:text-[32px]" : "text-[34px] font-bold leading-[1.05] tracking-[-0.025em] text-brand-text text-balance"}>
+      <h1 className={showBar ? "text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text text-balance sm:text-[32px]" : "text-[29px] font-bold leading-[1.1] tracking-[-0.025em] text-brand-text text-balance"}>
         {sentence(activeSectionLabel)}
       </h1>
     </div>

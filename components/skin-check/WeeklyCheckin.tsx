@@ -70,10 +70,10 @@ export function WeeklyCheckin({ onClose, scanId }: { onClose: () => void; scanId
       {scanId && <Stepper steps={[...C.steps]} current={1} />}
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h1 ref={titleRef} tabIndex={-1} className="text-[34px] font-bold leading-[1.05] tracking-[-0.025em] text-brand-text outline-none">
+          <h1 ref={titleRef} tabIndex={-1} className="text-[27px] font-bold leading-[1.1] tracking-[-0.025em] text-brand-text outline-none">
             {C.title}
           </h1>
-          <p className="mt-1 text-[17px] leading-snug text-brand-text-muted">{C.intro}</p>
+          <p className="mt-1 text-sm leading-snug text-brand-text-muted">{C.intro}</p>
         </div>
         <IconWell icon={ClipboardList} size={80} className="bg-brand-50" />
       </div>
