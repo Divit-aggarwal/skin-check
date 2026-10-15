@@ -1,5 +1,4 @@
 import { z } from "zod";
-import type { SideAngle } from "@/lib/feature-contracts/check-photos";
 import { getIdToken } from "firebase/auth";
 import { auth } from "@/lib/firebase/client";
 import { IMAGE_RETENTION_CONSENT_VERSION } from "@/lib/consent";
@@ -171,7 +170,7 @@ const UPLOAD_TIMEOUT_MS = 120_000;
  * The client picks neither the uid, the bucket, nor the key: it sends a
  * scanId and gets back a URL that can only write one object.
  */
-export async function uploadOriginalImage(scanId: string, original: Blob, angle?: SideAngle): Promise<void> {
+export async function uploadOriginalImage(scanId: string, original: Blob, angle?: "left" | "right"): Promise<void> {
   // TD-18 (3): the cap is 25 MB; say so plainly, before asking for a URL.
   if (original.size > MAX_ORIGINAL_BYTES) throw new ApiError(413, UPLOAD_TOO_LARGE_MESSAGE, "upload/too-large");
   const idToken = await freshIdToken();
