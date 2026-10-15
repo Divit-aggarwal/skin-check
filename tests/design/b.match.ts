@@ -18,7 +18,11 @@ test.use({
 });
 
 const choice = (page: Page) => page.getByRole("heading", { name: Q.title, exact: true });
-const settle = (page: Page) => page.waitForTimeout(700); // entrance animations
+// Entrance animations, then the top of the page (a click scrolls its target into view; the mockups show the top).
+const settle = async (page: Page, top = true) => {
+  if (top) await page.evaluate(() => window.scrollTo(0, 0));
+  await page.waitForTimeout(700);
+};
 
 // A returning user who answered starts at the photo step (TD-43); the choice screen (05) is for one who skipped.
 // No seeded user has both skipped questions and a kept photo, so the photos strip shows its empty state here.
@@ -35,7 +39,7 @@ test("05 start with the three angles and the user's own photos", async ({ page }
   await settle(page);
   await matchShot(page, info, "05-start");
   await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-  await settle(page);
+  await settle(page, false);
   await matchShot(page, info, "05-start-lower");
 });
 
@@ -106,7 +110,7 @@ test("07 guided capture: the stepper, live checks, three photos, then the usual 
   await expect(page.getByRole("img", { name: G.steps[2] })).toBeVisible();
   await page.getByRole("checkbox").first().check();
   await expect(page.getByRole("button", { name: "Analyze my skin" })).toBeVisible();
-  await page.getByRole("heading", { name: G.review }).scrollIntoViewIfNeeded();
-  await settle(page);
+  await page.getByRole("heading", { name: G.review }).evaluate((el) => el.scrollIntoView({ block: "start" }));
+  await settle(page, false);
   await matchShot(page, info, "07-review");
 });

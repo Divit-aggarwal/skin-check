@@ -314,7 +314,7 @@ export function SkinCheckFlow() {
             animate="center"
             exit="exit"
             transition={{ duration: 0.25, ease: [0.19, 1, 0.22, 1] }}
-            className="mx-auto flex max-w-2xl flex-col gap-10 px-4 pb-10 pt-6 sm:px-6"
+            className={`mx-auto flex max-w-2xl flex-col gap-10 px-4 pb-10 sm:px-6 ${guidedPhoto ? "pt-1" : "pt-6"}`}
           >
             {/* Screen 05 for a returning user (TD-43): the photo step is the start. */}
             {section.id === "skin-photo" && reusingSaved && !updating && <LastCheckCard />}

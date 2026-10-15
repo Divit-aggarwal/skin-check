@@ -177,7 +177,7 @@ export function GuidedCapture({ onDone, onFallback }: { onDone: (photos: GuidedP
   const nextAngle = ANGLES[step + 1];
   const ready = status === "active";
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-3">
       <Stepper steps={[...C.steps]} current={step} />
       <div>
         <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-brand-text">{C.title[angle]}</h2>
