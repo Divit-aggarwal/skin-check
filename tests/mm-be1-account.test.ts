@@ -263,7 +263,7 @@ describe("H36: GET/POST /api/account/consents", () => {
 
   // Known: product_improvement's contract title and copy say "improve" (BANNED_WORDS).
   // Kit request BE1-1 (docs/lanes/kit-requests.md). Turn back into it() when the copy changes.
-  it.fails("the consent copy carries no banned word", () => {
+  it("the consent copy carries no banned word", () => {
     expect(Object.values(CONSENT_TEXTS).flatMap((t) => bannedWordsIn(`${t.title} ${t.copy}`))).toEqual([]);
   });
 });

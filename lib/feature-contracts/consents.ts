@@ -4,7 +4,8 @@
 // at the current version wins. Texts are DRAFTS until the legal review (H29).
 //
 // What each withdrawal switches off in code:
-// - personalisation: the routine and Echo product suggestions (Echo still answers about readings).
+// - personalisation: Echo's product suggestions and its opening (Echo still answers about readings).
+//   The user's own routine record stays: it reads no checks and is their own log.
 // - ai_share (existing): Echo entirely.
 // - product_improvement, research: nothing reads them today (recorded only; no data leaves).
 // - marketing: the "marketing" notification type (contracts/notifications.ts).
@@ -33,9 +34,9 @@ export const CONSENT_TEXTS: Record<NewConsentPurpose, ConsentText> = {
     defaultGranted: true,
   },
   product_improvement: {
-    version: "product improvement DRAFT version 1",
-    title: "Use my data to improve Project Skin",
-    copy: "Let Project Skin use my checks to improve the app and its skin analysis.",
+    version: "product improvement DRAFT version 2",
+    title: "Use my data to develop Project Skin",
+    copy: "Let Project Skin use my checks to develop the app and its skin analysis.",
     defaultGranted: false,
   },
   research: {
