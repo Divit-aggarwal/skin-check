@@ -11,7 +11,7 @@ import { matchShot } from "./match";
 //   NEXT_PUBLIC_UI_THREE_ANGLE=on NEXT_PUBLIC_UI_WEEKLY_CHECKIN=on \
 //   PW_ARGS="-c tests/design/match.config.ts tests/design/b.match.ts" bash scripts/with-stack-slot.sh npm run test:browser
 // The fake camera shows the fixture face (make .local-stack/fake-face.y4m as in tests/design/playwright.config.ts).
-// Nothing is saved: the check-in POST is answered here (BE3's route is not in this branch) and no photo is analysed.
+// The check-in goes to the real route (one per week for the seeded user); no photo is analysed or saved.
 test.use({
   permissions: ["camera"],
   launchOptions: { args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", "--use-file-for-fake-video-capture=.local-stack/fake-face.y4m"] },
@@ -34,13 +34,9 @@ test("05 start with the three angles and the user's own photos", async ({ page }
   await matchShot(page, info, "05-start-lower");
 });
 
-test("08 check-in: answers, saved, already this week", async ({ page }, info) => {
-  let status = 201;
-  const bodies: unknown[] = [];
-  await page.route((url) => url.pathname === "/api/checkins", async (route) => {
-    bodies.push(route.request().postDataJSON());
-    await route.fulfill({ status, contentType: "application/json", body: "{}" });
-  });
+test("08 check-in: answers, saved, already this week (BE3's real route)", async ({ page }, info) => {
+  const posts: unknown[] = [];
+  page.on("request", (r) => r.method() === "POST" && new URL(r.url()).pathname === "/api/checkins" && posts.push(r.postDataJSON()));
   await signIn(page, MESH_SEED.kept.phoneNumber);
   await page.goto("/skin-check");
   await expect(choice(page)).toBeVisible({ timeout: 60_000 });
@@ -49,21 +45,23 @@ test("08 check-in: answers, saved, already this week", async ({ page }, info) =>
   // Nothing answered: the button says why and sends nothing.
   await expect(page.getByText(C.pickOne)).toBeVisible();
   await page.getByRole("button", { name: C.save }).click();
-  expect(bodies).toHaveLength(0);
+  expect(posts).toHaveLength(0);
   for (const name of ["A bit better", "None", "Fading", "No", "Balanced"]) await page.getByRole("radio", { name, exact: true }).first().click();
   await settle(page);
   await matchShot(page, info, "08-checkin");
   await page.getByRole("button", { name: C.save }).click();
-  await expect(page.getByRole("heading", { name: C.savedTitle })).toBeVisible();
-  expect(bodies[0]).toMatchObject({ answers: { overall: "bit_better", new_breakouts: "none", existing_spots: "fading", routine_changed: "no", skin_feel: "balanced" } });
-  await matchShot(page, info, "08-saved");
+  // One check-in per week for this user: the first width to run saves it, the others see "already".
+  const saved = page.getByRole("heading", { name: C.savedTitle });
+  const already = page.getByRole("heading", { name: C.alreadyTitle });
+  await expect(saved.or(already)).toBeVisible({ timeout: 30_000 });
+  expect(posts[0]).toMatchObject({ answers: { overall: "bit_better", new_breakouts: "none", existing_spots: "fading", routine_changed: "no", skin_feel: "balanced" } });
+  if (await saved.isVisible()) await matchShot(page, info, "08-saved");
 
-  status = 409;
   await page.getByRole("button", { name: C.done }).click();
   await page.getByRole("button", { name: S.checkinOpen }).click();
   await page.getByRole("radio", { name: "Dry", exact: true }).click();
   await page.getByRole("button", { name: C.save }).click();
-  await expect(page.getByRole("heading", { name: C.alreadyTitle })).toBeVisible();
+  await expect(already).toBeVisible({ timeout: 30_000 });
   await matchShot(page, info, "08-already");
 });
 
