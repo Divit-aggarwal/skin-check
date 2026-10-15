@@ -164,8 +164,9 @@ export function SkinCheckFlow() {
     <div className="min-h-dvh bg-brand-bg">
       {/* Back and the Home link share a row above the progress bar, so the bar
           and every question start on the same edge (design review G03). */}
-      <div ref={headerRef} className={`mx-auto flex flex-col gap-2 px-4 pt-4 sm:px-6 sm:pt-6 ${complete ? "max-w-6xl lg:px-8" : "max-w-2xl"}`}>
-        <div className="grid min-h-11 grid-cols-[1fr_auto_1fr] items-center">
+      <div ref={headerRef} className={`mx-auto flex flex-col gap-2 px-4 sm:px-6 sm:pt-2 ${complete ? "max-w-6xl lg:px-8" : "max-w-2xl"}`}>
+        {/* The kit header's height (AppHeader, h-14), so every screen's wordmark sits in one place. */}
+        <div className="grid h-14 grid-cols-[1fr_auto_1fr] items-center">
           <button
             type="button"
             onClick={back}

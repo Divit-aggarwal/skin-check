@@ -140,7 +140,7 @@ export function GuidedCapture({ onDone, onFallback }: { onDone: (photos: GuidedP
     if (status === "denied") onFallback("denied");
     else if (status === "unavailable") onFallback("unavailable");
     else if (status === "error") onFallback("failed");
-    else if (status === "active") shutterRef.current?.focus();
+    else if (status === "active") shutterRef.current?.focus({ preventScroll: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
   // Object URLs of the thumbnails go with the component.
@@ -183,7 +183,7 @@ export function GuidedCapture({ onDone, onFallback }: { onDone: (photos: GuidedP
         <h2 className="text-[28px] font-semibold leading-tight tracking-[-0.02em] text-brand-text">{C.title[angle]}</h2>
         <p className="mt-1 text-[17px] leading-snug text-brand-text-muted">{C.intro}</p>
       </div>
-      <div className="relative aspect-[5/6] w-full overflow-hidden rounded-card bg-brand-900">
+      <div className="relative -mx-1 aspect-[5/6] overflow-hidden rounded-card bg-brand-900">
         <video ref={videoRef} aria-label={K.previewLabel} aria-hidden={!ready} className="absolute inset-0 h-full w-full object-cover" playsInline muted autoPlay />
         <canvas ref={canvasRef} className="hidden" />
         {!ready && (

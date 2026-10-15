@@ -49,7 +49,9 @@ test("08 check-in: answers, saved, already this week (BE3's real route)", async 
   await expect(page.getByRole("heading", { level: 1, name: C.title })).toBeVisible();
   // Nothing answered: the button says why and sends nothing.
   await expect(page.getByText(C.pickOne)).toBeVisible();
-  await page.getByRole("button", { name: C.save }).click();
+  // aria-disabled (still focusable): a tap goes through to the handler, which sends nothing.
+  await page.getByRole("button", { name: C.save }).dispatchEvent("click");
+  await page.waitForTimeout(300);
   expect(posts).toHaveLength(0);
   for (const name of ["A bit better", "None", "Fading", "No", "Balanced"]) await page.getByRole("radio", { name, exact: true }).first().click();
   await settle(page);
