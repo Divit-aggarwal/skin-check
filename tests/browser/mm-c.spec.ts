@@ -36,7 +36,10 @@ test("16: readings from the start day on, closed change slots, own photos; 15 li
   // Three checks after the start day (the one 35 days ago is before it): every slot is closed (C12).
   await expect(page.getByText("Needs more checks")).toHaveCount(5);
   await expect(page.getByRole("table").first().getByRole("row")).toHaveCount(3);
-  await expect(page.getByRole("region", { name: C.photos }).or(page.locator("section", { has: page.getByRole("heading", { name: C.photos }) })).getByRole("img")).toHaveCount(3, { timeout: 20_000 });
+  // Real <img> elements: a photo that fails to load becomes a text tile instead (PhotoTile).
+  const photos = page.locator("section", { has: page.getByRole("heading", { name: C.photos }) }).locator("img");
+  await expect(photos).toHaveCount(3, { timeout: 20_000 });
+  for (const img of await photos.all()) await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
   await expect(page.getByText(/working|improving|response|insight/i)).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });

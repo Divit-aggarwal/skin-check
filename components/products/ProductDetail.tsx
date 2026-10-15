@@ -39,23 +39,25 @@ export function ProductDetail({ id, store }: { id: string; store: StoreProduct |
             <h1 className="break-words text-[28px] font-semibold leading-tight text-brand-text sm:text-[32px]">{p.name}</h1>
             <p className="text-brand-text-muted">{C.ownLine}</p>
           </div>
-          {!store?.images[0] && <ProductPhoto image={null} step={info?.step} width={96} />}
+          {/* The mockup's hero: the store's first photo beside the title; the rest below. */}
+          <ProductPhoto image={store?.images[0]} step={info?.step} width={store?.images[0] ? 144 : 96} height={store?.images[0] ? 176 : 96} alt={store?.images[0] ? C.photoAlt(p.name, 1) : ""} priority />
         </section>
 
-        {store && store.images.length > 0 && (
+        {store && store.images.length > 1 && (
           // A row of the store's photos, swiped sideways; the page itself never scrolls sideways.
           <section aria-label={C.gallery(p.name)} className="-mx-4 sm:mx-0">
             <ul className="flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:px-0">
-              {store.images.map((img, i) => (
-                <li key={img.src} className="w-[78%] shrink-0 snap-start sm:w-[48%]">
-                  <ProductPhoto image={img} step={info?.step} width={480} height={480} alt={C.photoAlt(p.name, i + 1)} priority={i === 0} className="aspect-square h-auto w-full rounded-card" />
+              {store.images.slice(1).map((img, i) => (
+                <li key={img.src} className="w-[42%] shrink-0 snap-start sm:w-[30%]">
+                  <ProductPhoto image={img} step={info?.step} width={320} height={320} alt={C.photoAlt(p.name, i + 2)} className="aspect-square h-auto w-full rounded-tile" />
                 </li>
               ))}
             </ul>
           </section>
         )}
 
-        {p.availability !== "available" && (
+        {/* The catalogue's stock line only when the store (live stock) was not read. */}
+        {!store && p.availability !== "available" && (
           <p role="status" className="rounded-card bg-brand-50 px-4 py-3 text-brand-text">
             {p.availability === "out_of_stock" ? C.outOfStock : C.discontinued}
           </p>
