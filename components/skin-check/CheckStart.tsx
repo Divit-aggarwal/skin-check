@@ -5,14 +5,14 @@ import Link from "next/link";
 import { CalendarCheck, ChevronRight, Lightbulb, ScanFace } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { threeAngleUi } from "@/lib/ui-flags";
-import { PHOTO_ROUTE } from "@/lib/feature-contracts/check-photos";
+import { PHOTO_ROUTE, type CaptureAngle } from "@/lib/feature-contracts/check-photos";
 import { CHECK_INTERVAL_RULE, nextCheck, type NextCheck } from "@/lib/home/schedule";
 import { loadDashboard } from "@/components/dashboard/data";
 import { deriveDashboard, type HistoryRow } from "@/components/dashboard/state";
 import { lastReadingDate } from "@/components/dashboard/HomeCards";
 import { formatDate } from "@/components/dashboard/format";
 import { HOME_COPY as H } from "@/components/dashboard/homeCopy";
-import { PhotoStrip, Skel, TintCard } from "@/components/ui/kit";
+import { PhotoStrip, PhotoTile, Skel, TintCard } from "@/components/ui/kit";
 import { textLink } from "@/components/ui/page";
 import { START_COPY as S } from "./flowCopy";
 
@@ -87,17 +87,59 @@ export function PhotoTip() {
   return <TintCard icon={Lightbulb} title={<span className="sr-only">{S.tipLabel}</span>} body={threeAngleUi() ? S.tipThree : H.next.tip} />;
 }
 
-/** Three-angle capture only: what this check will take. Outlines, never a photo of anyone. */
-function AnglesRow() {
+/** A short-lived link to one of the user's own kept photos, or null (nothing kept, not theirs, or any failure). */
+async function keptPhotoUrl(token: string, scanId: string, angle: CaptureAngle = "front"): Promise<string | null> {
+  try {
+    const q = `scanId=${encodeURIComponent(scanId)}${angle === "front" ? "" : `&angle=${angle}`}`;
+    const res = await fetch(`${PHOTO_ROUTE}?${q}`, { headers: { authorization: `Bearer ${token}` }, cache: "no-store" });
+    const body = res.ok ? ((await res.json()) as { url?: unknown }) : null;
+    return typeof body?.url === "string" ? body.url : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The newest kept check's three photos (front, left, right), each null when it was not kept. */
+function useLastAngles(history: HistoryRow[] | null): Record<CaptureAngle, string | null> | null {
+  const { user } = useAuth();
+  const [urls, setUrls] = useState<Record<CaptureAngle, string | null> | null>(null);
+  useEffect(() => {
+    setUrls(null);
+    const row = history?.find((h) => h.photoClaimed);
+    if (!user || !row) return;
+    let active = true;
+    (async () => {
+      const token = await user.getIdToken().catch(() => null);
+      const [front, left, right] = token ? await Promise.all((["front", "left", "right"] as const).map((a) => keptPhotoUrl(token, row.scanId, a))) : [null, null, null];
+      if (active) setUrls({ front: front ?? null, left: left ?? null, right: right ?? null });
+    })();
+    return () => {
+      active = false;
+    };
+  }, [user, history]);
+  return urls;
+}
+
+/**
+ * Three-angle capture only: the three photos of a check. The user's own last
+ * kept photos when there are any (through /api/checks/photo?angle=), otherwise
+ * an outline. Never a photo of anyone else.
+ */
+function AnglesRow({ history }: { history: HistoryRow[] | null }) {
+  const urls = useLastAngles(history);
   return (
     <section aria-labelledby="angles-title">
       <h2 id="angles-title" className="sr-only">{S.anglesTitle}</h2>
       <ul className="grid grid-cols-3 gap-2">
         {S.angles.map((a) => (
           <li key={a.id} className="flex flex-col overflow-hidden rounded-tile border border-brand-border bg-brand-surface">
-            <span aria-hidden className="grid aspect-square place-items-center bg-brand-50 text-brand-700">
-              <ScanFace size={40} strokeWidth={1.5} />
-            </span>
+            {urls?.[a.id] ? (
+              <PhotoTile src={urls[a.id]!} alt={S.lastAngleAlt(a.label)} fallback={a.label} className="rounded-none [&_img]:aspect-square [&>div]:aspect-square" />
+            ) : (
+              <span aria-hidden className="grid aspect-square place-items-center bg-brand-50 text-brand-700">
+                <ScanFace size={40} strokeWidth={1.5} />
+              </span>
+            )}
             <span className="px-3 py-3 text-[15px] font-medium text-brand-text">{a.label}</span>
           </li>
         ))}
@@ -122,15 +164,10 @@ function useKeptPhotos(history: HistoryRow[] | null): Kept[] | null {
       const found = token
         ? await Promise.all(
             rows.map(async (h): Promise<Kept | null> => {
-              try {
-                const res = await fetch(`${PHOTO_ROUTE}?scanId=${encodeURIComponent(h.scanId)}`, { headers: { authorization: `Bearer ${token}` }, cache: "no-store" });
-                const body = res.ok ? ((await res.json()) as { url?: unknown }) : null;
-                if (typeof body?.url !== "string") return null;
-                const when = h.date ? capital(H.latest.ago(daysAgo(h.date))) : S.justNow;
-                return { key: h.scanId, src: body.url, alt: S.photoAlt(h.date ? formatDate(h.date) : S.justNow), label: when };
-              } catch {
-                return null;
-              }
+              const src = await keptPhotoUrl(token, h.scanId);
+              if (!src) return null;
+              const when = h.date ? capital(H.latest.ago(daysAgo(h.date))) : S.justNow;
+              return { key: h.scanId, src, alt: S.photoAlt(h.date ? formatDate(h.date) : S.justNow), label: when };
             })
           )
         : [];
@@ -173,7 +210,7 @@ export function StartOverview() {
   return (
     <>
       <LastCheckView last={last} />
-      {threeAngleUi() && <AnglesRow />}
+      {threeAngleUi() && <AnglesRow history={history} />}
       <PhotoTip />
       {/* Signed out there are no photos to show. */}
       {user && <KeptStrip history={history} />}

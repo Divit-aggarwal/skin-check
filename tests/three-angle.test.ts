@@ -13,23 +13,19 @@ const sides = { left: blob("l"), right: blob("r") };
 describe("cheek photo uploads", () => {
   it("without the retention consent nothing is uploaded and both say not stored", async () => {
     const upload = vi.fn();
-    expect(await uploadSides("u1", "s1", sides, false, upload)).toEqual({ left: { stored: false }, right: { stored: false } });
+    expect(await uploadSides("s1", sides, false, upload)).toEqual({ left: false, right: false });
     expect(upload).not.toHaveBeenCalled();
   });
   it("with it, each side goes up with its angle and gets its own key", async () => {
     const upload = vi.fn().mockResolvedValue(undefined);
-    expect(await uploadSides("u1", "s1", sides, true, upload)).toEqual({
-      left: { stored: true, storage: "s3", key: "users/u1/scans/s1/left.jpg" },
-      right: { stored: true, storage: "s3", key: "users/u1/scans/s1/right.jpg" },
-    });
+    expect(await uploadSides("s1", sides, true, upload)).toEqual({ left: true, right: true });
     expect(upload).toHaveBeenCalledWith("s1", sides.left, "left");
     expect(upload).toHaveBeenCalledWith("s1", sides.right, "right");
   });
   it("a failed side is not stored and never throws", async () => {
     const upload = vi.fn((_s: string, _b: Blob, angle: string) => (angle === "left" ? Promise.reject(new Error("x")) : Promise.resolve()));
-    const out = await uploadSides("u1", "s1", sides, true, upload);
-    expect(out.left).toEqual({ stored: false });
-    expect(out.right.stored).toBe(true);
+    const out = await uploadSides("s1", sides, true, upload);
+    expect(out).toEqual({ left: false, right: true });
   });
 });
 

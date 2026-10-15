@@ -304,7 +304,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     const captureMethod: CaptureMethod = captureMethodRef.current;
     const quality = flow.quality ?? undefined;
     // C10: the cheek photos upload beside the front (same retention consent) and are never sent for reading.
-    const sidesDone = sides ? uploadSides(user.uid, scanId, { left: sides.left.blob, right: sides.right.blob }, hasRetentionConsent) : Promise.resolve(undefined);
+    const sidesDone = sides ? uploadSides(scanId, { left: sides.left.blob, right: sides.right.blob }, hasRetentionConsent) : Promise.resolve(undefined);
 
     // Move on now; the scan runs in the background.
     onChange("done");
@@ -342,7 +342,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
       processingConsentVersion: PROCESSING_CONSENT_VERSION,
     })
       .then(async ({ result, originalStored }) => {
-        const sideImages = await sidesDone;
+        const sidesStored = await sidesDone;
         onScanChange(
           {
             status: "success",
@@ -354,13 +354,13 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
             retentionConsentVersion,
             quality,
             processingConsentVersion: PROCESSING_CONSENT_VERSION,
-            ...(sideImages ? { sideImages } : {}),
+            ...(sidesStored ? { sidesStored } : {}),
           },
           scanId
         );
       })
       .catch(async (err) => {
-        const sideImages = await sidesDone;
+        const sidesStored = await sidesDone;
         console.error("Skin scan failed:", err);
         // The engine refused the photo for a reason a retake fixes (O-5).
         const retakeReason = isRetakeError(err) ? retakeReasonFromServerCode(err.code) ?? undefined : undefined;
@@ -389,7 +389,7 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
           quality,
           retakeReason,
           processingConsentVersion: PROCESSING_CONSENT_VERSION,
-          ...(sideImages ? { sideImages } : {}),
+          ...(sidesStored ? { sidesStored } : {}),
         }, scanId);
       });
   }, [flow, hasRetentionConsent, onChange, onCommit, onScanChange, user, scanId, sides]);

@@ -19,6 +19,7 @@ export const START_COPY = {
   noPhotos: "Photos you choose to keep show here.",
   justNow: "Just now",
   photoAlt: (date: string) => `Your photo from ${date}`,
+  lastAngleAlt: (angle: string) => `${angle}, from your last kept check`,
   lastTitle: "Last check",
   firstTitle: "No check yet",
   tipLabel: "Tip",
