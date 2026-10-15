@@ -87,11 +87,8 @@ export function PhoneHome({
   const send = (d: DueStep, status: "used" | typeof UNDO_STATUS) => void routine.send({ type: "usage", productId: d.productId, slot: d.slot, status });
   const date = now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
-  // Mockup 01 sets the name on its own line.
-  const [helloA, helloB] = hello.includes(", ") ? [hello.slice(0, hello.indexOf(", ") + 1), hello.slice(hello.indexOf(", ") + 2)] : [hello, ""];
-
   return (
-    <main className="mx-auto flex w-full max-w-[600px] flex-col gap-2.5 px-4 pb-28 pt-1 sm:px-6 sm:pt-6">
+    <main className="mx-auto flex w-full max-w-[600px] flex-col gap-2 px-4 pb-28 pt-1 sm:px-6 sm:pt-6">
       {/* 1. Wordmark and Account (mockup 01), the date, the greeting. The mockup's line about
           the skin today is left out: Home never says how the skin is doing. */}
       <header className="flex flex-col">
@@ -101,13 +98,8 @@ export function PhoneHome({
         </div>
         <p className="mt-1 truncate text-[15px] text-brand-text-muted">{date}</p>
         <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text sm:text-[32px]">
-          {helloA}
-          {helloB && (
-            <>
-              {" "}
-              <span className="block">{helloB}</span>
-            </>
-          )}
+          {/* One line (mockup 01 breaks after the comma): home-v3's fold needs the room. */}
+          {hello}
         </h1>
       </header>
 
@@ -153,7 +145,7 @@ function Ring({ done, total }: { done: number; total: number }) {
   const c = 2 * Math.PI * r;
   const part = total > 0 ? done / total : 0;
   return (
-    <div role="img" aria-label={H.today.ringLabel(done, total)} className="size-12 shrink-0">
+    <div role="img" aria-label={H.today.ringLabel(done, total)} className="size-10 shrink-0">
       <svg viewBox="0 0 76 76" className="size-full -rotate-90" aria-hidden>
         <circle cx="38" cy="38" r={r} fill="none" strokeWidth="10" className="stroke-brand-100" />
         <circle cx="38" cy="38" r={r} fill="none" strokeWidth="10" strokeLinecap="round" strokeDasharray={c} strokeDashoffset={c * (1 - part)} className="stroke-brand-700 motion-safe:transition-[stroke-dashoffset] motion-safe:duration-base" />
@@ -195,31 +187,31 @@ function TodayCard({
   const slotName = ROUTINE_COPY.slot[action.kind === "step" ? action.step.slot : "AM"];
   const left = action.kind === "step" ? steps.filter((d) => d.slot === action.step.slot && d.status !== "used").length : 0;
 
-  const tile = `${card} flex min-w-0 flex-col gap-2 !p-3.5`;
+  const tile = `${card} flex min-w-0 flex-col gap-1.5 !p-3`;
   return (
-    <section aria-labelledby="today-title" className="flex flex-col gap-2.5">
+    <section aria-labelledby="today-title" className="flex flex-col gap-2">
       <h2 id="today-title" className="sr-only">
         {H.today.title}
       </h2>
 
       {/* Your next step: the one main action (lib/home/today.ts mainAction). No product picture (the brief keeps the kit hero). */}
-      <div className={`${heroCard} flex flex-col !px-5 !py-4`}>
+      <div className={`${heroCard} flex flex-col !px-5 !py-3`}>
         <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/80">{H.today.heroEyebrow}</p>
         {action.kind === "allDone" || action.kind === "slotDone" ? (
-          <p role="status" className="mt-1.5 flex items-center gap-2 text-[26px] font-semibold leading-tight">
+          <p role="status" className="mt-1 flex items-center gap-2 text-[24px] font-semibold leading-tight">
             <Check aria-hidden size={22} />
             {action.kind === "allDone" ? H.today.allDone : H.today.slotDone[steps.find((s) => s.status === "used")?.slot ?? "AM"]}
           </p>
         ) : (
-          <p className="mt-1.5 text-[26px] font-semibold leading-tight">{action.kind === "check" ? H.today.heroCheck : action.kind === "step" ? H.today.heroStep(slotName) : H.today.heroNone}</p>
+          <p className="mt-1 text-[24px] font-semibold leading-tight">{action.kind === "check" ? H.today.heroCheck : action.kind === "step" ? H.today.heroStep(slotName) : H.today.heroNone}</p>
         )}
         {action.kind === "step" && <p className="mt-0.5 text-base text-white/85">{H.today.stepsLeft(left)}</p>}
         {action.kind === "check" ? (
-          <Link href="/skin-check" className={`${btnOnDark} mt-3 !min-h-11 self-start !px-7`}>
+          <Link href="/skin-check" className={`${btnOnDark} mt-2.5 !min-h-11 self-start !px-7`}>
             {H.today.takeCheck}
           </Link>
         ) : action.kind === "step" ? (
-          <button type="button" className={`${btnOnDark} mt-3 !min-h-11 self-start !px-7`} aria-disabled={routine.busy} onClick={() => !routine.busy && send(action.step, "used")}>
+          <button type="button" className={`${btnOnDark} mt-2.5 !min-h-11 self-start !px-7`} aria-disabled={routine.busy} onClick={() => !routine.busy && send(action.step, "used")}>
             {H.today.markStep(stepLabel(action.step.productId))}
           </button>
         ) : null}
@@ -227,17 +219,19 @@ function TodayCard({
 
       {/* Today's conditions: the city, then UV once a city is set, or the way to add one. Hidden while weather is off. */}
       {weatherOn() && (
-        <div className={`${card} relative flex flex-col gap-1.5 !px-3.5 !py-3`}>
-          {settings?.city && (
-            <p className="flex items-center gap-1.5 truncate text-[13px] text-brand-text-muted">
-              <MapPin aria-hidden size={16} className="shrink-0 text-brand-text" />
-              {[settings.city.name, settings.city.country].filter(Boolean).join(", ")}
-            </p>
-          )}
+        <div className={`${card} relative flex flex-col !px-3.5 !py-2.5`}>
           <div className="flex items-center gap-3">
-            <IconWell icon={Sun} size={48} className="bg-amber-50 text-severity-moderate" />
+            <IconWell icon={Sun} size={40} className="bg-amber-50 text-severity-moderate" />
             <div className="min-w-0 flex-1">
-              <p className="text-sm text-brand-text">{H.weather.title}</p>
+              <p className="flex min-w-0 items-center gap-1 text-sm text-brand-text">
+                {H.weather.title}
+                {/* The city on the same line (mockup 01 gives it a row; home-v3's fold has no room). */}
+                {settings?.city && (
+                  <span className="flex min-w-0 items-center gap-0.5 truncate text-brand-text-muted">
+                    · <MapPin aria-hidden size={13} className="shrink-0" /> {settings.city.name}
+                  </span>
+                )}
+              </p>
               {settings?.city ? (
                 <UvLine user={user} settings={settings} open={() => dialog.current?.showModal()} />
               ) : (
@@ -252,10 +246,10 @@ function TodayCard({
       )}
 
       {/* Today's ring with the run of days, and the next check (mockup 01's two tiles). */}
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-2">
         <Link href="/routine" className={`${tile} transition-colors duration-fast hover:bg-brand-50`}>
           <span className="flex items-center gap-2">
-            <IconWell icon={ListChecks} size={28} />
+            <IconWell icon={ListChecks} size={24} />
             <span className="flex-1 text-sm text-brand-text">{H.today.todayTile}</span>
             <ChevronRight aria-hidden size={18} className="shrink-0 text-brand-text" />
           </span>
@@ -269,10 +263,10 @@ function TodayCard({
         </Link>
         <div className={tile}>
           <span className="flex items-center gap-2">
-            <IconWell icon={CalendarCheck} size={28} />
+            <IconWell icon={CalendarCheck} size={24} />
             <span className="flex-1 text-sm text-brand-text">{H.today.nextTile}</span>
           </span>
-          <p data-testid="next-check" className="text-lg font-semibold leading-tight text-brand-text">
+          <p data-testid="next-check" className="text-base font-semibold leading-tight text-brand-text">
             {nextLine}
           </p>
           <p className="text-xs leading-snug text-brand-text-muted">{H.today.starting(dashboard.trend.count, dashboard.trend.needed)}</p>
@@ -339,7 +333,7 @@ function RoutineRow({ routine, steps, slot, stepLabel, nameOf, send }: { routine
     );
   return (
     // Not in mockup 01; kept for one-tap logging (TD-48). Named by the time of day, no visible heading (the fold).
-    <section aria-label={slotName} className={`${row} flex flex-col gap-2 !py-3`}>
+    <section aria-label={slotName} className={`${row} flex flex-col gap-2 !py-2`}>
       {steps.length === 0 ? (
         <p className="text-sm text-brand-muted">{ROUTINE_COPY.nothingToday}</p>
       ) : (
@@ -389,33 +383,30 @@ function SkinTwinCard({ dashboard }: { dashboard: Dashboard }) {
   const { top, more } = view?.bands ? topReadings(view.bands) : { top: [], more: 0 };
   const picture =
     view && view.areas.length > 0 ? (
-      <span className="block size-14">
+      <span className="block size-12">
         <FaceDrawing labels={ECHO_REGION_LABELS} available={view.areas.map((a) => a.region)} />
       </span>
     ) : null;
   return (
-    <Link href={href} aria-label={H.latestRow.open(date)} className={`${row} flex flex-col gap-2 !py-3 transition-colors duration-fast hover:bg-brand-50`}>
-      <span className="flex items-center gap-2.5">
-        <IconWell icon={Sparkles} size={28} />
-        <span className="flex-1 text-sm text-brand-text">
-          {H.today.skinTwin} <span className="text-brand-text-muted">· {date}</span>
-        </span>
-        <ChevronRight aria-hidden size={20} className="shrink-0 text-brand-text" />
+    <Link href={href} aria-label={H.latestRow.open(date)} className={`${row} flex items-center gap-3 !py-2.5 transition-colors duration-fast hover:bg-brand-50`}>
+      {/* The user's own kept photo only (data rule 1), else the face drawing. */}
+      <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-tile bg-brand-50 [&_svg]:max-w-[48px]">
+        {shown?.photoClaimed && view ? <Thumb scanId={view.scanId} date={date} fallback={picture} /> : picture}
       </span>
-      <span className="flex items-center gap-3">
-        {/* The user's own kept photo only (data rule 1), else the face drawing. */}
-        <span className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-tile bg-brand-50 [&_svg]:max-w-[56px]">
-          {shown?.photoClaimed && view ? <Thumb scanId={view.scanId} date={date} fallback={picture} /> : picture}
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex items-center gap-1.5 text-sm text-brand-text">
+          <Sparkles aria-hidden size={16} className="shrink-0 text-brand-700" />
+          {H.today.skinTwin} <span className="truncate text-brand-text-muted">· {date}</span>
         </span>
-        <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1 text-sm text-brand-text">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-3 text-sm text-brand-text">
           {analysing ? (
             H.latestRow.analysing
           ) : top.length ? (
             top.map((b) => {
               const icon = READING_ICON[b.metric as Reading];
               return (
-                <span key={b.metric} className="inline-flex items-center gap-1.5">
-                  {icon && <IconWell icon={icon.icon} size={24} className={icon.well} />}
+                <span key={b.metric} className="inline-flex items-center gap-1">
+                  {icon && <IconWell icon={icon.icon} size={20} className={icon.well} />}
                   {b.label} <span className="font-semibold">{b.band}</span>
                 </span>
               );
@@ -426,6 +417,7 @@ function SkinTwinCard({ dashboard }: { dashboard: Dashboard }) {
           {!analysing && more > 0 && <span className="text-brand-muted">{H.latestRow.more(more)}</span>}
         </span>
       </span>
+      <ChevronRight aria-hidden size={20} className="shrink-0 text-brand-text" />
     </Link>
   );
 }
@@ -449,8 +441,8 @@ function EchoChips({ uid, dashboard, data, productsOn }: { uid: string; dashboar
     );
   return (
     // Mockup 01's Ask Echo card: the header opens Echo; the two starters are the region (home-v3 counts its buttons).
-    <div className={`${card} flex flex-col gap-2 !p-3`}>
-      <button type="button" onClick={() => openEcho()} className="-m-1 flex min-h-11 items-center gap-2.5 rounded-tile p-1 text-left text-sm text-brand-text hover:bg-brand-50">
+    <div className={`${card} flex flex-col gap-1 !p-2.5`}>
+      <button type="button" onClick={() => openEcho()} className="flex min-h-11 items-center gap-2.5 rounded-tile p-1 text-left text-sm text-brand-text hover:bg-brand-50">
         <IconWell icon={MessageCircle} size={28} />
         <span className="flex-1">{H.echo.title}</span>
         <ChevronRight aria-hidden size={20} className="shrink-0" />

@@ -16,8 +16,11 @@ export const metadata = {
 // Reached from the main navigation, Home's routine card and the timeline.
 // G37 (screen 03): each product's first store photo (TD-52, server side, 10-minute
 // cache); none when the store cannot be read, and the step tile shows instead.
+// Off unless NEXT_PUBLIC_UI_ROUTINE_PHOTOS is "on": flows.spec.ts asserts no <img> on /routine
+// (kit request D-3, and D-4 to move this switch into lib/ui-flags.ts).
 export default async function RoutineRoute() {
-  const photos: Record<string, StoreImage> = Object.fromEntries((await storeProducts())?.flatMap((p) => (p.images[0] ? [[p.productId, p.images[0]]] : [])) ?? []);
+  const store = process.env.NEXT_PUBLIC_UI_ROUTINE_PHOTOS === "on" ? await storeProducts() : null;
+  const photos: Record<string, StoreImage> = Object.fromEntries(store?.flatMap((p) => (p.images[0] ? [[p.productId, p.images[0]]] : [])) ?? []);
   return (
     <main className={page}>
       {/* Phones: the wordmark bar (redesign); the rail and side bar carry it from 640px. */}

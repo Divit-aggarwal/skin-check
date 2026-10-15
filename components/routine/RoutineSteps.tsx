@@ -128,7 +128,7 @@ export function SlotSteps({ data, slot, busy, send, photos = {} }: { data: Routi
         const name = (
           <p className="text-lg font-semibold leading-snug text-brand-text">
             <span className="sr-only">{C.stepNumber(i + 1)}: </span>
-            {label}
+            <span>{label}</span>
             {items.length === 0 && !(step === "protect" && slot === "PM") && <span className="sr-only">{C.emptyStep}</span>}
           </p>
         );
