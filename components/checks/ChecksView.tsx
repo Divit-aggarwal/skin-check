@@ -71,13 +71,13 @@ export function ChecksView({ openId }: { openId: string | null }) {
     </PageHeader>
   ) : (
     <>
-      <div className="pt-2">
+      <div className="-mt-1.5">
         <AppHeader right={<AccountButton />} />
       </div>
-      <header className="flex items-start justify-between gap-3 pb-4 pt-3">
-        <div className="min-w-0">
+      <header className="flex flex-wrap items-start justify-between gap-3 pb-3 pt-1">
+        <div className="min-w-[11rem] flex-1">
           <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text sm:text-[32px]">{K.twinTitle}</h1>
-          <p className="mt-1 text-[15px] leading-snug text-brand-text-muted">{K.twinIntro}</p>
+          <p className="mt-1 text-sm leading-snug text-brand-text-muted">{K.twinIntro}</p>
         </div>
         {newest && (
           <Link href={`/checks/${encodeURIComponent(newest.scanId)}`} className="flex shrink-0 items-center gap-2 rounded-card bg-brand-100 py-2 pl-2 pr-1.5">
@@ -151,7 +151,7 @@ export function ChecksView({ openId }: { openId: string | null }) {
   return (
     <main className={page}>
       {openId ? (
-        <div className="pt-2 lg:hidden">
+        <div className="-mt-1.5 lg:hidden">
           <AppHeader back="/checks" backLabel={K.back} right={<AccountButton />} />
         </div>
       ) : null}
@@ -236,49 +236,55 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
   const canAnswer = questionsTarget(uid, data.checks, data.analyses, data.laterAnswers)?.id === check.scanId;
   const n = dashboard.history.length - dashboard.history.findIndex((h) => h.scanId === check.scanId);
   return (
-    <section aria-labelledby="check-title" className="flex flex-col gap-5 lg:rounded-card lg:border lg:border-brand-border lg:bg-brand-surface lg:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className={`${eyebrow} mb-1`}>{K.opened}</p>
-          <h2 id="check-title" className="text-[26px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text">
-            {C.history.checkFrom(date)}
-          </h2>
-          <p className="mt-1 text-brand-text-muted">{C.history.kind[check.kind]}</p>
+    <div className="flex flex-col gap-5 lg:rounded-card lg:border lg:border-brand-border lg:bg-brand-surface lg:p-5">
+      <section aria-labelledby="check-title" className="flex flex-col gap-5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className={`${eyebrow} mb-1 hidden lg:block`}>{K.opened}</p>
+            <h2 id="check-title" className="text-2xl font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text">
+              {C.history.checkFrom(date)}
+            </h2>
+            <p className="mt-1 text-brand-text-muted">{C.history.kind[check.kind]}</p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2 rounded-card bg-brand-100 px-3 py-2">
+            <CalendarCheck aria-hidden size={22} className="text-brand-700" />
+            <span className="flex flex-col text-sm">
+              <span className="font-semibold text-brand-700">{date}</span>
+              <span className="text-brand-text-muted">{K.checkNumber(n, dashboard.history.length)}</span>
+            </span>
+          </div>
         </div>
-        <div className="flex shrink-0 items-center gap-2 rounded-card bg-brand-100 px-3 py-2">
-          <CalendarCheck aria-hidden size={22} className="text-brand-700" />
-          <span className="flex flex-col text-sm">
-            <span className="font-semibold text-brand-700">{date}</span>
-            <span className="text-brand-text-muted">{K.checkNumber(n, dashboard.history.length)}</span>
-          </span>
-        </div>
-      </div>
-      {/* TD-39: one photo. The thumbnail only until the large photo below can be shown. */}
-      {check.photoClaimed && !photo && <Thumb key={check.scanId} scanId={check.scanId} date={date} size={112} />}
-      {check.photoCheck && <PhotoCheckLine text={C.photoCheck[check.photoCheck]} />}
-      {check.view ? (
-        <>
-          {/* TD-24 (1): on every opened check with readings, never behind a toggle. */}
-          <p className={fixedLine}>{C.history.pastLine}</p>
-          {/* TD-46: on the newest check, a face area opens Echo on it (Echo talks about the newest check only). */}
-          <CheckReadings view={{ ...check.view, photoCheck: null }} photo={photo} onArea={newest && echoOn() ? (r) => router.push(`/echo?region=${r}`) : undefined} />
-          {check.view.bands && over && (
-            <ul aria-label={K.wholeFace} className="-mx-4 grid auto-cols-[calc((100%-2rem-24px)/4)] grid-flow-col gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:auto-cols-fr sm:px-0">
-              {READING_ORDER.map((m) => (
-                <li key={m} className="min-w-[84px]">
-                  <LevelTile metric={m} level={check.view!.bands!.find((b) => b.metric === m)!.band} slot={over.series.find((s) => s.metric === m)!.change} />
-                </li>
-              ))}
-            </ul>
-          )}
-          {check.view.bands && (
-            <div className="border-t border-brand-border pt-5">
-              <KnownAndNotKnown />
+        {/* TD-39: one photo. The thumbnail only until the large photo below can be shown. */}
+        {check.photoClaimed && !photo && <Thumb key={check.scanId} scanId={check.scanId} date={date} size={112} />}
+        {check.photoCheck && <PhotoCheckLine text={C.photoCheck[check.photoCheck]} />}
+        {check.view ? (
+          <>
+            {/* TD-24 (1): on every opened check with readings, never behind a toggle. */}
+            <p className={fixedLine}>{C.history.pastLine}</p>
+            {/* G37: the photo wide, as the mockup's photo row (the mesh follows the same cover crop). */}
+            <div className="[&_[data-testid=face-photo]]:aspect-[4/3] [&_[data-testid=face-photo]]:max-w-none">
+              {/* TD-46: on the newest check, a face area opens Echo on it (Echo talks about the newest check only). */}
+              <CheckReadings view={{ ...check.view, photoCheck: null }} photo={photo} onArea={newest && echoOn() ? (r) => router.push(`/echo?region=${r}`) : undefined} />
             </div>
-          )}
-        </>
-      ) : (
-        <p>{K.noReadings}</p>
+          </>
+        ) : (
+          <p>{K.noReadings}</p>
+        )}
+      </section>
+      {/* Outside the section above: there each reading's name shows once, in the table's header. */}
+      {check.view?.bands && over && (
+        <ul aria-label={K.wholeFace} className="-mx-4 grid auto-cols-[calc((100%-1.5rem)/3.5)] grid-flow-col gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:auto-cols-fr sm:px-0">
+          {READING_ORDER.map((m) => (
+            <li key={m}>
+              <LevelTile metric={m} level={check.view!.bands!.find((b) => b.metric === m)!.band} slot={over.series.find((s) => s.metric === m)!.change} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {check.view?.bands && (
+        <div className="border-t border-brand-border pt-5">
+          <KnownAndNotKnown />
+        </div>
       )}
       {skipped && (
         <div className="flex flex-col items-start gap-1 border-t border-brand-border pt-5">
@@ -322,7 +328,7 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
       <Link href="/skin-check" className={`${btnSecondary} w-full`}>
         {C.newCheck}
       </Link>
-    </section>
+    </div>
   );
 }
 

@@ -27,11 +27,9 @@ export function LevelTile({ metric, level, slot, href, className }: { metric: Sh
   const { icon, well } = READING_ICON[metric];
   const body = (
     <>
-      <span className="flex items-center gap-2">
-        <IconWell icon={icon} size={32} className={cn(well, "bg-white/70")} />
-        <span className="text-[13px] font-medium leading-tight text-brand-text">{METRIC_LABELS[metric]}</span>
-      </span>
-      <span className="text-lg font-semibold leading-tight text-brand-text">{level}</span>
+      <IconWell icon={icon} size={32} className={cn(well, "bg-white/70")} />
+      <span className="text-[13px] font-medium leading-tight text-brand-text">{METRIC_LABELS[metric]}</span>
+      <span className="text-base font-semibold leading-tight text-brand-text">{level}</span>
       {isEarlyEstimate(metric) && <span className="text-[11px] text-brand-text-muted">{C.table.earlyEstimate}</span>}
       <span className="mt-auto">
         <ChangeSlot slot={slot} />

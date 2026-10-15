@@ -234,19 +234,19 @@ export function ReadingView({ uid, metric, dashboard, data }: { uid: string; met
   const newestSrc = newestKept && urls?.get(newestKept.scanId);
   return (
     <section aria-labelledby="reading-title" className="flex flex-col gap-4">
-      <div className="pt-2">
+      <div className="-mt-1.5">
         <AppHeader back="/checks?view=readings" backLabel={K.allReadings} right={<AccountButton />} />
       </div>
       <div>
         <h1 id="reading-title" className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text sm:text-[32px]">{label}</h1>
-        <p className="mt-1 text-[15px] text-brand-text-muted">{K.readingLead}</p>
+        <p className="mt-1 text-sm leading-snug text-brand-text-muted">{K.readingLead}</p>
       </div>
       <ReadingPicker current={metric} />
       {latest ? (
         <>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid min-h-48 grid-cols-2 gap-3">
             {newestKept && newestSrc ? (
-              <PhotoTile src={newestSrc} alt={K.photoAlt(formatDate(newestKept.date))} label={formatDate(newestKept.date)} fallback={K.photoNone} className="h-full [&>img]:h-full" />
+              <PhotoTile src={newestSrc} alt={K.photoAlt(formatDate(newestKept.date))} label={formatDate(newestKept.date)} fallback={K.photoNone} className="min-h-48 [&>img]:absolute [&>img]:inset-0 [&>img]:aspect-auto [&>img]:h-full" />
             ) : newestKept && !urls ? (
               <div aria-hidden className="animate-pulse rounded-tile bg-brand-50 motion-reduce:animate-none" />
             ) : (

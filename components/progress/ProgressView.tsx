@@ -52,13 +52,13 @@ export function ProgressView() {
 
   const header = (
     <>
-      <div className="pt-2">
+      <div className="-mt-1.5">
         <AppHeader back="/checks" backLabel={C.history.title} right={<AccountButton />} />
       </div>
-      <header className="flex items-start justify-between gap-3 pb-4 pt-3">
-        <div className="min-w-0">
+      <header className="flex flex-wrap items-start justify-between gap-3 pb-3 pt-1">
+        <div className="min-w-[11rem] flex-1">
           <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text sm:text-[32px]">{P.title}</h1>
-          <p className="mt-1 text-[15px] text-brand-text-muted">{P.intro}</p>
+          <p className="mt-1 text-sm leading-snug text-brand-text-muted">{P.intro}</p>
         </div>
         {dashboard && dashboard.history.length > 0 && (
           <label className="relative shrink-0">
@@ -155,9 +155,9 @@ export function ProgressView() {
       ) : (
         <div className="flex flex-col gap-4">
           <section aria-label={P.latestIn}>
-            <ul className="-mx-4 grid snap-x auto-cols-[calc((100%-2rem-24px)/4)] grid-flow-col gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:auto-cols-fr sm:px-0">
+            <ul className="-mx-4 grid snap-x auto-cols-[calc((100%-1.5rem)/3.5)] grid-flow-col gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:auto-cols-fr sm:px-0">
               {series.map((s) => (
-                <li key={s.metric} className="min-w-[84px] snap-start">
+                <li key={s.metric} className="snap-start">
                   <LevelTile metric={s.metric} level={latestBand(s) ?? C.current.noReading} slot={s.change} href={`/checks?reading=${s.metric}`} />
                 </li>
               ))}

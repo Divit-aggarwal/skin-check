@@ -39,7 +39,7 @@ test("four checks: Skin Twin, one reading, Progress and an opened check", async 
   await page.getByRole("radio", { name: "4W" }).click();
   await expect(page.getByRole("radio", { name: "4W" })).toHaveAttribute("aria-checked", "true");
   await expect(timeline.getByRole("row")).toHaveCount(4); // all four are within 4 weeks
-  const photos = page.locator("section", { has: page.getByRole("heading", { name: K.yourPhotos }) }).getByRole("img", { name: /Your kept photo from/ });
+  const photos = page.getByRole("region", { name: K.yourPhotos }).getByRole("img", { name: /Your kept photo from/ });
   await expect(photos).toHaveCount(4, { timeout: 30_000 });
   await expect(page.getByRole("link", { name: new RegExp(K.keepRoutine) })).toHaveAttribute("href", "/routine");
   await expect(page.getByRole("main")).not.toContainText(NO_CHANGE);
