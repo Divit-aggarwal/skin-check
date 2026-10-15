@@ -97,6 +97,8 @@ export LOCAL_STACK_WEB="http://127.0.0.1:$WEB"
 export NEXT_TELEMETRY_DISABLED=1
 # H04/H21 erase sweep (lib/erase.ts): local-only values, not secrets. A short
 # delay so the end-to-end test need not wait 70 minutes; ignored in production builds.
+# C-mm-1 (TD-52): store prices and stock from the saved feed, never the live store.
+export STORE_LOCAL_FEED="$PWD/tests/fixtures/store-products-2026-10-15.json"
 export CRON_SECRET=local-dev-cron-secret ERASE_SWEEP_DELAY_SECONDS=2
 
 # A local stand-in for Gemini (scripts/fake-gemini.mjs): records every request
@@ -125,10 +127,10 @@ const pub = Buffer.concat([Buffer.from([4]), Buffer.from(j.x, "base64url"), Buff
 console.log(`export NEXT_PUBLIC_VAPID_PUBLIC_KEY=${pub} VAPID_PRIVATE_KEY=${privateKey.export({ format: "jwk" }).d}`);
 ')"
 
-# Base seed, then any lane seed (scripts/seed-lane-<lane>.ts), so lanes never
+# Base seed, then any lane seed (scripts/seed-lane-<lane>.ts, scripts/seed-mm-<agent>.ts), so lanes never
 # edit the shared seed file.
 SEED="npx vite-node --config vitest.config.ts scripts/seed-local.ts"
-for f in scripts/seed-lane-*.ts; do [ -e "$f" ] && SEED="$SEED && npx vite-node --config vitest.config.ts $f"; done
+for f in scripts/seed-lane-*.ts scripts/seed-mm-*.ts; do [ -e "$f" ] && SEED="$SEED && npx vite-node --config vitest.config.ts $f"; done
 if [ "$MODE" = up ]; then
   echo "== web on http://localhost:$WEB  (emulator UI http://127.0.0.1:$UI; sign-in codes print in this terminal)"
   $FIREBASE emulators:exec --config firebase.local.json --project "$PROJECT" --only auth,firestore --ui \

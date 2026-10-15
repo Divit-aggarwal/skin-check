@@ -3,6 +3,7 @@
 // Next's fetch cache. Only products in our catalogue are returned (the 4-step
 // kit is not), matched by the catalogue's verified shopifyHandle.
 
+import { readFile } from "node:fs/promises";
 import { z } from "zod";
 import { CATALOGUE } from "@/lib/catalog/catalogue";
 import { STORE_CACHE_SECONDS, STORE_ORIGIN, type StoreProduct } from "@/lib/feature-contracts/store-products";
@@ -67,6 +68,9 @@ export function toStoreProducts(feed: StoreFeed): StoreProduct[] {
 
 /** Live products, or null when the store cannot be read (callers show the store link only). */
 export async function storeProducts(): Promise<StoreProduct[] | null> {
+  // C-mm-1: the local stack reads a saved feed, never the live store. Never in a production build.
+  const local = process.env.NODE_ENV !== "production" ? process.env.STORE_LOCAL_FEED : undefined;
+  if (local) return toStoreProducts(JSON.parse(await readFile(local, "utf8")));
   try {
     const res = await fetch(`${STORE_ORIGIN}/products.json`, { next: { revalidate: STORE_CACHE_SECONDS }, signal: AbortSignal.timeout(5000) });
     if (!res.ok) return null;
