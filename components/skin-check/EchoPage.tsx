@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig } from "framer-motion";
-import { AlertCircle, BookOpen, ChevronDown, ChevronLeft, ChevronRight, MessageCircle, Sparkles, Stethoscope, UserRound } from "lucide-react";
+import { AlertCircle, BarChart3, BookOpen, Camera, ChevronDown, ChevronLeft, ChevronRight, ListChecks, MessageCircle, Sparkles, Stethoscope, UserRound } from "lucide-react";
 import { TypingIndicator } from "@/components/primitives/TypingIndicator";
 import { ECHO_COPY as E } from "./echoCopy";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
@@ -16,8 +16,7 @@ import { hasQuestionAnswers, safetyQuestionsAnswered } from "@/lib/skin-check-va
 import { QUESTIONS_COPY as Q } from "./questionsCopy";
 import { readingsOf, toDate } from "@/components/dashboard/state";
 import { AccountButton, btnGhost, btnPrimary, btnSecondary, card, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton, textLink, tintCard } from "@/components/ui/page";
-import { ChatBubble, ChatInput, Chip, IconWell, SuggestionChips, Wordmark } from "@/components/ui/kit";
-import { EchoMark } from "./EchoMark";
+import { ChatBubble, ChatInput, Chip, EchoAvatar, IconWell, SuggestionChips, Wordmark } from "@/components/ui/kit";
 import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getEchoOpening, getSkinCheckChatReply, ApiError, type ShownProduct } from "@/lib/api";
 import { ProductCards, splitDoctorLine, splitRedFlagNote } from "./ProductCards";
@@ -74,6 +73,12 @@ let messageSeq = 0;
 
 // Mockup 18's three "what Echo does" tiles, in the order of E.does.
 const DOES_ICONS = [BookOpen, MessageCircle, UserRound] as const;
+// Mockup 18's quick actions, only to pages that exist (no product list page yet).
+const QUICK = [
+  { href: "/skin-check", icon: Camera, copy: E.quick.check, well: "bg-brand-100 text-brand-700" },
+  { href: "/routine", icon: ListChecks, copy: E.quick.routine, well: "bg-concern-texture-soft text-concern-texture" },
+  { href: "/checks", icon: BarChart3, copy: E.quick.checks, well: "bg-concern-pigment-soft text-concern-pigment" },
+] as const;
 const TYPING = "rounded-card rounded-bl-md border border-brand-border bg-brand-surface text-brand-text-muted shadow-none";
 
 // /echo: one thread per face area, switched in place (no remount), each held
@@ -362,7 +367,7 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
   // TD-50 (mockups 18, 19): an area with no question yet opens on Echo's
   // introduction (18); once asked, the compact Echo header and the chat (19).
   const empty = messages.length === 0;
-  const echoAvatar = <EchoMark className="size-8" />;
+  const echoAvatar = <EchoAvatar size={36} className="shrink-0" />;
 
   // TD-46: one thread per face area.
   const areaPicker = (
@@ -384,6 +389,46 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
   );
 
   const alertBox = `${card} !p-4 flex flex-col items-start gap-2`;
+
+  // The question box and the starters (input first on 18, starters first on 19).
+  const startersShown = echoOn && starters.length > 0 && safetyQuestionsAnswered(session.answers) && activeError?.code !== "ECHO_DAILY_LIMIT" && activeError?.code !== "ECHO_OFF";
+  const starterChips = startersShown && <SuggestionChips label={E.startersLabel} items={starters} onPick={(q) => handleSend(q)} disabled={sendingRegion !== null} />;
+  // TD-29 (5): with Echo switched off, a plain notice replaces the input.
+  const box = (
+    <>
+      {!echoOn ? (
+        <div role="status" className="my-3 space-y-2 rounded-card bg-brand-50 px-4 py-3 text-sm text-brand-text-muted">
+          <p>{E.off}</p>
+          <p>{withPhoneLinks(REFERRAL_LINE)}</p>
+        </div>
+      ) : (
+        <ChatInput
+          label={E.placeholder(areaLabel)}
+          sendLabel={E.send}
+          value={draft}
+          onChange={setDraft}
+          onSend={() => handleSend()}
+          // Matches ChatMessageSchema's text bound (app/api/skin-check/chat/
+          // route.ts) — caps client-side so a too-long message fails to type
+          // rather than failing at send with a 400 the UI can't usefully retry.
+          maxLength={2000}
+          // TD-29 (5): after the day's limit, every question would fail the same way.
+          disabled={sendingRegion !== null || activeError?.code === "ECHO_DAILY_LIMIT"}
+        />
+      )}
+    </>
+  );
+  const composer = empty ? (
+    <div className="flex flex-col gap-3">
+      {box}
+      {starterChips}
+    </div>
+  ) : (
+    <>
+      {starterChips && <div className="pt-2">{starterChips}</div>}
+      <div className="py-3">{box}</div>
+    </>
+  );
 
   return (
     <MotionConfig reducedMotion="user">
@@ -408,15 +453,16 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
         {/* Mockup 19: the compact Echo header once a question is asked. */}
         {!empty && (
           <div className="flex shrink-0 items-center gap-3 pb-3 pt-2">
-            <EchoMark className="size-11" />
+            <EchoAvatar size={56} className="shrink-0" />
             <div className="min-w-0 flex-1">
-              <h1 className="flex items-center gap-1 text-2xl font-semibold leading-tight tracking-[-0.02em] text-brand-text">
+              <h1 className="flex items-start gap-0.5 text-[28px] font-semibold leading-tight tracking-[-0.02em] text-brand-text">
                 {E.title}
-                <Sparkles aria-hidden size={16} className="text-brand-700" />
+                <Sparkles aria-hidden size={16} className="mt-1 text-brand-700" />
               </h1>
               <p className="truncate text-sm text-brand-text-muted">{E.checkFrom(date)}</p>
             </div>
-            <Link href={`/checks/${encodeURIComponent(session.scanId)}`} className={`${btnGhost} shrink-0 bg-brand-50 !px-3 text-sm lg:hidden`}>
+            <Link href={`/checks/${encodeURIComponent(session.scanId)}`} className={`${btnGhost} shrink-0 gap-1.5 bg-brand-50 !px-3 text-sm lg:hidden`}>
+              <UserRound aria-hidden size={16} />
               {E.openCheck}
             </Link>
           </div>
@@ -427,26 +473,51 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
           {/* Mockup 18: who Echo is and what it does (it explains; it does not decide). */}
           {empty && (
             <section className="flex flex-col gap-5 pb-5 pt-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 pt-2">
                   <p className={`${eyebrow} tracking-[0.3em]`}>{E.meet}</p>
-                  <h1 className="mt-1 flex items-start gap-1 text-[44px] font-semibold leading-none tracking-[-0.03em] text-brand-900">
+                  <h1 className="mt-1 flex items-start gap-1 text-[56px] font-semibold leading-none tracking-[-0.03em] text-brand-900">
                     {E.title}
-                    <Sparkles aria-hidden size={22} className="mt-0.5 text-brand-700" />
+                    <Sparkles aria-hidden size={26} className="mt-0.5 text-brand-700" />
                   </h1>
-                  <p className="mt-2 text-base text-brand-text-muted">{E.tagline}</p>
+                  <p className="mt-2 text-lg text-brand-text-muted">{E.tagline}</p>
                 </div>
-                <EchoMark className="mr-2 mt-2 size-20 shadow-[0_0_0_10px_var(--brand-50)]" />
+                {/* Echo's hello in a bubble over its avatar (mockup 18). */}
+                <div className="relative flex w-[46%] max-w-[200px] shrink-0 flex-col items-center">
+                  <p className="z-10 self-end rounded-card rounded-bl-md bg-brand-100 px-3 py-2 text-[13px] leading-snug text-brand-text">
+                    <span className="block font-semibold">{E.hello}</span>
+                    {E.helloLine}
+                  </p>
+                  <EchoAvatar size={120} className="-mt-3 drop-shadow-[0_0_24px_rgba(191,230,207,0.9)]" />
+                </div>
               </div>
-              <p className="text-brand-text-muted">{E.intro(date)}</p>
+              <p className="-mt-2 text-brand-text-muted">{E.intro(date)}</p>
               <ul aria-label={E.doesLabel} className="grid grid-cols-3 gap-2">
                 {E.does.map((line, i) => (
-                  <li key={line} className={`${card} flex flex-col items-start gap-2 !p-3 text-[13px] font-medium leading-snug text-brand-text`}>
+                  <li key={line} className={`${card} flex items-center gap-2 !p-2.5 text-[13px] font-medium leading-snug text-brand-text`}>
                     <IconWell icon={DOES_ICONS[i]!} size={36} />
                     {line}
                   </li>
                 ))}
               </ul>
+              {/* Mockup 18: the question box and the starters up here until the first question. */}
+              {composer}
+              <section aria-labelledby="quick-title" className="flex flex-col gap-3">
+                <h2 id="quick-title" className="text-xl font-semibold text-brand-text">
+                  {E.quickTitle}
+                </h2>
+                <ul className="grid grid-cols-3 gap-2">
+                  {QUICK.map((q) => (
+                    <li key={q.href}>
+                      <Link href={q.href} className={`${card} flex h-full flex-col items-center gap-1.5 !p-3 text-center transition-colors duration-fast hover:bg-brand-50`}>
+                        <IconWell icon={q.icon} size={44} className={q.well} />
+                        <span className="text-sm font-semibold leading-snug text-brand-text">{q.copy.title}</span>
+                        <span className="text-xs text-brand-text-muted">{q.copy.body}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
               {areaPicker}
             </section>
           )}
@@ -569,36 +640,8 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
           </div>
         </div>
 
-        {/* Hidden whenever Echo cannot answer: Echo off, the questions not answered (F11), the day's limit. */}
-        {echoOn && starters.length > 0 && safetyQuestionsAnswered(session.answers) && activeError?.code !== "ECHO_DAILY_LIMIT" && activeError?.code !== "ECHO_OFF" && (
-          <div className="shrink-0 pt-2">
-            <SuggestionChips label={E.startersLabel} items={starters} onPick={(q) => handleSend(q)} disabled={sendingRegion !== null} />
-          </div>
-        )}
-
-        {/* TD-29 (5): with Echo switched off, a plain notice replaces the input. */}
-        {!echoOn ? (
-          <div role="status" className="my-3 shrink-0 space-y-2 rounded-card bg-brand-50 px-4 py-3 text-sm text-brand-text-muted">
-            <p>{E.off}</p>
-            <p>{withPhoneLinks(REFERRAL_LINE)}</p>
-          </div>
-        ) : (
-          <div className="shrink-0 py-3">
-            <ChatInput
-              label={E.placeholder(areaLabel)}
-              sendLabel={E.send}
-              value={draft}
-              onChange={setDraft}
-              onSend={() => handleSend()}
-              // Matches ChatMessageSchema's text bound (app/api/skin-check/chat/
-              // route.ts) — caps client-side so a too-long message fails to type
-              // rather than failing at send with a 400 the UI can't usefully retry.
-              maxLength={2000}
-              // TD-29 (5): after the day's limit, every question would fail the same way.
-              disabled={sendingRegion !== null || activeError?.code === "ECHO_DAILY_LIMIT"}
-            />
-          </div>
-        )}
+        {/* Mockup 19: the starters and the box under the chat once a question is asked (on 18 they sit in the introduction). */}
+        {!empty && <div className="shrink-0">{composer}</div>}
       </div>
 
       <aside aria-label={E.readingsSummary} className="hidden min-h-0 overflow-y-auto px-6 py-8 lg:block">

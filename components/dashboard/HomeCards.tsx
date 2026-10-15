@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
-import { Check, ChevronDown, Droplet, Flame, MapPin, Sun, Wind } from "lucide-react";
+import { CalendarClock, Check, ChevronDown, ChevronRight, Droplet, Flame, MapPin, Sun, Thermometer, Wind } from "lucide-react";
 import { btnPrimary, btnSecondary, card, h2, LoadingState, ReloadButton, textLink } from "@/components/ui/page";
 import { IconWell } from "@/components/ui/kit";
 import { Thumb } from "@/components/checks/Thumb";
@@ -18,7 +18,7 @@ import { ECHO_REGION_LABELS, type EchoRegion } from "@/lib/echo-regions";
 import { isEarlyEstimate } from "@/lib/skin-check-skus";
 import { safetyQuestionsAnswered } from "@/lib/skin-check-validation";
 import { CHECK_INTERVAL_RULE, isDue, nextCheck } from "@/lib/home/schedule";
-import { aqiCategory, uvCategory, UV_ADVICE, type WeatherReading } from "@/lib/home/weather";
+import { aqiCategory, uvCategory, UV_ADVICE, type UvHour, type WeatherReading } from "@/lib/home/weather";
 import { needsHomeScreen, promptFor, type BrowserState, type HomeSettings, type SavedCity } from "@/lib/home/permissions";
 import type { Place } from "@/lib/home/places";
 import { pushOn } from "@/lib/home/switches";
@@ -331,7 +331,7 @@ export function RoutineCard({ routine }: { routine: Routine }) {
 
 type Weather = { kind: "loading" } | { kind: "ready"; c: WeatherReading } | { kind: "stale"; c: WeatherReading } | { kind: "unavailable" };
 
-export function WeatherCard({ user, settings, onSettings }: { user: User; settings: HomeSettings | null; onSettings: (s: HomeSettings) => void }) {
+export function WeatherCard({ user, settings, onSettings, sheet = false }: { user: User; settings: HomeSettings | null; onSettings: (s: HomeSettings) => void; sheet?: boolean }) {
   const city = settings?.city ?? null;
   const [weather, setWeather] = useState<Weather>({ kind: "loading" });
   const [changing, setChanging] = useState(false);
@@ -364,42 +364,84 @@ export function WeatherCard({ user, settings, onSettings }: { user: User; settin
     focusCard("weather");
   };
 
-  if (!city || changing) return <Card id="weather" title={H.weather.title}><ChooseCity user={user} canAsk={!!settings?.askedAt} onCity={(c, location) => save({ city: c, ...(location ? { location } : {}) })} /></Card>;
+  const title = sheet && (
+    <h2 id="weather-title" tabIndex={-1} className="text-[32px] font-semibold leading-[1.1] tracking-[-0.02em] text-brand-text outline-none">
+      {H.weather.title}
+    </h2>
+  );
+
+  if (!city || changing)
+    return (
+      <WeatherFrame sheet={sheet}>
+        {title}
+        <ChooseCity user={user} canAsk={!!settings?.askedAt} onCity={(c, location) => save({ city: c, ...(location ? { location } : {}) })} />
+      </WeatherFrame>
+    );
 
   const time = (iso: string) => new Date(iso).toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit" });
+  const c = weather.kind === "ready" || weather.kind === "stale" ? weather.c : null;
+  const category = c ? uvCategory(c.uv) : null;
   return (
-    <Card id="weather" title={H.weather.title}>
-      {weather.kind === "loading" && <LoadingState label={H.weather.loading} blocks={["h-5", "h-24", "h-10"]} />}
+    <WeatherFrame sheet={sheet}>
+      {/* Mockup 02: title and intro, the place and "Change city" beside them. */}
+      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0 flex-1 basis-48">
+          {title}
+          <p className={`text-brand-text-muted ${sheet ? "mt-2" : ""}`}>{H.weather.intro}</p>
+        </div>
+        <div className="flex flex-col items-end gap-1">
+          <p className="flex items-center gap-1.5 text-sm text-brand-text">
+            <span className="grid size-8 place-items-center rounded-full bg-brand-50">
+              <MapPin aria-hidden size={16} />
+            </span>
+            {[city.name, city.country].filter(Boolean).join(", ")}
+          </p>
+          <button type="button" className="inline-flex min-h-11 items-center gap-1 rounded-full bg-brand-100 px-4 text-sm font-medium text-brand-700 hover:bg-brand-50" onClick={() => setChanging(true)}>
+            {H.weather.change}
+            <ChevronRight aria-hidden size={16} />
+          </button>
+        </div>
+      </div>
+      {weather.kind === "loading" && <LoadingState label={H.weather.loading} blocks={["h-28", "h-24", "h-40"]} />}
       {weather.kind === "unavailable" && <p className="text-brand-muted">{H.weather.unavailable}</p>}
-      {(weather.kind === "ready" || weather.kind === "stale") && (
+      {c && category && (
         <>
-          {/* Mockup 02, from the data that exists: UV (today's peak), humidity, air. No temperature, UV curve or forecast. */}
-          <div className="flex items-start gap-4 rounded-card bg-brand-50 p-4">
-            <IconWell icon={Sun} size={56} className="bg-brand-surface text-severity-moderate" />
+          {/* UV today (the day's peak), its category in words and colour, and the one advice line. */}
+          <div className="flex items-center gap-4 rounded-card bg-amber-50/70 p-4">
+            <IconWell icon={Sun} size={72} className="bg-amber-100/70 text-severity-moderate" />
             <dl className="min-w-0">
-              <dt className="text-sm text-brand-text-muted">{H.weather.uv}</dt>
-              <dd className="text-[40px] font-semibold leading-none text-brand-text">{Math.round(weather.c.uv)}</dd>
-              <dd className={`mt-1 font-semibold ${SEVERITY[uvLevel(uvCategory(weather.c.uv))]}`}>{H.weather.uvNote(uvCategory(weather.c.uv))}</dd>
-              <dd className="mt-2 text-sm text-brand-text">{UV_ADVICE[uvCategory(weather.c.uv)]}</dd>
+              <dt className="text-sm text-brand-text">{H.weather.uv}</dt>
+              <dd className="flex flex-wrap items-baseline gap-x-3">
+                <span className="text-[44px] font-semibold leading-none text-brand-text">{Math.round(c.uv)}</span>
+                <span className={`text-lg font-semibold ${SEVERITY[uvLevel(category)]}`}>{H.weather.uvNote(category)}</span>
+              </dd>
+              <dd className="mt-1.5 text-sm text-brand-text-muted">{UV_ADVICE[category]}</dd>
             </dl>
           </div>
-          <dl className="grid grid-cols-2 gap-3">
-            <Tile icon={Droplet} label={H.weather.humidity} value={H.weather.humidityValue(weather.c.humidity)} />
-            <Tile icon={Wind} label={H.weather.air} value={String(Math.round(weather.c.usAqi))} note={H.weather.airNote(aqiCategory(weather.c.usAqi))} noteClass={SEVERITY[aqiLevel(aqiCategory(weather.c.usAqi))]} />
+          <dl className="grid grid-cols-3 gap-2">
+            <Tile icon={Droplet} label={H.weather.humidity} value={H.weather.humidityValue(c.humidity)} />
+            {typeof c.temperature === "number" && <Tile icon={Thermometer} label={H.weather.temperature} value={H.weather.temperatureValue(c.temperature)} />}
+            <Tile icon={Wind} label={H.weather.air} value={String(Math.round(c.usAqi))} note={H.weather.airNote(aqiCategory(c.usAqi))} noteClass={SEVERITY[aqiLevel(aqiCategory(c.usAqi))]} />
           </dl>
-          <p className="flex items-center gap-1.5 text-sm text-brand-muted">
-            <MapPin aria-hidden size={16} />
-            {H.weather.updated(city.name, time(weather.c.observedAt))}
-          </p>
-          {weather.kind === "stale" && <p className="text-sm text-brand-muted">{H.weather.lastKnown(time(weather.c.observedAt))}</p>}
-        </>
-      )}
-      <div className="flex flex-wrap items-center justify-between gap-x-4">
-        <button type="button" className={textLink} onClick={() => setChanging(true)}>
-          {H.weather.change}
-        </button>
-        {(weather.kind === "ready" || weather.kind === "stale") && (
-          <span className="flex flex-wrap gap-x-3">
+          {/* Today by the hour (real hourly values), when the source gave them. */}
+          <div className="flex flex-col gap-3 rounded-card border border-brand-border bg-brand-surface p-3.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="flex items-center gap-2 text-brand-text">
+                <MapPin aria-hidden size={18} />
+                {H.weather.uvDay}
+              </p>
+              <p className="rounded-full bg-brand-50 px-3 py-1 text-xs text-brand-text-muted">{H.weather.updated(city.name, time(c.observedAt))}</p>
+            </div>
+            {c.hourly && <UvCurve hours={c.hourly} />}
+            {typeof c.uvHighUntil === "number" && (
+              <p className="flex items-center gap-3 rounded-tile bg-brand-50 p-3 text-sm text-brand-text">
+                <IconWell icon={CalendarClock} size={40} />
+                {H.weather.uvHighUntil(hourLabel(c.uvHighUntil))}
+              </p>
+            )}
+          </div>
+          {weather.kind === "stale" && <p className="text-sm text-brand-muted">{H.weather.lastKnown(time(c.observedAt))}</p>}
+          <span className="-mt-2 flex flex-wrap gap-x-3">
             <a href="https://open-meteo.com/" target="_blank" rel="noopener noreferrer" className="inline-flex min-h-11 items-center text-xs text-brand-muted underline underline-offset-2">
               {H.weather.source}
             </a>
@@ -408,18 +450,70 @@ export function WeatherCard({ user, settings, onSettings }: { user: User; settin
               {H.weather.places}
             </a>
           </span>
-        )}
-      </div>
+        </>
+      )}
+    </WeatherFrame>
+  );
+}
+
+/** Screen 02 (G37): in the phone sheet the card is the page (large title, no frame); on the desktop Home a card. */
+function WeatherFrame({ sheet, children }: { sheet: boolean; children: React.ReactNode }) {
+  return sheet ? (
+    <section aria-labelledby="weather-title" className="flex min-w-0 flex-col gap-4">
+      {children}
+    </section>
+  ) : (
+    <Card id="weather" title={H.weather.title}>
+      {children}
     </Card>
+  );
+}
+
+const hourLabel = (h: number) => new Date(2000, 0, 1, h).toLocaleTimeString("en-IN", { hour: "numeric" });
+
+/** Screen 02's curve: today's hourly UV from the first to the last hour above 0, every second hour labelled. */
+function UvCurve({ hours }: { hours: UvHour[] }) {
+  const lit = hours.filter((h) => Math.round(h.uv) >= 1);
+  const from = lit[0]?.hour;
+  const to = lit[lit.length - 1]?.hour;
+  if (from === undefined || to === undefined || to - from < 2) return null;
+  const shown = hours.filter((h) => h.hour >= from && h.hour <= to);
+  const labelled = shown.filter((h) => h.hour % 2 === 0);
+  const peak = Math.max(...shown.map((h) => h.uv));
+  const W = 320, H0 = 22, PH = 78, PAD = 22;
+  const x = (h: number) => PAD + ((h - from) / (to - from)) * (W - 2 * PAD);
+  const y = (uv: number) => H0 + (1 - uv / Math.max(peak, 1)) * PH;
+  const line = shown.map((h, i) => `${i ? "L" : "M"}${x(h.hour).toFixed(1)} ${y(h.uv).toFixed(1)}`).join(" ");
+  const base = H0 + PH;
+  return (
+    <svg role="img" aria-label={H.weather.uvDayLabel(labelled.map((h) => `${hourLabel(h.hour)} ${Math.round(h.uv)}`).join(", "))} viewBox={`0 0 ${W} ${base + 24}`} className="w-full">
+      <path d={`${line} L${x(to).toFixed(1)} ${base} L${x(from).toFixed(1)} ${base} Z`} className="fill-amber-100/60" />
+      <path d={line} fill="none" strokeWidth="2" strokeLinejoin="round" className="stroke-amber-300" />
+      {labelled.map((h) => {
+        const top = h.uv === peak;
+        return (
+          <g key={h.hour}>
+            <line x1={x(h.hour)} x2={x(h.hour)} y1={y(h.uv)} y2={base} className="stroke-brand-border" />
+            <circle cx={x(h.hour)} cy={y(h.uv)} r="5.5" className={top ? "fill-severity-high" : "fill-amber-400"} stroke="white" strokeWidth="1.5" />
+            <text x={x(h.hour)} y={y(h.uv) - 10} textAnchor="middle" className="fill-brand-text text-[13px] font-semibold">
+              {Math.round(h.uv)}
+            </text>
+            <text x={x(h.hour)} y={base + 18} textAnchor="middle" className="fill-brand-text-muted text-[12px]">
+              {hourLabel(h.hour)}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 
 function Tile({ icon, label, value, note, noteClass = "text-brand-ink" }: { icon: typeof Sun; label: string; value: string; note?: string; noteClass?: string }) {
   return (
-    <div className="flex min-w-0 items-start gap-3 rounded-card border border-brand-border p-3">
+    <div className="flex min-w-0 flex-col gap-2 rounded-card border border-brand-border bg-brand-surface p-3">
       <IconWell icon={icon} size={36} />
       <div className="min-w-0">
-        <dt className="text-xs font-semibold text-brand-muted">{label}</dt>
+        <dt className="text-xs text-brand-text">{label}</dt>
         <dd className="text-xl font-semibold text-brand-title">{value}</dd>
         {note && <dd className={`text-xs font-semibold ${noteClass}`}>{note}</dd>}
       </div>
