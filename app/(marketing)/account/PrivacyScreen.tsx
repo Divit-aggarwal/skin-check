@@ -8,7 +8,7 @@ import { btnSecondary, card } from "@/components/ui/page";
 import { IconWell, Skel, ToggleRow } from "@/components/ui/kit";
 import { CONSENT_TEXTS, type NewConsentPurpose } from "@/lib/feature-contracts/consents";
 import { consentsUi, dataExportUi } from "@/lib/ui-flags";
-import { fetchExport, getConsents, optimistic, postConsent, saveBlob } from "./accountApi";
+import { fetchExport, getConsents, optimistic, postConsent, retryIn, saveBlob } from "./accountApi";
 import { ACCOUNT_COPY } from "./copy";
 
 const D = ACCOUNT_COPY.data;
@@ -138,15 +138,18 @@ function Consents() {
 
 function ExportRow() {
   const { user } = useAuth();
-  const [status, setStatus] = useState<"idle" | "busy" | "done" | "tooMany" | "failed">("idle");
+  const [status, setStatus] = useState<"idle" | "busy" | "done" | "tooMany" | "notAllowed" | "failed">("idle");
+  const [wait, setWait] = useState<ReturnType<typeof retryIn>>(null);
   const run = async () => {
     if (!user || status === "busy") return;
     setStatus("busy");
     const r = await fetchExport(fetch, await user.getIdToken());
     if (r.ok) saveBlob(r.data.blob, r.data.name);
-    setStatus(r.ok ? "done" : r.status === 429 ? "tooMany" : "failed");
+    else setWait(retryIn(r.retryAfter));
+    setStatus(r.ok ? "done" : r.status === 429 ? "tooMany" : r.status === 403 ? "notAllowed" : "failed");
   };
-  const line = { idle: null, busy: D.exporting, done: D.exportDone, tooMany: D.exportTooMany, failed: D.exportFailed }[status];
+  const later = wait === null ? D.tryAgainLater : "hours" in wait ? D.tryAgainIn(wait.hours, "hour") : D.tryAgainIn(wait.minutes, "minute");
+  const line = { idle: null, busy: D.exporting, done: D.exportDone, tooMany: `${D.exportTooMany} ${later}`, notAllowed: D.exportNotAllowed, failed: D.exportFailed }[status];
   return (
     <div>
       <button type="button" aria-disabled={status === "busy" || undefined} onClick={() => void run()} className="flex min-h-[64px] w-full items-center gap-3 py-2.5 text-left transition-colors duration-fast hover:bg-brand-50">
@@ -158,7 +161,7 @@ function ExportRow() {
         <ChevronRight aria-hidden size={18} className="shrink-0 text-brand-text-muted" />
       </button>
       {line && (
-        <p role={status === "failed" || status === "tooMany" ? "alert" : "status"} className="pb-2 text-sm">
+        <p role={status === "failed" || status === "tooMany" || status === "notAllowed" ? "alert" : "status"} className="pb-2 text-sm">
           {line}
         </p>
       )}

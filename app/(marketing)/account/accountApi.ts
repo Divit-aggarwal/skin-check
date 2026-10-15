@@ -6,7 +6,7 @@ import { NOTIFICATIONS_ROUTE, SENDABLE_TYPES, WAITS_ON, type LocalTime, type Not
 // lib/feature-contracts and tested with its fixtures (tests/account-mm.test.ts).
 // fetch is passed in so the tests need no browser.
 
-export type Result<T> = { ok: true; data: T } | { ok: false; status: number; code?: string | undefined };
+export type Result<T> = { ok: true; data: T } | { ok: false; status: number; code?: string | undefined; retryAfter?: number | undefined };
 type Fetch = typeof fetch;
 
 async function call<T>(f: Fetch, token: string, url: string, init?: { method: string; body: unknown }): Promise<Result<T>> {
@@ -65,11 +65,21 @@ export function exportFileName(disposition: string | null, now = new Date()): st
 export async function fetchExport(f: Fetch, token: string): Promise<Result<{ blob: Blob; name: string }>> {
   try {
     const res = await f(EXPORT_ROUTE, { headers: { authorization: `Bearer ${token}` } });
-    if (!res.ok) return { ok: false, status: res.status, code: ((await res.json().catch(() => null)) as { code?: string } | null)?.code };
+    if (!res.ok) {
+      const code = ((await res.json().catch(() => null)) as { code?: string } | null)?.code;
+      const retry = Number(res.headers.get("retry-after"));
+      return { ok: false, status: res.status, code, ...(retry > 0 ? { retryAfter: retry } : {}) };
+    }
     return { ok: true, data: { blob: await res.blob(), name: exportFileName(res.headers.get("content-disposition")) } };
   } catch {
     return { ok: false, status: 0 };
   }
+}
+
+/** "in about 3 hours" / "in about 20 minutes" from a Retry-After in seconds; null when unknown. */
+export function retryIn(seconds: number | undefined): { hours: number } | { minutes: number } | null {
+  if (!seconds) return null;
+  return seconds >= 3600 ? { hours: Math.ceil(seconds / 3600) } : { minutes: Math.max(1, Math.ceil(seconds / 60)) };
 }
 
 /** Saves a blob through a temporary link. */

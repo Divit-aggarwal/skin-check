@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { exportFileName, fetchExport, getConsents, getPrefs, optimistic, patchType, postConsent, rowState, timeLabel } from "@/app/(marketing)/account/accountApi";
+import { exportFileName, fetchExport, retryIn, getConsents, getPrefs, optimistic, patchType, postConsent, rowState, timeLabel } from "@/app/(marketing)/account/accountApi";
 import { answerText, initials, profileFrom } from "@/app/(marketing)/account/profile";
 import { ACCOUNT_COPY } from "@/app/(marketing)/account/copy";
 import { consentsFixture, dataExportFixture, notificationPrefsFixture } from "@/lib/feature-contracts/fixtures";
@@ -89,7 +89,11 @@ describe("export (22)", () => {
 
   it("names the file by date without a header, and reports 429", async () => {
     expect(exportFileName(null, new Date("2026-10-15T10:00:00Z"))).toBe("project-skin-data-2026-10-15.json");
-    expect(await fetchExport(vi.fn().mockResolvedValue(json(429, { code: "TOO_MANY" })), "t")).toEqual({ ok: false, status: 429, code: "TOO_MANY" });
+    expect(await fetchExport(vi.fn().mockResolvedValue(json(429, { code: "TOO_MANY" }, { "retry-after": "7300" })), "t")).toEqual({ ok: false, status: 429, code: "TOO_MANY", retryAfter: 7300 });
+    expect(await fetchExport(vi.fn().mockResolvedValue(json(403, { code: "NOT_ALLOWED" })), "t")).toEqual({ ok: false, status: 403, code: "NOT_ALLOWED" });
+    expect(retryIn(7300)).toEqual({ hours: 3 });
+    expect(retryIn(90)).toEqual({ minutes: 2 });
+    expect(retryIn(undefined)).toBeNull();
   });
 });
 
