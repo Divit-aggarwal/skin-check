@@ -1,3 +1,6 @@
+// G37 feature contracts: shapes, route signatures, constants and fixtures shared by
+// the backend and UI agents. Unlike lib/contracts (types only, TD-13), these
+// may hold runtime values. Owned by the main session; agents request changes.
 // G31 (TD-51 (2)): per-type notification switches, types from mockup 20.
 // Types only plus the route signature; BE1 implements, lane E draws screen 20.
 //

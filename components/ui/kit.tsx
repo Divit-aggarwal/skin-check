@@ -3,16 +3,18 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
-import { ArrowRight, Dot, Hand, Package, Pipette, ShowerHead, Sun, ArrowUp, Check, ChevronLeft, ChevronRight, CircleDot, Contrast, Droplet, Flame, Waves, type LucideIcon } from "lucide-react";
+import { ArrowRight, Dot, Hand, Package, Pipette, ShowerHead, Sun, ArrowUp, Check, ChevronLeft, ChevronRight, CircleDot, Contrast, Droplet, Flame, Waves, Angry, Droplets, Frown, Laugh, Meh, Smile, Zap, type LucideIcon } from "lucide-react";
+import type { ChangeSlot as ChangeSlotData } from "@/lib/feature-contracts/readings-series";
+import type { CheckinQuestion } from "@/lib/feature-contracts/checkin";
 import { cn } from "@/lib/utils";
 import { card, heroCard, tintCard } from "./classes";
 
 // The redesign kit (TD-50, docs/lanes/redesign-report.md). Pieces that page.tsx
 // does not already have. Every piece here renders only what it is given: no
-// sample numbers, no change words. Anything that shows change between checks
-// (deltas, arrows, status pills, sparklines, trend charts, before/after) is
-// deliberately absent (TD-47(4), TD-24, D-12); MetricTile and the 09–12
-// layouts keep a `footer` slot where those could go later.
+// sample numbers, no change words, no better/worse colours. Over time (TD-54):
+// LevelTimeline draws the stored level of each check, PhotoStrip the user's own
+// photos, and ChangeSlot a change value only when the comparability gate has
+// opened it (lib/contracts/readings-series.ts); otherwise "needs more checks".
 
 /* ─── Header ─────────────────────────────────────────────────────────── */
 
@@ -307,16 +309,19 @@ export function StatusMark({ status, label }: { status: StepStatus; label?: stri
 }
 
 /** A switch. Busy keeps it focusable (aria-disabled), as the rest of the app does. */
-export function ToggleRow({ label, description, checked, onChange, busy, disabled }: { label: string; description?: string | undefined; checked: boolean; onChange: (v: boolean) => void; busy?: boolean; disabled?: boolean }) {
+export function ToggleRow({ label, description, checked, onChange, busy, disabled, icon, iconClassName, trailing }: { label: string; description?: string | undefined; checked: boolean; onChange: (v: boolean) => void; busy?: boolean; disabled?: boolean; icon?: LucideIcon | undefined; iconClassName?: string | undefined; trailing?: React.ReactNode }) {
+  // icon, trailing (G37): screens 20 and 22 put an icon well before the text and a time chip before the switch.
   // disabled: a switch whose backend does not exist yet (kit request E1). Focusable, never changes.
   const id = useId();
   const off = busy || disabled;
   return (
     <div className="flex items-start gap-3 py-3">
+      {icon && <IconWell icon={icon} size={36} className={iconClassName} />}
       <div className="min-w-0 flex-1">
         <p id={`${id}-l`} className="font-medium text-brand-text">{label}</p>
         {description && <p id={`${id}-d`} className="mt-0.5 text-sm text-brand-text-muted">{description}</p>}
       </div>
+      {trailing}
       <button
         type="button"
         role="switch"
@@ -466,3 +471,175 @@ export const Skel = {
   Hero: () => <div aria-hidden className={cn(block, "h-[180px]")} />,
   Photo: () => <div aria-hidden className={cn(block, "aspect-[3/4] rounded-tile")} />,
 };
+
+/* ─── Over time (TD-54) ──────────────────────────────────────────────── */
+
+const LEVELS = ["Low", "Moderate", "Elevated"] as const;
+type Level = (typeof LEVELS)[number];
+
+/** Stroke colour per reading for the timeline line (identity colour, never good/bad). */
+const READING_STROKE: Record<Reading, string> = {
+  redness: "text-concern-redness",
+  oiliness: "text-concern-oiliness",
+  texture: "text-concern-texture",
+  blemishes: "text-concern-blemishes",
+  pigment: "text-concern-pigment",
+};
+
+/**
+ * The stored level of one reading at each check, oldest first, on three level
+ * rows. Only real checks; a check with no level is a gap. A hidden table gives
+ * the same points to screen readers.
+ */
+export function LevelTimeline({ reading, label, points }: { reading: Reading; label: string; points: { key: string; dateLabel: string; band: Level | null }[] }) {
+  const w = 320;
+  const h = 132;
+  const left = 72;
+  const rowY = (l: Level) => 16 + (2 - LEVELS.indexOf(l)) * 40;
+  const x = (i: number) => (points.length < 2 ? (left + w) / 2 : left + 8 + (i * (w - left - 16)) / (points.length - 1));
+  const drawn = points.map((p, i) => (p.band ? { x: x(i), y: rowY(p.band) } : null));
+  const segments: string[] = [];
+  drawn.forEach((p, i) => {
+    const prev = drawn[i - 1];
+    if (p && prev) segments.push(`M${prev.x},${prev.y}L${p.x},${p.y}`);
+  });
+  return (
+    <figure className="w-full">
+      <svg aria-hidden viewBox={`0 0 ${w} ${h + 20}`} className={cn("w-full", READING_STROKE[reading])}>
+        {LEVELS.map((l) => (
+          <g key={l}>
+            <line x1={left} x2={w} y1={rowY(l)} y2={rowY(l)} className="stroke-brand-border" strokeDasharray="3 4" />
+            <text x={0} y={rowY(l) + 4} className="fill-brand-text-muted text-[11px]">{l}</text>
+          </g>
+        ))}
+        <path d={segments.join("")} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+        {drawn.map((p, i) => p && <circle key={points[i]!.key} cx={p.x} cy={p.y} r={4.5} fill="currentColor" className="stroke-white" strokeWidth={1.5} />)}
+        {points.map((p, i) => (
+          <text key={p.key} x={x(i)} y={h + 14} textAnchor="middle" className="fill-brand-text-muted text-[10px]">{p.dateLabel}</text>
+        ))}
+      </svg>
+      <table className="sr-only">
+        <caption>{label}</caption>
+        <tbody>
+          {points.map((p) => (
+            <tr key={p.key}><th scope="row">{p.dateLabel}</th><td>{p.band ?? "No reading"}</td></tr>
+          ))}
+        </tbody>
+      </table>
+    </figure>
+  );
+}
+
+/** The user's own photos in a row of four, each with its label ("Today", a date). Never stock images. */
+export function PhotoStrip({ photos, action }: { photos: { key: string; src: string; alt: string; label: string }[]; action?: React.ReactNode }) {
+  return (
+    <div>
+      <ul className="grid grid-cols-4 gap-2">
+        {photos.slice(-4).map((p) => (
+          <li key={p.key}><PhotoTile src={p.src} alt={p.alt} label={p.label} fallback="Photo not kept" /></li>
+        ))}
+      </ul>
+      {action}
+    </div>
+  );
+}
+
+/**
+ * A change value, only when the comparability gate opened it; otherwise the
+ * "needs more checks" state with how many comparable checks there are.
+ */
+export function ChangeSlot({ slot }: { slot: ChangeSlotData }) {
+  if (slot.status === "needs_more_checks") {
+    return (
+      <p className="text-xs text-brand-text-muted">
+        <span className="rounded-full bg-brand-50 px-2 py-0.5 font-medium">Needs more checks</span>{" "}
+        {slot.comparableCount} of {slot.needed} comparable
+      </p>
+    );
+  }
+  const sign = slot.change > 0 ? "+" : slot.change < 0 ? "−" : "";
+  return (
+    <p className="text-sm text-brand-text">
+      <span className="font-semibold">{sign}{Math.abs(slot.change).toFixed(1)} {slot.unit}</span>
+      <span className="ml-1 text-xs text-brand-text-muted">{slot.label}</span>
+    </p>
+  );
+}
+
+/* ─── Store (TD-52) ──────────────────────────────────────────────────── */
+
+const inr = new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 });
+
+/** Live store price; the was-price only when the data gives one (higher than the price). */
+export function PriceBlock({ price, wasPrice, available, className }: { price: number; wasPrice: number | null; available: boolean; className?: string | undefined }) {
+  return (
+    <p className={cn("flex items-baseline gap-2", className)}>
+      <span className="text-lg font-semibold text-brand-text">{inr.format(price)}</span>
+      {wasPrice !== null && <s className="text-sm text-brand-text-muted"><span className="sr-only">Was </span>{inr.format(wasPrice)}</s>}
+      {!available && <span className="text-sm font-medium text-brand-text-muted">Out of stock</span>}
+    </p>
+  );
+}
+
+/* ─── Weekly check-in (E19) ──────────────────────────────────────────── */
+
+const CHECKIN_ICON: Record<string, LucideIcon> = { Laugh, Smile, Meh, Frown, Angry, Droplet, Waves, Droplets, Zap };
+
+/** One numbered check-in question, single choice, drawn from the contract (faces, pills or icon tiles). */
+export function CheckinQuestionCard({ n, question, value, onChange }: { n: number; question: CheckinQuestion; value: string | undefined; onChange: (id: string) => void }) {
+  const id = useId();
+  const cols = question.layout === "faces" ? "grid-cols-5" : question.options.length === 2 ? "grid-cols-2" : "grid-cols-4";
+  return (
+    <section className={cn(card, "p-4 sm:p-4")} aria-labelledby={id}>
+      <h2 id={id} className="flex items-center gap-3 font-semibold text-brand-text">
+        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-700">{n}</span>
+        {question.text}
+      </h2>
+      <div role="radiogroup" aria-labelledby={id} className={cn("mt-3 grid gap-2", cols)}>
+        {question.options.map((o) => {
+          const Icon = o.icon ? CHECKIN_ICON[o.icon] : undefined;
+          const on = value === o.id;
+          return (
+            <button
+              key={o.id}
+              type="button"
+              role="radio"
+              aria-checked={on}
+              onClick={() => onChange(o.id)}
+              className={cn(
+                "flex min-h-11 flex-col items-center justify-center gap-1 border text-sm font-medium transition-colors duration-fast",
+                question.layout === "pills" ? "rounded-full px-2" : "rounded-tile px-1 py-2",
+                on ? "border-brand-700 bg-brand-100 text-brand-700" : "border-brand-border bg-brand-surface text-brand-text",
+              )}
+            >
+              {Icon && question.layout === "tiles" && <Icon aria-hidden size={22} />}
+              <span className="text-center leading-tight">{o.label}</span>
+              {Icon && question.layout === "faces" && <Icon aria-hidden size={24} />}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/* ─── Echo avatar ────────────────────────────────────────────────────── */
+
+/** Echo's mark (mockup 18): a soft mint sphere with a pale ring and two eyes. Our own SVG (docs/ASSETS.md). */
+export function EchoAvatar({ size = 40, className }: { size?: number; className?: string | undefined }) {
+  const gid = useId().replace(/:/g, "");
+  return (
+    <svg aria-hidden width={size} height={size} viewBox="0 0 100 100" className={className}>
+      <defs>
+        <radialGradient id={`${gid}-f`} cx="42%" cy="35%" r="70%">
+          <stop offset="0%" stopColor="#FFFFFF" />
+          <stop offset="55%" stopColor="#E3F5EA" />
+          <stop offset="100%" stopColor="#BFE6CF" />
+        </radialGradient>
+      </defs>
+      <circle cx="50" cy="50" r="46" fill={`url(#${gid}-f)`} stroke="#CFE4E8" strokeWidth="5" />
+      <ellipse cx="38" cy="52" rx="4.2" ry="6.8" fill="#0B4A3E" />
+      <ellipse cx="62" cy="52" rx="4.2" ry="6.8" fill="#0B4A3E" />
+    </svg>
+  );
+}

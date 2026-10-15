@@ -5,7 +5,7 @@
 
 import { z } from "zod";
 import { CATALOGUE } from "@/lib/catalog/catalogue";
-import { STORE_CACHE_SECONDS, STORE_ORIGIN, type StoreProduct } from "@/lib/contracts/store-products";
+import { STORE_CACHE_SECONDS, STORE_ORIGIN, type StoreProduct } from "@/lib/feature-contracts/store-products";
 
 const Money = z.string().regex(/^\d+(\.\d+)?$/).transform(Number);
 const FeedSchema = z.object({
