@@ -406,16 +406,18 @@ export function withdrawalOutcome(status: number): "saved" | "stale" | "retry" {
 /**
  * Every check with a measured reading, as lib/readings/series.ts takes them:
  * the record picked as Echo picks it, its skinstate-2 read, and whether its
- * record says the front photo was kept (shown only if /api/checks/photo finds
- * it, H27). Side photos are not stored yet (C10). Screen 16 (lane C).
+ * record says each photo was kept (front `image`, sides `sideImages`, C10;
+ * shown only if /api/checks/photo finds it, H27). Screen 16 (lane C).
  */
 export function seriesChecks(uid: string, checks: readonly Doc[], analyses: readonly Doc[]): SeriesCheck[] {
   return Array.from(primaryPerScan(uid, analyses).values()).map((m) => {
-    const image = checks.find((c) => c.id === m.scanId)?.data.image;
+    const data = checks.find((c) => c.id === m.scanId)?.data ?? {};
+    const kept = (v: unknown) => isObj(v) && v.stored === true;
+    const sides = isObj(data.sideImages) ? data.sideImages : {};
     return {
       view: measuredView(m),
       state: { kind: "skinstate", state: m.state },
-      photos: { front: isObj(image) && image.stored === true, left: false, right: false },
+      photos: { front: kept(data.image), left: kept(sides.left), right: kept(sides.right) },
     };
   });
 }
