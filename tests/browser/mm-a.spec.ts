@@ -66,8 +66,9 @@ test("four checks: Skin Twin, one reading, Progress and an opened check", async 
   const opened = page.locator("section", { has: page.getByRole("heading", { name: /Check from/ }) });
   await expect(opened.getByText(C.history.pastLine)).toBeVisible();
   await expect(opened.getByText(K.checkNumber(4, 4))).toBeVisible();
-  await expect(opened.getByRole("list", { name: K.wholeFace }).getByText("Needs more checks")).toHaveCount(5);
-  await expect(opened).not.toContainText(NO_CHANGE);
+  // The whole-face tiles sit just after the check's section (each reading's name shows once inside it).
+  await expect(page.getByRole("main").getByRole("list", { name: K.wholeFace }).getByText("Needs more checks")).toHaveCount(5);
+  await expect(page.getByRole("main")).not.toContainText(NO_CHANGE);
 });
 
 test("one check: Progress and the reading show one point and need more checks", async ({ page }) => {
