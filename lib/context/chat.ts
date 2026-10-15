@@ -81,12 +81,13 @@ export async function recordReferral(uid: string, scanId: string, region: EchoRe
   await recordBestEffort(uid, scanId, region, message, reply, { ...NO_CALL, packageVersion: null, packageSha256: null, prefilter: kind, redFlag: kind === "red_flag", latencyMs: 0 });
 }
 
-export async function handleContextChat(input: { uid: string; scanId: string; region: EchoRegion; message: string; opening?: boolean }): Promise<ContextChatResult> {
+/** `personalised: false` (H36 personalisation withdrawn): Echo still answers, with no product suggestions. */
+export async function handleContextChat(input: { uid: string; scanId: string; region: EchoRegion; message: string; opening?: boolean; personalised?: boolean }): Promise<ContextChatResult> {
   const { uid, scanId, region } = input;
   // TD-34: the opening is a fixed request about the whole face, outside any thread.
   const opening = input.opening === true;
   const message = opening ? OPENING_MESSAGE : input.message;
-  const ownProducts = echoProductsOn();
+  const ownProducts = echoProductsOn() && input.personalised !== false;
   const started = Date.now();
   const meta = (m: Omit<EchoTurnRecord, "latencyMs">): EchoTurnRecord => ({ ...m, latencyMs: Date.now() - started });
 
