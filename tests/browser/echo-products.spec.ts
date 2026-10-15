@@ -60,7 +60,7 @@ for (const width of ["390", "768", "1280"] as const) {
         await expect(card).toContainText(`${E.echoNote}:`);
         // TD-52 (C-mm-4): the store is read (STORE_LOCAL_FEED), so the card shows a price and one store action.
         await expect(card).toContainText("₹");
-        await expect(card.getByRole("link", { name: /^View .+ in the store$|to cart on the store$/ })).toHaveAttribute("href", /^https:\/\/theprojectskin\.com\/(products|cart)\//);
+        await expect(card.getByRole("link", { name: /^View .+ in the store( \(opens in a new tab\))?$|to cart on the store( \(opens in a new tab\))?$/ })).toHaveAttribute("href", /^https:\/\/theprojectskin\.com\/(products|cart)\//);
         // Redesign lane C (screen 15): each card links to our product page.
         await expect(card.getByRole("link", { name: PRODUCTS_COPY.detailsLabel(p.name) })).toHaveAttribute("href", `/products/${p.id}`);
       }
