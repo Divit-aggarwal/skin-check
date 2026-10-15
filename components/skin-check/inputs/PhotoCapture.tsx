@@ -186,7 +186,12 @@ export function PhotoCapture({ step, scanId, value, onChange, onCommit, scan, on
     captureMethodRef.current = captureMethod;
     dispatch({ type: "captured", photoId });
     void frameFromBlob(blob).then((frame) =>
-      dispatch({ type: "gateResult", photoId, quality: runCaptureGate(frame, { captureMethod, retakeCount: 0 }, undefined, live) })
+      dispatch({
+        type: "gateResult",
+        photoId,
+        // Without live checks (flag off, or today's capture) the call is today's.
+        quality: live ? runCaptureGate(frame, { captureMethod, retakeCount: 0 }, undefined, live) : runCaptureGate(frame, { captureMethod, retakeCount: 0 }),
+      })
     );
   }, []);
 
