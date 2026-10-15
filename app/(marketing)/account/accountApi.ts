@@ -1,6 +1,6 @@
 import { CONSENTS_ROUTE, CONSENT_TEXTS, type ConsentState, type NewConsentPurpose } from "@/lib/feature-contracts/consents";
 import { EXPORT_ROUTE } from "@/lib/feature-contracts/data-export";
-import { NOTIFICATIONS_ROUTE, SENDABLE_TYPES, WAITS_ON, type LocalTime, type NotificationPrefs, type NotificationType } from "@/lib/feature-contracts/notifications";
+import { NOTIFICATIONS_ROUTE, SENDABLE_TYPES, WAITS_ON, type NotificationPrefs, type NotificationType } from "@/lib/feature-contracts/notifications";
 
 // Screens 20 and 22 (G37): calls to the G31, H36 and H37 routes, built against
 // lib/feature-contracts and tested with its fixtures (tests/account-mm.test.ts).
@@ -31,12 +31,6 @@ export const patchType = (f: Fetch, token: string, type: NotificationType, on: b
 export function rowState(type: NotificationType): { disabled: boolean; waitsOn: string | undefined } {
   const disabled = !SENDABLE_TYPES.includes(type);
   return { disabled, waitsOn: disabled ? WAITS_ON[type] : undefined };
-}
-
-/** "08:00" → "8:00 AM". */
-export function timeLabel(t: LocalTime): string {
-  const [h, m] = t.split(":").map(Number) as [number, number];
-  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "AM" : "PM"}`;
 }
 
 export const getConsents = (f: Fetch, token: string) => call<{ consents: ConsentState[] }>(f, token, CONSENTS_ROUTE);

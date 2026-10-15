@@ -71,7 +71,8 @@ export const ACCOUNT_COPY = {
     needsConsent: "Turn on marketing messages under Privacy first.",
     notAllowed: "This account cannot change reminders.",
     tooMany: "Too many changes at once. Please wait a minute and try again.",
-    everyDay: (day: string) => `Every ${day}`,
+    onceADay: "Once a day",
+    weekly: (day: string) => `${day}s`,
     days: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"],
     sections: {
       routine: { title: "Daily routine reminders", note: "A reminder to follow your routine." },
@@ -90,7 +91,8 @@ export const ACCOUNT_COPY = {
       echo_tips: { label: "Tips from Echo", note: "" },
       marketing: { label: "Product launches and offers", note: "" },
     },
-    noProducts: "No product reminders stored.",
+    noProducts: "No products in your routine yet.",
+    routineFailed: "Your routine could not be loaded.",
   },
 
   // Mockup 22 (H36 behind consentsUi(), H37 behind dataExportUi()).

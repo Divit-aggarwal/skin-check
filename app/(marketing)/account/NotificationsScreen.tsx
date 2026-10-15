@@ -7,7 +7,9 @@ import { HomeSettingsSection } from "@/components/dashboard/HomeSettingsSection"
 import { btnSecondary, card } from "@/components/ui/page";
 import { ProductTile, Skel, ToggleRow } from "@/components/ui/kit";
 import { WAITS_ON, type NotificationPrefs, type NotificationType } from "@/lib/feature-contracts/notifications";
-import { getPrefs, optimistic, patchType, rowState, timeLabel, type Result } from "./accountApi";
+import { useRoutine } from "@/components/routine/useRoutine";
+import { OTHER_PRODUCT_ID } from "@/lib/routine/events";
+import { getPrefs, optimistic, patchType, rowState, type Result } from "./accountApi";
 import { ACCOUNT_COPY } from "./copy";
 
 const N = ACCOUNT_COPY.notify;
@@ -72,7 +74,8 @@ export function NotificationsScreen({ products }: { products: ProductInfo }) {
   const row = (type: NotificationType, p: NotificationPrefs) => {
     const { disabled, waitsOn } = rowState(type);
     const t = N.types[type];
-    const chip = type === "routine_morning" ? timeLabel(p.morningTime) : type === "routine_evening" ? timeLabel(p.eveningTime) : type === "weekly_checkin" ? N.everyDay(N.days[p.weeklyCheckinDay]!) : null;
+    // No clock time on screen: the daily push picks its own hour (stored times stay in the data only).
+    const chip = type === "routine_morning" || type === "routine_evening" ? N.onceADay : type === "weekly_checkin" ? N.weekly(N.days[p.weeklyCheckinDay]!) : null;
     return (
       <ToggleRow
         key={type}
@@ -129,13 +132,21 @@ export function NotificationsScreen({ products }: { products: ProductInfo }) {
   );
 }
 
-/** One disabled switch per stored product id, with its store photo (or the neutral tile). */
+/**
+ * One disabled switch per product in the user's current routine (the routine
+ * read, /api/routine/events), on/off from prefs.products (default off), with
+ * its store photo or the neutral tile. product_usage is not sendable yet.
+ */
 function ProductRows({ prefs, products }: { prefs: NotificationPrefs; products: ProductInfo }) {
-  const ids = Object.keys(prefs.products);
-  if (!ids.length) return <ToggleRow label={N.types.product_usage.label} description={WAITS_ON.product_usage} icon={Sparkles} checked={prefs.types.product_usage} disabled onChange={() => undefined} />;
+  const { data, failed } = useRoutine();
+  if (failed) return <p role="alert" className="py-3 text-sm">{N.routineFailed}</p>;
+  if (!data) return <div role="status" aria-label={N.loading} className="py-2"><Skel.Row /></div>;
+  const items = data.routine.filter((i) => i.productId !== OTHER_PRODUCT_ID);
+  if (!items.length) return <ToggleRow label={N.types.product_usage.label} description={`${N.noProducts} ${WAITS_ON.product_usage}`} icon={Sparkles} checked={false} disabled onChange={() => undefined} />;
+  const name = (id: string) => products[id]?.title ?? data.products.find((p) => p.id === id)?.name ?? id;
   return (
     <>
-      {ids.map((id) => (
+      {items.map(({ productId: id }) => (
         <div key={id} className="flex items-start gap-3">
           {products[id]?.image ? (
             // eslint-disable-next-line @next/next/no-img-element -- store CDN photo; next.config images is shared (kit-requests).
@@ -144,7 +155,7 @@ function ProductRows({ prefs, products }: { prefs: NotificationPrefs; products: 
             <ProductTile step={null} size={48} className="mt-2" />
           )}
           <div className="min-w-0 flex-1">
-            <ToggleRow label={products[id]?.title ?? id} description={WAITS_ON.product_usage} checked={prefs.products[id] === true} disabled onChange={() => undefined} />
+            <ToggleRow label={name(id)} description={WAITS_ON.product_usage} checked={prefs.products[id] === true} disabled onChange={() => undefined} />
           </div>
         </div>
       ))}
