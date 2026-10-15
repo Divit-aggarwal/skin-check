@@ -14,7 +14,7 @@ import { card, heroCard, tintCard } from "./classes";
 // sample numbers, no change words, no better/worse colours. Over time (TD-54):
 // LevelTimeline draws the stored level of each check, PhotoStrip the user's own
 // photos, and ChangeSlot a change value only when the comparability gate has
-// opened it (lib/contracts/readings-series.ts); otherwise "needs more checks".
+// opened it (lib/feature-contracts/readings-series.ts); otherwise "needs more checks".
 
 /* ─── Header ─────────────────────────────────────────────────────────── */
 

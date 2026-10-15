@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import feed from "./fixtures/store-products-2026-10-15.json";
 import { sanitizeDescription, toStoreProducts } from "@/lib/store/products";
-import { cartUrl } from "@/lib/contracts/store-products";
+import { cartUrl } from "@/lib/feature-contracts/store-products";
 
 // TD-52: live store data. Feed saved from theprojectskin.com/products.json on 2026-10-15 (trimmed to the fields read).
 describe("store products (TD-52)", () => {
