@@ -91,14 +91,16 @@ export async function PATCH(request: NextRequest) {
   const patch = parsed.data;
 
   // The same markers the Firestore rules check for client writes (H04, H24).
+  // An erased account writes nothing (the sweep must not find new data); an
+  // under-18 account may switch off and change times, never switch on.
+  const on = TYPES.filter((t) => patch.types?.[t] === true);
   const [erased, under18] = await Promise.all([
     adminDb().collection("erasedAccounts").doc(uid).get(),
     adminDb().collection("under18Accounts").doc(uid).get(),
   ]);
-  if (erased.exists || under18.exists) return fail(403, "NOT_ALLOWED");
+  if (erased.exists || (on.length > 0 && under18.exists)) return fail(403, "NOT_ALLOWED");
 
   // Switching off is always allowed. Consent first, so a missing marketing grant says so.
-  const on = TYPES.filter((t) => patch.types?.[t] === true);
   if (on.includes("marketing") && !(await marketingGranted(uid))) return fail(409, "NEEDS_CONSENT");
   if (on.some((t) => !SENDABLE_TYPES.includes(t))) return fail(409, "NOT_SENDABLE");
 

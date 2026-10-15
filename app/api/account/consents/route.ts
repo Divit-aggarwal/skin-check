@@ -67,11 +67,13 @@ export async function POST(request: NextRequest) {
   if (version !== text.version) return fail(409, "VERSION_STALE");
   try {
     // The same markers the Firestore rules check for client writes (H04, H24).
+    // An erased account writes nothing (the sweep must not find new data); an
+    // under-18 account may always withdraw, never grant.
     const [erased, under18] = await Promise.all([
       adminDb().collection("erasedAccounts").doc(uid).get(),
       adminDb().collection("under18Accounts").doc(uid).get(),
     ]);
-    if (erased.exists || under18.exists) return fail(403, "NOT_ALLOWED");
+    if (erased.exists || (granted && under18.exists)) return fail(403, "NOT_ALLOWED");
     await appendConsent(uid, { purpose, granted, version: text.version, copy: text.copy, scanId: null, source: "consent_route" });
     // The entry just written is the newest, so it is the state (its stored time is the server's, within a moment of this one).
     const state: ConsentState = { purpose, granted, version: text.version, at: new Date().toISOString() };

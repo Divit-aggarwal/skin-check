@@ -151,13 +151,22 @@ describe("G31: GET/PATCH /api/account/notifications", () => {
     expect(docs.has(settings("notifications"))).toBe(false);
   });
 
-  it("403 for an erased or under-18 account; nothing written", async () => {
+  it("403 for an erased account, and for an under-18 account switching on; nothing written", async () => {
     docs.set("erasedAccounts/uid-be1", {});
     expect((await patch({ types: { weekly_checkin: true } })).status).toBe(403);
+    expect((await patch({ types: { weekly_checkin: false } })).status).toBe(403);
     docs.clear();
     docs.set("under18Accounts/uid-be1", {});
     expect((await patch({ types: { weekly_checkin: true } })).status).toBe(403);
     expect(docs.has(settings("notifications"))).toBe(false);
+  });
+
+  it("an under-18 account can always switch off", async () => {
+    docs.set("under18Accounts/uid-be1", {});
+    docs.set(settings("home"), { reminders: "allowed" });
+    const res = await patch({ types: { routine_morning: false } });
+    expect(res.status).toBe(200);
+    expect((await getPrefs()).types.routine_morning).toBe(false);
   });
 
   it("H36: a withdrawn (or never given) marketing consent reads the marketing type off", async () => {
@@ -243,6 +252,13 @@ describe("H36: GET/POST /api/account/consents", () => {
     docs.clear();
     docs.set("erasedAccounts/uid-be1", {});
     expect((await grant("marketing", true)).status).toBe(403);
+    expect((await grant("personalisation", false)).status).toBe(403);
+  });
+
+  it("an under-18 account can always withdraw (personalisation starts on)", async () => {
+    docs.set("under18Accounts/uid-be1", {});
+    expect((await grant("personalisation", false)).status).toBe(200);
+    expect((await getConsents())[0]).toMatchObject({ purpose: "personalisation", granted: false });
   });
 
   // Known: product_improvement's contract title and copy say "improve" (BANNED_WORDS).
