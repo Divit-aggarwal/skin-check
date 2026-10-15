@@ -36,11 +36,11 @@ export function ProductDetail({ id, store }: { id: string; store: StoreProduct |
         <section className="flex items-start gap-4">
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             {info && <p className={eyebrow}>{STEP_LABEL[info.step]}</p>}
-            <h1 className="break-words text-[28px] font-semibold leading-tight text-brand-text sm:text-[32px]">{p.name}</h1>
+            <h1 className="break-words text-[26px] font-semibold leading-tight text-brand-text min-[375px]:text-[28px] sm:text-[32px]">{p.name}</h1>
             <p className="text-brand-text-muted">{C.ownLine}</p>
           </div>
           {/* The mockup's hero: the store's first photo beside the title; the rest below. */}
-          <ProductPhoto image={store?.images[0]} step={info?.step} width={store?.images[0] ? 144 : 96} height={store?.images[0] ? 176 : 96} alt={store?.images[0] ? C.photoAlt(p.name, 1) : ""} priority />
+          <ProductPhoto image={store?.images[0]} step={info?.step} width={store?.images[0] ? 144 : 96} height={store?.images[0] ? 176 : 96} alt={store?.images[0] ? C.photoAlt(p.name, 1) : ""} priority className={store?.images[0] ? "aspect-[9/11] h-auto w-[30%] max-w-36" : ""} />
         </section>
 
         {store && store.images.length > 1 && (
