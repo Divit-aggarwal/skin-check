@@ -1,6 +1,6 @@
 # Rollback, 2026-10-16 (G37 rules deploy and S3 IAM)
 
-These are the live versions from just before the owner-approved changes of 2026-10-16 (TD-56, G38). The account ID has been removed from the IAM files; the bucket ARN is real.
+These are the live versions from just before the owner-approved changes of 2026-10-16 (TD-56, G38). The IAM files hold no account ID; the bucket ARN is the real one.
 
 **Firestore rules** (project projectskin-a202c):
 ```
