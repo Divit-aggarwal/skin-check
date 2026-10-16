@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { BarChart3, Camera, Lightbulb, Moon, Sparkles, Sun, Tag, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { HomeSettingsSection } from "@/components/dashboard/HomeSettingsSection";
-import { btnSecondary, card } from "@/components/ui/page";
+import { btnSecondary, card, h2 } from "@/components/ui/page";
 import { ProductTile, Skel, ToggleRow } from "@/components/ui/kit";
 import { WAITS_ON, type NotificationPrefs, type NotificationType } from "@/lib/feature-contracts/notifications";
 import { useRoutine } from "@/components/routine/useRoutine";
@@ -115,7 +115,7 @@ export function NotificationsScreen({ products }: { products: ProductInfo }) {
           )}
           {SECTIONS.map(({ key, types }) => (
             <section key={key} aria-labelledby={`n-${key}`} className={`${card} !pb-1`}>
-              <h2 id={`n-${key}`} className="text-[17px] font-semibold leading-tight text-brand-text">
+              <h2 id={`n-${key}`} className={h2}>
                 {N.sections[key].title}
               </h2>
               <p className="mt-0.5 text-[13px] text-brand-text-muted">{N.sections[key].note}</p>

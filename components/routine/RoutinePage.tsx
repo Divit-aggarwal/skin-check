@@ -6,7 +6,7 @@ import { ChevronRight, Info, Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { ROUTINE_COPY as C } from "@/lib/routine/copy";
 import { OTHER_PRODUCT_ID as OTHER, type Schedule } from "@/lib/routine/events";
-import { btnPrimary, btnSecondary, card, ErrorState, h2, LoadingState, PageHeader, ReloadButton, SignedOutCard } from "@/components/ui/page";
+import { btnPrimary, btnSecondary, card, ErrorState, h2, lead, LoadingState, PageHeader, ReloadButton, SignedOutCard, titleDisplay } from "@/components/ui/page";
 import { Arrow, IconWell, SegmentedControl } from "@/components/ui/kit";
 import { slotNow } from "@/lib/home/today";
 import { dueEntries, SlotSteps, STEPS, stepOf, type Slot, type Step } from "./RoutineSteps";
@@ -75,8 +75,8 @@ export function RoutinePage() {
       <div data-keep className="flex flex-col gap-4">
         {/* Screen 03: the time of day's title and how many steps are due; no time estimates (none are stored). */}
         <div className="pt-1 sm:pt-12">
-          <h1 className="text-[32px] font-semibold leading-[1.1] tracking-[-0.02em] text-brand-text">{C.slotTitle[slot]}</h1>
-          <p className="mt-1.5 text-lg text-brand-text-muted">{entries.length > 0 ? C.dueCount(entries.length) : C.nothingInSlot}</p>
+          <h1 className={titleDisplay}>{C.slotTitle[slot]}</h1>
+          <p className={`mt-1.5 ${lead}`}>{entries.length > 0 ? C.dueCount(entries.length) : C.nothingInSlot}</p>
         </div>
         <SegmentedControl label={C.slotSwitch} value={slot} onChange={choose} options={[{ value: "AM", label: C.slot.AM }, { value: "PM", label: C.slot.PM }]} />
         {allLogged && <RoutineLogged entries={entries} slot={slot} eveningWaits={eveningWaits} onSeeEvening={() => choose("PM")} />}

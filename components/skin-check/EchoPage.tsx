@@ -15,7 +15,7 @@ import { newestEchoSession } from "@/components/dashboard/echo-session";
 import { hasQuestionAnswers, safetyQuestionsAnswered } from "@/lib/skin-check-validation";
 import { QUESTIONS_COPY as Q } from "./questionsCopy";
 import { readingsOf, toDate } from "@/components/dashboard/state";
-import { AccountButton, btnGhost, btnPrimary, btnSecondary, card, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton, textLink, tintCard } from "@/components/ui/page";
+import { AccountButton, btnGhost, btnPrimary, btnSecondary, card, EmptyState, SignedOutCard, ErrorState, eyebrow, lead, LoadingState, page, PageHeader, ReloadButton, textLink, tintCard } from "@/components/ui/page";
 import { ChatBubble, ChatInput, Chip, EchoAvatar, IconWell, SuggestionChips, Wordmark } from "@/components/ui/kit";
 import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getEchoOpening, getSkinCheckChatReply, ApiError, type ShownProduct } from "@/lib/api";
@@ -437,7 +437,7 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
         the readings sit beside it (TD-25 (1), from direction B). */}
     <main className="mx-auto flex h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] w-full max-w-[1200px] flex-col sm:h-dvh lg:grid lg:grid-cols-[minmax(0,1fr)_360px]">
       <div className="flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:border-r lg:border-brand-border lg:px-8">
-        <header className="grid shrink-0 grid-cols-[44px_1fr_44px] items-center pt-2 sm:pt-6">
+        <header className="grid shrink-0 grid-cols-[44px_1fr_44px] items-center sm:pt-6">
           <Link
             // K-1: a hand-off from the dashboard goes back there, not to an old results screen.
             href={session.fromDashboard ? "/dashboard" : "/skin-check"}
@@ -446,8 +446,7 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
           >
             <ChevronLeft aria-hidden size={22} />
           </Link>
-          {/* The trailing letter-space would push the word off centre. */}
-          <Wordmark className="justify-self-center pl-[0.35em]" />
+          <Wordmark centred />
           <AccountButton />
         </header>
 
@@ -481,7 +480,7 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
                     {E.title}
                     <Sparkles aria-hidden size={26} className="mt-0.5 text-brand-700" />
                   </h1>
-                  <p className="mt-2 text-lg text-brand-text-muted">{E.tagline}</p>
+                  <p className={`mt-2 ${lead}`}>{E.tagline}</p>
                 </div>
                 {/* Echo's hello in a bubble over its avatar (mockup 18). */}
                 <div className="relative flex w-[46%] max-w-[200px] shrink-0 flex-col items-center">

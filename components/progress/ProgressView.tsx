@@ -11,7 +11,7 @@ import { deriveDashboard } from "@/components/dashboard/state";
 import { readingsOverTime } from "@/lib/readings/series";
 import type { SeriesWindow } from "@/lib/feature-contracts/readings-series";
 import { METRIC_LABELS } from "@/lib/skin-check-skus";
-import { AccountButton, btnPrimary, card, EmptyState, ErrorState, h2, LoadingState, page, ReloadButton, SignedOutCard, textLink } from "@/components/ui/page";
+import { AccountButton, btnPrimary, card, EmptyState, ErrorState, h2, LoadingState, page, ReloadButton, SignedOutCard, subtitle, textLink, titlePage } from "@/components/ui/page";
 import { AppHeader, PhotoTile, TabBar } from "@/components/ui/kit";
 import { fixedLine } from "@/components/checks/ChecksTabs";
 import { LevelTile, latestBand, OwnPhotos, SeriesTimeline, shortDate } from "@/components/checks/OverTime";
@@ -52,13 +52,11 @@ export function ProgressView() {
 
   const header = (
     <>
-      <div className="-mt-1.5">
-        <AppHeader back="/checks" backLabel={C.history.title} right={<AccountButton />} />
-      </div>
-      <header className="flex flex-wrap items-start justify-between gap-3 pb-3 pt-1">
+      <AppHeader back="/checks" backLabel={C.history.title} right={<AccountButton />} />
+      <header className="flex flex-wrap items-start justify-between gap-3 pb-3">
         <div className="min-w-[11rem] flex-1">
-          <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text sm:text-[32px]">{P.title}</h1>
-          <p className="mt-1 text-sm leading-snug text-brand-text-muted">{P.intro}</p>
+          <h1 className={titlePage}>{P.title}</h1>
+          <p className={`mt-1 ${subtitle}`}>{P.intro}</p>
         </div>
         {dashboard && dashboard.history.length > 0 && (
           <label className="relative shrink-0">

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { User } from "firebase/auth";
 import { CalendarClock, Check, ChevronDown, ChevronRight, Droplet, Flame, MapPin, Sun, Thermometer, Wind } from "lucide-react";
-import { btnPrimary, btnSecondary, card, h2, LoadingState, ReloadButton, textLink } from "@/components/ui/page";
+import { btnPrimary, btnSecondary, card, h2, LoadingState, lead, ReloadButton, textLink, titleDisplay } from "@/components/ui/page";
 import { IconWell } from "@/components/ui/kit";
 import { Thumb } from "@/components/checks/Thumb";
 import { useRoutine } from "@/components/routine/useRoutine";
@@ -365,7 +365,7 @@ export function WeatherCard({ user, settings, onSettings, sheet = false }: { use
   };
 
   const title = sheet && (
-    <h2 id="weather-title" tabIndex={-1} className="text-[32px] font-semibold leading-[1.1] tracking-[-0.02em] text-brand-text outline-none">
+    <h2 id="weather-title" tabIndex={-1} className={`${titleDisplay} outline-none`}>
       {H.weather.title}
     </h2>
   );
@@ -387,7 +387,7 @@ export function WeatherCard({ user, settings, onSettings, sheet = false }: { use
       <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
         <div className="min-w-0 flex-1 basis-48">
           {title}
-          <p className={`text-brand-text-muted ${sheet ? "mt-2" : ""}`}>{H.weather.intro}</p>
+          <p className={sheet ? `mt-2 ${lead}` : "text-brand-text-muted"}>{H.weather.intro}</p>
         </div>
         <div className="flex flex-col items-end gap-1">
           <p className="flex items-center gap-1.5 text-sm text-brand-text">
