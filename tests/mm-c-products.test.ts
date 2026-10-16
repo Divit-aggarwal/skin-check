@@ -26,6 +26,7 @@ vi.mock("@/lib/store/products", async (orig) => {
 });
 
 import ProductRoute from "@/app/(marketing)/products/[id]/page";
+import { NextRequest } from "next/server";
 import { GET } from "@/app/api/store/products/route";
 import { ProductCards } from "@/components/skin-check/ProductCards";
 import { SinceStarted } from "@/components/products/SinceStarted";
@@ -80,7 +81,7 @@ describe("Echo product cards with store data (screen 14)", () => {
   });
 
   it("the browser's store route never carries the description", async () => {
-    const body = await (await GET()).json();
+    const body = await (await GET(new NextRequest("http://localhost/api/store/products"))).json();
     expect(body.products).toHaveLength(store.length);
     expect(JSON.stringify(body)).not.toContain("descriptionHtml");
   });
