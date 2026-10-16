@@ -1,5 +1,7 @@
 // D-12 word check (docs/lanes/routine-design.md §4). Used by the tests over
 // routine copy, routine UI text and the catalogue's user-visible fields.
+// TD-51 (owner 2026-10-15): "progress" and "twin" are allowed again
+// ("Progress", "Skin Twin", the product name).
 // Case-insensitive, whole word or whole phrase; an entry ending in "*" is a
 // prefix. "before" and "since" alone are allowed on purpose (order
 // instructions, "since <date>"); both stay banned inside their phrases below.
@@ -7,10 +9,10 @@ export const BANNED_WORDS: readonly string[] = [
   // GEMINI_BOUNDARY rule 4
   "improve*", "better", "worse", "lower", "higher", "less", "more than", "reduc*", "increas*", "fade*",
   "clear*", "calm*", "brighten*", "even out", "repair*", "restore*", "went down", "went up", "last time",
-  "progress*", "pehle", "kam", "zyada", "behtar", "accha hua",
+  "pehle", "kam", "zyada", "behtar", "accha hua",
   // rule 5
   "diagnos*", "cure*", "heal*", "treat*", "prescription", "guarantee*", "proven", "causes", "caused",
-  "caused by", "twin", "acne", "eczema", "rosacea", "melasma", "psoriasis", "dermatitis",
+  "caused by", "acne", "eczema", "rosacea", "melasma", "psoriasis", "dermatitis",
   // routine-specific
   "works", "working", "results", "because of", "thanks to", "since you started", "before and after",
 ];

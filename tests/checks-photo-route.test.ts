@@ -14,7 +14,8 @@ const { verifyFirebaseIdToken, originalExists, presignOriginalRead, docs } = vi.
 
 const docAt = (path: string): Doc => {
   const data = docs.get(path);
-  return { exists: data !== undefined, get: (k: string) => data?.[k] };
+  // Dotted paths like Firestore's DocumentSnapshot.get ("sideImages.left").
+  return { exists: data !== undefined, get: (k: string) => k.split(".").reduce<unknown>((o, p) => (o as Record<string, unknown> | undefined)?.[p], data) };
 };
 const ref = (path: string) => ({
   get: async () => docAt(path),
@@ -140,5 +141,49 @@ describe("GET /api/checks/photo", () => {
     const src = readFileSync("app/api/checks/photo/route.ts", "utf8");
     expect(src).toMatch(/export const dynamic = "force-dynamic"/);
     expect(src).not.toMatch(/revalidate|s-maxage|public/);
+  });
+});
+
+// C10 (TD-54 (2)): side photos. Same ownership rules; the record's own
+// sideImages.<angle> must say kept, and the key is built from the caller's uid.
+describe("GET /api/checks/photo?angle=left|right", () => {
+  const SIDES = { left: { stored: true, storage: "s3", key: "x" }, right: { stored: false } };
+  const getAngle = (angle: string, scanId = MINE) =>
+    GET(new NextRequest(`http://localhost/api/checks/photo?scanId=${scanId}&angle=${encodeURIComponent(angle)}`, { headers: { authorization: "Bearer t" } }));
+
+  beforeEach(() => {
+    docs.set(`users/alice/skinChecks/${MINE}`, { image: { stored: true }, sideImages: SIDES });
+    docs.set(`users/bob/skinChecks/${THEIRS}`, { image: { stored: true }, sideImages: { left: { stored: true }, right: { stored: true } } });
+    originalExists.mockResolvedValue(true);
+  });
+
+  it("a kept side: a link to that side's own key", async () => {
+    const res = await getAngle("left");
+    expect(res.status).toBe(200);
+    expect(presignOriginalRead).toHaveBeenCalledWith(`users/alice/scans/${MINE}/left.jpg`);
+    expect(originalExists).toHaveBeenCalledWith(`users/alice/scans/${MINE}/left.jpg`);
+  });
+
+  it("front (explicit) is unchanged", async () => {
+    expect((await getAngle("front")).status).toBe(200);
+    expect(presignOriginalRead).toHaveBeenCalledWith(`users/alice/scans/${MINE}/original.jpg`);
+  });
+
+  it("a side the record says was not kept, a record with no sideImages, or no object: 404", async () => {
+    expect((await getAngle("right")).status).toBe(404);
+    docs.set(`users/alice/skinChecks/${MINE}`, { image: { stored: true } });
+    expect((await getAngle("left")).status).toBe(404);
+    docs.set(`users/alice/skinChecks/${MINE}`, { image: { stored: true }, sideImages: SIDES });
+    originalExists.mockResolvedValue(false);
+    expect((await getAngle("left")).status).toBe(404);
+    expect(presignOriginalRead).not.toHaveBeenCalled();
+  });
+
+  it("another user's side and an unknown angle are the same 404, nothing signed", async () => {
+    expect((await getAngle("left", THEIRS)).status).toBe(404);
+    for (const angle of ["back", "../original", "LEFT", ""]) {
+      expect((await getAngle(angle)).status, angle).toBe(404);
+    }
+    expect(presignOriginalRead).not.toHaveBeenCalled();
   });
 });

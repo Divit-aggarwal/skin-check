@@ -13,15 +13,18 @@ describe("app shell", () => {
   it("every shell string passes the D-12 word checks", () => {
     const all = strings(SHELL_COPY);
     expect(all.length).toBeGreaterThan(8);
+    // TD-51: the two exact bottom-bar labels from the mockup.
+    const TD51 = ["Skin Twin", "Progress"];
     for (const s of all) {
       expect(bannedWordsIn(s), s).toEqual([]);
+      if (TD51.includes(s)) continue;
       for (const re of [CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST]) expect(re.test(s), s).toBe(false);
     }
   });
 
-  it("the navigation reaches the six main places, marks the current one, and is labelled", () => {
+  it("the navigation reaches the six main places (TD-51: Progress in place of Routine), marks the current one, and is labelled", () => {
     const nav = readFileSync("components/shell/Nav.tsx", "utf8");
-    for (const href of ["/dashboard", "/checks", "/skin-check", "/routine", "/echo", "/account"]) expect(nav).toContain(`href: "${href}"`);
+    for (const href of ["/dashboard", "/checks", "/skin-check", "/progress", "/echo", "/account"]) expect(nav).toContain(`href: "${href}"`);
     expect(nav).toMatch(/aria-current=\{current\(/);
     expect(nav.match(/aria-label=\{S\.navLabel\}/g)).toHaveLength(3);
   });

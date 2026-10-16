@@ -42,8 +42,20 @@ export const PRIVACY_POLICY_LINK_TEXT = "Read our Privacy Policy";
 // Client-safe strings only, like everything above. The server-only ledger
 // helpers that record these live in app/api/account/_ledger.ts.
 
-/** One purpose per consent-ledger entry. Purposes are never combined. */
-export type ConsentPurpose = "image_retention" | "processing" | "ai_share" | "age_18_plus";
+/**
+ * One purpose per consent-ledger entry. Purposes are never combined.
+ * H36 (TD-51 (2)): the last four are screen 22's separate consents; their copy
+ * and versions live in lib/feature-contracts/consents.ts.
+ */
+export type ConsentPurpose =
+  | "image_retention"
+  | "processing"
+  | "ai_share"
+  | "age_18_plus"
+  | "personalisation"
+  | "product_improvement"
+  | "research"
+  | "marketing";
 
 /** Bump when the attestation copy below changes. */
 export const AGE_ATTESTATION_VERSION = "age 18 plus attestation version 1";

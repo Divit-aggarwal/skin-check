@@ -58,13 +58,15 @@ for (const width of ["390", "768", "1280"] as const) {
         await expect(card).toContainText(p.keyIngredient);
         await expect(card).toContainText(p.usage);
         await expect(card).toContainText(`${E.echoNote}:`);
-        await expect(card.getByRole("link", { name: new RegExp(E.onStore) })).toHaveAttribute("href", p.url);
+        // TD-52 (C-mm-4): the store is read (STORE_LOCAL_FEED), so the card shows a price and one store action.
+        await expect(card).toContainText("₹");
+        await expect(card.getByRole("link", { name: /^View .+ in the store( \(opens in a new tab\))?$|to cart on the store( \(opens in a new tab\))?$/ })).toHaveAttribute("href", /^https:\/\/theprojectskin\.com\/(products|cart)\//);
         // Redesign lane C (screen 15): each card links to our product page.
         await expect(card.getByRole("link", { name: PRODUCTS_COPY.detailsLabel(p.name) })).toHaveAttribute("href", `/products/${p.id}`);
       }
       expect(SHOWN.map((p) => STEP_LABEL[p.step])).toEqual(["Cleanse", "Treat", "Moisturise", "Protect"]);
-      // No price, no buy button.
-      await expect(page.locator("main")).not.toContainText(/₹|Rs\.? ?\d|price|buy|add to cart/i);
+      // TD-52: no cart while the cart flag is off (A34).
+      await expect(page.locator("main")).not.toContainText(/add to cart/i);
       // Nothing wider than the screen.
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
       await shot(page, `echo-opening-${width}`);

@@ -1,6 +1,7 @@
-import type { WeatherReading } from "./weather";
+import { hoursOf, uvHighUntil, type WeatherReading } from "./weather";
 
 // SERVER ONLY. TD-47: today's UV, humidity and air quality from Open-Meteo
+// (G37: also the temperature and today's hourly UV, in the same forecast call)
 // (https://open-meteo.com, data CC BY 4.0). Business use needs the paid
 // customer hosts and OPEN_METEO_API_KEY; the free hosts are never used in a
 // production build. Only the rounded position (tenths of a degree) is sent:
@@ -39,7 +40,7 @@ export async function fetchWeather(latE1: number, lonE1: number): Promise<Weathe
     return u;
   };
   const [w, a] = await Promise.all([
-    get(where("/v1/forecast", forecast, { current: "relative_humidity_2m", daily: "uv_index_max", forecast_days: "1" })),
+    get(where("/v1/forecast", forecast, { current: "relative_humidity_2m,temperature_2m", daily: "uv_index_max", hourly: "uv_index", forecast_days: "1" })),
     get(where("/v1/air-quality", air, { current: "us_aqi" })),
   ]);
   const wc = (w.current ?? {}) as Record<string, unknown>;
@@ -51,5 +52,16 @@ export async function fetchWeather(latE1: number, lonE1: number): Promise<Weathe
   if (uv === null || humidity === null || usAqi === null || typeof wc.time !== "string") throw new WeatherUnavailableError("conditions source: missing values");
   // Open-Meteo gives local time without a zone; turn it into a real instant.
   const observedAt = new Date(Date.parse(`${wc.time}:00Z`) - offset * 1000).toISOString();
-  return { uv, humidity, usAqi, observedAt };
+  // Optional extras: missing ones are left out, and the card hides their tile or the curve.
+  const temperature = num(wc.temperature_2m);
+  const hourlyRaw = (w.hourly ?? {}) as Record<string, unknown>;
+  const hourly = hoursOf(hourlyRaw.time, hourlyRaw.uv_index, wc.time.slice(0, 10));
+  return {
+    uv,
+    humidity,
+    usAqi,
+    observedAt,
+    ...(temperature === null ? {} : { temperature }),
+    ...(hourly.length === 0 ? {} : { hourly, uvHighUntil: uvHighUntil(hourly, Number(wc.time.slice(11, 13))) }),
+  };
 }

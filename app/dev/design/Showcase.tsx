@@ -11,6 +11,7 @@ import {
   ChatInput,
   Chip,
   ChoiceGrid,
+  EchoAvatar,
   HeroCard,
   InsightRow,
   MetricTile,
@@ -25,7 +26,6 @@ import {
   TintCard,
   ToggleRow,
 } from "@/components/ui/kit";
-import { EchoMark } from "@/components/skin-check/EchoMark";
 
 const H = ({ children }: { children: React.ReactNode }) => <h2 className="mb-3 mt-10 border-t border-brand-border pt-4 text-xs font-semibold uppercase tracking-[0.14em] text-brand-text-subtle">{children}</h2>;
 
@@ -105,7 +105,7 @@ export function Showcase() {
 
       <H>Echo</H>
       <div className="flex flex-col gap-3 rounded-card bg-brand-50 p-3">
-        <ChatBubble from="echo" avatar={<span className="shrink-0"><EchoMark className="size-7" /></span>}>Echo explains what your checks show. Sample text.</ChatBubble>
+        <ChatBubble from="echo" avatar={<EchoAvatar size={28} className="shrink-0" />}>Echo explains what your checks show. Sample text.</ChatBubble>
         <ChatBubble from="user">A sample question</ChatBubble>
         <SuggestionChips label="Suggested questions" items={["Sample question one", "Sample question two", "Sample question three"]} onPick={setText} />
         <ChatInput label="Ask Echo" sendLabel="Send" value={text} onChange={setText} onSend={() => setText("")} />

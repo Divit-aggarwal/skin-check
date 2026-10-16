@@ -12,8 +12,8 @@ import { CAUSE, CHANGE, DIAGNOSIS, FORECAST, MEDICAL } from "@/lib/context/lexic
 
 const BANNED_WORDS = /\b(improve\w*|worse|better|reduc\w*|increas\w*|decreas\w*|because|caused|due to|effect\w*|works)\b/i;
 const problems = (text: string) => {
-  // TD-49: the three owner-approved labels, exact whole text only.
-  if (labelIsExcepted(text)) return [];
+  // TD-49: the three owner-approved labels, exact whole text only. TD-51: "Skin Twin" (G37, Home's card title) is allowed again.
+  if (labelIsExcepted(text) || text === "Skin Twin") return [];
   const out = bannedWordsIn(text);
   for (const [name, re] of Object.entries({ BANNED_WORDS, CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST })) if (re.test(text)) out.push(name);
   return out;
@@ -36,13 +36,14 @@ describe("Home v2 wording (TD-47 (4), D-12)", () => {
     expect(problems("your redness is lower than last check")).not.toEqual([]);
     expect(problems("a sign of acne")).not.toEqual([]);
     expect(problems("your skin will improve")).not.toEqual([]);
-    expect(problems("Your progress so far")).toContain("progress*");
+    // TD-51: "progress" left the D-12 word list; Home's own CHANGE check still has it.
+    expect(problems("Your progress so far")).not.toContain("progress*");
     expect(problems("Skin conditions")).toContain("MEDICAL");
   });
 
   it("TD-49: the three label exceptions are exact; the words stay banned everywhere else", () => {
     expect(LABEL_EXCEPTIONS).toEqual(["Your progress", "Today's conditions", "View full results"]);
-    for (const s of ["Your progress so far", "your progress", "Skin conditions today", "View full results of your skin", "Today's conditions "]) expect(problems(s), s).not.toEqual([]);
+    for (const s of ["Skin conditions today", "View full results of your skin", "Today's conditions "]) expect(problems(s), s).not.toEqual([]);
     expect(Array.from(new Set(ALL.filter(labelIsExcepted))).sort()).toEqual([...LABEL_EXCEPTIONS].sort());
   });
 

@@ -65,3 +65,27 @@ export function gateRows(quality: { verdict: string; checks: readonly GateCheck[
     return c ? [{ id, label: GATE_COPY.checks[id], status: c.status }] : [];
   });
 }
+
+// C10/C11 (TD-54 (2)), behind threeAngleUi(): the guided three-photo capture.
+// The live checks' own words are in lib/capture-quality/live.ts (LIVE_COPY).
+export const GUIDED_COPY = {
+  steps: ["Front", "Left cheek", "Right cheek"],
+  title: { front: "Capture your front", left: "Capture left cheek", right: "Capture right cheek" },
+  intro: "Follow the guide for a sharp, even photo.",
+  checksLabel: "Live photo checks",
+  takeAngle: { front: "Take the front photo", left: "Take the left cheek photo", right: "Take the right cheek photo" },
+  done: "Done",
+  next: "Next",
+  review: "Your three photos",
+  sidesNote: "Only the front photo is read. The two cheek photos are kept for your own history, and only if you tick the box to keep your photo.",
+  retakeAll: "Retake all three",
+  // Why the guided capture is not available: today's one-photo capture is shown instead.
+  fallback: {
+    denied: "Camera access is blocked, so the guided three photos are off. You can still take one photo.",
+    unavailable: "We couldn't find a camera for the guided photos. You can still take one photo.",
+    failed: "Your camera didn't start for the guided photos. You can still take one photo.",
+    model: "The live guide could not load on this device. You can still take one photo.",
+    dataSaver: "The live guide is off on a data-saver connection. You can still take one photo.",
+  },
+} as const;
+export type GuidedFallback = keyof typeof GUIDED_COPY.fallback;

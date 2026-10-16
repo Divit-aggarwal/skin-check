@@ -17,7 +17,8 @@ const DIGIT_NEXT_TO_CHANGE = new RegExp(`\\d\\s*${CHANGE_WORDS}\\b|\\b${CHANGE_W
 
 function problems(text: string): string[] {
   // TD-49: the three owner-approved labels, exact whole text only.
-  if (labelIsExcepted(text)) return [];
+  // TD-51: "Skin Twin" (G37, Home's card title) is allowed again.
+  if (labelIsExcepted(text) || text === "Skin Twin") return [];
   const out = bannedWordsIn(text);
   for (const [name, re] of Object.entries({ BANNED_WORDS, DIGIT_NEXT_TO_CHANGE, CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST })) {
     if (re.test(text)) out.push(name);

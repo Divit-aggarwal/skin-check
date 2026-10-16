@@ -16,6 +16,7 @@ import { SkinScanScoresSchema } from "@/types/skin-scan";
 import { ECHO_REGIONS, ECHO_REGION_LABELS, type EchoRegion } from "@/lib/echo-regions";
 import { hasQuestionAnswers, productNamesFrom, questionAnswersOnly, type ProductNames } from "@/lib/skin-check-validation";
 import type { SkinCheckAnswers } from "@/types/skin-check";
+import type { SeriesCheck } from "@/lib/readings/series";
 
 /** One Firestore document: its id and its data, as read. */
 export interface Doc {
@@ -398,4 +399,25 @@ export function aiShareStatus(ledger: readonly Doc[]): AiShareStatus {
 /** What the page does with the consent route's answer to a withdrawal. 409 is VERSION_STALE: resending cannot work. */
 export function withdrawalOutcome(status: number): "saved" | "stale" | "retry" {
   return status >= 200 && status < 300 ? "saved" : status === 409 ? "stale" : "retry";
+}
+
+// ─── Readings over time (TD-54) ─────────────────────────────────────────────
+
+/**
+ * Every check with a measured reading, as lib/readings/series.ts takes them:
+ * the record picked as Echo picks it, its skinstate-2 read, and whether its
+ * record says each photo was kept (front `image`, sides `sideImages`, C10;
+ * shown only if /api/checks/photo finds it, H27). Screen 16 (lane C).
+ */
+export function seriesChecks(uid: string, checks: readonly Doc[], analyses: readonly Doc[]): SeriesCheck[] {
+  return Array.from(primaryPerScan(uid, analyses).values()).map((m) => {
+    const data = checks.find((c) => c.id === m.scanId)?.data ?? {};
+    const kept = (v: unknown) => isObj(v) && v.stored === true;
+    const sides = isObj(data.sideImages) ? data.sideImages : {};
+    return {
+      view: measuredView(m),
+      state: { kind: "skinstate", state: m.state },
+      photos: { front: kept(data.image), left: kept(sides.left), right: kept(sides.right) },
+    };
+  });
 }

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Camera, Home, Layers, MessageCircle, Repeat, UserRound, type LucideIcon } from "lucide-react";
+import { Camera, ChartColumnIncreasing, Home, MessageCircle, SquareActivity, UserRound, type LucideIcon } from "lucide-react";
 import { SHELL_COPY as S } from "./copy";
 import { Wordmark } from "@/components/ui/kit";
 
@@ -15,9 +15,9 @@ type Place = { key: Key; href: string; icon: LucideIcon; match: (path: string) =
 
 const PLACES: Place[] = [
   { key: "home", href: "/dashboard", icon: Home, match: (p) => p === "/dashboard" },
-  { key: "checks", href: "/checks", icon: Layers, match: (p) => p.startsWith("/checks") },
+  { key: "checks", href: "/checks", icon: ChartColumnIncreasing, match: (p) => p.startsWith("/checks") },
   { key: "newCheck", href: "/skin-check", icon: Camera, match: (p) => p.startsWith("/skin-check") },
-  { key: "routine", href: "/routine", icon: Repeat, match: (p) => p.startsWith("/routine") },
+  { key: "progress", href: "/progress", icon: SquareActivity, match: (p) => p.startsWith("/progress") },
   { key: "echo", href: "/echo", icon: MessageCircle, match: (p) => p.startsWith("/echo") },
 ];
 const ACCOUNT: Place = { key: "account", href: "/account", icon: UserRound, match: (p) => p.startsWith("/account") };

@@ -55,6 +55,9 @@ service cloud.firestore {
                       && imageKeyIsOwn(uid, checkId)
                       && storedImageHasConsent()
                       && questionnaireIsKnown()
+                      // ── mm:be3 ── (C10 side photos; the function is in the mm:be3 block below)
+                      && sideImagesOk(uid, checkId)
+                      // ── end mm:be3 ──
                       && productNamesOk(request.resource.data);
         allow update, delete: if false;
       }
@@ -174,6 +177,52 @@ service cloud.firestore {
                || img.get('key', '') == 'users/' + uid + '/scans/' + checkId + '/original.jpg';
       }
 
+      // ── mm:be3 ──
+      // C10 (TD-54 (2)): side photos of a three-angle check. Optional; when
+      // present, both sides. A side is either { stored: false } or a kept S3
+      // object at exactly users/<uid>/scans/<checkId>/<left|right>.jpg for this
+      // uid, with the same image-retention consent the front needs. Like the
+      // front, both fields sit in the same client-written record, so this
+      // stops the app's own flow, not a tampered client; the presign route's
+      // ledger entry is the authoritative consent record.
+      function sideImagesOk(uid, checkId) {
+        let s = request.resource.data.get('sideImages', null);
+        return s == null
+               || (s is map
+                   && s.keys().hasOnly(['left', 'right'])
+                   && s.keys().hasAll(['left', 'right'])
+                   && sideImageOk(s.left, uid, checkId, 'left')
+                   && sideImageOk(s.right, uid, checkId, 'right'));
+      }
+
+      function sideImageOk(side, uid, checkId, angle) {
+        return side is map
+               && side.get('stored', null) is bool
+               && ((side.stored == false && side.keys().hasOnly(['stored']))
+                   || (side.stored == true
+                       && side.keys().hasOnly(['stored', 'storage', 'key'])
+                       && side.get('storage', '') == 's3'
+                       && side.get('key', '') == 'users/' + uid + '/scans/' + checkId + '/' + angle + '.jpg'
+                       && sideRetentionConsented()));
+      }
+
+      // The consent clause of storedImageHasConsent, for the sides (same versions).
+      function sideRetentionConsented() {
+        let consent = request.resource.data.get('consent', null);
+        return consent != null
+               && consent.get('imageRetention', false) == true
+               && consent.get('imageRetentionVersion', '') in ['skin image retention version 1', 'skin image retention version 2'];
+      }
+
+      // E19 weekly check-ins (lib/feature-contracts/checkin.ts). Written ONLY by
+      // /api/checkins through the Admin SDK, which bypasses these rules, with
+      // create() so one per week. The owner may read; no client may create,
+      // change or delete one. Account erase removes them with users/{uid}.
+      match /checkins/{checkinId} {
+        allow get, list: if request.auth != null && request.auth.uid == uid;
+        allow write: if false;
+      }
+      // ── end mm:be3 ──
       // ── lane:routine ──
       // E03 routine events (docs/lanes/routine-design.md, R-6 A). Written ONLY
       // by /api/routine/events through the Admin SDK, which bypasses these
@@ -239,6 +288,16 @@ service cloud.firestore {
                && c.lonE1 is int && c.lonE1 >= -1800 && c.lonE1 <= 1800
                && c.source in ['device', 'typed'];
       }
+
+      // ── mm:be1 ──
+      // G31 notification switches (settings/notifications). Written ONLY by
+      // /api/account/notifications through the Admin SDK, which bypasses these
+      // rules. The owner may read; no client write (the settings/{name} rule
+      // above allows writes to settings/home only).
+      match /settings/notifications {
+        allow get: if request.auth != null && request.auth.uid == uid;
+      }
+      // ── end mm:be1 ──
 
       // TD-47: web push subscriptions, written and read only by the server
       // (Admin SDK). No client may read or write one.
