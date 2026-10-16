@@ -60,3 +60,27 @@ None to `data-export.ts` to make this work. Kit-requests BE2-1 (stale base impor
 - `npm run lint` scoped to my files (`next lint --file …`): no warnings or errors.
 - `npx vitest run tests/account-export.test.ts tests/s3-export.test.ts tests/s3-read.test.ts`: 3 files, 21 tests passed (auth, plain uid, erased, 3 a day then 429, timestamp conversion, truncation incl. moving to the next collection, only own paths and keys, photo gating, no uid/key/URL in logs, banned words over `notIncluded`, presign TTL/headers/fail closed).
 - `bash scripts/with-stack-slot.sh npm run test:local` (PORT_BASE 4100, with the BE2-1 fix applied locally and reverted): exit 0. Unit 115 files passed, 19 skipped, 2412 tests passed; stack 18 files, 85 tests passed, incl. `tests/account-export.e2e.test.ts` (two seeded users; each export holds only its own docs; both photo links fetch the user's own S3Mock objects; no token 401; erased marker 403). Stack stopped, no containers left.
+
+## mm/fix-export (owner decisions 2026-10-16)
+
+### Changelog
+- H37 export holds everything we hold: new `profile` (the `users/{uid}` doc: phoneNumber, lastSeenAt) and `under18Marker` (`under18Accounts/{uid}`, `{ markedAt }`), both null when absent; `EXPORT_COLLECTIONS` adds `pushSubscriptions` (whole docs: endpoint, timeZone, createdAt, lastSentOn), `echoUsage` and `exportUsage` (the daily `{ day, count }` docs; exportUsage counts the current download). `notIncluded` drops the profile/devices/counts line; the Auth line now says our copy of the phone number is in the file. 4 MB cut unchanged (new collections join it; profile and marker are never cut). Closes BE2-2.
+- Shared files touched because the task required it: `lib/feature-contracts/data-export.ts`, `lib/feature-contracts/fixtures.ts` (fixture gains the new fields).
+- `/api/store/products`: per-IP `checkRequestRate` (60/min) and `consumeDailyQuota` (2000/day; `checkRequestRate` alone does not enforce perDay), scope `store-products`, 429 in the existing shape. `revalidate = 600` became `dynamic = "force-dynamic"` (reading the IP makes the route dynamic anyway); the 10-minute cache stays in `storeProducts()`'s fetch cache. Lane C's `tests/mm-c-products.test.ts` now passes a `NextRequest` to `GET` (one call, one import).
+
+### Every per-user Firestore doc the server or client writes, and where it is in the file
+| Path | In the file |
+|---|---|
+| `users/{uid}` (profile) | `profile` |
+| `users/{uid}/skinChecks`, `scanAnalyses`, `laterAnswers`, `consentLedger`, `routineEvents`, `checkins`, `settings` (home, notifications), `chatTurns` | `collections.*` |
+| `users/{uid}/pushSubscriptions` | `collections.pushSubscriptions` |
+| `users/{uid}/echoUsage/daily`, `users/{uid}/exportUsage/daily` | `collections.echoUsage`, `collections.exportUsage` |
+| `under18Accounts/{uid}` | `under18Marker` |
+| `erasedAccounts/{uid}` | never: the export answers 403 while it exists |
+| `erasures/*` | not per user (a count receipt with no uid) |
+| S3 `users/{uid}/scans/{scanId}/{original,left,right}.jpg` | `photos` (signed links) |
+Rate-limit counters (per IP, per uid) are in process memory, not stored.
+
+### Tests
+- `npx tsc --noEmit`: clean. `npm run lint`: 0 errors (existing `<img>` warnings only). `npx vitest run`: 127 files passed, 23 skipped; 2555 tests passed.
+- `bash scripts/with-stack-slot.sh npm run test:local`: exit 0; stack 22 files, 101 tests passed, incl. `tests/account-export.e2e.test.ts`. Stack stopped. Log: `.local-stack/be2/test-local-fix-export.log`.

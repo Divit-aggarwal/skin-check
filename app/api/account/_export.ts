@@ -25,8 +25,8 @@ export const EXPORT_DAILY_PER_USER = 3;
  * One document per user, users/{uid}/exportUsage/daily = { day, count }, the
  * same shape and India-time day as Echo's limit (lib/echo-quota.ts). No rule
  * matches it (deny by default), the account erase removes it with the rest of
- * users/{uid}, and it is not in EXPORT_COLLECTIONS, so it never reaches the
- * file. Returns null when allowed, else the 429. Throws when the store fails:
+ * users/{uid}, and the file carries it (EXPORT_COLLECTIONS), counting this
+ * download. Returns null when allowed, else the 429. Throws when the store fails:
  * the route answers 500 and no export runs (fail closed).
  */
 export async function consumeExport(uid: string, now: Date = new Date()): Promise<NextResponse | null> {
@@ -68,14 +68,16 @@ const PLAIN_NAME: Record<ExportCollection, string> = {
   checkins: "check-ins",
   settings: "settings",
   chatTurns: "Echo messages",
+  pushSubscriptions: "reminder devices",
+  echoUsage: "daily Echo counts",
+  exportUsage: "daily download counts",
 };
 
 /** Always true of the file, whatever the user has (lib/consent.ts H26 wording for Google's copy). */
 export const NOT_INCLUDED = [
   "Messages you sent to Echo were processed by Google, which may keep them under its own terms. Google's copy is not ours, so it is not in this file.",
-  "Your sign-in account (your phone number and sign-in records) is held by Google's Firebase Authentication and is not in this file.",
+  "Your sign-in account (the sign-in records Google's Firebase Authentication keeps for your phone number) is held by Google and is not in this file. Your phone number as our app saved it is in the file.",
   `The photos themselves are not inside the file. It lists a download link for each of your kept photos, and the links expire ${EXPORT_LINK_SECONDS / 60} minutes after you download the file.`,
-  "Your app profile (phone number and last visit), the devices you allowed to get reminders, and the daily Echo and download counts are not in this file.",
 ];
 
 const bytes = (s: string) => Buffer.byteLength(s, "utf8");
@@ -134,9 +136,14 @@ async function photosOf(uid: string, checks: Entry[]): Promise<ExportPhoto[]> {
   return found.filter((p): p is ExportPhoto => p !== null);
 }
 
-/** Reads the user's own collections and photo links into the file (before the size limit). */
+/** Reads the user's profile doc, under-18 marker, own collections and photo links into the file (before the size limit). */
 export async function buildExport(uid: string, now: Date = new Date()): Promise<DataExport> {
-  const snaps = await Promise.all(EXPORT_COLLECTIONS.map((name) => user(uid).collection(name).get()));
+  const [profile, under18, ...snaps] = await Promise.all([
+    user(uid).get(),
+    adminDb().collection("under18Accounts").doc(uid).get(),
+    ...EXPORT_COLLECTIONS.map((name) => user(uid).collection(name).get()),
+  ]);
+  const plainDoc = (d: { exists: boolean; data: () => unknown }) => (d.exists ? (toPlain(d.data()) as Record<string, unknown>) : null);
   const collections = Object.fromEntries(
     EXPORT_COLLECTIONS.map((name, i) => [
       name,
@@ -150,6 +157,8 @@ export async function buildExport(uid: string, now: Date = new Date()): Promise<
     formatVersion: EXPORT_FORMAT_VERSION,
     exportedAt: now.toISOString(),
     uid,
+    profile: plainDoc(profile!),
+    under18Marker: plainDoc(under18!),
     collections,
     photos,
     photoLinksExpireAt: new Date(now.getTime() + EXPORT_LINK_SECONDS * 1000).toISOString(),
