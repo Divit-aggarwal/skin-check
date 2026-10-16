@@ -15,7 +15,7 @@ import { newestEchoSession } from "@/components/dashboard/echo-session";
 import { hasQuestionAnswers, safetyQuestionsAnswered } from "@/lib/skin-check-validation";
 import { QUESTIONS_COPY as Q } from "./questionsCopy";
 import { readingsOf, toDate } from "@/components/dashboard/state";
-import { AccountButton, btnGhost, btnPrimary, btnSecondary, card, EmptyState, SignedOutCard, ErrorState, eyebrow, LoadingState, page, PageHeader, ReloadButton, textLink, tintCard } from "@/components/ui/page";
+import { AccountButton, btnGhost, btnPrimary, btnSecondary, card, EmptyState, SignedOutCard, ErrorState, eyebrow, lead, LoadingState, page, PageHeader, ReloadButton, textLink, tintCard } from "@/components/ui/page";
 import { ChatBubble, ChatInput, Chip, EchoAvatar, IconWell, SuggestionChips, Wordmark } from "@/components/ui/kit";
 import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getEchoOpening, getSkinCheckChatReply, ApiError, type ShownProduct } from "@/lib/api";
@@ -480,7 +480,7 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
                     {E.title}
                     <Sparkles aria-hidden size={26} className="mt-0.5 text-brand-700" />
                   </h1>
-                  <p className="mt-2 text-lg text-brand-text-muted">{E.tagline}</p>
+                  <p className={`mt-2 ${lead}`}>{E.tagline}</p>
                 </div>
                 {/* Echo's hello in a bubble over its avatar (mockup 18). */}
                 <div className="relative flex w-[46%] max-w-[200px] shrink-0 flex-col items-center">

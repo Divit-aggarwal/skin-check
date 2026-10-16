@@ -16,7 +16,7 @@ import { SkinCheckDashboard } from "./SkinCheckDashboard";
 import { DashboardLink } from "@/components/dashboard/DashboardLink";
 import { QuestionsChoice, SkippedNote } from "./QuestionsChoice";
 import { hasQuestionAnswers, QUESTION_SECTION_IDS } from "@/lib/skin-check-validation";
-import { appBar, btnSecondary, card, eyebrow, textLink } from "@/components/ui/page";
+import { appBar, btnSecondary, card, eyebrow, lead, textLink } from "@/components/ui/page";
 import { Wordmark } from "@/components/ui/kit";
 import { threeAngleUi, weeklyCheckinUi } from "@/lib/ui-flags";
 import { LastCheckCard, StartOverview } from "./CheckStart";
@@ -231,7 +231,7 @@ export function SkinCheckFlow() {
             className="mx-auto flex max-w-2xl flex-col gap-4 px-4 pb-10 pt-2 sm:px-6"
           >
             {/* Screen 05: what this check is, the last check, the choice (TD-44), a tip. */}
-            <p className="text-base leading-snug text-brand-text-muted">{threeAngleUi() ? START_COPY.introThree : START_COPY.intro}</p>
+            <p className={lead}>{threeAngleUi() ? START_COPY.introThree : START_COPY.intro}</p>
             {/* The choice first, so its buttons are on the first screen at 375px (owner answer 5). */}
             <QuestionsChoice answers={answers} onChoose={chooseQuestions} />
             <StartOverview />
