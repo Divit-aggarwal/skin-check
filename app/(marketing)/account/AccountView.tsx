@@ -9,7 +9,7 @@ import { PhoneOtpForm } from "@/components/auth/PhoneOtpForm";
 import { ConsentSection } from "@/components/dashboard/ConsentSection";
 import { HomeSettingsSection } from "@/components/dashboard/HomeSettingsSection";
 import { DashboardLink } from "@/components/dashboard/DashboardLink";
-import { btnGhost, btnSecondary, card, h2, LoadingState, PageHeader, tintCard } from "@/components/ui/page";
+import { btnGhost, btnSecondary, card, h2, LoadingState, PageHeader, subtitle, tintCard, titleSub } from "@/components/ui/page";
 import { AppHeader, IconWell, SettingsRow, Skel, TabBar } from "@/components/ui/kit";
 import { DeleteAccount } from "./DeleteAccount";
 import { QuestionsCard } from "@/components/skin-check/QuestionsChoice";
@@ -277,8 +277,8 @@ function ScreenTitle({ title, intro, icon }: { title: string; intro: string; ico
   return (
     <header className="flex items-start gap-3 pb-4 sm:pt-8">
       <div className="min-w-0 flex-1">
-        <h1 className="text-[26px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text text-balance sm:text-[32px]">{title}</h1>
-        <p className="mt-2 text-[15px] text-brand-muted">{intro}</p>
+        <h1 className={titleSub}>{title}</h1>
+        <p className={`mt-1 ${subtitle}`}>{intro}</p>
       </div>
       {icon && <IconWell icon={icon} size={72} />}
     </header>

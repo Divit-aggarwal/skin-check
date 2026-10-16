@@ -446,8 +446,7 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
           >
             <ChevronLeft aria-hidden size={22} />
           </Link>
-          {/* The trailing letter-space would push the word off centre. */}
-          <Wordmark className="justify-self-center pl-[0.35em]" />
+          <Wordmark centred />
           <AccountButton />
         </header>
 

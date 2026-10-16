@@ -7,7 +7,7 @@ import { OWN_PRODUCT_INFO, STEP_LABEL, STORE_URL } from "@/lib/context/products"
 import type { StoreProduct } from "@/lib/feature-contracts/store-products";
 import { useRoutine } from "@/components/routine/useRoutine";
 import { AppHeader, PriceBlock } from "@/components/ui/kit";
-import { btnPrimary, card, eyebrow, h2, page, textLink } from "@/components/ui/page";
+import { btnPrimary, card, eyebrow, h2, page, subtitle, textLink, titleSub } from "@/components/ui/page";
 import { PRODUCTS_COPY as C } from "./copy";
 import { ProductPhoto } from "./ProductPhoto";
 import { StoreAction } from "./StoreAction";
@@ -32,12 +32,12 @@ export function ProductDetail({ id, store }: { id: string; store: StoreProduct |
   return (
     <main className={page}>
       <AppHeader back backLabel={C.back} />
-      <div className="mx-auto flex max-w-2xl flex-col gap-5 pt-2">
+      <div className="mx-auto flex max-w-2xl flex-col gap-5 pt-1">
         <section className="flex items-start gap-4">
-          <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
             {info && <p className={eyebrow}>{STEP_LABEL[info.step]}</p>}
-            <h1 className="break-words text-[26px] font-semibold leading-tight text-brand-text min-[375px]:text-[28px] sm:text-[32px]">{p.name}</h1>
-            <p className="text-brand-text-muted">{C.ownLine}</p>
+            <h1 className={`break-words ${titleSub}`}>{p.name}</h1>
+            <p className={subtitle}>{C.ownLine}</p>
           </div>
           {/* The mockup's hero: the store's first photo beside the title; the rest below. */}
           <ProductPhoto image={store?.images[0]} step={info?.step} width={store?.images[0] ? 144 : 96} height={store?.images[0] ? 176 : 96} alt={store?.images[0] ? C.photoAlt(p.name, 1) : ""} priority className={store?.images[0] ? "aspect-[9/11] h-auto w-[30%] max-w-36" : ""} />

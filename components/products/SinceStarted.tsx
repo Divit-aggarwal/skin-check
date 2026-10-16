@@ -15,7 +15,7 @@ import { formatDate } from "@/components/dashboard/format";
 import { useRoutine } from "@/components/routine/useRoutine";
 import { startedProducts } from "@/lib/routine/events";
 import { AppHeader, ChangeSlot, LevelTimeline, MetricTile, PhotoStrip } from "@/components/ui/kit";
-import { btnPrimary, card, EmptyState, ErrorState, h2, LoadingState, page, ReloadButton, SignedOutCard, textLink } from "@/components/ui/page";
+import { btnPrimary, card, EmptyState, ErrorState, h2, LoadingState, page, ReloadButton, SignedOutCard, subtitle, textLink, titlePage } from "@/components/ui/page";
 import { cn } from "@/lib/utils";
 import { PRODUCTS_COPY as C } from "./copy";
 import { ProductPhoto } from "./ProductPhoto";
@@ -65,13 +65,11 @@ export function SinceStarted({ id }: { id: string }) {
 
   const name = getProduct(id)?.name ?? id;
   const head = (
-    <>
+    <div>
       <AppHeader back backLabel={C.back} />
-      <div className="flex flex-col gap-1 pt-2">
-        <h1 className="break-words text-[28px] font-semibold leading-tight text-brand-text sm:text-[32px]">{C.sinceTitle(name)}</h1>
-        <p className="text-brand-text-muted">{C.sinceIntro}</p>
-      </div>
-    </>
+      <h1 className={`break-words ${titlePage}`}>{C.sinceTitle(name)}</h1>
+      <p className={`mt-1 ${subtitle}`}>{C.sinceIntro}</p>
+    </div>
   );
   const shell = (body: React.ReactNode) => (
     <main className={page}>

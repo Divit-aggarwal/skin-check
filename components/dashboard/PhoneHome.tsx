@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { User } from "firebase/auth";
 import { CalendarCheck, Check, ChevronLeft, ChevronRight, ListChecks, MapPin, MessageCircle, Sparkles, Sun } from "lucide-react";
-import { AccountButton, card, heroCard } from "@/components/ui/page";
+import { AccountButton, appBar, card, heroCard, titlePage } from "@/components/ui/page";
 import { btnOnDark, IconWell, READING_ICON, Wordmark, type Reading } from "@/components/ui/kit";
 import { Thumb } from "@/components/checks/Thumb";
 import { stepOf, STEPS } from "@/components/routine/RoutineSteps";
@@ -97,7 +97,7 @@ export function PhoneHome({
           <AccountButton />
         </div>
         <p className="mt-1 truncate text-[15px] text-brand-text-muted">{date}</p>
-        <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text sm:text-[32px]">
+        <h1 className={titlePage}>
           {/* One line (mockup 01 breaks after the comma): home-v3's fold needs the room. */}
           {hello}
         </h1>
@@ -278,11 +278,11 @@ function TodayCard({
       {weatherOn() && (
         <dialog ref={dialog} aria-label={H.today.weatherSheet} className="m-0 h-dvh max-h-none w-full max-w-none overflow-y-auto bg-brand-bg p-0 backdrop:bg-black/30 sm:m-auto sm:h-auto sm:max-h-[90dvh] sm:max-w-md sm:rounded-card" onClick={(e) => e.target === dialog.current && dialog.current?.close()}>
           <div className="px-4 pb-8">
-            <div className="grid h-14 grid-cols-[44px_1fr_44px] items-center">
+            <div className={`${appBar} grid-cols-[44px_1fr_44px]`}>
               <button type="button" aria-label={H.today.close} onClick={() => dialog.current?.close()} className="-ml-2 grid size-11 place-items-center rounded-full text-brand-text hover:bg-brand-50">
                 <ChevronLeft aria-hidden size={22} />
               </button>
-              <Wordmark className="justify-self-center pl-[0.35em]" />
+              <Wordmark centred />
             </div>
             <WeatherCard user={user} settings={settings} onSettings={onSettings} sheet />
           </div>

@@ -16,7 +16,7 @@ import { SkinCheckDashboard } from "./SkinCheckDashboard";
 import { DashboardLink } from "@/components/dashboard/DashboardLink";
 import { QuestionsChoice, SkippedNote } from "./QuestionsChoice";
 import { hasQuestionAnswers, QUESTION_SECTION_IDS } from "@/lib/skin-check-validation";
-import { btnSecondary, card, eyebrow, textLink } from "@/components/ui/page";
+import { appBar, btnSecondary, card, eyebrow, textLink } from "@/components/ui/page";
 import { Wordmark } from "@/components/ui/kit";
 import { threeAngleUi, weeklyCheckinUi } from "@/lib/ui-flags";
 import { LastCheckCard, StartOverview } from "./CheckStart";
@@ -165,8 +165,8 @@ export function SkinCheckFlow() {
       {/* Back and the Home link share a row above the progress bar, so the bar
           and every question start on the same edge (design review G03). */}
       <div ref={headerRef} className={`mx-auto flex flex-col gap-2 px-4 sm:px-6 sm:pt-2 ${complete ? "max-w-6xl lg:px-8" : "max-w-2xl"}`}>
-        {/* The kit header's height (AppHeader, h-14), so every screen's wordmark sits in one place. */}
-        <div className="grid h-14 grid-cols-[1fr_auto_1fr] items-center">
+        {/* The kit header row (appBar, as AppHeader), so every screen's wordmark sits in one place. */}
+        <div className={`${appBar} grid-cols-[1fr_auto_1fr]`}>
           <button
             type="button"
             onClick={back}
@@ -176,8 +176,7 @@ export function SkinCheckFlow() {
           >
             <ChevronLeft className="h-[22px] w-[22px]" />
           </button>
-          {/* The trailing letter-space would push the word off centre (kit AppHeader). */}
-          <Wordmark className="pl-[0.35em]" />
+          <Wordmark centred />
           <div className="justify-self-end">
             {/* O-D3: the signed-in start page links to /dashboard. */}
             {isFirst && !complete && (

@@ -23,7 +23,7 @@ import { stepOf } from "@/components/routine/RoutineSteps";
 import { FacePhoto } from "@/components/mesh/FacePhoto";
 import { useKeptPhoto } from "@/components/mesh/useKeptPhoto";
 import { READING_ORDER, seriesChecks, usePhotoUrls, WINDOWS } from "./series";
-import { AccountButton, card, EmptyState, eyebrow, h2, textLink } from "@/components/ui/page";
+import { AccountButton, card, EmptyState, eyebrow, h2, subtitle, textLink, titleSub } from "@/components/ui/page";
 import { CHECKS_COPY as K } from "./copy";
 import { readingHistory } from "./readings";
 import { Thumb } from "./Thumb";
@@ -234,12 +234,10 @@ export function ReadingView({ uid, metric, dashboard, data }: { uid: string; met
   const newestSrc = newestKept && urls?.get(newestKept.scanId);
   return (
     <section aria-labelledby="reading-title" className="flex flex-col gap-4">
-      <div className="-mt-1.5">
-        <AppHeader back="/checks?view=readings" backLabel={K.allReadings} right={<AccountButton />} />
-      </div>
       <div>
-        <h1 id="reading-title" className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text sm:text-[32px]">{label}</h1>
-        <p className="mt-1 text-sm leading-snug text-brand-text-muted">{K.readingLead}</p>
+        <AppHeader back="/checks?view=readings" backLabel={K.allReadings} right={<AccountButton />} />
+        <h1 id="reading-title" className={titleSub}>{label}</h1>
+        <p className={`mt-1 ${subtitle}`}>{K.readingLead}</p>
       </div>
       <ReadingPicker current={metric} />
       {latest ? (

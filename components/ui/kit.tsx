@@ -7,7 +7,7 @@ import { ArrowRight, Dot, Hand, Package, Pipette, ShowerHead, Sun, ArrowUp, Chec
 import type { ChangeSlot as ChangeSlotData } from "@/lib/feature-contracts/readings-series";
 import type { CheckinQuestion } from "@/lib/feature-contracts/checkin";
 import { cn } from "@/lib/utils";
-import { card, heroCard, tintCard } from "./classes";
+import { appBar, card, heroCard, tintCard } from "./classes";
 
 // The redesign kit (TD-50, docs/lanes/redesign-report.md). Pieces that page.tsx
 // does not already have. Every piece here renders only what it is given: no
@@ -18,8 +18,10 @@ import { card, heroCard, tintCard } from "./classes";
 
 /* ─── Header ─────────────────────────────────────────────────────────── */
 
-export function Wordmark({ className }: { className?: string }) {
-  return <span className={cn("text-[13px] font-medium uppercase tracking-[0.35em] text-brand-text", className)}>Project Skin</span>;
+export function Wordmark({ className, centred }: { className?: string; centred?: boolean }) {
+  // 12px, 0.3em: the mockups' cap height (8-8.7 pt) and width (124 pt), at the 12px floor.
+  // centred: the trailing letter-space would push the word off centre, so pad the left by the same.
+  return <span className={cn("text-xs font-medium uppercase tracking-[0.3em] text-brand-text", centred && "justify-self-center pl-[0.3em]", className)}>Project Skin</span>;
 }
 
 /** Back (link or history), centred wordmark, optional right action. */
@@ -30,7 +32,7 @@ export function AppHeader({ back, right, backLabel = "Back", backDisabled }: { b
   const cls = "grid size-11 place-items-center rounded-full text-brand-text hover:bg-brand-50";
   const icon = <ChevronLeft aria-hidden size={22} />;
   return (
-    <header className="grid h-14 grid-cols-[44px_1fr_44px] items-center">
+    <header className={cn(appBar, "grid-cols-[44px_1fr_44px]")}>
       {back === true || typeof back === "function" ? (
         <button type="button" aria-label={backLabel} disabled={backDisabled} onClick={() => (back === true ? router.back() : back())} className={cn(cls, backDisabled && "invisible")}>{icon}</button>
       ) : back ? (
@@ -38,8 +40,7 @@ export function AppHeader({ back, right, backLabel = "Back", backDisabled }: { b
       ) : (
         <span />
       )}
-      {/* The trailing letter-space would push the word off centre. */}
-      <Wordmark className="justify-self-center pl-[0.35em]" />
+      <Wordmark centred />
       <div className="justify-self-end">{right}</div>
     </header>
   );

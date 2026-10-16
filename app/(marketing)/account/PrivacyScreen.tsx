@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { BarChart3, Camera, ChevronRight, ClipboardList, Download, FlaskConical, LineChart, Mail, MessageCircle, Repeat, Trash2, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { btnSecondary, card } from "@/components/ui/page";
+import { btnSecondary, card, h2 } from "@/components/ui/page";
 import { IconWell, Skel, ToggleRow } from "@/components/ui/kit";
 import { CONSENT_TEXTS, type NewConsentPurpose } from "@/lib/feature-contracts/consents";
 import { consentsUi, dataExportUi } from "@/lib/ui-flags";
@@ -16,7 +16,7 @@ const PURPOSES = Object.keys(CONSENT_TEXTS) as NewConsentPurpose[];
 const CONSENT_ICON: Record<NewConsentPurpose, LucideIcon> = { personalisation: BarChart3, product_improvement: LineChart, research: FlaskConical, marketing: Mail };
 const ROW_ICON: Record<(typeof D.rows)[number]["key"], LucideIcon> = { photos: Camera, checks: BarChart3, routine: Repeat, answers: ClipboardList, echo: MessageCircle };
 
-const sectionTitle = "text-xl font-semibold leading-tight tracking-[-0.01em] text-brand-text";
+const sectionTitle = h2;
 
 /** Icon, label, one-line note, optional action word, chevron. A link (kit request E3: SettingsRow with a note). */
 function DataRow({ icon, label, note, href, action }: { icon: LucideIcon; label: string; note: string; href: string; action?: string }) {

@@ -18,7 +18,7 @@ import { useRoutine } from "@/components/routine/useRoutine";
 import { mergeTimeline, dayOf } from "@/components/timeline/timeline";
 import { TimelineList } from "@/components/timeline/TimelineList";
 import { ROUTINE_COPY } from "@/lib/routine/copy";
-import { AccountButton, btnPrimary, btnSecondary, card, EmptyState, SignedOutCard, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, textLink } from "@/components/ui/page";
+import { AccountButton, btnPrimary, btnSecondary, card, EmptyState, SignedOutCard, ErrorState, eyebrow, h2, LoadingState, page, PageHeader, ReloadButton, subtitle, textLink, titlePage, titleSub } from "@/components/ui/page";
 import { AppHeader, Arrow, IconWell, TabBar } from "@/components/ui/kit";
 import { readingsOverTime } from "@/lib/readings/series";
 import { LevelTile } from "./OverTime";
@@ -72,13 +72,11 @@ export function ChecksView({ openId }: { openId: string | null }) {
     </PageHeader>
   ) : (
     <>
-      <div className="-mt-1.5">
-        <AppHeader right={<AccountButton />} />
-      </div>
-      <header className="flex flex-wrap items-start justify-between gap-3 pb-3 pt-1">
+      <AppHeader right={<AccountButton />} />
+      <header className="flex flex-wrap items-start justify-between gap-3 pb-3">
         <div className="min-w-[11rem] flex-1">
-          <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text sm:text-[32px]">{K.twinTitle}</h1>
-          <p className="mt-1 text-sm leading-snug text-brand-text-muted">{K.twinIntro}</p>
+          <h1 className={titlePage}>{K.twinTitle}</h1>
+          <p className={`mt-1 ${subtitle}`}>{K.twinIntro}</p>
         </div>
         {newest && (
           <Link href={`/checks/${encodeURIComponent(newest.scanId)}`} className="flex shrink-0 items-center gap-2 rounded-card bg-brand-100 py-2 pl-2 pr-1.5">
@@ -242,10 +240,10 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className={`${eyebrow} mb-1 hidden lg:block`}>{K.opened}</p>
-            <h2 id="check-title" className="text-2xl font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text">
+            <h2 id="check-title" className={titleSub}>
               {C.history.checkFrom(date)}
             </h2>
-            <p className="mt-1 text-brand-text-muted">{C.history.kind[check.kind]}</p>
+            <p className={`mt-1 ${subtitle}`}>{C.history.kind[check.kind]}</p>
           </div>
           <div className="flex shrink-0 items-center gap-2 rounded-card bg-brand-100 px-3 py-2">
             <CalendarCheck aria-hidden size={22} className="text-brand-700" />

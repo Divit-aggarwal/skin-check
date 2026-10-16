@@ -9,7 +9,7 @@ import { liveChecks, measureFace, LIVE_COPY, type FaceMeasure, type LandmarkPt }
 import { CAPTURE_QUALITY_SETTINGS } from "@/lib/capture-quality/settings";
 import type { CaptureAngle, LiveCheckId, LiveChecks } from "@/lib/feature-contracts/check-photos";
 import { Stepper, TintCard } from "@/components/ui/kit";
-import { btnPrimary } from "@/components/ui/page";
+import { btnPrimary, subtitle, titlePage } from "@/components/ui/page";
 import { cn } from "@/lib/utils";
 import { CAPTURE_COPY as K, GATE_COPY as G, GUIDED_COPY as C, type GuidedFallback } from "../captureStates";
 
@@ -180,8 +180,8 @@ export function GuidedCapture({ onDone, onFallback }: { onDone: (photos: GuidedP
     <div className="flex flex-col gap-3">
       <Stepper steps={[...C.steps]} current={step} />
       <div>
-        <h2 className="text-[23px] font-semibold leading-tight tracking-[-0.02em] text-brand-text">{C.title[angle]}</h2>
-        <p className="mt-1 text-sm leading-snug text-brand-text-muted">{C.intro}</p>
+        <h2 className={titlePage}>{C.title[angle]}</h2>
+        <p className={`mt-1 ${subtitle}`}>{C.intro}</p>
       </div>
       <div className="relative -mx-1 aspect-[5/6] overflow-hidden rounded-card bg-brand-900">
         <video ref={videoRef} aria-label={K.previewLabel} aria-hidden={!ready} className="absolute inset-0 h-full w-full object-cover" playsInline muted autoPlay />
