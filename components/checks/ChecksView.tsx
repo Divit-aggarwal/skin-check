@@ -150,7 +150,7 @@ export function ChecksView({ openId }: { openId: string | null }) {
   return (
     <main className={page}>
       {openId ? (
-        <div className="-mt-1.5 lg:hidden">
+        <div className="lg:hidden">
           <AppHeader back="/checks" backLabel={K.back} right={<AccountButton />} />
         </div>
       ) : null}

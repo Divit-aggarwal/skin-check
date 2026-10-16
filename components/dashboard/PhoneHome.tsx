@@ -88,7 +88,7 @@ export function PhoneHome({
   const date = now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
   return (
-    <main className="mx-auto flex w-full max-w-[600px] flex-col gap-2 px-4 pb-28 pt-1 sm:px-6 sm:pt-6">
+    <main className="mx-auto flex w-full max-w-[600px] flex-col gap-2 px-4 pb-28 sm:px-6 sm:pt-6">
       {/* 1. Wordmark and Account (mockup 01), the date, the greeting. The mockup's line about
           the skin today is left out: Home never says how the skin is doing. */}
       <header className="flex flex-col">

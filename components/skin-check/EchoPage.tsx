@@ -437,7 +437,7 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
         the readings sit beside it (TD-25 (1), from direction B). */}
     <main className="mx-auto flex h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] w-full max-w-[1200px] flex-col sm:h-dvh lg:grid lg:grid-cols-[minmax(0,1fr)_360px]">
       <div className="flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:border-r lg:border-brand-border lg:px-8">
-        <header className="grid shrink-0 grid-cols-[44px_1fr_44px] items-center pt-2 sm:pt-6">
+        <header className="grid shrink-0 grid-cols-[44px_1fr_44px] items-center sm:pt-6">
           <Link
             // K-1: a hand-off from the dashboard goes back there, not to an old results screen.
             href={session.fromDashboard ? "/dashboard" : "/skin-check"}

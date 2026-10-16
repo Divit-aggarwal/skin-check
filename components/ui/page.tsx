@@ -17,7 +17,7 @@ export function PageHeader({ title, kicker, intro, children, phoneCompact = fals
   // content; `order` keeps it top right (flow review G03). phoneCompact: a
   // phone row above already has the title context and the Account button.
   return (
-    <header className={`flex items-start justify-between gap-4 pb-6 ${phoneCompact ? "pt-2 lg:pt-12" : "pt-8 sm:pt-12"}`}>
+    <header className={`flex items-start justify-between gap-4 ${phoneCompact ? "pb-2 lg:pb-6 lg:pt-12" : "pb-6 pt-8 sm:pt-12"}`}>
       <div className={`order-2 ${phoneCompact ? "hidden" : ""}`}>
         <AccountButton />
       </div>
