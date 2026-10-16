@@ -47,5 +47,6 @@ Do not merge anything to master during the build: every master merge deploys pro
 - **Preview:** lane/redesign fast-forwarded to c853e4b, deployment dpl_CqzkiXtiU1nf1rUnBbNDyXKMTPyp, Ready.
   - Preview-only flags on, scoped to lane/redesign: WEEKLY_CHECKIN, NOTIFICATION_TYPES, CONSENTS, DATA_EXPORT, CART.
   - THREE_ANGLE is off (waiting on IAM).
-- **Review pack:** https://claude.ai/artifact/CosgCmsjCFtrGP2ByXiyhC
+- **Review pack:** https://claude.ai/artifact/CosgCmsjCFtrGP2ByXiyhC (v2, 2026-10-16, after kit batch 2)
+- **Preview 2026-10-16:** lane/redesign at 7e0d174, dpl_8Cjs41Bi7Q4Dsd7VJeMH96Bgarz7, Ready.
 - **Waiting on the owner:** rules approval (not deployed), IAM, A34, G36, the export question, mockup-derived content, and the phone check, then an explicit "go" for production.
