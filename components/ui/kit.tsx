@@ -56,18 +56,19 @@ export function IconWell({ icon: Icon, className, size = 40 }: { icon: LucideIco
 }
 
 /** Row card: icon well, title, body, chevron. A link when href is given. */
-export function TintCard({ icon, title, body, href, tinted = true, className }: { icon?: LucideIcon | undefined; title: React.ReactNode; body?: React.ReactNode | undefined; href?: string | undefined; tinted?: boolean | undefined; className?: string }) {
+export function TintCard({ icon, title, body, href, tinted = true, className, compact }: { icon?: LucideIcon | undefined; title: React.ReactNode; body?: React.ReactNode | undefined; href?: string | undefined; tinted?: boolean | undefined; className?: string; compact?: boolean }) {
+  // compact (kit request B-mm-3): the mockups' small tip and hint cards; text never below 12px.
   const inner = (
     <>
-      {icon && <IconWell icon={icon} className={tinted ? "bg-brand-surface" : undefined} />}
+      {icon && <IconWell icon={icon} size={compact ? 32 : 40} className={tinted ? "bg-brand-surface" : undefined} />}
       <span className="min-w-0 flex-1">
-        <span className="block font-semibold text-brand-text">{title}</span>
-        {body && <span className="mt-0.5 block text-sm text-brand-text-muted">{body}</span>}
+        <span className={cn("block font-semibold text-brand-text", compact && "text-sm")}>{title}</span>
+        {body && <span className={cn("mt-0.5 block text-brand-text-muted", compact ? "text-xs" : "text-sm")}>{body}</span>}
       </span>
       {href && <ChevronRight aria-hidden size={20} className="shrink-0 text-brand-text-muted" />}
     </>
   );
-  const cls = cn(tinted ? tintCard : card, "flex items-center gap-3", href && "transition-colors duration-fast hover:bg-brand-50", className);
+  const cls = cn(tinted ? tintCard : card, "flex items-center gap-3", compact && "p-3 sm:p-3", href && "transition-colors duration-fast hover:bg-brand-50", className);
   return href ? <Link href={href} className={cls}>{inner}</Link> : <div className={cls}>{inner}</div>;
 }
 
@@ -186,16 +187,17 @@ export function SegmentedControl<T extends string>({ label, options, value, onCh
 }
 
 /** Page tabs as links (each tab is a URL, so Back works). Scrolls sideways on narrow phones. */
-export function TabBar({ label, tabs, current }: { label: string; tabs: { href: string; label: string; key: string }[]; current: string }) {
+export function TabBar({ label, tabs, current, fill }: { label: string; tabs: { href: string; label: string; key: string }[]; current: string; fill?: boolean }) {
+  // fill (kit request A-1): page tabs as one full-width track with equal tabs, as mockups 10 and 12 draw them.
   return (
-    <nav aria-label={label} className="-mx-4 overflow-x-auto px-4 [scrollbar-width:none]">
-      <ul className="flex gap-2">
+    <nav aria-label={label} className={fill ? "rounded-full bg-brand-50 p-1" : "-mx-4 overflow-x-auto px-4 [scrollbar-width:none]"}>
+      <ul className={fill ? "flex" : "flex gap-2"}>
         {tabs.map((t) => (
-          <li key={t.key}>
+          <li key={t.key} className={fill ? "min-w-0 flex-1" : undefined}>
             <Link
               href={t.href}
               aria-current={t.key === current ? "page" : undefined}
-              className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full px-4 text-sm font-semibold text-brand-text-muted transition-colors duration-fast hover:bg-brand-50 aria-[current=page]:bg-brand-700 aria-[current=page]:text-white"
+              className={cn("inline-flex min-h-11 items-center whitespace-nowrap rounded-full px-4 text-sm font-semibold text-brand-text-muted transition-colors duration-fast hover:bg-brand-50 aria-[current=page]:bg-brand-700 aria-[current=page]:text-white", fill && "w-full justify-center px-2 hover:bg-brand-100")}
             >
               {t.label}
             </Link>
@@ -244,9 +246,10 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
         const done = i < current;
         return (
           <li key={s} aria-current={i === current ? "step" : undefined} className="relative flex flex-1 flex-col items-center gap-1 text-xs font-medium text-brand-text-muted aria-[current=step]:text-brand-700">
-            {i > 0 && <span aria-hidden className={cn("absolute right-1/2 top-4 h-0.5 w-full -translate-x-4", i <= current ? "bg-brand-700" : "bg-brand-border")} />}
-            <span className={cn("relative z-10 grid size-8 place-items-center rounded-full border-2 text-sm font-semibold", done ? "border-brand-700 bg-brand-700 text-white" : i === current ? "border-brand-700 bg-brand-surface text-brand-700" : "border-brand-border bg-brand-surface")}>
-              {done ? <Check aria-hidden size={16} /> : i + 1}
+            {/* Kit request B-mm-2: 26px circles; the current step filled, as mockups 07 and 08 draw it. */}
+            {i > 0 && <span aria-hidden className={cn("absolute right-1/2 top-[12px] h-0.5 w-full -translate-x-[13px]", i <= current ? "bg-brand-700" : "bg-brand-border")} />}
+            <span className={cn("relative z-10 grid size-[26px] place-items-center rounded-full border-2 text-xs font-semibold", i <= current ? "border-brand-700 bg-brand-700 text-white" : "border-brand-border bg-brand-surface")}>
+              {done ? <Check aria-hidden size={14} /> : i + 1}
             </span>
             <span>
               {s}
@@ -445,17 +448,19 @@ export function SuggestionChips({ label, items, onPick, disabled }: { label: str
   );
 }
 
-export function ChatInput({ label, sendLabel, value, onChange, onSend, disabled, maxLength }: { label: string; sendLabel: string; value: string; onChange: (v: string) => void; onSend: () => void; disabled?: boolean | undefined; maxLength?: number }) {
+export function ChatInput({ label, sendLabel, value, onChange, onSend, disabled, maxLength, icon: Icon }: { label: string; sendLabel: string; value: string; onChange: (v: string) => void; onSend: () => void; disabled?: boolean | undefined; maxLength?: number; icon?: LucideIcon | undefined }) {
+  // Kit request D-2: an optional leading icon, and the send button inside the one rounded field (mockups 18, 19).
   return (
     <form
-      className="flex items-center gap-2"
+      className="flex items-center gap-2 rounded-full border border-brand-border bg-brand-surface py-1 pl-4 pr-1 focus-within:ring-2 focus-within:ring-brand-700"
       onSubmit={(e) => {
         e.preventDefault();
         if (!disabled && value.trim()) onSend();
       }}
     >
-      <input aria-label={label} placeholder={label} value={value} maxLength={maxLength} onChange={(e) => onChange(e.target.value)} disabled={disabled} className="h-12 min-w-0 flex-1 rounded-full border border-brand-border bg-brand-surface px-4 text-base text-brand-text placeholder:text-brand-text-subtle disabled:opacity-60" />
-      <button type="submit" aria-label={sendLabel} disabled={disabled || !value.trim()} className="grid size-12 shrink-0 place-items-center rounded-full bg-brand-700 text-white transition-colors duration-fast hover:bg-brand-900 disabled:bg-brand-50 disabled:text-brand-text-subtle">
+      {Icon && <Icon aria-hidden size={20} className="shrink-0 text-brand-700" />}
+      <input aria-label={label} placeholder={label} value={value} maxLength={maxLength} onChange={(e) => onChange(e.target.value)} disabled={disabled} className="h-11 min-w-0 flex-1 bg-transparent text-base text-brand-text outline-none placeholder:text-brand-text-subtle disabled:opacity-60" />
+      <button type="submit" aria-label={sendLabel} disabled={disabled || !value.trim()} className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-700 text-white transition-colors duration-fast hover:bg-brand-900 disabled:bg-brand-50 disabled:text-brand-text-subtle">
         <ArrowUp aria-hidden size={20} />
       </button>
     </form>
@@ -590,12 +595,13 @@ export function CheckinQuestionCard({ n, question, value, onChange }: { n: numbe
   const id = useId();
   const cols = question.layout === "faces" ? "grid-cols-5" : question.options.length === 2 ? "grid-cols-2" : "grid-cols-4";
   return (
-    <section className={cn(card, "p-4 sm:p-4")} aria-labelledby={id}>
-      <h2 id={id} className="flex items-center gap-3 font-semibold text-brand-text">
-        <span aria-hidden className="grid size-9 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-700">{n}</span>
+    // Kit request B-mm-4: the mockup's density (14px question, 12px options), still 44px targets.
+    <section className={cn(card, "p-3 sm:p-3")} aria-labelledby={id}>
+      <h2 id={id} className="flex items-center gap-2.5 text-sm font-semibold text-brand-text">
+        <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-50 text-brand-700">{n}</span>
         {question.text}
       </h2>
-      <div role="radiogroup" aria-labelledby={id} className={cn("mt-3 grid gap-2", cols)}>
+      <div role="radiogroup" aria-labelledby={id} className={cn("mt-2.5 grid gap-1.5", cols)}>
         {question.options.map((o) => {
           const Icon = o.icon ? CHECKIN_ICON[o.icon] : undefined;
           const on = value === o.id;
@@ -607,7 +613,7 @@ export function CheckinQuestionCard({ n, question, value, onChange }: { n: numbe
               aria-checked={on}
               onClick={() => onChange(o.id)}
               className={cn(
-                "flex min-h-11 flex-col items-center justify-center gap-1 border text-sm font-medium transition-colors duration-fast",
+                "flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 border text-xs font-medium transition-colors duration-fast",
                 question.layout === "pills" ? "rounded-full px-2" : "rounded-tile px-1 py-2",
                 on ? "border-brand-700 bg-brand-100 text-brand-700" : "border-brand-border bg-brand-surface text-brand-text",
               )}

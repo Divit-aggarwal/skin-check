@@ -78,6 +78,7 @@ export function ProgressView() {
       </header>
       <div className="mb-4">
         <TabBar
+          fill
           label={P.views}
           current={view}
           tabs={[

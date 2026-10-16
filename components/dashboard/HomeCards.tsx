@@ -407,8 +407,8 @@ export function WeatherCard({ user, settings, onSettings, sheet = false }: { use
       {c && category && (
         <>
           {/* UV today (the day's peak), its category in words and colour, and the one advice line. */}
-          <div className="flex items-center gap-4 rounded-card bg-amber-50/70 p-4">
-            <IconWell icon={Sun} size={72} className="bg-amber-100/70 text-severity-moderate" />
+          <div className="flex items-center gap-4 rounded-card bg-sun-wash/70 p-4">
+            <IconWell icon={Sun} size={72} className="bg-sun-soft/70 text-severity-moderate" />
             <dl className="min-w-0">
               <dt className="text-sm text-brand-text">{H.weather.uv}</dt>
               <dd className="flex flex-wrap items-baseline gap-x-3">
@@ -487,14 +487,14 @@ function UvCurve({ hours }: { hours: UvHour[] }) {
   const base = H0 + PH;
   return (
     <svg role="img" aria-label={H.weather.uvDayLabel(labelled.map((h) => `${hourLabel(h.hour)} ${Math.round(h.uv)}`).join(", "))} viewBox={`0 0 ${W} ${base + 24}`} className="w-full">
-      <path d={`${line} L${x(to).toFixed(1)} ${base} L${x(from).toFixed(1)} ${base} Z`} className="fill-amber-100/60" />
-      <path d={line} fill="none" strokeWidth="2" strokeLinejoin="round" className="stroke-amber-300" />
+      <path d={`${line} L${x(to).toFixed(1)} ${base} L${x(from).toFixed(1)} ${base} Z`} className="fill-sun-soft/60" />
+      <path d={line} fill="none" strokeWidth="2" strokeLinejoin="round" className="stroke-sun-line" />
       {labelled.map((h) => {
         const top = h.uv === peak;
         return (
           <g key={h.hour}>
             <line x1={x(h.hour)} x2={x(h.hour)} y1={y(h.uv)} y2={base} className="stroke-brand-border" />
-            <circle cx={x(h.hour)} cy={y(h.uv)} r="5.5" className={top ? "fill-severity-high" : "fill-amber-400"} stroke="white" strokeWidth="1.5" />
+            <circle cx={x(h.hour)} cy={y(h.uv)} r="5.5" className={top ? "fill-severity-high" : "fill-sun"} stroke="white" strokeWidth="1.5" />
             <text x={x(h.hour)} y={y(h.uv) - 10} textAnchor="middle" className="fill-brand-text text-[13px] font-semibold">
               {Math.round(h.uv)}
             </text>

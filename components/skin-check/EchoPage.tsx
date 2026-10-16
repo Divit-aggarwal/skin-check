@@ -403,6 +403,7 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
         </div>
       ) : (
         <ChatInput
+          icon={Sparkles}
           label={E.placeholder(areaLabel)}
           sendLabel={E.send}
           value={draft}

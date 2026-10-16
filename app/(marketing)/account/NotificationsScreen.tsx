@@ -18,12 +18,12 @@ const N = ACCOUNT_COPY.notify;
 export type ProductInfo = Record<string, { title: string; image: string | null }>;
 
 const ICON: Record<NotificationType, { icon: LucideIcon; well?: string }> = {
-  routine_morning: { icon: Sun, well: "bg-amber-50 text-amber-600" },
+  routine_morning: { icon: Sun, well: "bg-sun-wash text-sun-ink" },
   routine_evening: { icon: Moon, well: "bg-sky-50 text-sky-700" },
   weekly_checkin: { icon: Camera },
   product_usage: { icon: Sparkles },
   weekly_summary: { icon: BarChart3, well: "bg-sky-50 text-sky-700" },
-  recommendations: { icon: Lightbulb, well: "bg-amber-50 text-amber-600" },
+  recommendations: { icon: Lightbulb, well: "bg-sun-wash text-sun-ink" },
   echo_tips: { icon: Sparkles },
   marketing: { icon: Tag, well: "bg-rose-50 text-rose-600" },
 };

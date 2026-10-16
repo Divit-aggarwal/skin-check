@@ -54,6 +54,7 @@ export function ChecksView({ openId }: { openId: string | null }) {
   // the list is still on the left (flow review G03).
   const tabs = (
     <TabBar
+      fill
       label={K.views}
       current={view}
       tabs={[

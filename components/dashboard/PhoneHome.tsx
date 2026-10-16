@@ -221,7 +221,7 @@ function TodayCard({
       {weatherOn() && (
         <div className={`${card} relative flex flex-col !px-3.5 !py-2.5`}>
           <div className="flex items-center gap-3">
-            <IconWell icon={Sun} size={40} className="bg-amber-50 text-severity-moderate" />
+            <IconWell icon={Sun} size={40} className="bg-sun-wash text-severity-moderate" />
             <div className="min-w-0 flex-1">
               <p className="flex min-w-0 items-center gap-1 text-sm text-brand-text">
                 {H.weather.title}

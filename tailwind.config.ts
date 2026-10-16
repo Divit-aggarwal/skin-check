@@ -198,6 +198,8 @@ const config: Config = {
         },
         // Environment severity text (Very high / Hot / Moderate).
         severity: { high: "#B91C1C", warm: "#C2410C", moderate: "#B45309" },
+        // Kit request D-1: the weather sun (UV panel, sun wells, UV curve), instead of Tailwind's default amber.
+        sun: { wash: "#FFFBEB", soft: "#FEF3C7", line: "#FCD34D", DEFAULT: "#FBBF24", ink: "#D97706" },
       },
 
       // ─── Typography ────────────────────────────────────────────────

@@ -84,7 +84,7 @@ export function LastCheckCard() {
 
 /** The lighting tip (mockup 05). One photo: Today's own wording; three angles: the same light and place each week. */
 export function PhotoTip() {
-  return <TintCard icon={Lightbulb} title={<span className="sr-only">{S.tipLabel}</span>} body={threeAngleUi() ? S.tipThree : H.next.tip} />;
+  return <TintCard compact icon={Lightbulb} title={<span className="sr-only">{S.tipLabel}</span>} body={threeAngleUi() ? S.tipThree : H.next.tip} />;
 }
 
 /** A short-lived link to one of the user's own kept photos, or null (nothing kept, not theirs, or any failure). */

@@ -207,7 +207,7 @@ export function GuidedCapture({ onDone, onFallback }: { onDone: (photos: GuidedP
         {ready && <LiveCheckBadges live={live} />}
       </div>
       <div aria-live="polite">
-        <TintCard icon={ScanFace} title={G.frameTitle} body={ready ? (live ? live.hint ?? LIVE_COPY.ready : K.loading) : undefined} className="bg-brand-50 py-3 sm:py-3" />
+        <TintCard compact icon={ScanFace} title={G.frameTitle} body={ready ? (live ? live.hint ?? LIVE_COPY.ready : K.loading) : undefined} className="bg-brand-50 py-3 sm:py-3" />
       </div>
       {ready ? (
         <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
