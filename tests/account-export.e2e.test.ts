@@ -39,6 +39,9 @@ describe.skipIf(!WEB)("account export end to end", () => {
         sideImages: { left: { stored: true, storage: "s3", key: sideImageKey(u.uid, u.scanId, "left") }, right: { stored: false } },
       });
       await ref.collection("chatTurns").doc("t1").set({ text: u.canary });
+      // Profile and reminder device as lib/auth-context.tsx and /api/home/reminders write them.
+      await ref.set({ phoneNumber: u.phoneNumber, lastSeenAt: Timestamp.fromDate(new Date("2026-10-15T09:00:00Z")) });
+      await ref.collection("pushSubscriptions").doc("s1").set({ endpoint: `https://fcm.googleapis.com/fcm/send/${u.canary}`, timeZone: "Asia/Kolkata", createdAt: Timestamp.fromDate(new Date("2026-10-02T08:00:00Z")) });
       for (const key of [scanImageKey(u.uid, u.scanId), sideImageKey(u.uid, u.scanId, "left")]) {
         await s3.send(new PutObjectCommand({ Bucket: "skin-originals-dev", Key: key, Body: `${u.canary}:${key}`, ContentType: "image/jpeg" }));
       }
@@ -59,6 +62,13 @@ describe.skipIf(!WEB)("account export end to end", () => {
     expect(a.collections.skinChecks[0]!.data.createdAt).toBe("2026-10-01T10:00:00.000Z");
     expect(a.collections.chatTurns).toEqual([{ id: "t1", data: { text: A.canary } }]);
     expect(a.collections.checkins).toEqual([]);
+    expect(a.profile).toEqual({ phoneNumber: A.phoneNumber, lastSeenAt: "2026-10-15T09:00:00.000Z" });
+    expect(a.under18Marker).toBeNull();
+    expect(a.collections.pushSubscriptions).toEqual([
+      { id: "s1", data: { endpoint: `https://fcm.googleapis.com/fcm/send/${A.canary}`, timeZone: "Asia/Kolkata", createdAt: "2026-10-02T08:00:00.000Z" } },
+    ]);
+    expect(a.collections.exportUsage).toEqual([{ id: "daily", data: { day: expect.any(String), count: 1 } }]);
+    expect(a.notIncluded.join(" ")).not.toMatch(/app profile|reminders/);
     expect(a.photos.map((p) => p.angle).sort()).toEqual(["front", "left"]);
     // The signed links really fetch A's own objects from storage.
     for (const p of a.photos) {
@@ -73,6 +83,7 @@ describe.skipIf(!WEB)("account export end to end", () => {
     const { file: b, idToken: bToken } = await exportOf(B);
     expect(JSON.stringify(b)).not.toContain(A.canary);
     expect(JSON.stringify(b)).not.toContain(A.uid);
+    expect(JSON.stringify(b)).not.toContain(A.phoneNumber);
 
     // No token: 401. An erased account: 403 (the marker alone, set by hand,
     // due a day from now so no erase sweep in another test picks B up).

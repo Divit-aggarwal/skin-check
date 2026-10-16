@@ -28,6 +28,8 @@ export const dataExportFixture: DataExport = {
   formatVersion: EXPORT_FORMAT_VERSION,
   exportedAt: "2026-10-15T08:00:00.000Z",
   uid: "fixture-uid",
+  profile: { phoneNumber: "+919999900000", lastSeenAt: "2026-10-15T07:59:00.000Z" },
+  under18Marker: null,
   collections: {
     skinChecks: [{ id: "scan-aaaa1111", data: { status: "completed" } }],
     scanAnalyses: [],
@@ -37,6 +39,9 @@ export const dataExportFixture: DataExport = {
     checkins: [],
     settings: [],
     chatTurns: [],
+    pushSubscriptions: [],
+    echoUsage: [],
+    exportUsage: [],
   },
   photos: [{ scanId: "scan-aaaa1111", angle: "front", url: "https://example.invalid/signed" }],
   photoLinksExpireAt: "2026-10-15T09:00:00.000Z",

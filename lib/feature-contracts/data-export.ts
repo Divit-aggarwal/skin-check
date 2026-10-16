@@ -18,6 +18,9 @@ export const EXPORT_COLLECTIONS = [
   "checkins",
   "settings",
   "chatTurns",
+  "pushSubscriptions",
+  "echoUsage",
+  "exportUsage",
 ] as const;
 export type ExportCollection = (typeof EXPORT_COLLECTIONS)[number];
 
@@ -32,6 +35,10 @@ export interface DataExport {
   formatVersion: typeof EXPORT_FORMAT_VERSION;
   exportedAt: string;
   uid: string;
+  /** The profile doc users/{uid} itself (phoneNumber, lastSeenAt), null when there is none. */
+  profile: Record<string, unknown> | null;
+  /** under18Accounts/{uid} (H24: set after an under-18 answer, { markedAt }), null when there is none. */
+  under18Marker: Record<string, unknown> | null;
   /** Firestore timestamps become ISO strings; nothing else is transformed. */
   collections: Record<ExportCollection, Array<{ id: string; data: Record<string, unknown> }>>;
   photos: ExportPhoto[];

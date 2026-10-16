@@ -82,6 +82,12 @@ beforeEach(() => {
     sideImages: { left: { stored: true }, right: { stored: false } },
   });
   put("users/alice/settings/home", { reminders: "allowed" });
+  put("users/alice", { phoneNumber: "+919999900001", lastSeenAt: Timestamp.fromDate(new Date("2026-10-15T09:00:00Z")) });
+  put("users/alice/pushSubscriptions/s1", { endpoint: "https://fcm.googleapis.com/fcm/send/alice-device", timeZone: "Asia/Kolkata", createdAt: Timestamp.fromDate(new Date("2026-10-02T08:00:00Z")), lastSentOn: "2026-10-14" });
+  put("users/alice/echoUsage/daily", { day: "2026-10-15", count: 2 });
+  put("users/bob", { phoneNumber: "+91BOBDATA" });
+  put("users/bob/pushSubscriptions/s1", { endpoint: "https://fcm.googleapis.com/fcm/send/BOBDATA" });
+  put("under18Accounts/bob", { markedAt: "BOBDATA" });
   put(`users/bob/skinChecks/${THEIRS}`, { image: { stored: true }, secret: "BOBDATA" });
   put("users/bob/chatTurns/t1", { text: "BOBDATA" });
   originalExists.mockResolvedValue(true);
@@ -103,6 +109,14 @@ describe("GET /api/account/export", () => {
     ]);
     expect(file.collections.settings).toEqual([{ id: "home", data: { reminders: "allowed" } }]);
     expect(file.collections.checkins).toEqual([]); // BE3's collection may not exist yet
+    // Everything we hold: the profile doc, reminder devices and the daily counts too.
+    expect(file.profile).toEqual({ phoneNumber: "+919999900001", lastSeenAt: "2026-10-15T09:00:00.000Z" });
+    expect(file.under18Marker).toBeNull();
+    expect(file.collections.pushSubscriptions).toEqual([
+      { id: "s1", data: { endpoint: "https://fcm.googleapis.com/fcm/send/alice-device", timeZone: "Asia/Kolkata", createdAt: "2026-10-02T08:00:00.000Z", lastSentOn: "2026-10-14" } },
+    ]);
+    expect(file.collections.echoUsage).toEqual([{ id: "daily", data: { day: "2026-10-15", count: 2 } }]);
+    expect(file.collections.exportUsage).toEqual([{ id: "daily", data: { day: expect.any(String), count: 1 } }]);
     expect(file.photos).toEqual([
       { scanId: MINE, angle: "front", url: `https://s3.example/users/alice/scans/${MINE}/original.jpg?sig` },
       { scanId: MINE, angle: "left", url: `https://s3.example/users/alice/scans/${MINE}/left.jpg?sig` },
@@ -115,8 +129,19 @@ describe("GET /api/account/export", () => {
   it("only the caller's own paths are read, and another user's data never appears", async () => {
     const res = await get();
     expect(JSON.stringify(await res.json())).not.toMatch(/bob|BOBDATA|7c9e6679/);
-    for (const p of readPaths) expect(p).toMatch(/^(users\/alice\/|erasedAccounts\/alice$)/);
+    for (const p of readPaths) expect(p).toMatch(/^(users\/alice\/|(users|erasedAccounts|under18Accounts)\/alice$)/);
     for (const [key] of originalExists.mock.calls) expect(key).toMatch(/^users\/alice\/scans\//);
+  });
+
+  it("an under-18 marker is in the file", async () => {
+    put("under18Accounts/alice", { markedAt: Timestamp.fromDate(new Date("2026-10-03T00:00:00Z")) });
+    const file = (await (await get()).json()) as DataExport;
+    expect(file.under18Marker).toEqual({ markedAt: "2026-10-03T00:00:00.000Z" });
+  });
+
+  it("no profile doc: profile is null", async () => {
+    docs.delete("users/alice");
+    expect(((await (await get()).json()) as DataExport).profile).toBeNull();
   });
 
   it("a photo is linked only when the record says kept and storage has it", async () => {
@@ -195,6 +220,8 @@ describe("serializeWithinLimit", () => {
     formatVersion: 1,
     exportedAt: "2026-10-15T00:00:00.000Z",
     uid: "alice",
+    profile: null,
+    under18Marker: null,
     collections: {
       ...(Object.fromEntries(EXPORT_COLLECTIONS.map((c) => [c, []])) as unknown as DataExport["collections"]),
       chatTurns: [entry("old", 400), entry("mid", 400), entry("new", 400)],
