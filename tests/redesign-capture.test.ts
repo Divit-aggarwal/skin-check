@@ -20,19 +20,21 @@ describe("07: the quality gate's result after capture", () => {
   });
 });
 
-describe("08: the weekly check-in stays behind its flag and saves nothing (E19)", () => {
+describe("08: the weekly check-in stays behind its flag (E19)", () => {
   const flow = readFileSync("components/skin-check/SkinCheckFlow.tsx", "utf8");
   const checkin = readFileSync("components/skin-check/WeeklyCheckin.tsx", "utf8");
 
-  it("is opened and shown only when weeklyCheckinUi() is on", () => {
+  it("is opened and shown only when weeklyCheckinUi() is on: from the start, and after a check's results", () => {
     expect(flow).toMatch(/if \(checkin && weeklyCheckinUi\(\)\)/);
-    expect(flow).toMatch(/\{weeklyCheckinUi\(\) && \(\s*<button type="button" onClick=\{\(\) => setCheckin\(true\)\}/);
-    expect(flow.match(/setCheckin\(true\)/g)).toHaveLength(1);
+    expect(flow).toMatch(/\{weeklyCheckinUi\(\) && \(\s*<button type="button" onClick=\{\(\) => setCheckin\(\{ scanId: null \}\)\}/);
+    expect(flow).toMatch(/\{weeklyCheckinUi\(\) && \(\s*<button type="button" onClick=\{\(\) => setCheckin\(\{ scanId \}\)\}/);
+    expect(flow.match(/setCheckin\(\{/g)).toHaveLength(2);
   });
 
-  it("has no save path: no fetch, no Firestore, the save button disabled", () => {
-    expect(checkin).not.toMatch(/fetch\(|@\/lib\/firebase|@\/lib\/api|localStorage|setDoc|addDoc/);
-    expect(checkin).toMatch(/<button type="button" disabled aria-describedby="checkin-later"/);
+  it("saves only through POST /api/checkins: no Firestore, no local storage; questions from the contract", () => {
+    expect(checkin).not.toMatch(/@\/lib\/firebase|localStorage|setDoc|addDoc/);
+    expect(checkin).toMatch(/CHECKIN_QUESTIONS\.map/);
+    expect(readFileSync("components/skin-check/checkinSubmit.ts", "utf8")).toMatch(/fetch\(CHECKINS_ROUTE, \{\s*method: "POST"/);
   });
 });
 

@@ -126,7 +126,9 @@ describe("the Echo switch (ECHO_SWITCH)", () => {
 
   it("/echo reads the switch and, when off, shows the notice in place of the input", async () => {
     const { readFileSync } = await import("node:fs");
-    expect(readFileSync("app/(marketing)/echo/page.tsx", "utf8")).toContain("<EchoPage echoOn={echoOn()} productsOn={echoProductsOn()} />"); // TD-34: the product switch is passed beside it
+    expect(readFileSync("app/(marketing)/echo/page.tsx", "utf8")).toContain("<EchoWithConsent echoOn={echoOn()} productsOn={echoProductsOn()} />");
+    // H36 (lane C): the wrapper passes the Echo switch through unchanged and only narrows products.
+    expect(readFileSync("components/products/PersonalisedProducts.tsx", "utf8")).toContain("<EchoPage echoOn={echoOn} productsOn={productsOn && personal} />"); // TD-34: the product switch is passed beside it
     const page = readFileSync("components/skin-check/EchoPage.tsx", "utf8");
     // The notice, then the help line (safety review: a user who cannot write still sees it).
     expect(page).toMatch(/\{!echoOn \? \(\s*<div role="status"[^>]*>\s*<p>\{E\.off\}<\/p>\s*<p>\{withPhoneLinks\(REFERRAL_LINE\)\}<\/p>/);
@@ -137,7 +139,7 @@ describe("the Echo switch (ECHO_SWITCH)", () => {
     expect(config).toContain('ECHO_PRODUCTS_SWITCH: process.env.ECHO_PRODUCTS_SWITCH ?? "",'); // TD-34: the product switch beside it
     // TD-47: Home's Ask Echo card (with its starter questions) is the dashboard's way into Echo.
     expect(readFileSync("components/dashboard/DashboardPage.tsx", "utf8")).toMatch(/\{echoOn\(\) && \(\s*<Area name="echo">\s*<AskEchoCard/);
-    expect(readFileSync("components/checks/ChecksView.tsx", "utf8")).toMatch(/echoOn\(\) && \(\s*<Link href="\/echo"/);
+    expect(readFileSync("components/checks/ChecksView.tsx", "utf8")).toMatch(/echoOn\(\) && <NextRow href="\/echo"/); // G37 lane A: the opened check's Echo row
     expect(readFileSync("components/skin-check/SkinCheckDashboard.tsx", "utf8")).toMatch(/\{echoOn\(\) && \(\s*<div className="sticky/);
     // Every refusal that stops the user writing carries the help line, the limit-store outage too (retryable).
     for (const code of ["ECHO_OFF", "ECHO_DAILY_LIMIT", "ECHO_LIMIT_UNAVAILABLE"]) expect(page).toMatch(new RegExp(`${code}: \`\\$\\{E\\.\\w+\\} \\$\\{REFERRAL_LINE\\}\``));

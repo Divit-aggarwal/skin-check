@@ -9,7 +9,7 @@ import { SHELL_COPY } from "@/components/shell/copy";
 // Shared page pieces of the design system (docs/design/system.md §4-5).
 
 export * from "./classes";
-import { btnPrimary, btnSecondary, card, eyebrow, h2 } from "./classes";
+import { btnPrimary, btnSecondary, card, eyebrow, h2, subtitle, titlePage } from "./classes";
 
 /** Page title. On phones the Account button sits top right (system.md §6). */
 export function PageHeader({ title, kicker, intro, children, phoneCompact = false }: { title: string; kicker?: string; intro?: string; children?: React.ReactNode; phoneCompact?: boolean }) {
@@ -17,16 +17,16 @@ export function PageHeader({ title, kicker, intro, children, phoneCompact = fals
   // content; `order` keeps it top right (flow review G03). phoneCompact: a
   // phone row above already has the title context and the Account button.
   return (
-    <header className={`flex items-start justify-between gap-4 pb-6 ${phoneCompact ? "pt-2 lg:pt-12" : "pt-8 sm:pt-12"}`}>
+    <header className={`flex items-start justify-between gap-4 ${phoneCompact ? "pb-2 lg:pb-6 lg:pt-12" : "pb-6 pt-8 sm:pt-12"}`}>
       <div className={`order-2 ${phoneCompact ? "hidden" : ""}`}>
         <AccountButton />
       </div>
       <div className="order-1 min-w-0">
         <div className={phoneCompact ? "sr-only lg:not-sr-only" : undefined}>
           {kicker && <p className={`${eyebrow} mb-2`}>{kicker}</p>}
-          <h1 className="text-[28px] font-semibold leading-[1.15] tracking-[-0.02em] text-brand-text text-balance sm:text-[32px]">{title}</h1>
+          <h1 className={titlePage}>{title}</h1>
         </div>
-        {intro && <p className="mt-3 max-w-prose text-brand-muted">{intro}</p>}
+        {intro && <p className={`mt-1 max-w-prose ${subtitle}`}>{intro}</p>}
         {children}
       </div>
     </header>

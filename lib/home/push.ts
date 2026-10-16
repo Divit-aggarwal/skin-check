@@ -2,6 +2,7 @@ import { createHash, createPrivateKey, sign } from "node:crypto";
 import type { Firestore } from "firebase-admin/firestore";
 import { deriveDashboard, type Doc } from "@/components/dashboard/state";
 import { currentRoutine, isTimeZone, todayIn, weekdayOf, type RoutineEvent } from "@/lib/routine/events";
+import type { NotificationPrefs } from "@/lib/feature-contracts/notifications";
 import { nextCheck } from "./schedule";
 
 // SERVER ONLY. TD-47 reminders: standard web push (RFC 8030) signed with our
@@ -67,6 +68,15 @@ export function dueToday(uid: string, data: { checks: Doc[]; analyses: Doc[]; ev
   return { check: nextCheck(last, now, timeZone).kind === "today", routine };
 }
 
+/**
+ * G31: with saved prefs, the daily push goes out for the morning routine when
+ * a routine step is due, and for the weekly check-in on the chosen weekday
+ * (0 = Sunday, in the subscription's time zone) whether or not a check is due.
+ */
+export function wanted(prefs: Pick<NotificationPrefs, "types" | "weeklyCheckinDay">, due: { routine: boolean }, weekday: number): boolean {
+  return (prefs.types?.routine_morning === true && due.routine) || (prefs.types?.weekly_checkin === true && prefs.weeklyCheckinDay === weekday);
+}
+
 /** Subscriptions one account may keep (one per browser; old ones go when a service says they are gone). */
 export const MAX_SUBSCRIPTIONS_PER_USER = 5;
 /** The cron stops starting new users after this, well inside the 300 s function limit, and says so. */
@@ -119,12 +129,16 @@ export async function sendReminders(db: Firestore, now = new Date(), send = send
     }
     try {
       const user = db.collection("users").doc(uid);
-      const [settings, checks, analyses, events] = await Promise.all([
+      const [settings, prefsDoc, checks, analyses, events] = await Promise.all([
         user.collection("settings").doc("home").get(),
+        user.collection("settings").doc("notifications").get(),
         ...["skinChecks", "scanAnalyses", "routineEvents"].map((c) => user.collection(c).get()),
       ] as const);
       // Reminders turned off in Account (even if a browser's subscription is still here): nothing is sent.
       if ((settings as { get: (f: string) => unknown }).get("reminders") !== "allowed") continue;
+      // G31: per-type switches (users/{uid}/settings/notifications). With no doc, today's rule (check or routine due).
+      const saved = prefsDoc as FirebaseFirestore.DocumentSnapshot;
+      const prefs = saved.exists ? (saved.data() as Pick<NotificationPrefs, "types" | "weeklyCheckinDay">) : null;
       const data = {
         checks: (checks as FirebaseFirestore.QuerySnapshot).docs.map((d) => ({ id: d.id, data: d.data() })),
         analyses: (analyses as FirebaseFirestore.QuerySnapshot).docs.map((d) => ({ id: d.id, data: d.data() })),
@@ -136,7 +150,7 @@ export async function sendReminders(db: Firestore, now = new Date(), send = send
         const today = todayIn(tz, now);
         if (lastSentOn === today) continue;
         const due = dueToday(uid, data, tz, now);
-        if (!due.check && !due.routine) continue;
+        if (prefs ? !wanted(prefs, due, weekdayOf(today)) : !due.check && !due.routine) continue;
         if (!allowedEndpoint(endpoint) || (await send(endpoint)) === "gone") {
           await sub.ref.delete();
           removed += 1;

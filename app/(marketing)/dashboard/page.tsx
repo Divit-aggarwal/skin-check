@@ -1,5 +1,5 @@
 import { Suspense } from "react";
-import { DashboardPage } from "@/components/dashboard/DashboardPage";
+import { DashboardWithConsent } from "@/components/products/PersonalisedProducts";
 import { LoadingState, page } from "@/components/ui/page";
 import { echoProductsOn } from "@/lib/echo-limits";
 
@@ -23,8 +23,8 @@ export default function DashboardRoute() {
         </main>
       }
     >
-      {/* Read at build time, like /echo: the starter questions hide product questions while suggestions are off. */}
-      <DashboardPage productsOn={echoProductsOn()} />
+      {/* H36: also off when the user withdrew personalisation (PersonalisedProducts). Read at build time, like /echo: the starter questions hide product questions while suggestions are off. */}
+      <DashboardWithConsent productsOn={echoProductsOn()} />
     </Suspense>
   );
 }

@@ -264,3 +264,41 @@ describe("upload size", () => {
     }
   });
 });
+
+// C10 (TD-54 (2)): side photos of a three-angle check. Same route, same checks;
+// only the key differs, and it is still built from the verified uid.
+describe("upload angle (C10)", () => {
+  it("absent or front: the front key, unchanged", async () => {
+    for (const extra of [{}, { angle: "front" }]) {
+      presignOriginalUpload.mockClear();
+      const res = await post({ scanId: SCAN_ID, ...CONSENT, ...extra }, "Bearer good");
+      expect(res.status).toBe(200);
+      expect((await res.json()).key).toBe(`users/verified-uid/scans/${SCAN_ID}/original.jpg`);
+      expect(presignOriginalUpload).toHaveBeenCalledWith(`users/verified-uid/scans/${SCAN_ID}/original.jpg`, CONSENT.contentLength);
+    }
+  });
+
+  it("left and right: their own keys under the verified uid; a body uid is ignored", async () => {
+    for (const angle of ["left", "right"]) {
+      presignOriginalUpload.mockClear();
+      const res = await post({ scanId: SCAN_ID, ...CONSENT, angle, uid: "victim" }, "Bearer good");
+      expect(res.status).toBe(200);
+      expect((await res.json()).key).toBe(`users/verified-uid/scans/${SCAN_ID}/${angle}.jpg`);
+      expect(presignOriginalUpload).toHaveBeenCalledWith(`users/verified-uid/scans/${SCAN_ID}/${angle}.jpg`, CONSENT.contentLength);
+    }
+  });
+
+  it.each([["back"], ["LEFT"], ["../original"], [""], [1], [null]])("angle %j is refused before anything is presigned", async (angle) => {
+    const res = await post({ scanId: SCAN_ID, ...CONSENT, angle }, "Bearer good");
+    expect(res.status).toBe(400);
+    expect((await res.json()).code).toBe("INVALID_ANGLE");
+    expect(presignOriginalUpload).not.toHaveBeenCalled();
+  });
+
+  it("a side needs the same consent and size checks as the front", async () => {
+    expect((await post({ scanId: SCAN_ID, contentLength: 1000, angle: "left" }, "Bearer good")).status).toBe(403);
+    expect((await post({ scanId: SCAN_ID, ...CONSENT, contentLength: 25 * 1024 * 1024 + 1, angle: "right" }, "Bearer good")).status).toBe(413);
+    expect((await post({ scanId: "../x", ...CONSENT, angle: "left" }, "Bearer good")).status).toBe(400);
+    expect(presignOriginalUpload).not.toHaveBeenCalled();
+  });
+});

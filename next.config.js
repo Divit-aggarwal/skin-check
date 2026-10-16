@@ -24,7 +24,8 @@ const nextConfig = {
 
   images: {
     formats: ["image/avif", "image/webp"],
-    remotePatterns: [],
+    // TD-52: product photos from the store's own CDN (lib/store/products.ts).
+    remotePatterns: [{ protocol: "https", hostname: "cdn.shopify.com", pathname: "/s/files/1/1006/6100/2611/**" }],
   },
 
   compress: true,

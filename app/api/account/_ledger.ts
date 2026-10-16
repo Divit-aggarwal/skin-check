@@ -89,8 +89,15 @@ async function entries(uid: string, purpose: ConsentPurpose) {
 
 /** The newest entry's answer for a purpose at `version`, or null when there is none. */
 export async function latestGrant(uid: string, purpose: ConsentPurpose, version: string): Promise<boolean | null> {
+  return (await latestEntry(uid, purpose, version))?.granted ?? null;
+}
+
+/** H36: the newest entry for a purpose at `version` with its time (ISO), or null. Older versions do not count. */
+export async function latestEntry(uid: string, purpose: ConsentPurpose, version: string): Promise<{ granted: boolean; at: string | null } | null> {
   const newest = (await entries(uid, purpose)).find((e) => e.version === version);
-  return newest ? newest.granted === true : null;
+  if (!newest) return null;
+  const at = millis(newest.recordedAt);
+  return { granted: newest.granted === true, at: at ? new Date(at).toISOString() : null };
 }
 
 /**

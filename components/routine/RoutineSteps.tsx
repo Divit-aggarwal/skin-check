@@ -6,6 +6,8 @@ import { getProduct } from "@/lib/catalog/catalogue";
 import { ROUTINE_COPY as C } from "@/lib/routine/copy";
 import { OTHER_PRODUCT_ID as OTHER, UNDO_STATUS } from "@/lib/routine/events";
 import { StatusMark, type StepStatus } from "@/components/ui/kit";
+import { ProductPhoto } from "@/components/products/ProductPhoto";
+import type { StoreCard } from "@/components/products/useStoreProducts";
 import type { RoutineData } from "./useRoutine";
 
 // The store's four steps, shown for one time of day at a time (redesign
@@ -76,25 +78,29 @@ export function LogButtons({ productId, name, slot, status, busy, send, large = 
   );
 }
 
-const badge = "grid size-7 shrink-0 place-items-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700";
+const badge = "grid size-9 shrink-0 place-items-center rounded-full bg-brand-100 text-base font-semibold text-brand-700";
 
 /** One slot: the four steps in order, then products not in a step. */
-export function SlotSteps({ data, slot, busy, send }: { data: RoutineData; slot: Slot; busy: boolean; send: Send }) {
+export function SlotSteps({ data, slot, busy, send, store }: { data: RoutineData; slot: Slot; busy: boolean; send: Send; store?: StoreCard[] | null | undefined }) {
   const nameOf = nameIn(data);
   const statusOf = statusIn(data, slot);
   const inSlot = data.routine.filter((i) => i.schedule.slot === slot || i.schedule.slot === "AM_PM");
   const other = inSlot.filter((i) => stepOf(i.productId) === null);
   const today = weekdayOf(data.today);
 
-  const entry = (productId: string, due: boolean) => {
+  // Screen 03's step card: photo, then the step (on its first product), the product, today's status.
+  const entry = (productId: string, due: boolean, head?: React.ReactNode) => {
     const name = nameOf(productId);
     const status = statusOf(productId);
     return (
       <div key={productId} data-routine-entry className="flex flex-col gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-start gap-3">
+          {/* Screen 03: the store photo (TD-52, lane C's ProductPhoto), else the step tile. */}
+          <ProductPhoto image={store?.find((p) => p.productId === productId)?.images[0]} step={stepOf(productId)} width={64} />
           <div className="min-w-0 flex-1">
-            <p className="break-words text-brand-text">{name}</p>
-            <p className="text-sm text-brand-text-muted">{due ? C.todayStatus(C.status[status]) : C.notToday}</p>
+            {head}
+            <p className="break-words text-brand-text-muted">{name}</p>
+            <p className="mt-1.5 inline-flex rounded-full bg-brand-50 px-2.5 py-0.5 text-sm text-brand-700">{due ? C.todayStatus(C.status[status]) : C.notToday}</p>
           </div>
           {due && <StatusMark status={status} label={C.status[status]} />}
         </div>
@@ -108,24 +114,29 @@ export function SlotSteps({ data, slot, busy, send }: { data: RoutineData; slot:
       {STEPS.map((step, i) => {
         const items = inSlot.filter((it) => stepOf(it.productId) === step);
         const label = C.steps[step];
-        const head = (
-          <p className="flex items-center gap-3">
-            <span aria-hidden className={badge}>
-              {i + 1}
-            </span>
+        const number = (
+          <span aria-hidden className={badge}>
+            {i + 1}
+          </span>
+        );
+        const name = (
+          <p className="text-lg font-semibold leading-snug text-brand-text">
             <span className="sr-only">{C.stepNumber(i + 1)}: </span>
-            <span className="font-semibold text-brand-text">{label}</span>
+            <span>{label}</span>
             {items.length === 0 && !(step === "protect" && slot === "PM") && <span className="sr-only">{C.emptyStep}</span>}
           </p>
         );
         return items.length > 0 ? (
-          <li key={step} className="flex flex-col gap-3 rounded-card border border-brand-border bg-brand-surface p-4">
-            {head}
-            <div className="flex flex-col gap-4 pl-10">{items.map((it) => entry(it.productId, it.schedule.days.includes(today)))}</div>
+          <li key={step} className="flex items-start gap-3 rounded-card border border-brand-border bg-brand-surface p-4">
+            {number}
+            <div className="flex min-w-0 flex-1 flex-col gap-4">{items.map((it, n) => entry(it.productId, it.schedule.days.includes(today), n === 0 ? name : undefined))}</div>
           </li>
         ) : (
           <li key={step} className="flex min-h-14 flex-wrap items-center justify-between gap-x-3 rounded-card border border-dashed border-brand-border py-2 pl-4 pr-1">
-            {head}
+            <span className="flex items-center gap-3">
+              {number}
+              {name}
+            </span>
             {step === "protect" && slot === "PM" ? (
               <p className="py-2 pr-3 text-sm text-brand-text-muted">{C.eveningProtect}</p>
             ) : (

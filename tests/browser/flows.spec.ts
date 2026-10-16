@@ -260,7 +260,8 @@ test("routine: the four steps, an empty step invites an add, used and skipped in
   await expect(entry(R.otherProduct).getByText(R.todayStatus(R.status.skipped))).toBeVisible();
   // No reading or photo next to a routine entry.
   await expect(page.locator("main")).not.toContainText(/\b(Low|Moderate|Elevated)\b/);
-  await expect(page.locator("main img")).toHaveCount(0);
+  // TD-52 (C-mm-4): store product photos are allowed; no other image (no skin photo) on the routine.
+  await expect(page.locator('main img:not([src*="cdn.shopify.com"]):not([src*="/_next/image"])')).toHaveCount(0);
   // R-6: the page fits a 390 px phone screen, with long product names in every list.
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
   for (const el of await page.locator("select, article[data-routine-card], [data-routine-entry]").all()) {

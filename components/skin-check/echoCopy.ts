@@ -14,6 +14,15 @@ export const ECHO_COPY = {
   tagline: "Talks you through your checks",
   does: ["Goes through your readings", "Answers in plain words", "Never decides for you"],
   doesLabel: "What Echo does",
+  // G37 (mockup 18): Echo's hello beside its avatar, and quick actions to pages that exist.
+  hello: "Hi, I'm Echo.",
+  helloLine: "Here to talk you through your checks.",
+  quickTitle: "Quick actions",
+  quick: {
+    check: { title: "New skin check", body: "Take a new photo" },
+    routine: { title: "My routine", body: "Today's steps" },
+    checks: { title: "My checks", body: "Your past checks" },
+  },
   areaHint: "Each area has its own conversation.",
   areaPicker: "Ask about one area of your face",
   openCheck: "Open this check",

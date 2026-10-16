@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { SideAngle } from "@/lib/feature-contracts/check-photos";
 import type { CaptureQuality, RetakeReason } from "@/lib/capture-quality/types";
 
 // Matches the skin-scan service's POST /scan response exactly — the 7th key
@@ -158,9 +159,16 @@ export type CaptureMethod = "native" | "canvas";
 // `processingConsentVersion` (D-16, R3) is the processing consent this photo
 // was analyzed under; the scan route writes no analysis record without it. It
 // is not draft-persisted, so a restored scan's retry is not recorded (fails closed).
+/**
+ * C10 three-angle capture: true for a cheek photo whose upload this tab
+ * watched land. Absent for a one-photo check. saveSkinCheck's sidesStored
+ * turns it into the record's sideImages.
+ */
+export type SidesStored = Record<SideAngle, boolean>;
+
 export type SkinScanState =
   | { status: "idle" }
   // `photo` (TD-37 (2)): the photo being read, so the scanning view can draw the mesh over it. Not draft-persisted.
   | { status: "loading"; photo?: Blob | undefined }
-  | { status: "success"; result: SkinScanResult; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined; processingConsentVersion?: string | undefined }
-  | { status: "error"; message: string; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined; retakeReason?: RetakeReason | undefined; processingConsentVersion?: string | undefined };
+  | { status: "success"; result: SkinScanResult; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined; processingConsentVersion?: string | undefined; sidesStored?: SidesStored | undefined }
+  | { status: "error"; message: string; photo: Blob; original?: Blob | undefined; captureMethod: CaptureMethod; originalStored?: boolean | undefined; retentionConsentVersion?: string | undefined; quality?: CaptureQuality | undefined; retakeReason?: RetakeReason | undefined; processingConsentVersion?: string | undefined; sidesStored?: SidesStored | undefined };

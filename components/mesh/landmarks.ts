@@ -99,3 +99,24 @@ export function faceMeshOf(photo: Blob): Promise<FaceMesh | null> {
   }
   return found;
 }
+
+// C11 (screen 07): a second landmarker in VIDEO mode for the live capture
+// checks on the camera stream. Same files and GPU→CPU fallback; the IMAGE one
+// above is left as it is. Points are measured in the tab and never kept.
+// ponytail: kept for the session once loaded (a few MB); close it if memory on low-end phones matters.
+let videoLandmarker: Promise<Landmarker> | null = null;
+
+/** Rejects when the library or model cannot load (the capture then falls back to one photo). */
+export function getVideoLandmarker(): Promise<Landmarker> {
+  videoLandmarker ??= (async () => {
+    const { FaceLandmarker, FilesetResolver } = await import("@mediapipe/tasks-vision");
+    const fileset = await FilesetResolver.forVisionTasks(WASM_PATH);
+    const create = (delegate: "GPU" | "CPU") =>
+      FaceLandmarker.createFromOptions(fileset, { baseOptions: { modelAssetPath: MODEL_PATH, delegate }, runningMode: "VIDEO", numFaces: 1 });
+    return create("GPU").catch(() => create("CPU"));
+  })().catch((err) => {
+    videoLandmarker = null;
+    throw err;
+  });
+  return videoLandmarker;
+}

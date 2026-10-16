@@ -1,6 +1,7 @@
 import { DeleteObjectsCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { ORIGINAL_CONTENT_TYPE, userPrefix } from "@/lib/s3-key";
+import { EXPORT_LINK_SECONDS } from "@/lib/feature-contracts/data-export";
 
 // SERVER ONLY — same tripwire as lib/firebase/admin.ts. AWS credentials come
 // from the standard provider chain (instance/execution role in production, or
@@ -214,5 +215,26 @@ export function presignOriginalRead(key: string): Promise<string> {
       ResponseContentDisposition: "inline",
     }),
     { expiresIn: READ_URL_TTL_SECONDS }
+  );
+}
+
+/**
+ * H37 data export: presigned GET for one of the user's own photos, listed in
+ * the export file. Same read pair and the same no-store response as
+ * presignOriginalRead, but it lasts EXPORT_LINK_SECONDS (the user downloads
+ * the file first, then the photos) and S3 sends it as a download. `key` must
+ * come from scanImageKey or sideImageKey with a server-VERIFIED uid.
+ */
+export function presignExportRead(key: string): Promise<string> {
+  return getSignedUrl(
+    s3Read(),
+    new GetObjectCommand({
+      Bucket: BUCKET!,
+      Key: key,
+      ResponseCacheControl: "private, no-store, max-age=0",
+      ResponseContentType: ORIGINAL_CONTENT_TYPE,
+      ResponseContentDisposition: "attachment",
+    }),
+    { expiresIn: EXPORT_LINK_SECONDS }
   );
 }

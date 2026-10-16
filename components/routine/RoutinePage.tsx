@@ -2,11 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight, Plus } from "lucide-react";
+import { ChevronRight, Info, Plus } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { ROUTINE_COPY as C } from "@/lib/routine/copy";
 import { OTHER_PRODUCT_ID as OTHER, type Schedule } from "@/lib/routine/events";
-import { btnPrimary, btnSecondary, card, ErrorState, h2, LoadingState, ReloadButton, SignedOutCard } from "@/components/ui/page";
+import { btnPrimary, btnSecondary, card, ErrorState, h2, lead, LoadingState, PageHeader, ReloadButton, SignedOutCard, titleDisplay } from "@/components/ui/page";
 import { Arrow, IconWell, SegmentedControl } from "@/components/ui/kit";
 import { slotNow } from "@/lib/home/today";
 import { dueEntries, SlotSteps, STEPS, stepOf, type Slot, type Step } from "./RoutineSteps";
@@ -14,6 +14,8 @@ import { GuidedStep, RoutineLogged } from "./RoutineFlow";
 import { getProduct } from "@/lib/catalog/catalogue";
 import { PRODUCTS_COPY as P } from "@/components/products/copy";
 import { ProductTile, productHref } from "@/components/products/ProductTile";
+import { ProductPhoto } from "@/components/products/ProductPhoto";
+import { useStoreProducts } from "@/components/products/useStoreProducts";
 import { timeZone, useRoutine } from "./useRoutine";
 
 // The user's own routine record (R-1 A): today's four steps for morning and
@@ -37,6 +39,7 @@ export function RoutinePage() {
   const { data, failed, busy, send } = useRoutine();
   const [slot, setSlot] = useState<Slot>(() => slotNow(new Date(), timeZone()));
   const [guided, setGuided] = useState(false);
+  const store = useStoreProducts();
   // The brief hides the bottom bar during the active routine flow (globals.css, body[data-flow]).
   useEffect(() => {
     if (!guided) return;
@@ -44,9 +47,16 @@ export function RoutinePage() {
     return () => void delete document.body.dataset.flow;
   }, [guided]);
 
-  if (loading) return <LoadingState label={C.loading} blocks={["h-40", "h-40"]} />;
-  if (!user) return <SignedOutCard body={C.signIn} />;
-  if (!data) return failed ? <ErrorState body={C.error} action={<ReloadButton label={C.tryAgain} />} /> : <LoadingState label={C.loading} blocks={["h-40", "h-40"]} />;
+  // Before the routine loads, the page's own title (the slot title replaces it once loaded, screen 03).
+  const titled = (body: React.ReactNode) => (
+    <>
+      <PageHeader title={C.title} intro={C.purpose} phoneCompact />
+      {body}
+    </>
+  );
+  if (loading) return titled(<LoadingState label={C.loading} blocks={["h-40", "h-40"]} />);
+  if (!user) return titled(<SignedOutCard body={C.signIn} />);
+  if (!data) return titled(failed ? <ErrorState body={C.error} action={<ReloadButton label={C.tryAgain} />} /> : <LoadingState label={C.loading} blocks={["h-40", "h-40"]} />);
 
   const nameOf = (id: string) => (id === OTHER ? C.otherProduct : data.products.find((p) => p.id === id)?.name ?? id);
   const choices = [...data.products.filter((p) => p.available).map((p) => ({ id: p.id, name: p.name })), { id: OTHER, name: C.otherProduct }];
@@ -63,17 +73,18 @@ export function RoutinePage() {
       {failed && <div data-keep><ErrorState body={C.error} action={<ReloadButton label={C.tryAgain} />} /></div>}
 
       <div data-keep className="flex flex-col gap-4">
+        {/* Screen 03: the time of day's title and how many steps are due; no time estimates (none are stored). */}
+        <div className="pt-1 sm:pt-12">
+          <h1 className={titleDisplay}>{C.slotTitle[slot]}</h1>
+          <p className={`mt-1.5 ${lead}`}>{entries.length > 0 ? C.dueCount(entries.length) : C.nothingInSlot}</p>
+        </div>
         <SegmentedControl label={C.slotSwitch} value={slot} onChange={choose} options={[{ value: "AM", label: C.slot.AM }, { value: "PM", label: C.slot.PM }]} />
         {allLogged && <RoutineLogged entries={entries} slot={slot} eveningWaits={eveningWaits} onSeeEvening={() => choose("PM")} />}
         <section aria-label={C.slot[slot]} className="flex flex-col gap-4">
-          <div>
-            <h2 className="text-[22px] font-semibold leading-tight text-brand-text">{C.slotTitle[slot]}</h2>
-            <p className="mt-1 text-brand-text-muted">{entries.length > 0 ? C.dueCount(entries.length) : C.nothingInSlot}</p>
-          </div>
           {guided && pending.length > 0 ? (
             <GuidedStep entries={entries} slot={slot} busy={busy} send={send} onExit={() => setGuided(false)} />
           ) : (
-            <SlotSteps data={data} slot={slot} busy={busy} send={send} />
+            <SlotSteps data={data} slot={slot} busy={busy} send={send} store={store} />
           )}
         </section>
         {!guided && pending.length > 0 && (
@@ -86,6 +97,12 @@ export function RoutinePage() {
         )}
       </div>
 
+      {/* The routine record's purpose (R-1 A), where screen 03 has its footer note. */}
+      <p className="-mt-3 flex items-start gap-3 rounded-card bg-brand-50 px-4 py-3 text-sm text-brand-text-muted">
+        <Info aria-hidden size={20} className="mt-0.5 shrink-0 text-brand-text" />
+        {C.purpose}
+      </p>
+
       {/* Redesign screen 06 as the routine set-up: the user's own products as step cards, then the add form (R-2 B: no recommendation here). */}
       <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start">
         <section aria-labelledby="products-title" className="flex flex-col gap-3 lg:col-span-7">
@@ -93,7 +110,7 @@ export function RoutinePage() {
             {C.yourProducts}
           </h2>
           {data.routine.length === 0 && <p className={`${card} text-brand-text-muted`}>{C.empty}</p>}
-          {[...data.routine].sort((a, b) => rank(a.productId) - rank(b.productId)).map((item) => {
+          {[...data.routine].sort((a, b) => rank(a.productId) - rank(b.productId)).map((item, i) => {
             const others = choices.filter((c) => c.id !== item.productId);
             const name = nameOf(item.productId);
             const step = stepOf(item.productId);
@@ -101,7 +118,9 @@ export function RoutinePage() {
             return (
               <article key={item.productId} data-routine-card className={`${card} flex min-w-0 flex-col gap-3`}>
                 <div className="flex min-w-0 items-start gap-3">
-                  <ProductTile step={step} />
+                  {/* Screen 06: the step number, then the store's photo (TD-52), or the step tile when the store is not read. */}
+                  <span aria-hidden className="grid size-8 shrink-0 place-items-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">{i + 1}</span>
+                  <ProductPhoto image={store?.find((s) => s.productId === item.productId)?.images[0]} step={step} width={64} height={80} />
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-brand-text">{step ? C.steps[step] : C.otherGroup}</p>
                     <h3 className="break-words text-brand-text-muted">{name}</h3>

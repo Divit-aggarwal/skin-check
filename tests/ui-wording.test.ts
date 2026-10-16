@@ -29,13 +29,19 @@ export function uiFiles(dirs: string[]): string[] {
 /** A Tailwind class list, not words a user reads ("animate-in fade-in" is not the banned "fade"). */
 const isClassList = (s: string) => /(^|\s)(flex|grid|rounded|text-|bg-|border|px-|py-|inset-|object-|animate-|absolute|relative|h-|w-)/.test(s);
 
+// TD-51 (owner 2026-10-15): the names "Skin Twin" and "Progress" are allowed on screen; Echo's
+// lexicon still refuses them in Gemini's words, so only these exact names are taken out first.
+const TD51 = /\bSkin Twin\b|\bprogress\b/gi;
 const problems = (text: string) => isClassList(text) ? [] : [
   ...bannedWordsIn(text),
-  ...Object.entries({ CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST }).filter(([, re]) => re.test(text)).map(([n]) => n),
+  ...Object.entries({ CHANGE, MEDICAL, DIAGNOSIS, CAUSE, FORECAST }).filter(([, re]) => re.test(text.replace(TD51, ""))).map(([n]) => n),
 ];
 
 /** "scan" as a word a user reads; paths, imports and identifiers (scanId) are not on screen. */
 export const saysScan = (s: string) => !/^[@./]/.test(s.trim()) && !/[={}()]/.test(s) && /(^|[^\w/-])scans?\b/i.test(s);
+
+/** TD-53 (G37 lane C): screen 16's title and route, exactly; any other "since" is still checked. */
+const TD53_EXACT = ["Since you started ${name}", "/products/${id}/since"];
 
 describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
   it("self-check: the checks catch planted words", () => {
@@ -63,6 +69,7 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
     expect(files.length).toBeGreaterThanOrEqual(8);
     for (const f of files) {
       for (const s of sourceText(readFileSync(f, "utf8"))) {
+        if (TD53_EXACT.includes(s)) continue;
         expect(problems(s), `${f}: ${s}`).toEqual([]);
         expect(saysScan(s), `${f}: ${s}`).toBe(false);
       }
@@ -77,10 +84,11 @@ describe("redesigned screens: wording (D-12, TD-25 (6))", () => {
     }
   });
 
-  it("no redesigned file shows a score, an arrow, a chart or a band colour", () => {
+  // TD-54: level charts from stored data are allowed (kit LevelTimeline); scores, arrows and trends stay out.
+  it("no redesigned file shows a score, an arrow, a trend or a band colour", () => {
     for (const f of uiFiles(DIRS)) {
       const src = readFileSync(f, "utf8");
-      expect(src, f).not.toMatch(/\/100|toConcern|BAND_STYLE|scorePct|ArrowUp|ArrowDown|Trending|Chart/);
+      expect(src, f).not.toMatch(/\/100|toConcern|BAND_STYLE|scorePct|ArrowUp|ArrowDown|Trending/);
       expect(src, f).not.toMatch(/text-(red|green|emerald|rose|amber)-|confidence-|subscore-/);
     }
   });

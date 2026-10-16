@@ -1,5 +1,5 @@
 import { RoutinePage } from "@/components/routine/RoutinePage";
-import { PageHeader, page } from "@/components/ui/page";
+import { page } from "@/components/ui/page";
 import { AppHeader } from "@/components/ui/kit";
 import { ROUTINE_COPY as C } from "@/lib/routine/copy";
 
@@ -12,6 +12,7 @@ export const metadata = {
 };
 
 // Reached from the main navigation, Home's routine card and the timeline.
+// The page title lives in RoutinePage (screen 03: the slot title replaces it once loaded).
 export default function RoutineRoute() {
   return (
     <main className={page}>
@@ -19,7 +20,6 @@ export default function RoutineRoute() {
       <div className="sm:hidden">
         <AppHeader back="/dashboard" backLabel="Back to Today" />
       </div>
-      <PageHeader title={C.title} intro={C.purpose} />
       <RoutinePage />
     </main>
   );

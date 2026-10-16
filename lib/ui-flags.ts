@@ -16,3 +16,9 @@ export const consentsUi = () => process.env.NEXT_PUBLIC_UI_CONSENTS === "on";
 
 /** Screen 22, data export. Waits on tracker H37. */
 export const dataExportUi = () => process.env.NEXT_PUBLIC_UI_DATA_EXPORT === "on";
+
+/** TD-52 (2): Add to Cart (store checkout). Off until the Vercel plan question (A34) is settled. */
+export const cartUi = () => process.env.NEXT_PUBLIC_UI_CART === "on";
+
+/** TD-54 (2): three-angle capture with live checks (C10, C11). Off: the one-photo capture stays. */
+export const threeAngleUi = () => process.env.NEXT_PUBLIC_UI_THREE_ANGLE === "on";

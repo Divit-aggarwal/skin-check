@@ -25,7 +25,16 @@ createServer((req, res) => {
   if (url.pathname.startsWith("/push/")) return send(url.pathname === "/push/gone" ? 410 : 201);
   if (existsSync(`${DIR}/down`)) return send(503, { error: true });
   if (url.pathname === "/v1/forecast")
-    return send(200, { utc_offset_seconds: 19800, current: { time: "2026-10-11T09:30", relative_humidity_2m: 68 }, daily: { uv_index_max: [7.4] } });
+    return send(200, {
+      utc_offset_seconds: 19800,
+      current: { time: "2026-10-11T09:30", relative_humidity_2m: 68, temperature_2m: 29.6 },
+      daily: { uv_index_max: [7.4] },
+      // Today's hourly UV (G37, screen 02): 6 or more from 11:00 to 14:00.
+      hourly: {
+        time: Array.from({ length: 24 }, (_, h) => `2026-10-11T${String(h).padStart(2, "0")}:00`),
+        uv_index: [0, 0, 0, 0, 0, 0, 0.1, 0.8, 2.1, 3.9, 5.2, 6.6, 7.4, 7.1, 6.1, 4.2, 2.3, 0.7, 0, 0, 0, 0, 0, 0],
+      },
+    });
   if (url.pathname === "/v1/air-quality") return send(200, { current: { time: "2026-10-11T09:00", us_aqi: 85 } });
   send(404, { error: true });
 }).listen(PORT, "127.0.0.1", () => console.log(`fake weather on ${PORT}`));

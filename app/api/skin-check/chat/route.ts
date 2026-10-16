@@ -14,6 +14,7 @@ import { bandScores } from "@/lib/skin-check-rules";
 import { summarizeConcerns } from "@/lib/skin-check-score";
 import { ageStatus, latestGrant, withLedgerTimeout, type AgeStatus } from "@/app/api/account/_ledger";
 import { AI_SHARE_CONSENT_VERSION } from "@/lib/consent";
+import { CONSENT_TEXTS } from "@/lib/feature-contracts/consents";
 import { contextChatEnabled, ECHO_OFF_COPY, echoOn } from "@/lib/context/switch";
 import { handleContextChat, recordReferral, serveStoredOpening } from "@/lib/context/chat";
 import { loadOpening, loadSplitCheckTurns } from "@/lib/context/chat-turns";
@@ -244,7 +245,7 @@ export async function POST(request: NextRequest) {
     // F12 (TD-20): the context-package path is the chat that ships. Today's
     // Echo below runs only behind the switch, in development or test.
     if (contextChatEnabled()) {
-      const result = await handleContextChat({ uid, scanId, region, message });
+      const result = await handleContextChat({ uid, scanId, region, message, personalised: await personalised(uid) });
       if (!result.ok) return NextResponse.json({ error: result.error, code: result.code }, { status: result.status });
       const turns = [...history, { role: "user" as const, text: message }, { role: "echo" as const, text: result.reply }];
       return NextResponse.json({ ok: true, reply: result.reply, products: result.products, historyToken: signHistory(uid, scanId, region, turns) });
@@ -378,6 +379,20 @@ async function echoGates(uid: string, scanId: string): Promise<NextResponse | nu
 }
 
 /**
+ * H36: the personalisation consent (newest entry at its version; default on).
+ * Withdrawn: Echo still answers but suggests no products. Unreadable ledger:
+ * no products (fails closed), the answer still goes out.
+ */
+async function personalised(uid: string): Promise<boolean> {
+  try {
+    const grant = await withLedgerTimeout(latestGrant(uid, "personalisation", CONSENT_TEXTS.personalisation.version));
+    return grant ?? CONSENT_TEXTS.personalisation.defaultGranted;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * TD-34: the opening suggestion. Off with Echo, off with product suggestions
  * (and on the older Echo path). After the same gates as a question; a stored
  * opening for this check is shown again without a Gemini call or a question
@@ -392,6 +407,8 @@ async function opening(uid: string, body: unknown): Promise<NextResponse> {
 
   const refused = await echoGates(uid, scanId);
   if (refused) return refused;
+  // H36: no suggestion (stored or new) once personalisation is withdrawn.
+  if (!(await personalised(uid))) return NextResponse.json({ error: "No suggestion here.", code: "ECHO_PRODUCTS_OFF" }, { status: 404 });
 
   try {
     // ponytail: two requests at once (two tabs) can each make an opening and spend a question; the oldest is served. Reserve a fixed doc id if that matters.
