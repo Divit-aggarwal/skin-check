@@ -2,12 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { ArrowRight, Dot, Hand, Package, Pipette, ShowerHead, Sun, ArrowUp, Check, ChevronLeft, ChevronRight, CircleDot, Contrast, Droplet, Flame, Waves, Angry, Droplets, Frown, Laugh, Meh, Smile, Zap, type LucideIcon } from "lucide-react";
 import type { ChangeSlot as ChangeSlotData } from "@/lib/feature-contracts/readings-series";
 import type { CheckinQuestion } from "@/lib/feature-contracts/checkin";
 import { cn } from "@/lib/utils";
-import { appBar, card, heroCard, tintCard } from "./classes";
+import { appBar, card, heroCard, press, tintCard } from "./classes";
 
 // The redesign kit (TD-50, docs/lanes/redesign-report.md). Pieces that page.tsx
 // does not already have. Every piece here renders only what it is given: no
@@ -40,7 +40,7 @@ export function AppHeader({ back, right, backLabel = "Back", backDisabled }: { b
       ) : (
         <span />
       )}
-      <Wordmark centred />
+      <Wordmark centred className="lg:group-data-[nav]/shell:invisible" />
       <div className="justify-self-end">{right}</div>
     </header>
   );
@@ -90,7 +90,7 @@ export function HeroCard({ eyebrow, title, meta, action, media }: { eyebrow?: st
 
 /** The white pill used on a dark hero. */
 export const btnOnDark =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-6 text-base font-semibold text-brand-700 transition-colors duration-fast hover:bg-brand-50";
+  `inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-white px-6 text-base font-semibold text-brand-700 ${press} hover:bg-brand-50`;
 
 /** Trailing arrow for primary pills. */
 export const Arrow = () => <ArrowRight aria-hidden size={18} />;
@@ -159,7 +159,7 @@ export function Chip({ selected, onClick, children }: { selected?: boolean | und
       type="button"
       aria-pressed={selected}
       onClick={onClick}
-      className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-brand-border bg-brand-surface px-4 text-sm font-medium text-brand-text transition-colors duration-fast aria-pressed:border-transparent aria-pressed:bg-brand-100 aria-pressed:text-brand-700"
+      className={cn("inline-flex min-h-11 items-center gap-1.5 rounded-full border border-brand-border bg-brand-surface px-4 text-sm font-medium text-brand-text aria-pressed:border-transparent aria-pressed:bg-brand-100 aria-pressed:text-brand-700", press)}
     >
       {selected && <Check aria-hidden size={16} />}
       {children}
@@ -223,7 +223,7 @@ export function ChoiceGrid<T extends string>({ label, options, value, onChange, 
             role={multiple ? "checkbox" : "radio"}
             aria-checked={on}
             onClick={() => toggle(o.value)}
-            className="relative flex min-h-24 flex-col items-center justify-center gap-2 rounded-card border border-brand-border bg-brand-surface p-3 text-center text-sm font-medium text-brand-text transition-colors duration-fast aria-checked:border-brand-700 aria-checked:bg-brand-50"
+            className={cn("relative flex min-h-24 flex-col items-center justify-center gap-2 rounded-card border border-brand-border bg-brand-surface p-3 text-center text-sm font-medium text-brand-text aria-checked:border-brand-700 aria-checked:bg-brand-50", press)}
           >
             {o.image ? <img src={o.image} alt="" className="size-12 rounded-tile object-cover" /> : o.emoji ? <span aria-hidden className="text-2xl">{o.emoji}</span> : null}
             {o.label}
@@ -440,7 +440,7 @@ export function SuggestionChips({ label, items, onPick, disabled }: { label: str
     <ul aria-label={label} className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none]">
       {items.map((q) => (
         <li key={q} className="shrink-0">
-          <button type="button" disabled={disabled} onClick={() => onPick(q)} className="min-h-11 max-w-[16rem] rounded-full border border-brand-border bg-brand-surface px-4 py-2 text-left text-sm font-medium text-brand-700 transition-colors duration-fast hover:bg-brand-50 disabled:opacity-50">
+          <button type="button" disabled={disabled} onClick={() => onPick(q)} className={`min-h-11 max-w-[16rem] rounded-full border border-brand-border bg-brand-surface px-4 py-2 text-left text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50 ${press}`}>
             {q}
           </button>
         </li>
@@ -461,7 +461,7 @@ export function ChatInput({ label, sendLabel, value, onChange, onSend, disabled,
     >
       {Icon && <Icon aria-hidden size={20} className="shrink-0 text-brand-700" />}
       <input aria-label={label} placeholder={label} value={value} maxLength={maxLength} onChange={(e) => onChange(e.target.value)} disabled={disabled} className="h-11 min-w-0 flex-1 bg-transparent text-base text-brand-text outline-none placeholder:text-brand-text-subtle disabled:opacity-60" />
-      <button type="submit" aria-label={sendLabel} disabled={disabled || !value.trim()} className="grid size-11 shrink-0 place-items-center rounded-full bg-brand-700 text-white transition-colors duration-fast hover:bg-brand-900 disabled:bg-brand-50 disabled:text-brand-text-subtle">
+      <button type="submit" aria-label={sendLabel} disabled={disabled || !value.trim()} className={cn("grid size-11 shrink-0 place-items-center rounded-full bg-brand-700 text-white hover:bg-brand-900 disabled:bg-brand-50 disabled:text-brand-text-subtle", press)}>
         <ArrowUp aria-hidden size={20} />
       </button>
     </form>
@@ -498,11 +498,21 @@ const READING_STROKE: Record<Reading, string> = {
  * the same points to screen readers.
  */
 export function LevelTimeline({ reading, label, points }: { reading: Reading; label: string; points: { key: string; dateLabel: string; band: Level | null }[] }) {
-  const w = 320;
+  // Drawn at the figure's own width (1 unit = 1px), so labels stay 12px on a wide card
+  // instead of scaling up with it (polish lane #1). 320 until measured.
+  const [w, setW] = useState(320);
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setW(Math.max(240, Math.round(e!.contentRect.width))));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const h = 132;
   const left = 72;
   const rowY = (l: Level) => 16 + (2 - LEVELS.indexOf(l)) * 40;
-  const x = (i: number) => (points.length < 2 ? (left + w) / 2 : left + 8 + (i * (w - left - 16)) / (points.length - 1));
+  const x = (i: number) => (points.length < 2 ? (left + w) / 2 : left + 24 + (i * (w - left - 48)) / (points.length - 1));
   const drawn = points.map((p, i) => (p.band ? { x: x(i), y: rowY(p.band) } : null));
   const segments: string[] = [];
   drawn.forEach((p, i) => {
@@ -510,18 +520,18 @@ export function LevelTimeline({ reading, label, points }: { reading: Reading; la
     if (p && prev) segments.push(`M${prev.x},${prev.y}L${p.x},${p.y}`);
   });
   return (
-    <figure className="w-full">
-      <svg aria-hidden viewBox={`0 0 ${w} ${h + 20}`} className={cn("w-full", READING_STROKE[reading])}>
+    <figure ref={ref} className="w-full">
+      <svg aria-hidden width="100%" height={h + 20} viewBox={`0 0 ${w} ${h + 20}`} className={cn("block", READING_STROKE[reading])}>
         {LEVELS.map((l) => (
           <g key={l}>
             <line x1={left} x2={w} y1={rowY(l)} y2={rowY(l)} className="stroke-brand-border" strokeDasharray="3 4" />
-            <text x={0} y={rowY(l) + 4} className="fill-brand-text-muted text-[11px]">{l}</text>
+            <text x={0} y={rowY(l) + 4} className="fill-brand-text-muted text-xs">{l}</text>
           </g>
         ))}
-        <path d={segments.join("")} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" />
+        <path d={segments.join("")} fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
         {drawn.map((p, i) => p && <circle key={points[i]!.key} cx={p.x} cy={p.y} r={4.5} fill="currentColor" className="stroke-white" strokeWidth={1.5} />)}
         {points.map((p, i) => (
-          <text key={p.key} x={x(i)} y={h + 14} textAnchor="middle" className="fill-brand-text-muted text-[10px]">{p.dateLabel}</text>
+          <text key={p.key} x={x(i)} y={h + 16} textAnchor="middle" className="fill-brand-text-muted text-xs">{p.dateLabel}</text>
         ))}
       </svg>
       <table className="sr-only">
@@ -556,10 +566,11 @@ export function PhotoStrip({ photos, action }: { photos: { key: string; src: str
  */
 export function ChangeSlot({ slot }: { slot: ChangeSlotData }) {
   if (slot.status === "needs_more_checks") {
+    // Two short lines, so a narrow tile wraps them cleanly (polish lane #2).
     return (
-      <p className="text-xs text-brand-text-muted">
-        <span className="rounded-full bg-brand-50 px-2 py-0.5 font-medium">Needs more checks</span>{" "}
-        {slot.comparableCount} of {slot.needed} comparable
+      <p className="flex flex-col items-start gap-1 text-xs leading-tight text-brand-text-muted">
+        <span className="rounded-md bg-brand-text/[0.06] px-2 py-0.5 font-medium">Needs more checks</span>
+        <span>{slot.comparableCount} of {slot.needed} comparable</span>
       </p>
     );
   }
@@ -614,7 +625,8 @@ export function CheckinQuestionCard({ n, question, value, onChange }: { n: numbe
               aria-checked={on}
               onClick={() => onChange(o.id)}
               className={cn(
-                "flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 border text-xs font-medium transition-colors duration-fast",
+                "flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 border text-xs font-medium",
+                press,
                 question.layout === "pills" ? "rounded-full px-2" : "rounded-tile px-1 py-2",
                 on ? "border-brand-700 bg-brand-100 text-brand-700" : "border-brand-border bg-brand-surface text-brand-text",
               )}

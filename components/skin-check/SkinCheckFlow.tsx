@@ -74,12 +74,13 @@ export function SkinCheckFlow() {
 
   // Screen 08 (E19), flag on: opened from the start (no check yet) or after a check's results (its scanId).
   const [checkin, setCheckin] = useState<{ scanId: string | null } | null>(null);
-  // Capture, the wait while the photo is read, and the check-in hide the
-  // bottom bar (globals.css, body[data-flow]); the start and the results keep it.
+  // Every question step, capture, the wait while the photo is read, and the
+  // check-in hide the bottom bar (globals.css, body[data-flow]): a focused task
+  // has one way on (polish lane #6). The start, under-18 and results keep it.
   const overlay = complete || blocked || confirmingUnder18 || choosingQuestions;
   // C10 (flag on): the guided photo step has its own stepper and title (mockup 07); the part bar and title stay for screen readers.
   const guidedPhoto = threeAngleUi() && !overlay && section.id === "skin-photo";
-  const focused = checkin !== null || (!overlay && (section.id === "skin-photo" || section.id === "get-your-results"));
+  const focused = checkin !== null || !overlay;
   useEffect(() => {
     if (!focused) return;
     document.body.dataset.flow = "check";

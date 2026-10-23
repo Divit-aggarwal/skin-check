@@ -154,7 +154,7 @@ export function ProgressView() {
       ) : (
         <div className="flex flex-col gap-4">
           <section aria-label={P.latestIn}>
-            <ul className="-mx-4 grid snap-x auto-cols-[calc((100%-1.5rem)/3.5)] grid-flow-col gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:auto-cols-fr sm:px-0">
+            <ul className="-mx-4 grid snap-x auto-cols-[calc((100%-1rem)/2.5)] grid-flow-col gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:auto-cols-fr sm:px-0">
               {series.map((s) => (
                 <li key={s.metric} className="snap-start">
                   <LevelTile metric={s.metric} level={latestBand(s) ?? C.current.noReading} slot={s.change} href={`/checks?reading=${s.metric}`} />
