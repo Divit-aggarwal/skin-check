@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 import { test, type Page } from "@playwright/test";
 import { signIn } from "../browser/helpers";
 import { MMA_SEED as U } from "../browser/seed-mm-a";
@@ -56,4 +56,25 @@ test("products", async ({ page }) => {
     await settle(page);
     await page.screenshot({ path: `${DIR}/${name}-${test.info().project.name}.png`, fullPage: true, animations: "disabled" });
   }
+});
+
+test("check flow: a question step and the photo before consent (phone)", async ({ page }) => {
+  test.skip(test.info().project.name !== "390", "phone only");
+  test.setTimeout(180_000);
+  const shot = (name: string) => page.screenshot({ path: `${DIR}/${name}-390.png`, fullPage: false, animations: "disabled" });
+  await signIn(page, U.empty.phoneNumber);
+  await page.goto("/skin-check");
+  await page.getByRole("button", { name: "Answer the questions now" }).click({ timeout: 60_000 });
+  const name = page.locator('input[type="text"]').first();
+  await name.fill("Tester");
+  await name.press("Enter");
+  await page.getByRole("button", { name: "25–34", exact: true }).click();
+  await page.waitForTimeout(800);
+  await shot("flow-question");
+  await page.getByRole("button", { name: "Female", exact: true }).click();
+  await page.locator('input[type="file"]').setInputFiles({ name: "face.png", mimeType: "image/png", buffer: readFileSync(process.env.LOCAL_STACK_FACE ?? "../skin-scan/fixtures/input_face.png") });
+  const analyze = page.getByRole("button", { name: "Analyze my skin" });
+  await analyze.scrollIntoViewIfNeeded({ timeout: 30_000 });
+  await page.waitForTimeout(800);
+  await shot("flow-photo-consent");
 });
