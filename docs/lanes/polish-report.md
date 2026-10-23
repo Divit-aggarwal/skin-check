@@ -17,6 +17,8 @@ Skills used as the rubric, from the repositories the owner shared:
 
 - `SHOTS=polish-before`: tests/design/pages.shots.ts at 390 (the run was stopped after 32 of 144 because stale specs hit 180s timeouts; see §5). New tests/design/polish.shots.ts at 390, 768 and 1280 covers Today, Skin Twin (overview, timeline, opened check), Progress, Photos, Routine, Echo, Account, a product, Since you started, and the empty account.
 - Screenshots: docs/design/polish-before/ and docs/design/polish-after/.
+- Reviewed closely: 390 and 1280 for the screens above, the check flow at 390 (questions, photo step, results), Echo and Account at 390; 768 checked after the change for the opened check and Progress.
+- Captured but not reviewed in detail: the rest of the 768 set; Account sub-pages (notifications, privacy); the weekly check-in (08) and guided capture (07); signed-out pages on desktop; Echo and Routine at 1280. This pass does not claim them.
 
 ## 3. Findings, ranked (evidence: screenshot, then file)
 
@@ -35,6 +37,8 @@ Skills used as the rubric, from the repositories the owner shared:
 
 ## 4. Owner questions (not changed: wording or tested behaviour)
 
+- **Decision needed (changed, easy to undo): reading tiles on phones show 2.5 per screen, not 3.5 as mockup 12 draws them** (Progress and an opened check). At 3.5, "Needs more checks" broke into a three-line pill. Undo: `auto-cols-[calc((100%-1.5rem)/3.5)]` in components/progress/ProgressView.tsx and components/checks/ChecksView.tsx.
+- The bottom bar is now hidden on question steps. The way out stays: Part 1's back button returns to the start screen, which has "Go to Today".
 - Today while loading shows the title "Your skin checks" and then "Good morning": the header changes when data arrives. The browser tests wait on that title, so the change is the owner's.
 - Today, empty account: three calls to take the first check (hero, Next check tile, "No check yet" row).
 - Today's "Next check" tile repeats its label in its title ("Next check / Next check in 5 days").
@@ -43,6 +47,7 @@ Skills used as the rubric, from the repositories the owner shared:
 
 ## 5. Found outside the task (new rows for the tracker at merge)
 
+- Seen, not investigated: on desktop Today (today-1280, both sets) the latest-check photo was still its loading box when shot, though the same user's photo shows on phone Today and Progress. Probably the shot was taken before /api/checks/photo answered; not proven. The loading box is also wider than the 112px photo it stands for, so the card changes shape when the photo arrives.
 - tests/design/pages.shots.ts is stale: for example, "Delete my account and data" is no longer a button on /account, so several shots wait 180s and fail.
 
 ## 6. Results
