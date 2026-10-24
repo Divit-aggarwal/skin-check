@@ -7,7 +7,7 @@ import { ArrowRight, Dot, Hand, Package, Pipette, ShowerHead, Sun, ArrowUp, Chec
 import type { ChangeSlot as ChangeSlotData } from "@/lib/feature-contracts/readings-series";
 import type { CheckinQuestion } from "@/lib/feature-contracts/checkin";
 import { cn } from "@/lib/utils";
-import { appBar, card, heroCard, press, tintCard } from "./classes";
+import { appBar, card, heroCard, phoneChrome, press, tintCard } from "./classes";
 
 // The redesign kit (TD-50, docs/lanes/redesign-report.md). Pieces that page.tsx
 // does not already have. Every piece here renders only what it is given: no
@@ -25,14 +25,15 @@ export function Wordmark({ className, centred }: { className?: string; centred?:
 }
 
 /** Back (link or history), centred wordmark, optional right action. */
-export function AppHeader({ back, right, backLabel = "Back", backDisabled }: { back?: string | true | (() => void) | undefined; right?: React.ReactNode | undefined; backLabel?: string; backDisabled?: boolean | undefined }) {
+export function AppHeader({ back, right, backLabel = "Back", backDisabled, top }: { back?: string | true | (() => void) | undefined; right?: React.ReactNode | undefined; backLabel?: string; backDisabled?: boolean | undefined; top?: boolean }) {
+  // top: a page the side bar links to; from 1024px the side bar is its way around, so the row goes (desktop parity).
   // back: a link, true (browser history) or a function (kit request B1). backDisabled keeps the
   // button in the tree, disabled and invisible, so nothing shifts (B1).
   const router = useRouter();
   const cls = "grid size-11 place-items-center rounded-full text-brand-text hover:bg-brand-50";
   const icon = <ChevronLeft aria-hidden size={22} />;
   return (
-    <header className={cn(appBar, "grid-cols-[44px_1fr_44px]")}>
+    <header className={cn(appBar, "grid-cols-[44px_1fr_44px]", top && phoneChrome)}>
       {back === true || typeof back === "function" ? (
         <button type="button" aria-label={backLabel} disabled={backDisabled} onClick={() => (back === true ? router.back() : back())} className={cn(cls, backDisabled && "invisible")}>{icon}</button>
       ) : back ? (

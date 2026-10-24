@@ -104,7 +104,7 @@ export function AccountView({ products = {} }: { products?: ProductInfo }) {
       ) : user ? (
         <>
           <div className="sm:hidden">
-            <AppHeader back="/dashboard" backLabel={R.back} />
+            <AppHeader back="/dashboard" backLabel={R.back} top />
           </div>
           <ScreenTitle title={R.title} intro={R.intro} />
         </>

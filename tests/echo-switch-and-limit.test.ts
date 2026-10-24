@@ -138,7 +138,8 @@ describe("the Echo switch (ECHO_SWITCH)", () => {
     expect(config).toContain('ECHO_SWITCH: process.env.ECHO_SWITCH ?? "",');
     expect(config).toContain('ECHO_PRODUCTS_SWITCH: process.env.ECHO_PRODUCTS_SWITCH ?? "",'); // TD-34: the product switch beside it
     // TD-47: Home's Ask Echo card (with its starter questions) is the dashboard's way into Echo.
-    expect(readFileSync("components/dashboard/DashboardPage.tsx", "utf8")).toMatch(/\{echoOn\(\) && \(\s*<Area name="echo">\s*<AskEchoCard/);
+    // Desktop parity (owner, 2026-10-25): the phone Home at every width carries Home's Echo entry.
+    expect(readFileSync("components/dashboard/PhoneHome.tsx", "utf8")).toMatch(/\{echoOn\(\) && <EchoChips /);
     expect(readFileSync("components/checks/ChecksView.tsx", "utf8")).toMatch(/echoOn\(\) && <NextRow href="\/echo"/); // G37 lane A: the opened check's Echo row
     expect(readFileSync("components/skin-check/SkinCheckDashboard.tsx", "utf8")).toMatch(/\{echoOn\(\) && \(\s*<div className="sticky/);
     // Every refusal that stops the user writing carries the help line, the limit-store outage too (retryable).

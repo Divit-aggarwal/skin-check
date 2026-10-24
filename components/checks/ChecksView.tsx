@@ -68,8 +68,8 @@ export function ChecksView({ openId }: { openId: string | null }) {
   // G37 screen 10: wordmark, "Your Skin Twin", the last check's date, the tabs.
   const listHeader = (
     <>
-      <AppHeader right={<AccountButton />} />
-      <header className="flex flex-wrap items-start justify-between gap-3 pb-3">
+      <AppHeader right={<AccountButton />} top />
+      <header className="flex flex-wrap items-start justify-between gap-3 pb-3 lg:pt-12">
         <div className="min-w-[11rem] flex-1">
           <h1 className={titlePage}>{K.twinTitle}</h1>
           <p className={`mt-1 ${subtitle}`}>{K.twinIntro}</p>

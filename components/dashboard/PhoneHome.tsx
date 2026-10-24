@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { User } from "firebase/auth";
 import { CalendarCheck, Check, ChevronLeft, ChevronRight, ListChecks, MapPin, MessageCircle, Sparkles, Sun } from "lucide-react";
-import { AccountButton, appBar, card, heroCard, titlePage } from "@/components/ui/page";
+import { AccountButton, appBar, card, heroCard, pageColumn, phoneChrome, titlePage } from "@/components/ui/page";
 import { btnOnDark, IconWell, READING_ICON, Wordmark, type Reading } from "@/components/ui/kit";
 import { Thumb } from "@/components/checks/Thumb";
 import { stepOf, STEPS } from "@/components/routine/RoutineSteps";
@@ -88,11 +88,11 @@ export function PhoneHome({
   const date = now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
   return (
-    <main className="mx-auto flex w-full max-w-[600px] flex-col gap-2 px-4 pb-28 sm:px-6 sm:pt-6">
+    <main className={`${pageColumn} flex flex-col gap-2 pb-28 sm:pt-6 lg:gap-3 lg:pb-16 lg:pt-12`}>
       {/* 1. Wordmark and Account (mockup 01), the date, the greeting. The mockup's line about
           the skin today is left out: Home never says how the skin is doing. */}
       <header className="flex flex-col">
-        <div className="flex min-h-11 items-center justify-between gap-3">
+        <div className={`flex min-h-11 items-center justify-between gap-3 ${phoneChrome}`}>
           <Wordmark />
           <AccountButton />
         </div>

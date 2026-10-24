@@ -43,5 +43,11 @@ export const lead = "text-sm leading-[1.3] text-brand-text-muted sm:text-[15px]"
 export const appBar = "grid h-11 items-center";
 /** Section heading, 14px weight 600, sentence case (cap 9-11 pt on 10, 12, 15, 20, 22). */
 export const h2 = "text-sm font-semibold leading-tight text-brand-text sm:text-xl";
+/** One reading column, the same on every single-flow page at every width (polish lane, desktop parity). */
+export const column = "mx-auto w-full max-w-2xl";
+/** Phone chrome (wordmark row, generic back) that the desktop side bar replaces: gone from 1024px when signed in. */
+export const phoneChrome = "lg:group-data-[nav]/shell:hidden";
 /** Page width and gutters: 16 / 24 / 32px (system.md §4). */
 export const page = "mx-auto w-full max-w-[1200px] px-4 pb-12 sm:px-6 lg:px-8";
+/** A single-flow page: the same gutters, the reading column's width (672px of content). */
+export const pageColumn = "mx-auto w-full max-w-[736px] px-4 pb-12 sm:px-6 lg:px-8";

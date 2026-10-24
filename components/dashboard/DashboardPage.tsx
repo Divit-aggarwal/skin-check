@@ -1,23 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { useSkinCheckSession } from "@/lib/skin-check-session-context";
-import { ErrorState, LoadingState, page, PageHeader, ReloadButton, SignedOutCard } from "@/components/ui/page";
+import { column, ErrorState, LoadingState, page, PageHeader, ReloadButton, SignedOutCard } from "@/components/ui/page";
 import { useRoutine } from "@/components/routine/useRoutine";
-import { QuestionsCard } from "@/components/skin-check/QuestionsChoice";
-import { echoOn } from "@/lib/echo-limits";
-import type { EchoRegion } from "@/lib/echo-regions";
-import { isDue, nextCheck, partOfDay } from "@/lib/home/schedule";
+import { partOfDay } from "@/lib/home/schedule";
 import { AFTER_CHECK_KEY, showPermissions, type HomeSettings } from "@/lib/home/permissions";
 import { weatherOn, pushOn } from "@/lib/home/switches";
-import { formatDate } from "./CheckReadings";
 import { DASHBOARD_COPY as C } from "./copy";
 import { HOME_COPY as H } from "./homeCopy";
 import { loadDashboard, type DashboardData } from "./data";
 import { deriveDashboard, toDate, waitingQuestions, type Dashboard } from "./state";
-import { AskEchoCard, lastReadingDate, LatestCheckCard, NewCheckBanner, NextCheckCard, RecordCard, RoutineCard, useOpenEcho, WeatherCard } from "./HomeCards";
 import { loadHomeSettings } from "./homeSettings";
 import { PermissionsScreen } from "./PermissionsScreen";
 import { PhoneHome } from "./PhoneHome";
@@ -99,14 +94,9 @@ export function DashboardPage({ productsOn = true }: { productsOn?: boolean }) {
   if (loading || (user && (load.kind === "loading" || settings === undefined))) {
     return (
       <Shell>
-        {/* Shaped like Home, so nothing jumps when it loads. */}
-        <div className="grid gap-6 xl:grid-cols-12">
-          <div className="xl:col-span-8">
-            <LoadingState label={C.loading} blocks={["h-40", "h-[28rem]", "h-64"]} />
-          </div>
-          <div aria-hidden className="hidden xl:col-span-4 xl:block">
-            <LoadingState label="" blocks={["h-48", "h-40", "h-40"]} />
-          </div>
+        {/* Shaped like Home (the Today card, the routine row, Skin Twin), so nothing jumps when it loads. */}
+        <div className={column}>
+          <LoadingState label={C.loading} blocks={["h-48", "h-16", "h-24", "h-28"]} />
         </div>
       </Shell>
     );
@@ -162,80 +152,14 @@ function Home({
   routine: ReturnType<typeof useRoutine>;
   productsOn: boolean;
 }) {
-  const openEcho = useOpenEcho(user.uid, data);
-  const current = dashboard.current;
-  // TD-46: a face area opens Echo on it, only where "Chat with Echo" would work (Echo talks about the newest check).
-  const onArea = echoOn() && current.kind === "reading" && current.view.scanId === dashboard.echoScanId ? (region: EchoRegion) => openEcho({ region }) : undefined;
   const waiting = waitingQuestions(user.uid, data.checks, data.analyses, data.laterAnswers);
   const name = firstName(data);
   const hello = H.greeting[partOfDay(new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata")];
-  // TD-48: phones and tablets get the compact Home; 1024px and up keep Home v2 unchanged.
-  const wide = useWide();
-  if (!wide)
-    return (
-      <PhoneHome user={user} data={data} dashboard={dashboard} settings={settings} onSettings={onSettings} routine={routine} productsOn={productsOn} hello={name ? H.greetingName(hello, name) : hello} waiting={waiting} />
-    );
-
+  // Desktop parity (owner, 2026-10-25): the phone Home at every width, replacing TD-48's desktop Home v2.
   return (
-    <Shell title={name ? H.greetingName(hello, name) : hello}>
-      {/* Phone order in the DOM; desktop placement by grid areas (app/globals.css .home-grid). */}
-      <div className="home-grid flex flex-col gap-4 sm:gap-6">
-        <Area name="next">
-          <NextCheckCard dashboard={dashboard} user={user} settings={settings} onSettings={onSettings} />
-        </Area>
-        <Area name="latest">
-          <div className="flex flex-col gap-4 sm:gap-6">
-            <LatestCheckCard dashboard={dashboard} onArea={onArea} />
-            {/* TD-33 (1): right under the newest reading, while its questions wait. */}
-            {waiting && <QuestionsCard isEcho={waiting.isEcho} date={waiting.date ? formatDate(waiting.date) : null} />}
-          </div>
-        </Area>
-        <Area name="routine">
-          <RoutineCard routine={routine} />
-        </Area>
-        {weatherOn() && (
-          <Area name="weather">
-            <WeatherCard user={user} settings={settings} onSettings={onSettings} />
-          </Area>
-        )}
-        <Area name="record">
-          <RecordCard dashboard={dashboard} routine={routine} />
-        </Area>
-        {/* TD-29 (5): no way into Echo while it is switched off. */}
-        {echoOn() && (
-          <Area name="echo">
-            <AskEchoCard uid={user.uid} dashboard={dashboard} data={data} productsOn={productsOn} />
-          </Area>
-        )}
-        {/* Not while a check is due: the Next check card already asks for one. */}
-        {dashboard.history.length > 0 && !isDue(nextCheck(lastReadingDate(dashboard), new Date(), Intl.DateTimeFormat().resolvedOptions().timeZone || "Asia/Kolkata")) && (
-          <Area name="banner">
-            <NewCheckBanner />
-          </Area>
-        )}
-      </div>
-    </Shell>
+    <PhoneHome user={user} data={data} dashboard={dashboard} settings={settings} onSettings={onSettings} routine={routine} productsOn={productsOn} hello={name ? H.greetingName(hello, name) : hello} waiting={waiting} />
   );
 }
-
-/** 1024px and up (the desktop Home). Read once on the client and on resize. */
-function useWide(): boolean {
-  return useSyncExternalStore(
-    (on) => {
-      const m = window.matchMedia("(min-width: 1024px)");
-      m.addEventListener("change", on);
-      return () => m.removeEventListener("change", on);
-    },
-    () => window.matchMedia("(min-width: 1024px)").matches,
-    () => true
-  );
-}
-
-const Area = ({ name, children }: { name: string; children: React.ReactNode }) => (
-  <div data-area={name} style={{ "--area": name } as React.CSSProperties} className="min-w-0">
-    {children}
-  </div>
-);
 
 /** The first word of the name given on the newest check that has one. */
 function firstName(data: DashboardData): string | null {
