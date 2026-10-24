@@ -78,3 +78,26 @@ Before and after: [docs/design/polish/](../design/polish/) (four comparison imag
 - `npm run test:all` (about 20 minutes) is still owed, once, before the merge.
 
 No test was removed or changed. New: tests/design/polish.shots.ts (screenshots only, not part of test:all).
+
+## 7. Desktop parity (owner, 2026-10-25)
+
+Brief: "make our desktop site look same as our mobile site as it feels broken and unpolished."
+
+**Proposed decision for the tracker (TD row at merge):** Today is the phone Home (PhoneHome) at every width. This replaces the part of TD-48 that kept Home v2 from 1024px. Kept from TD-25: the desktop Skin Twin list-and-detail split and Echo's readings panel (wide layouts built from the phone components).
+
+What was wrong on desktop (1280, 2026-10-24 shots):
+1. Today was a different design (Home v2: white cards, outline buttons, no "Your next step" hero) from phone and tablet.
+2. No shared width: Routine stretched to about 1,000px (440px Used/Skipped buttons), Today ran full width, Account was a centred 672px column; every page started at a different left edge.
+3. Phone chrome under a side bar: a lone back chevron and an empty header row on top-level pages; Echo still showed the wordmark.
+4. Pages that relied on that row for their top spacing (Progress, Skin Twin) put the title at the top edge once it was gone.
+
+What changed:
+- `pageColumn` (672px of content, same gutters as `page`): Today, Routine, Progress. Account, the product page and the check flow already used 672px.
+- `phoneChrome` (`lg:group-data-[nav]/shell:hidden`): the wordmark row and the generic back go from 1024px when the side bar shows. `AppHeader top` marks a page the side bar links to (Routine, Progress, Skin Twin, Account). Sub-pages (a product, Since you started, one reading, an opened check) keep their back.
+- 48px desktop top on Progress, Skin Twin and Echo; Echo's readings panel is a white side panel (the table's sticky Area column was a white strip on the grey page).
+- Routine's products and add form stack in the one column instead of a 7/5 split.
+- Today's loading state has the phone Home's shape.
+
+Lost on desktop, recorded: TD-46's tap-an-area-to-open-Echo face drawing lived only in Home v2's latest-check card. Phones and tablets have not had it on Today since TD-48; the opened newest check still has it.
+
+Follow-up row: HomeCards.tsx still exports Home v2 cards that nothing renders now (LatestCheckCard, NextCheckCard, RecordCard, RoutineCard, NewCheckBanner, AskEchoCard); delete with their tests' imports once the browser tests are ported.

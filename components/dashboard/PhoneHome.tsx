@@ -122,18 +122,22 @@ export function PhoneHome({
       <section aria-label={H.tiles.progress} className="grid grid-cols-2 gap-2.5">
         <Tile title={H.tiles.progress} value={H.tiles.progressValue(routine.data ? daysLoggedLast7(routine.data.events, routine.data.today) : 0)} note={H.tiles.progressNote} />
         {/* The honest line sits in the tile, not loose on the page (design review). */}
-        <Tile title={H.tiles.starting} value={H.tiles.startingValue(dashboard.trend.count, dashboard.trend.needed)} note={dashboard.trend.kind === "empty" ? C.trend.empty : C.trend.notEnough} />
+        <Tile title={H.tiles.starting} value={H.tiles.startingValue(dashboard.trend.count, dashboard.trend.needed)} note={dashboard.trend.kind === "empty" ? C.trend.empty : C.trend.notEnough} notes={[...(dashboard.trend.engineBoundary ? [C.trend.boundary] : []), ...(dashboard.trend.legacyPresent ? [C.trend.legacy] : [])]} />
       </section>
     </main>
   );
 }
 
-function Tile({ title, value, note }: { title: string; value: string; note?: string }) {
+function Tile({ title, value, note, notes = [] }: { title: string; value: string; note?: string; notes?: string[] }) {
   return (
     <div className={`${card} flex flex-col gap-0.5 !p-4`}>
       <p className="text-xs font-semibold text-brand-muted">{title}</p>
       <p className="text-lg font-semibold text-brand-title">{value}</p>
       {note && <p className="text-xs text-brand-muted">{note}</p>}
+      {/* Comparability gates in words (CLAUDE.md): why some checks are not used together. */}
+      {notes.map((n) => (
+        <p key={n} className="mt-1 text-xs text-brand-muted">{n}</p>
+      ))}
     </div>
   );
 }
@@ -398,6 +402,8 @@ function SkinTwinCard({ dashboard }: { dashboard: Dashboard }) {
           <Sparkles aria-hidden size={16} className="shrink-0 text-brand-700" />
           {H.today.skinTwin} <span className="truncate text-brand-text-muted">· {date}</span>
         </span>
+        {/* Provenance, as the desktop card had it: a newer check with no server reading, above "the reading below". */}
+        {!analysing && dashboard.newerCheckNotShown && <span className="text-xs text-brand-text-muted">{C.current.newerNotShown}</span>}
         <span className="flex min-w-0 flex-wrap items-center gap-x-3 text-sm text-brand-text">
           {analysing ? (
             H.latestRow.analysing
@@ -411,11 +417,14 @@ function SkinTwinCard({ dashboard }: { dashboard: Dashboard }) {
                 </span>
               );
             })
+          ) : view && !view.bands ? (
+            C.current.unreadable
           ) : (
             H.latestRow.noReading
           )}
           {!analysing && more > 0 && <span className="text-brand-muted">{H.latestRow.more(more)}</span>}
         </span>
+        {view?.source === "legacy" && view.bands && <span className="text-xs text-brand-text-muted">{C.history.kind.legacy}</span>}
       </span>
       <ChevronRight aria-hidden size={20} className="shrink-0 text-brand-text" />
     </Link>
