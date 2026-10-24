@@ -29,7 +29,7 @@ import { FaceDrawing } from "./FaceDrawing";
 import { formatDate } from "./format";
 import type { DashboardData } from "./data";
 import { checkAnswers, type Dashboard } from "./state";
-import { lastReadingDate, useOpenEcho, WeatherCard } from "./HomeCards";
+import { lastReadingDate, RemindersPrompt, useOpenEcho, WeatherCard } from "./HomeCards";
 import { lastWeather, weatherAt } from "./homeSettings";
 
 // TD-48: Home below 1024px. One "Today" card and compact rows, so the
@@ -278,6 +278,8 @@ function TodayCard({
       </div>
 
       {pushOn() && ios && <p className="text-xs text-brand-muted">{H.today.iosHint}</p>}
+      {/* Reminders not on: ask again where the browser can, or say how to unblock them (was only on the desktop Home v2). */}
+      {pushOn() && <RemindersPrompt user={user} settings={settings} onSettings={onSettings} inline />}
       {/* Screen 02: the conditions as their own screen on a phone (a full-height sheet), a centred sheet from 640px. */}
       {weatherOn() && (
         <dialog ref={dialog} aria-label={H.today.weatherSheet} className="m-0 h-dvh max-h-none w-full max-w-none overflow-y-auto bg-brand-bg p-0 backdrop:bg-black/30 sm:m-auto sm:h-auto sm:max-h-[90dvh] sm:max-w-md sm:rounded-card" onClick={(e) => e.target === dialog.current && dialog.current?.close()}>

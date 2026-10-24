@@ -98,6 +98,18 @@ What changed:
 - Routine's products and add form stack in the one column instead of a 7/5 split.
 - Today's loading state has the phone Home's shape.
 
+Kept on Home, so nothing about provenance or the comparability gates is lost (CLAUDE.md), and phones gain them too (they had lacked them since TD-48):
+- The Skin Twin row names a reading saved by the app only ("Reading saved by the app only"), says "The readings of this check could not be shown." for stored readings that do not parse (it said "No photo reading"), and names a newer check with no server reading above the reading it shows.
+- The Starting checks tile names the software-version boundary and app-only readings (C.trend.boundary, C.trend.legacy).
+- The reminders help ("Reminders are blocked…", or a way to turn them on) is on the phone Home, through Home v2's own RemindersPrompt (inline: no second iPhone hint, no card divider).
+
+Tests moved to the phone Home (no test removed; each Home v2 assertion now checks the same fact where it lives):
+- dashboard.spec.ts: every state at 1280 on the phone Home; the full table, "What this means", the photo check, the legacy note and the face-area-to-Echo drawing (TD-46) on the opened check.
+- home-v2.spec.ts: the layout test checks one centred column (at most 736px, right of the side bar) in the phone order at 1024 and 1280; weather tests open the same WeatherCard in the sheet (`weatherSheet()`); the permissions, routine, next-check and Ask Echo tests drive the phone Home.
+- flows.spec.ts: the `desktop()` calls that only reached Home v2 are gone; the Home routine test adds the product morning and evening so the row shows it at any hour; Echo's back link (K-1) is checked at phone width, where it lives.
+- mesh.spec.ts: the kept-photo thumbnail and the face-drawing fallback in the Skin Twin row at 390, 768 and 1280.
+- Unit: ui-wording (D-12 routine never beside the readings) and echo-switch now pin the phone Home.
+
 Lost on desktop, recorded: TD-46's tap-an-area-to-open-Echo face drawing lived only in Home v2's latest-check card. Phones and tablets have not had it on Today since TD-48; the opened newest check still has it.
 
 Follow-up row: HomeCards.tsx still exports Home v2 cards that nothing renders now (LatestCheckCard, NextCheckCard, RecordCard, RoutineCard, NewCheckBanner, AskEchoCard); delete with their tests' imports once the browser tests are ported.

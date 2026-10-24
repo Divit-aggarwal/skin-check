@@ -3,7 +3,6 @@ import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
 import { TIMELINE_COPY as T } from "@/components/timeline/copy";
 import { CHECKS_COPY as K } from "@/components/checks/copy";
 import { SHELL_COPY as S } from "@/components/shell/copy";
-import { ROUTINE_COPY as R } from "@/lib/routine/copy";
 import { DASHBOARD_SEED as U } from "./seed-users";
 import { shot, signIn } from "./helpers";
 import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
@@ -15,8 +14,12 @@ import { HOME_COPY as H } from "@/components/dashboard/homeCopy";
 // the table by face area, a hard-to-read area and the kinds of past checks
 // are on an opened check and Checks; the privacy card is on Account.
 
-// TD-48: these check the Home v2 content, which now shows from 1024px; phones get the compact Home (home-v3.spec.ts).
+// Desktop parity (owner, 2026-10-25): Home is the phone Home at every width (home-v3.spec.ts covers its
+// layout at 390 and 768); these check each dashboard state at a laptop width. What Home v2 showed in full
+// (the table, "What this means", the photo check, the legacy note) is checked on the opened check.
 test.use({ viewport: { width: 1280, height: 900 } });
+const twinRow = (page: Page) => page.getByRole("link", { name: /^Open the check from/ });
+const startingTile = (page: Page) => page.getByRole("region", { name: H.tiles.progress });
 
 const FS = process.env.PW_FIRESTORE_HOST!;
 const firestore = (page: Page) => (url: URL) => url.host === FS || url.href.includes("firestore.googleapis.com");
@@ -63,16 +66,15 @@ test("an unknown address shows a designed page with ways on, inside the app shel
 
 test("sign in as a seeded user and see the dashboard", async ({ page }) => {
   await dashboardAs(page, U.building!.phoneNumber);
-  // TD-47 Home: next check, latest check, today's routine, your record, Ask Echo, a new check.
-  for (const title of [H.next.title, H.latest.title, R.todayTitle, H.record.title, H.echo.title]) {
-    await expect(page.getByRole("heading", { name: title, exact: true })).toBeVisible();
-  }
-  await expect(page.getByRole("region", { name: H.banner.start })).toBeVisible();
-  await expect(page.getByText(C.trend.notEnough)).toBeVisible();
-  await expect(page.getByText(C.trend.count(2, 3))).toBeVisible();
-  await expect(page.getByText(C.photoCheck.pass)).toBeVisible();
-  // No routine yet: the card invites a set-up on /routine.
-  await expect(page.getByRole("link", { name: H.routine.setUp })).toHaveAttribute("href", "/routine");
+  // The phone Home: Today, the routine row, the Skin Twin row, Ask Echo, the two tiles.
+  await expect(page.getByRole("heading", { name: H.today.title, exact: true })).toBeVisible();
+  await expect(page.getByRole("img", { name: /routine steps done today/ })).toBeVisible();
+  await expect(twinRow(page)).toBeVisible();
+  await expect(page.getByRole("region", { name: H.echo.title })).toBeVisible();
+  await expect(startingTile(page).getByText(C.trend.notEnough)).toBeVisible();
+  await expect(startingTile(page).getByText(H.tiles.startingValue(2, 3), { exact: true })).toBeVisible();
+  // No routine yet: the row invites a set-up on /routine.
+  await expect(page.getByRole("link", { name: H.routineRow.setUp })).toHaveAttribute("href", "/routine");
   // No score, arrow or percentage anywhere on the page.
   await expect(page.locator("body")).not.toContainText(/\/100|%|↑|↓|▲|▼/);
   await shot(page, "building");
@@ -81,21 +83,16 @@ test("sign in as a seeded user and see the dashboard", async ({ page }) => {
 // TD-39: one table for the whole face and each area. TD-46: a face area on the drawing opens Echo on it.
 test("readings by face area: one table, every level in the same style, no score; a face area opens Echo on it", async ({ page }) => {
   await dashboardAs(page, U.set!.phoneNumber);
-  // TD-47: Home shows the whole face only, five readings, levels only, one style.
-  const latest = page.locator("section", { has: page.getByRole("heading", { name: H.latest.title }) });
-  await expect(latest.getByRole("table").getByRole("row")).toHaveCount(5);
-  for (const c of await latest.getByRole("cell").allTextContents()) expect(c).toMatch(/^(Low|Moderate|Elevated)$/);
-  expect(await latest.getByRole("cell").evaluateAll((els) => Array.from(new Set(els.map((e) => e.className))))).toHaveLength(1);
-  await expect(latest.getByText("Dryness")).toHaveCount(0);
-  await expect(latest).not.toContainText(/\/100|%/);
+  // Home: the Skin Twin row names readings by level word only, never Dryness, a score or a percentage.
+  await expect(twinRow(page)).toContainText(/\b(Low|Moderate|Elevated)\b/);
+  await expect(twinRow(page)).not.toContainText(/Dryness|\/100|%/);
   await shot(page, "home-areas");
-  // TD-46: the drawing's areas are buttons (keyboard too) that open Echo on that area.
-  await latest.getByRole("button", { name: C.chat.askAbout("Nose") }).focus();
-  await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/echo\?region=nose$/);
   // TD-39: the table by face area is on the opened check.
   await page.goto("/checks/seed-dash-set-5");
   const opened = page.locator("section", { has: page.getByRole("heading", { name: /Check from/ }) });
+  // TD-46: on the opened newest check, the drawing's areas are buttons (keyboard too) that open Echo on that area.
+  const nose = page.getByRole("button", { name: C.chat.askAbout("Nose") });
+  await expect(nose).toBeVisible();
   const table = opened.getByRole("table", { name: C.table.caption });
   // TD-40: five readings, the last three tagged.
   await expect(table.getByRole("columnheader")).toHaveText([C.table.area, "Redness", "Oiliness", /^Breakouts\s*early estimate$/, /^Texture\s*early estimate$/, /^Dark marks\s*early estimate$/]);
@@ -107,6 +104,9 @@ test("readings by face area: one table, every level in the same style, no score;
   await expect(opened.getByText(C.current.areaNote)).toBeVisible();
   await expect(opened.getByText("Dryness")).toHaveCount(0);
   await expect(opened).not.toContainText(/\/100|%/);
+  await nose.focus();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/echo\?region=nose$/);
 });
 
 test("loading", async ({ page }) => {
@@ -134,9 +134,10 @@ test("error: a failed read shows a plain message, no code", async ({ page }) => 
 
 test("empty", async ({ page }) => {
   await dashboardAs(page, U.empty!.phoneNumber);
-  await expect(page.getByText(H.latest.none)).toBeVisible();
-  await expect(page.getByText(C.trend.empty)).toBeVisible();
-  await expect(page.getByText(C.chat.needsFirst)).toBeVisible();
+  await expect(page.getByRole("link", { name: H.latestRow.first })).toHaveAttribute("href", "/skin-check");
+  await expect(startingTile(page).getByText(C.trend.empty)).toBeVisible();
+  // No check: no way into Echo from Home yet.
+  await expect(page.getByRole("region", { name: H.echo.title })).toHaveCount(0);
   await shot(page, "empty");
   // The privacy card is on Account (TD-47).
   await page.goto("/account");
@@ -146,44 +147,46 @@ test("empty", async ({ page }) => {
 
 test("one reading: bands, a hard-to-read area, 0 of 3", async ({ page }) => {
   await dashboardAs(page, U.one!.phoneNumber);
-  await expect(page.getByText("Redness", { exact: true })).toBeVisible();
-  await expect(page.getByText(C.trend.count(0, 3))).toBeVisible();
-  // "What this means": the fixed text, one tap away.
-  await page.getByText(H.latest.meaningTitle).click();
-  await expect(page.getByText(C.current.notKnown[0]!)).toBeVisible();
+  await expect(twinRow(page)).toContainText(/\b(Low|Moderate|Elevated)\b/);
+  await expect(startingTile(page).getByText(H.tiles.startingValue(0, 3), { exact: true })).toBeVisible();
   await shot(page, "one-reading");
-  // The hard-to-read area is named on the opened check, where the areas are.
+  // The hard-to-read area and "What this means" are on the opened check, where the areas are.
   await page.goto("/checks/seed-dash-one-1");
   await expect(page.getByText(C.current.hardToRead("Forehead"))).toBeVisible();
+  await expect(page.getByText(C.current.notKnown[0]!).first()).toBeVisible();
 });
 
 test("starting point set: still not enough evidence", async ({ page }) => {
   await dashboardAs(page, U.set!.phoneNumber);
-  await expect(page.getByText(C.trend.count(3, 3))).toBeVisible();
-  await expect(page.getByText(C.trend.set)).toBeVisible();
-  await expect(page.getByText(C.photoCheck.unchecked)).toBeVisible();
+  await expect(startingTile(page).getByText(H.tiles.startingValue(3, 3), { exact: true })).toBeVisible();
+  await expect(startingTile(page).getByText(C.trend.notEnough)).toBeVisible();
   await shot(page, "set");
+  // The photo check of the newest check is on the opened check.
+  await page.goto("/checks/seed-dash-set-5");
+  await expect(page.getByText(C.photoCheck.unchecked).first()).toBeVisible();
 });
 
 test("software boundary", async ({ page }) => {
   await dashboardAs(page, U.boundary!.phoneNumber);
-  await expect(page.getByText(C.trend.boundary)).toBeVisible();
+  await expect(startingTile(page).getByText(C.trend.boundary)).toBeVisible();
   await shot(page, "boundary");
 });
 
 test("legacy record: shown as saved, not counted", async ({ page }) => {
   await dashboardAs(page, U.legacy!.phoneNumber);
-  await expect(page.getByText(C.legacyNote)).toBeVisible();
-  await expect(page.getByText(C.trend.legacy)).toBeVisible();
-  await expect(page.getByText(C.chat.needsReading)).toBeVisible();
+  // Home names the provenance in the row and the gate in the tile; Echo has no server reading to talk about.
+  await expect(twinRow(page)).toContainText(C.history.kind.legacy);
+  await expect(startingTile(page).getByText(C.trend.legacy)).toBeVisible();
+  await expect(page.getByRole("region", { name: H.echo.title })).toHaveCount(0);
   await shot(page, "legacy");
   await page.goto("/checks");
+  await expect(page.getByText(C.legacyNote).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Open the check from/ }).getByText(C.history.kind.legacy)).toBeVisible();
 });
 
 test("no reading: questions-only and failed checks", async ({ page }) => {
   await dashboardAs(page, U.noreading!.phoneNumber);
-  await expect(page.getByText(H.latest.noReading)).toBeVisible();
+  await expect(twinRow(page)).toContainText(H.latestRow.noReading);
   await shot(page, "no-reading");
   await page.goto("/checks");
   await expect(page.getByRole("link", { name: /Open the check from/ }).getByText(C.history.kind.questions)).toBeVisible();
