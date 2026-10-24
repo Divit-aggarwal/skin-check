@@ -20,6 +20,8 @@ import { HOME_COPY as H } from "@/components/dashboard/homeCopy";
 test.use({ viewport: { width: 1280, height: 900 } });
 const twinRow = (page: Page) => page.getByRole("link", { name: /^Open the check from/ });
 const startingTile = (page: Page) => page.getByRole("region", { name: H.tiles.progress });
+// Home's Echo entry: the starters, or one "Chat with Echo" button while the check's questions are not answered.
+const echoEntry = (page: Page) => page.getByRole("region", { name: H.echo.title }).or(page.getByRole("button", { name: H.echo.open }));
 
 const FS = process.env.PW_FIRESTORE_HOST!;
 const firestore = (page: Page) => (url: URL) => url.host === FS || url.href.includes("firestore.googleapis.com");
@@ -70,7 +72,7 @@ test("sign in as a seeded user and see the dashboard", async ({ page }) => {
   await expect(page.getByRole("heading", { name: H.today.title, exact: true })).toBeVisible();
   await expect(page.getByRole("img", { name: /routine steps done today/ })).toBeVisible();
   await expect(twinRow(page)).toBeVisible();
-  await expect(page.getByRole("region", { name: H.echo.title })).toBeVisible();
+  await expect(echoEntry(page).first()).toBeVisible();
   await expect(startingTile(page).getByText(C.trend.notEnough)).toBeVisible();
   await expect(startingTile(page).getByText(H.tiles.startingValue(2, 3), { exact: true })).toBeVisible();
   // No routine yet: the row invites a set-up on /routine.
@@ -137,7 +139,7 @@ test("empty", async ({ page }) => {
   await expect(page.getByRole("link", { name: H.latestRow.first })).toHaveAttribute("href", "/skin-check");
   await expect(startingTile(page).getByText(C.trend.empty)).toBeVisible();
   // No check: no way into Echo from Home yet.
-  await expect(page.getByRole("region", { name: H.echo.title })).toHaveCount(0);
+  await expect(echoEntry(page)).toHaveCount(0);
   await shot(page, "empty");
   // The privacy card is on Account (TD-47).
   await page.goto("/account");
@@ -153,7 +155,7 @@ test("one reading: bands, a hard-to-read area, 0 of 3", async ({ page }) => {
   // The hard-to-read area and "What this means" are on the opened check, where the areas are.
   await page.goto("/checks/seed-dash-one-1");
   await expect(page.getByText(C.current.hardToRead("Forehead"))).toBeVisible();
-  await expect(page.getByText(C.current.notKnown[0]!).first()).toBeVisible();
+  await expect(page.getByText(C.current.notKnown[0]!).filter({ visible: true }).first()).toBeVisible();
 });
 
 test("starting point set: still not enough evidence", async ({ page }) => {
@@ -163,7 +165,7 @@ test("starting point set: still not enough evidence", async ({ page }) => {
   await shot(page, "set");
   // The photo check of the newest check is on the opened check.
   await page.goto("/checks/seed-dash-set-5");
-  await expect(page.getByText(C.photoCheck.unchecked).first()).toBeVisible();
+  await expect(page.getByText(C.photoCheck.unchecked).filter({ visible: true }).first()).toBeVisible();
 });
 
 test("software boundary", async ({ page }) => {
@@ -177,10 +179,10 @@ test("legacy record: shown as saved, not counted", async ({ page }) => {
   // Home names the provenance in the row and the gate in the tile; Echo has no server reading to talk about.
   await expect(twinRow(page)).toContainText(C.history.kind.legacy);
   await expect(startingTile(page).getByText(C.trend.legacy)).toBeVisible();
-  await expect(page.getByRole("region", { name: H.echo.title })).toHaveCount(0);
+  await expect(echoEntry(page)).toHaveCount(0);
   await shot(page, "legacy");
   await page.goto("/checks");
-  await expect(page.getByText(C.legacyNote).first()).toBeVisible();
+  await expect(page.getByText(C.legacyNote).filter({ visible: true }).first()).toBeVisible();
   await expect(page.getByRole("link", { name: /Open the check from/ }).getByText(C.history.kind.legacy)).toBeVisible();
 });
 

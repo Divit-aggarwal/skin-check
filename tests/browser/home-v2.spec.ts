@@ -70,7 +70,7 @@ const section = (page: Page, title: string | RegExp) => page.locator("section", 
 // WeatherCard, in the sheet the Today card's conditions row opens; the old Home v2 cards map as below.
 const weatherSheet = async (page: Page) => {
   await page.getByRole("button", { name: new RegExp(`^(${H.today.addCity}|UV .+)$`) }).click();
-  return section(page, H.weather.title);
+  return page.getByRole("region", { name: H.weather.title, exact: true });
 };
 const twinRow = (page: Page) => page.getByRole("link", { name: /^Open the check from/ });
 
@@ -178,7 +178,7 @@ for (const width of [1024, 1280]) {
     try {
       await homeAs(page, U.homeDown!.phoneNumber);
       await page.getByRole("button", { name: H.today.uvDown }).click();
-      await expect(section(page, H.weather.title).getByText(H.weather.unavailable)).toBeVisible();
+      await expect(page.getByRole("region", { name: H.weather.title, exact: true }).getByText(H.weather.unavailable)).toBeVisible();
       await shot(page, `state-weather-unavailable-${width}`);
       await page.evaluate(() => localStorage.setItem("home-v2:last-weather", JSON.stringify({ at: "100,763", c: { uv: 4, humidity: 80, usAqi: 40, observedAt: "2026-10-11T03:00:00.000Z" } })));
       await page.reload();
@@ -304,7 +304,7 @@ test("weather: Use my location keeps only the city and a rounded position; only 
   const sent: string[] = [];
   page.on("request", (r) => r.url().includes("/api/home/") && sent.push(`${r.url()} ${r.postData() ?? ""}`));
   await (await weatherSheet(page)).getByRole("button", { name: H.weather.useLocation }).click();
-  await expect(section(page, H.weather.title).getByText(/^Bengaluru, updated/)).toBeVisible();
+  await expect(page.getByRole("region", { name: H.weather.title, exact: true }).getByText(/^Bengaluru, updated/)).toBeVisible();
   // The browser sent whole tenths only, in the body; nothing precise anywhere.
   expect(sent.join("\n")).not.toMatch(/12\.97|77\.59|129\.7|775\.9/);
   expect(sent.join("\n")).toMatch(/"latE1":130,"lonE1":776/);
@@ -336,7 +336,7 @@ test("weather: source down shows the last reading with its time, or a quiet line
     await homeAs(page, U.homeDown!.phoneNumber);
     await expect(page.getByTestId("next-check")).toBeVisible();
     await page.getByRole("button", { name: H.today.uvDown }).click();
-    await expect(section(page, H.weather.title).getByText(H.weather.unavailable)).toBeVisible();
+    await expect(page.getByRole("region", { name: H.weather.title, exact: true }).getByText(H.weather.unavailable)).toBeVisible();
     await shot(page, "weather-unavailable-390");
     await page.evaluate(() =>
       localStorage.setItem("home-v2:last-weather", JSON.stringify({ at: "100,763", c: { uv: 4, humidity: 80, usAqi: 40, observedAt: "2026-10-11T03:00:00.000Z" } }))

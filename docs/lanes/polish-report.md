@@ -113,3 +113,10 @@ Tests moved to the phone Home (no test removed; each Home v2 assertion now check
 Lost on desktop, recorded: TD-46's tap-an-area-to-open-Echo face drawing lived only in Home v2's latest-check card. Phones and tablets have not had it on Today since TD-48; the opened newest check still has it.
 
 Follow-up row: HomeCards.tsx still exports Home v2 cards that nothing renders now (LatestCheckCard, NextCheckCard, RecordCard, RoutineCard, NewCheckBanner, AskEchoCard); delete with their tests' imports once the browser tests are ported.
+
+### Desktop parity: test status (2026-10-25)
+
+- Unit: 2555 passed. Typecheck and lint clean.
+- Full browser suite (parallel, fresh stacks): home-v3, mesh and every other spec passed. dashboard, flows, home-v2 and questionnaire were re-run after their ports on a fresh stack: 78 passed, 1 failed.
+- Open: flows.spec.ts "a normal scan finishes and shows on the dashboard". After opening today's check from the Skin Twin row, "Photo checks on your phone: passed." is not visible at 390. Not yet investigated whether the freshly scanned check shows a different photo-check line or none on a phone. Next step: read the error context, then fix the test or the opened check.
+- Still owed: npm run test:all once; desktop/tablet after-shots of the final state.

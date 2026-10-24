@@ -98,7 +98,7 @@ test("a normal scan finishes and shows on the dashboard", async ({ page }) => {
   await expect(page.getByRole("link", { name: H.latestRow.first })).toHaveCount(0);
   // The photo check is on the opened check.
   await page.getByRole("link", { name: H.latestRow.open(today) }).click();
-  await expect(page.getByText(C.photoCheck.pass).first()).toBeVisible();
+  await expect(page.getByText(C.photoCheck.pass).filter({ visible: true }).first()).toBeVisible();
   await shot(page, "after-scan");
 });
 
@@ -299,7 +299,7 @@ test("Home: today's routine marks a step done in one tap, and it is still done a
 test("Ask Echo, back to the dashboard, a new check starts at the questions", async ({ page }) => {
   await signIn(page, U.echo!.phoneNumber);
   await page.goto("/dashboard");
-  await page.getByRole("region", { name: H.echo.title }).getByRole("button").first().click();
+  await page.getByRole("region", { name: H.echo.title }).getByRole("button").or(page.getByRole("button", { name: H.echo.open })).first().click();
   await expect(page).toHaveURL(/\/echo/);
   await page.goBack();
   await page.getByRole("navigation", { name: S.navLabel }).last().getByRole("link", { name: S.nav.newCheck }).click();
@@ -335,7 +335,7 @@ test("Echo with no photo reading: a designed empty state with a way to a new che
 test("K-1 fixed: Echo's back link after a dashboard hand-off returns to the dashboard", async ({ page }) => {
   await signIn(page, U.echo!.phoneNumber);
   await page.goto("/dashboard");
-  await page.getByRole("region", { name: H.echo.title }).getByRole("button").first().click();
+  await page.getByRole("region", { name: H.echo.title }).getByRole("button").or(page.getByRole("button", { name: H.echo.open })).first().click();
   await expect(page).toHaveURL(/\/echo/);
   await page.getByRole("link", { name: "Back to your skin checks" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
