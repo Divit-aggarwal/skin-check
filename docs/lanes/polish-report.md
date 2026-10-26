@@ -47,6 +47,7 @@ Skills used as the rubric, from the repositories the owner shared:
 
 ## 5. Found outside the task (new rows for the tracker at merge)
 
+- A reading with no saved check (the user analysed a photo, then left before the questions ended): Today's Skin Twin row shows the reading and links to /checks/<id>, which says "You have no skin checks yet." Seen on phones since TD-48 and now on desktop. Either the row should not link until the check is saved, or the opened check should show a reading without its record.
 - Seen, not investigated: on desktop Today (today-1280, both sets) the latest-check photo was still its loading box when shot, though the same user's photo shows on phone Today and Progress. Probably the shot was taken before /api/checks/photo answered; not proven. The loading box is also wider than the 112px photo it stands for, so the card changes shape when the photo arrives.
 - tests/design/pages.shots.ts is stale: for example, "Delete my account and data" is no longer a button on /account, so several shots wait 180s and fail.
 
@@ -118,5 +119,5 @@ Follow-up row: HomeCards.tsx still exports Home v2 cards that nothing renders no
 
 - Unit: 2555 passed. Typecheck and lint clean.
 - Full browser suite (parallel, fresh stacks): home-v3, mesh and every other spec passed. dashboard, flows, home-v2 and questionnaire were re-run after their ports on a fresh stack: 78 passed, 1 failed.
-- Open: flows.spec.ts "a normal scan finishes and shows on the dashboard". After opening today's check from the Skin Twin row, "Photo checks on your phone: passed." is not visible at 390. Not yet investigated whether the freshly scanned check shows a different photo-check line or none on a phone. Next step: read the error context, then fix the test or the opened check.
+- flows.spec.ts "a normal scan finishes and shows on the dashboard": the failure was not the redesign. The test leaves the flow after the photo, so the reading exists but the check record does not; opening it from Home showed "You have no skin checks yet." The test now checks Home's Skin Twin row (date and level words) and no longer opens the check. Coverage note: the "Photo checks on your phone: passed." line it used to see on Home v2 is not shown by the phone Home.
 - Still owed: npm run test:all once; desktop/tablet after-shots of the final state.
