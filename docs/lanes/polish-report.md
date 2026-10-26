@@ -115,6 +115,8 @@ Lost on desktop, recorded: TD-46's tap-an-area-to-open-Echo face drawing lived o
 
 Follow-up row: HomeCards.tsx still exports Home v2 cards that nothing renders now (LatestCheckCard, NextCheckCard, RecordCard, RoutineCard, NewCheckBanner, AskEchoCard); delete with their tests' imports once the browser tests are ported.
 
+Before and after on desktop (1280): [5-desktop-today](../design/polish/5-desktop-today.jpg), [6-desktop-routine](../design/polish/6-desktop-routine.jpg), [7-desktop-progress](../design/polish/7-desktop-progress.jpg). Tablet (768, the rail) keeps the phone header, wordmark and back, as before.
+
 ### Desktop parity: test status (2026-10-25)
 
 - Unit: 2555 passed. Typecheck and lint clean.
