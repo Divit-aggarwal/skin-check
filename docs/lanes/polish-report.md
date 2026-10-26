@@ -120,4 +120,4 @@ Follow-up row: HomeCards.tsx still exports Home v2 cards that nothing renders no
 - Unit: 2555 passed. Typecheck and lint clean.
 - Full browser suite (parallel, fresh stacks): home-v3, mesh and every other spec passed. dashboard, flows, home-v2 and questionnaire were re-run after their ports on a fresh stack: 78 passed, 1 failed.
 - flows.spec.ts "a normal scan finishes and shows on the dashboard": the failure was not the redesign. The test leaves the flow after the photo, so the reading exists but the check record does not; opening it from Home showed "You have no skin checks yet." The test now checks Home's Skin Twin row (date and level words) and no longer opens the check. Coverage note: the "Photo checks on your phone: passed." line it used to see on Home v2 is not shown by the phone Home.
-- Still owed: npm run test:all once; desktop/tablet after-shots of the final state.
+- `npm run test:all` on 9768e25 (2026-10-26): exit 0. Typecheck and lint clean; unit 2555 passed; stack 101/101; browser shard 1 72 passed, shard 2 50 passed, none failed; production build compiled.
