@@ -386,6 +386,8 @@ function SkinTwinCard({ dashboard }: { dashboard: Dashboard }) {
   const shown = view ? dashboard.history.find((h) => h.scanId === view.scanId) : newest;
   const date = formatDate(shown?.date ?? view?.date ?? null);
   const href = view ? `/checks/${encodeURIComponent(view.scanId)}` : "/checks";
+  // A reading whose check is not saved yet (the flow was left before its end) has no page to open: a plain row, no link.
+  const opens = !view || dashboard.history.some((h) => h.scanId === view.scanId);
   const { top, more } = view?.bands ? topReadings(view.bands) : { top: [], more: 0 };
   const picture =
     view && view.areas.length > 0 ? (
@@ -393,8 +395,9 @@ function SkinTwinCard({ dashboard }: { dashboard: Dashboard }) {
         <FaceDrawing labels={ECHO_REGION_LABELS} available={view.areas.map((a) => a.region)} />
       </span>
     ) : null;
-  return (
-    <Link href={href} aria-label={H.latestRow.open(date)} className={`${row} flex items-center gap-3 !py-2.5 transition-colors duration-fast hover:bg-brand-50`}>
+  const content = (
+    <>
+
       {/* The user's own kept photo only (data rule 1), else the face drawing. */}
       <span className="grid size-12 shrink-0 place-items-center overflow-hidden rounded-tile bg-brand-50 [&_svg]:max-w-[48px]">
         {shown?.photoClaimed && view ? <Thumb scanId={view.scanId} date={date} fallback={picture} /> : picture}
@@ -428,8 +431,18 @@ function SkinTwinCard({ dashboard }: { dashboard: Dashboard }) {
         </span>
         {view?.source === "legacy" && view.bands && <span className="text-xs text-brand-text-muted">{C.history.kind.legacy}</span>}
       </span>
-      <ChevronRight aria-hidden size={20} className="shrink-0 text-brand-text" />
+      {opens && <ChevronRight aria-hidden size={20} className="shrink-0 text-brand-text" />}
+    </>
+  );
+  const cls = `${row} flex items-center gap-3 !py-2.5`;
+  return opens ? (
+    <Link href={href} aria-label={H.latestRow.open(date)} data-testid="latest-row" className={`${cls} transition-colors duration-fast hover:bg-brand-50`}>
+      {content}
     </Link>
+  ) : (
+    <div data-testid="latest-row" className={cls}>
+      {content}
+    </div>
   );
 }
 

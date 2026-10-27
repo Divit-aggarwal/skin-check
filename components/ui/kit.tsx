@@ -41,7 +41,8 @@ export function AppHeader({ back, right, backLabel = "Back", backDisabled, top }
       ) : (
         <span />
       )}
-      <Wordmark centred className="lg:group-data-[nav]/shell:invisible" />
+      {/* Only a signed-in phone or tablet has no other wordmark: signed out, the shell's top bar has it; from 1024px the side bar. */}
+      <Wordmark centred className="invisible group-data-[nav]/shell:visible lg:group-data-[nav]/shell:invisible" />
       <div className="justify-self-end">{right}</div>
     </header>
   );

@@ -2,7 +2,6 @@
 
 /** What the user's choice came to, saved per permission in users/{uid}/settings/home. */
 export type PermissionOutcome = "allowed" | "not_now" | "refused" | "unsupported";
-export const PERMISSION_OUTCOMES: readonly PermissionOutcome[] = ["allowed", "not_now", "refused", "unsupported"];
 
 /** The browser's own answer, as navigator.permissions reports it, or "unsupported". */
 export type BrowserState = "granted" | "denied" | "prompt" | "unsupported";

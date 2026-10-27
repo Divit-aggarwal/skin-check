@@ -61,4 +61,10 @@ describe("app shell", () => {
     expect(readFileSync(`${dir}/PlusJakartaSans-Variable.woff2`).subarray(0, 4).toString("latin1")).toBe("wOF2");
     expect(readFileSync(`${dir}/OFL.txt`, "utf8")).toMatch(/SIL Open Font License, Version 1\.1/);
   });;
+
+  it("one wordmark on screen: the page header's only on a signed-in phone or tablet (polish lane)", () => {
+    // Signed out, the shell's top bar has the wordmark; signed in from 1024px, the side bar. The shell marks signed in with data-nav.
+    expect(readFileSync("components/shell/AppShell.tsx", "utf8")).toMatch(/data-nav=\{user \? "" : undefined\} className="group\/shell /);
+    expect(readFileSync("components/ui/kit.tsx", "utf8")).toContain('<Wordmark centred className="invisible group-data-[nav]/shell:visible lg:group-data-[nav]/shell:invisible" />');
+  });
 });

@@ -92,13 +92,14 @@ test("a normal scan finishes and shows on the dashboard", async ({ page }) => {
   await expect(async () => {
     // Desktop parity (owner, 2026-10-25): Home is the phone Home at every width; its Skin Twin row opens today's check.
     await page.goto("/dashboard");
-    await expect(page.getByRole("link", { name: H.latestRow.open(today) })).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByTestId("latest-row")).toContainText(today, { timeout: 5_000 });
   }).toPass({ timeout: 240_000, intervals: [5_000] });
   await expect(page.getByRole("region", { name: H.tiles.progress }).getByText(C.trend.notEnough)).toBeVisible();
-  await expect(page.getByRole("link", { name: H.latestRow.open(today) })).toContainText(/\b(Low|Moderate|Elevated)\b/);
+  await expect(page.getByTestId("latest-row")).toContainText(/\b(Low|Moderate|Elevated)\b/);
   await expect(page.getByRole("link", { name: H.latestRow.first })).toHaveCount(0);
-  // Not opened here: this check's record is saved only when the flow finishes, so /checks has no entry for it yet
-  // (polish report §5: the Skin Twin row then links to an empty Checks page). Home v2 showed the photo check line; the phone Home does not.
+  // The flow was left before its end, so this check has no saved record yet: the row shows the reading but is
+  // not a link (it once opened an empty Checks page). Home v2 showed the photo check line; the phone Home does not.
+  await expect(page.getByRole("link", { name: H.latestRow.open(today) })).toHaveCount(0);
   await shot(page, "after-scan");
 });
 

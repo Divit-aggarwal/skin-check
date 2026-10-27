@@ -29,9 +29,3 @@ export function toE164(input: string, country: Country = DEFAULT_COUNTRY): strin
   }
   return digits.length === country.nationalDigits ? `${country.dialCode}${digits}` : null;
 }
-
-/** Display-only grouping, e.g. "98765 43210". Never sent to Firebase. */
-export function formatNational(digits: string, country: Country = DEFAULT_COUNTRY): string {
-  if (country.iso !== "IN") return digits;
-  return digits.length > 5 ? `${digits.slice(0, 5)} ${digits.slice(5)}` : digits;
-}
