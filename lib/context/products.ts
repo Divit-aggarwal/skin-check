@@ -131,7 +131,7 @@ export function cardsFor<T extends { productId: string; reason?: string }>(produ
  * Dry or Ultra Dry, its card carries a fixed caution, drawn by our code from
  * the catalogue (never by Gemini), so the product is never shown to dry skin
  * as if it suited it. The card stays: the cleanser is the only Cleanse step.
- * The caution text is a DRAFT for the dermatology team's review (E16).
+ * The caution text was approved by the dermatology team (owner, 2026-10-27).
  */
 export const DRY_SKIN_TYPES: ReadonlySet<string> = new Set(["dry", "ultra_dry"]);
 export const DRY_SKIN_CAUTION =
