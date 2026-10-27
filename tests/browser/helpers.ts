@@ -51,4 +51,3 @@ export async function skipQuestions(page: Page) {
 }
 
 /** TD-48: Home v2 (cards, weather card, "Chat with Echo") is the desktop Home now; phones get the compact Home. */
-export const desktop = (page: Page) => page.setViewportSize({ width: 1280, height: 900 });

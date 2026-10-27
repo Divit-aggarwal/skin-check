@@ -66,14 +66,10 @@ export function ChecksView({ openId }: { openId: string | null }) {
   );
   const newest = dashboard?.history[0];
   // G37 screen 10: wordmark, "Your Skin Twin", the last check's date, the tabs.
-  const header = openId ? (
-    <PageHeader kicker={K.kicker} title={K.title} phoneCompact>
-      <div className="mt-5 hidden lg:block">{tabs}</div>
-    </PageHeader>
-  ) : (
+  const listHeader = (
     <>
-      <AppHeader right={<AccountButton />} />
-      <header className="flex flex-wrap items-start justify-between gap-3 pb-3">
+      <AppHeader right={<AccountButton />} top />
+      <header className="flex flex-wrap items-start justify-between gap-3 pb-3 lg:pt-12">
         <div className="min-w-[11rem] flex-1">
           <h1 className={titlePage}>{K.twinTitle}</h1>
           <p className={`mt-1 ${subtitle}`}>{K.twinIntro}</p>
@@ -91,6 +87,19 @@ export function ChecksView({ openId }: { openId: string | null }) {
       </header>
       <div className="mb-4">{tabs}</div>
     </>
+  );
+  // An opened check: on a phone its own back row (the title for screen readers);
+  // from 1024px, where the list stays on the left, the same header as the list,
+  // so the section keeps one title and one full-width tab bar (polish lane #10).
+  const header = openId ? (
+    <>
+      <div className="lg:hidden">
+        <PageHeader kicker={K.kicker} title={K.title} phoneCompact />
+      </div>
+      <div className="hidden lg:block">{listHeader}</div>
+    </>
+  ) : (
+    listHeader
   );
 
   if (loading || (user && load.kind === "loading"))
@@ -272,7 +281,7 @@ function CheckDetail({ uid, scanId, data, dashboard }: { uid: string; scanId: st
       </section>
       {/* Outside the section above: there each reading's name shows once, in the table's header. */}
       {check.view?.bands && over && (
-        <ul aria-label={K.wholeFace} className="-mx-4 grid auto-cols-[calc((100%-1.5rem)/3.5)] grid-flow-col gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:auto-cols-fr sm:px-0">
+        <ul aria-label={K.wholeFace} className="-mx-4 grid auto-cols-[calc((100%-1rem)/2.5)] grid-flow-col gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:grid-flow-row sm:grid-cols-3 sm:px-0">
           {READING_ORDER.map((m) => (
             <li key={m}>
               <LevelTile metric={m} level={check.view!.bands!.find((b) => b.metric === m)!.band} slot={over.series.find((s) => s.metric === m)!.change} />

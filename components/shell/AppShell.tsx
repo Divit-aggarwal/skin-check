@@ -16,7 +16,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const phone = user?.phoneNumber ?? "";
 
   return (
-    <div className="min-h-dvh bg-brand-linen text-brand-ink">
+    // data-nav: the side bar shows the wordmark from 1024px, so page headers hide theirs (polish lane #8).
+    <div data-nav={user ? "" : undefined} className="group/shell min-h-dvh bg-brand-linen text-brand-ink">
       <a
         href="#content"
         className="sr-only z-50 rounded-full bg-brand-action px-6 py-3 text-white focus:not-sr-only focus:fixed focus:left-4 focus:top-4"

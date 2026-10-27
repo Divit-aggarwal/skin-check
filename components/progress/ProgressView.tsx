@@ -11,7 +11,7 @@ import { deriveDashboard } from "@/components/dashboard/state";
 import { readingsOverTime } from "@/lib/readings/series";
 import type { SeriesWindow } from "@/lib/feature-contracts/readings-series";
 import { METRIC_LABELS } from "@/lib/skin-check-skus";
-import { AccountButton, btnPrimary, card, EmptyState, ErrorState, h2, LoadingState, page, ReloadButton, SignedOutCard, subtitle, textLink, titlePage } from "@/components/ui/page";
+import { AccountButton, btnPrimary, card, EmptyState, ErrorState, h2, LoadingState, pageColumn, ReloadButton, SignedOutCard, subtitle, textLink, titlePage } from "@/components/ui/page";
 import { AppHeader, PhotoTile, TabBar } from "@/components/ui/kit";
 import { fixedLine } from "@/components/checks/ChecksTabs";
 import { LevelTile, latestBand, OwnPhotos, SeriesTimeline, shortDate } from "@/components/checks/OverTime";
@@ -52,8 +52,8 @@ export function ProgressView() {
 
   const header = (
     <>
-      <AppHeader back="/checks" backLabel={C.history.title} right={<AccountButton />} />
-      <header className="flex flex-wrap items-start justify-between gap-3 pb-3">
+      <AppHeader back="/checks" backLabel={C.history.title} right={<AccountButton />} top />
+      <header className="flex flex-wrap items-start justify-between gap-3 pb-3 lg:pt-12">
         <div className="min-w-[11rem] flex-1">
           <h1 className={titlePage}>{P.title}</h1>
           <p className={`mt-1 ${subtitle}`}>{P.intro}</p>
@@ -91,28 +91,28 @@ export function ProgressView() {
 
   if (loading || (user && load.kind === "loading"))
     return (
-      <main className={page}>
+      <main className={pageColumn}>
         {header}
         <LoadingState label={C.loading} blocks={["h-32", "h-48", "h-56"]} />
       </main>
     );
   if (!user)
     return (
-      <main className={page}>
+      <main className={pageColumn}>
         {header}
         <SignedOutCard body={C.signedOut} />
       </main>
     );
   if (!ready || !dashboard)
     return (
-      <main className={page}>
+      <main className={pageColumn}>
         {header}
         <ErrorState body={C.error} action={<ReloadButton label={C.home.tryAgain} />} />
       </main>
     );
   if (checks.length === 0)
     return (
-      <main className={page}>
+      <main className={pageColumn}>
         {header}
         <EmptyState body={C.empty} action={<Link href="/skin-check" className={btnPrimary}>{C.firstCheck}</Link>} />
       </main>
@@ -129,7 +129,7 @@ export function ProgressView() {
   );
 
   return (
-    <main className={page}>
+    <main className={pageColumn}>
       {header}
       {inWindow.length === 0 ? (
         <EmptyState body={P.noChecksInWindow} />
@@ -154,7 +154,7 @@ export function ProgressView() {
       ) : (
         <div className="flex flex-col gap-4">
           <section aria-label={P.latestIn}>
-            <ul className="-mx-4 grid snap-x auto-cols-[calc((100%-1.5rem)/3.5)] grid-flow-col gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:auto-cols-fr sm:px-0">
+            <ul className="-mx-4 grid snap-x auto-cols-[calc((100%-1rem)/2.5)] grid-flow-col gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] sm:mx-0 sm:auto-cols-fr sm:px-0">
               {series.map((s) => (
                 <li key={s.metric} className="snap-start">
                   <LevelTile metric={s.metric} level={latestBand(s) ?? C.current.noReading} slot={s.change} href={`/checks?reading=${s.metric}`} />

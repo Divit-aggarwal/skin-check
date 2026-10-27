@@ -15,7 +15,7 @@ import { newestEchoSession } from "@/components/dashboard/echo-session";
 import { hasQuestionAnswers, safetyQuestionsAnswered } from "@/lib/skin-check-validation";
 import { QUESTIONS_COPY as Q } from "./questionsCopy";
 import { readingsOf, toDate } from "@/components/dashboard/state";
-import { AccountButton, btnGhost, btnPrimary, btnSecondary, card, EmptyState, SignedOutCard, ErrorState, eyebrow, lead, LoadingState, page, PageHeader, ReloadButton, textLink, tintCard } from "@/components/ui/page";
+import { AccountButton, btnGhost, btnPrimary, btnSecondary, card, EmptyState, SignedOutCard, ErrorState, eyebrow, lead, LoadingState, page, PageHeader, phoneChrome, ReloadButton, textLink, tintCard } from "@/components/ui/page";
 import { ChatBubble, ChatInput, Chip, EchoAvatar, IconWell, SuggestionChips, Wordmark } from "@/components/ui/kit";
 import { useSkinCheckSession, type EchoThread, type EchoThreadMessage } from "@/lib/skin-check-session-context";
 import { getEchoOpening, getSkinCheckChatReply, ApiError, type ShownProduct } from "@/lib/api";
@@ -436,8 +436,8 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
     {/* The chat fills the screen above the phone's bottom bar; on a wide screen
         the readings sit beside it (TD-25 (1), from direction B). */}
     <main className="mx-auto flex h-[calc(100dvh-4rem-env(safe-area-inset-bottom))] w-full max-w-[1200px] flex-col sm:h-dvh lg:grid lg:grid-cols-[minmax(0,1fr)_360px]">
-      <div className="flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:border-r lg:border-brand-border lg:px-8">
-        <header className="grid shrink-0 grid-cols-[44px_1fr_44px] items-center sm:pt-6">
+      <div className="flex min-h-0 flex-1 flex-col px-4 sm:px-6 lg:border-r lg:border-brand-border lg:px-8 lg:pt-6">
+        <header className={`grid shrink-0 grid-cols-[44px_1fr_44px] items-center sm:pt-6 ${phoneChrome}`}>
           <Link
             // K-1: a hand-off from the dashboard goes back there, not to an old results screen.
             href={session.fromDashboard ? "/dashboard" : "/skin-check"}
@@ -559,7 +559,7 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
                   {withPhoneLinks(splitDoctorLine(splitRedFlagNote(shownOpening.reply).text).text)}
                 </ChatBubble>
                 <div className="pl-10">
-                  <ProductCards products={shownOpening.products} doctorLine={splitDoctorLine(shownOpening.reply).doctorLine} />
+                  <ProductCards products={shownOpening.products} doctorLine={splitDoctorLine(shownOpening.reply).doctorLine} skinType={session.answers?.skin_type} />
                 </div>
               </div>
             )}
@@ -585,7 +585,7 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
                   </ChatBubble>
                   {m.products && (
                     <div className="pl-10">
-                      <ProductCards products={m.products} doctorLine={splitDoctorLine(m.text).doctorLine} />
+                      <ProductCards products={m.products} doctorLine={splitDoctorLine(m.text).doctorLine} skinType={session.answers?.skin_type} />
                     </div>
                   )}
                 </div>
@@ -644,7 +644,7 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
         {!empty && <div className="shrink-0">{composer}</div>}
       </div>
 
-      <aside aria-label={E.readingsSummary} className="hidden min-h-0 overflow-y-auto px-6 py-8 lg:block">
+      <aside aria-label={E.readingsSummary} className="hidden min-h-0 overflow-y-auto overscroll-contain bg-brand-surface px-6 py-8 lg:block">
         {panel}
       </aside>
     </main>

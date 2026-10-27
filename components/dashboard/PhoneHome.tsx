@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import type { User } from "firebase/auth";
 import { CalendarCheck, Check, ChevronLeft, ChevronRight, ListChecks, MapPin, MessageCircle, Sparkles, Sun } from "lucide-react";
-import { AccountButton, appBar, card, heroCard, titlePage } from "@/components/ui/page";
+import { AccountButton, appBar, card, heroCard, pageColumn, phoneChrome, titlePage } from "@/components/ui/page";
 import { btnOnDark, IconWell, READING_ICON, Wordmark, type Reading } from "@/components/ui/kit";
 import { Thumb } from "@/components/checks/Thumb";
 import { stepOf, STEPS } from "@/components/routine/RoutineSteps";
@@ -29,7 +29,7 @@ import { FaceDrawing } from "./FaceDrawing";
 import { formatDate } from "./format";
 import type { DashboardData } from "./data";
 import { checkAnswers, type Dashboard } from "./state";
-import { lastReadingDate, useOpenEcho, WeatherCard } from "./HomeCards";
+import { lastReadingDate, RemindersPrompt, useOpenEcho, WeatherCard } from "./HomeCards";
 import { lastWeather, weatherAt } from "./homeSettings";
 
 // TD-48: Home below 1024px. One "Today" card and compact rows, so the
@@ -88,11 +88,11 @@ export function PhoneHome({
   const date = now.toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" });
 
   return (
-    <main className="mx-auto flex w-full max-w-[600px] flex-col gap-2 px-4 pb-28 sm:px-6 sm:pt-6">
+    <main className={`${pageColumn} flex flex-col gap-2 pb-28 sm:pt-6 lg:gap-3 lg:pb-16 lg:pt-12`}>
       {/* 1. Wordmark and Account (mockup 01), the date, the greeting. The mockup's line about
           the skin today is left out: Home never says how the skin is doing. */}
       <header className="flex flex-col">
-        <div className="flex min-h-11 items-center justify-between gap-3">
+        <div className={`flex min-h-11 items-center justify-between gap-3 ${phoneChrome}`}>
           <Wordmark />
           <AccountButton />
         </div>
@@ -122,18 +122,22 @@ export function PhoneHome({
       <section aria-label={H.tiles.progress} className="grid grid-cols-2 gap-2.5">
         <Tile title={H.tiles.progress} value={H.tiles.progressValue(routine.data ? daysLoggedLast7(routine.data.events, routine.data.today) : 0)} note={H.tiles.progressNote} />
         {/* The honest line sits in the tile, not loose on the page (design review). */}
-        <Tile title={H.tiles.starting} value={H.tiles.startingValue(dashboard.trend.count, dashboard.trend.needed)} note={dashboard.trend.kind === "empty" ? C.trend.empty : C.trend.notEnough} />
+        <Tile title={H.tiles.starting} value={H.tiles.startingValue(dashboard.trend.count, dashboard.trend.needed)} note={dashboard.trend.kind === "empty" ? C.trend.empty : C.trend.notEnough} notes={[...(dashboard.trend.engineBoundary ? [C.trend.boundary] : []), ...(dashboard.trend.legacyPresent ? [C.trend.legacy] : [])]} />
       </section>
     </main>
   );
 }
 
-function Tile({ title, value, note }: { title: string; value: string; note?: string }) {
+function Tile({ title, value, note, notes = [] }: { title: string; value: string; note?: string; notes?: string[] }) {
   return (
     <div className={`${card} flex flex-col gap-0.5 !p-4`}>
       <p className="text-xs font-semibold text-brand-muted">{title}</p>
       <p className="text-lg font-semibold text-brand-title">{value}</p>
       {note && <p className="text-xs text-brand-muted">{note}</p>}
+      {/* Comparability gates in words (CLAUDE.md): why some checks are not used together. */}
+      {notes.map((n) => (
+        <p key={n} className="mt-1 text-xs text-brand-muted">{n}</p>
+      ))}
     </div>
   );
 }
@@ -274,6 +278,8 @@ function TodayCard({
       </div>
 
       {pushOn() && ios && <p className="text-xs text-brand-muted">{H.today.iosHint}</p>}
+      {/* Reminders not on: ask again where the browser can, or say how to unblock them (was only on the desktop Home v2). */}
+      {pushOn() && <RemindersPrompt user={user} settings={settings} onSettings={onSettings} inline />}
       {/* Screen 02: the conditions as their own screen on a phone (a full-height sheet), a centred sheet from 640px. */}
       {weatherOn() && (
         <dialog ref={dialog} aria-label={H.today.weatherSheet} className="m-0 h-dvh max-h-none w-full max-w-none overflow-y-auto bg-brand-bg p-0 backdrop:bg-black/30 sm:m-auto sm:h-auto sm:max-h-[90dvh] sm:max-w-md sm:rounded-card" onClick={(e) => e.target === dialog.current && dialog.current?.close()}>
@@ -398,6 +404,8 @@ function SkinTwinCard({ dashboard }: { dashboard: Dashboard }) {
           <Sparkles aria-hidden size={16} className="shrink-0 text-brand-700" />
           {H.today.skinTwin} <span className="truncate text-brand-text-muted">· {date}</span>
         </span>
+        {/* Provenance, as the desktop card had it: a newer check with no server reading, above "the reading below". */}
+        {!analysing && dashboard.newerCheckNotShown && <span className="text-xs text-brand-text-muted">{C.current.newerNotShown}</span>}
         <span className="flex min-w-0 flex-wrap items-center gap-x-3 text-sm text-brand-text">
           {analysing ? (
             H.latestRow.analysing
@@ -411,11 +419,14 @@ function SkinTwinCard({ dashboard }: { dashboard: Dashboard }) {
                 </span>
               );
             })
+          ) : view && !view.bands ? (
+            C.current.unreadable
           ) : (
             H.latestRow.noReading
           )}
           {!analysing && more > 0 && <span className="text-brand-muted">{H.latestRow.more(more)}</span>}
         </span>
+        {view?.source === "legacy" && view.bands && <span className="text-xs text-brand-text-muted">{C.history.kind.legacy}</span>}
       </span>
       <ChevronRight aria-hidden size={20} className="shrink-0 text-brand-text" />
     </Link>

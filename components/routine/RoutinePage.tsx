@@ -104,8 +104,8 @@ export function RoutinePage() {
       </p>
 
       {/* Redesign screen 06 as the routine set-up: the user's own products as step cards, then the add form (R-2 B: no recommendation here). */}
-      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-12 lg:items-start">
-        <section aria-labelledby="products-title" className="flex flex-col gap-3 lg:col-span-7">
+      <div className="flex flex-col gap-6">
+        <section aria-labelledby="products-title" className="flex flex-col gap-3">
           <h2 id="products-title" className={h2}>
             {C.yourProducts}
           </h2>
@@ -166,7 +166,7 @@ export function RoutinePage() {
           })}
         </section>
 
-        <div className="lg:col-span-5">
+        <div>
           <AddProduct
             choices={choices.filter((c) => !data.routine.some((i) => i.productId === c.id))}
             busy={busy}

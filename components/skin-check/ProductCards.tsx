@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronRight, ExternalLink } from "lucide-react";
+import { AlertTriangle, ChevronRight, ExternalLink } from "lucide-react";
 import { useId } from "react";
 import { btnSecondary, card, textLink } from "@/components/ui/page";
 import { PriceBlock } from "@/components/ui/kit";
@@ -9,7 +9,7 @@ import { ProductPhoto } from "@/components/products/ProductPhoto";
 import { StoreAction } from "@/components/products/StoreAction";
 import { useStoreProducts, type StoreCard } from "@/components/products/useStoreProducts";
 import { PRODUCT_DOCTOR_LINE } from "@/lib/context/products";
-import { cardsFor, OWN_PRODUCTS_LINE, STEP_LABEL } from "@/lib/context/products";
+import { cardsFor, DRY_SKIN_CAUTION, needsDryCaution, OWN_PRODUCTS_LINE, STEP_LABEL } from "@/lib/context/products";
 import { COPY } from "@/lib/rules/settings";
 import { ECHO_COPY as E } from "./echoCopy";
 
@@ -35,7 +35,8 @@ export function splitRedFlagNote(text: string): { text: string; note: boolean } 
   return text.startsWith(head) ? { text: text.slice(head.length), note: true } : { text, note: false };
 }
 
-export function ProductCards({ products, doctorLine = false, store }: { products: readonly { productId: string; reason?: string }[]; doctorLine?: boolean; store?: StoreCard[] | null }) {
+export function ProductCards({ products, doctorLine = false, store, skinType }: { products: readonly { productId: string; reason?: string }[]; doctorLine?: boolean; store?: StoreCard[] | null; skinType?: unknown }) {
+  // skinType: the user's own skin-type answer; Dry or Ultra Dry adds the fixed caution to drying products (lib/context/products.ts).
   const headingId = useId();
   const live = useStoreProducts();
   const stock = store === undefined ? live : store;
@@ -66,6 +67,12 @@ export function ProductCards({ products, doctorLine = false, store }: { products
                 <p className="self-start rounded-full bg-brand-100 px-2.5 py-0.5 text-xs font-semibold text-brand-700">{STEP_LABEL[p.step]}</p>
                 <h3 className="break-words text-[15px] font-semibold leading-snug text-brand-text">{p.name}</h3>
                 {sp && <PriceBlock price={sp.price} wasPrice={sp.wasPrice} available={sp.available} />}
+                {needsDryCaution(p.id, skinType) && (
+                  <p role="note" className="flex items-start gap-2 rounded-tile bg-sun-wash px-3 py-2 text-[13px] leading-snug text-brand-text">
+                    <AlertTriangle aria-hidden size={16} className="mt-0.5 shrink-0 text-severity-moderate" />
+                    <span>{DRY_SKIN_CAUTION}</span>
+                  </p>
+                )}
                 <dl className="space-y-1 text-[13px] leading-snug text-brand-text-muted">
                   <div>
                     <dt className="inline font-semibold text-brand-text">{E.keyIngredient}: </dt>

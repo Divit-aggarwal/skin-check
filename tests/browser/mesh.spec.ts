@@ -1,11 +1,10 @@
 import { mkdirSync, readFileSync } from "node:fs";
 import { devices, expect, test, type Locator, type Page, type Route } from "@playwright/test";
 import { DASHBOARD_COPY as C } from "@/components/dashboard/copy";
-import { HOME_COPY as H } from "@/components/dashboard/homeCopy";
 import { QUESTIONS_COPY as Q } from "@/components/skin-check/questionsCopy";
 import { WIDTHS, type Width } from "./seed-questionnaire";
 import { FACE_DARK, FACE_LIGHT, MESH_SEED } from "./seed-mesh";
-import { desktop, signIn, skipQuestions } from "./helpers";
+import { signIn, skipQuestions } from "./helpers";
 
 // TD-37 (docs/design/face-mesh.md): the face mesh while the photo is read.
 // TD-39: the results show the photo once with the mesh and both overlays, a
@@ -210,15 +209,15 @@ for (const width of WIDTHS) {
         const outside = watchHosts(page);
         const user = tone === "dark" ? MESH_SEED.kept : MESH_SEED.keptLight;
         await signIn(page, user.phoneNumber);
-        // TD-47: Home's latest check has the kept photo as a thumbnail (no mesh, no overlays) and the whole-face levels.
-        await desktop(page); // TD-48: the Home v2 content is the desktop Home
-        const latest = page.locator("section", { has: page.getByRole("heading", { name: H.latest.title }) });
+        // Home's Skin Twin row has the kept photo as a thumbnail (no mesh, no overlays) at this width
+        // (desktop parity, owner 2026-10-25: the phone Home at every width); the table is on the opened check.
+        const latest = page.getByRole("link", { name: /^Open the check from/ });
         const thumb = latest.getByRole("img", { name: /Your kept photo from/ });
         await expect(thumb).toBeVisible({ timeout: 90_000 });
         await expect.poll(() => thumb.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
         await expect(page.getByTestId("face-photo")).toHaveCount(0);
         await expect(latest.getByRole("img", { name: /^Where/ })).toHaveCount(0);
-        await expect(latest.getByRole("table").getByRole("row")).toHaveCount(5);
+        await expect(latest).toContainText(/\b(Low|Moderate|Elevated)\b/);
         await expectNothingElse(page);
         await shot(page, `home-kept-${tone}`, width);
         await page.goto(`/checks/${user.uid}-1`);
@@ -247,10 +246,10 @@ test("skipped questions on an opened check: the existing invitation, nothing abo
 test("the bucket refuses a read from our site (today's production CORS): the face drawing, no error", async ({ page }) => {
   await page.route((url) => url.hostname === "127.0.0.1" && url.pathname.includes("/original.jpg"), (route) => route.abort("accessdenied"));
   await signIn(page, MESH_SEED.kept.phoneNumber);
-  // TD-47: Home falls back to the face drawing; the opened check too.
-  await desktop(page); // TD-48: the Home v2 content is the desktop Home
-  await expect(page.getByRole("heading", { name: H.latest.title })).toBeVisible();
-  await expect(page.getByRole("img", { name: /A drawing of a face/ }).or(page.getByRole("group", { name: /A drawing of a face/ }))).toBeVisible();
+  // Home's Skin Twin row falls back to the face drawing; the opened check too.
+  const latest = page.getByRole("link", { name: /^Open the check from/ });
+  await expect(latest).toBeVisible();
+  await expect(latest.getByRole("img", { name: /A drawing of a face/ }).or(latest.getByRole("group", { name: /A drawing of a face/ }))).toBeVisible();
   await page.goto(`/checks/${MESH_SEED.kept.uid}-1`);
   await expectTable(page);
   await page.waitForTimeout(3_000);

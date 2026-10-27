@@ -6,14 +6,18 @@
 // TD-50 (redesign): primary is a filled --brand-700 pill (a trailing → is
 // added by the caller where the mockup has one); secondary an outline pill;
 // ghost a text pill. 150ms colour transitions.
+// Polish lane #5: every pressable scales to 0.96 while pressed (150ms ease-out), only
+// when the user allows motion; a disabled button has no pointer events, so never scales.
+export const press = "transition-[color,background-color,border-color,opacity,transform] duration-fast ease-out motion-safe:active:scale-[0.96]";
+// Polish lane #4: disabled is a soft brand tint with no outline, so it never looks like the secondary button.
 export const btnPrimary =
-  "inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full border border-brand-action bg-brand-action px-6 text-base font-semibold text-white transition-colors duration-fast hover:bg-brand-action-hover disabled:pointer-events-none disabled:border-brand-line disabled:bg-brand-paper disabled:text-brand-muted aria-disabled:border-brand-line aria-disabled:bg-brand-paper aria-disabled:text-brand-muted";
+  `inline-flex min-h-[52px] items-center justify-center gap-2 rounded-full border border-brand-action bg-brand-action px-6 text-base font-semibold text-white ${press} hover:bg-brand-action-hover disabled:pointer-events-none disabled:border-transparent disabled:bg-brand-100 disabled:text-brand-text-subtle aria-disabled:border-transparent aria-disabled:bg-brand-100 aria-disabled:text-brand-text-subtle`;
 export const btnSecondary =
-  "inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-brand-line bg-brand-surface px-[22px] text-[15px] font-semibold text-brand-ink transition-colors duration-fast hover:border-brand-700 hover:text-brand-700 disabled:pointer-events-none disabled:text-brand-muted aria-disabled:text-brand-muted";
+  `inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-brand-line bg-brand-surface px-[22px] text-[15px] font-semibold text-brand-ink ${press} hover:border-brand-700 hover:text-brand-700 disabled:pointer-events-none disabled:text-brand-muted aria-disabled:text-brand-muted`;
 export const textLink =
   "inline-flex min-h-11 items-center gap-1 font-semibold text-brand-forest underline-offset-4 hover:underline focus-visible:underline";
 export const btnGhost =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-[15px] font-semibold text-brand-700 transition-colors duration-fast hover:bg-brand-50";
+  `inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 text-[15px] font-semibold text-brand-700 ${press} hover:bg-brand-50`;
 /** White card: 1px --border, 16px corners, almost no shadow. */
 export const card = "rounded-card border border-brand-border bg-brand-surface p-4 shadow-card sm:p-5";
 /** Tinted card: --brand-100, no border. */
@@ -39,5 +43,11 @@ export const lead = "text-sm leading-[1.3] text-brand-text-muted sm:text-[15px]"
 export const appBar = "grid h-11 items-center";
 /** Section heading, 14px weight 600, sentence case (cap 9-11 pt on 10, 12, 15, 20, 22). */
 export const h2 = "text-sm font-semibold leading-tight text-brand-text sm:text-xl";
+/** One reading column, the same on every single-flow page at every width (polish lane, desktop parity). */
+export const column = "mx-auto w-full max-w-2xl";
+/** Phone chrome (wordmark row, generic back) that the desktop side bar replaces: gone from 1024px when signed in. */
+export const phoneChrome = "lg:group-data-[nav]/shell:hidden";
 /** Page width and gutters: 16 / 24 / 32px (system.md §4). */
 export const page = "mx-auto w-full max-w-[1200px] px-4 pb-12 sm:px-6 lg:px-8";
+/** A single-flow page: the same gutters, the reading column's width (672px of content). */
+export const pageColumn = "mx-auto w-full max-w-[736px] px-4 pb-12 sm:px-6 lg:px-8";

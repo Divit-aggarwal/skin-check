@@ -88,7 +88,9 @@ export function NextCheckCard({ dashboard, user, settings, onSettings }: { dashb
 }
 
 /** Reminders missing: ask again where the browser can, else say how; the iPhone home-screen hint. */
-function RemindersPrompt({ user, settings, onSettings }: { user: User; settings: HomeSettings | null; onSettings: (s: HomeSettings) => void }) {
+export function RemindersPrompt({ user, settings, onSettings, inline = false }: { user: User; settings: HomeSettings | null; onSettings: (s: HomeSettings) => void; inline?: boolean }) {
+  // inline: the phone Home, which shows its own iPhone hint and has no card around this.
+  const edge = inline ? "" : "border-t border-brand-line pt-3";
   const [state, setState] = useState<BrowserState | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [ios, setIos] = useState(false);
@@ -97,16 +99,16 @@ function RemindersPrompt({ user, settings, onSettings }: { user: User; settings:
     void hasSubscription().then(setSubscribed);
     setIos(needsHomeScreen(navigator.userAgent, window.matchMedia("(display-mode: standalone)").matches));
   }, []);
-  if (ios) return <p className="border-t border-brand-line pt-3 text-sm text-brand-muted">{H.next.iosHint}</p>;
+  if (ios) return inline ? null : <p className={`${edge} text-sm text-brand-muted`}>{H.next.iosHint}</p>;
   if (!state) return null;
   // "Allowed" counts only while this browser really holds a subscription (a sign-out removes it).
   const prompt = promptFor(state, settings?.reminders === "allowed" && state === "granted" && subscribed);
   if (prompt === "none" || prompt === "unsupported") return null;
   // TD-47 (3): no browser prompt before the permissions screen; with permission already granted, no prompt shows.
   if (prompt === "ask" && !settings?.askedAt && state !== "granted") return null;
-  if (prompt === "blocked") return <p className="border-t border-brand-line pt-3 text-sm text-brand-muted">{H.next.remindersBlocked}</p>;
+  if (prompt === "blocked") return <p className={`${edge} text-sm text-brand-muted`}>{H.next.remindersBlocked}</p>;
   return (
-    <div className="flex flex-col items-start gap-2 border-t border-brand-line pt-3">
+    <div className={`flex flex-col items-start gap-2 ${edge}`}>
       <p className="text-sm text-brand-muted">{H.next.remindersAsk}</p>
       <button
         type="button"

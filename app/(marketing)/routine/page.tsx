@@ -1,5 +1,5 @@
 import { RoutinePage } from "@/components/routine/RoutinePage";
-import { page } from "@/components/ui/page";
+import { pageColumn } from "@/components/ui/page";
 import { AppHeader } from "@/components/ui/kit";
 import { ROUTINE_COPY as C } from "@/lib/routine/copy";
 
@@ -15,10 +15,10 @@ export const metadata = {
 // The page title lives in RoutinePage (screen 03: the slot title replaces it once loaded).
 export default function RoutineRoute() {
   return (
-    <main className={page}>
+    <main className={pageColumn}>
       {/* Phones: the wordmark bar (redesign); the rail and side bar carry it from 640px. */}
       <div className="sm:hidden">
-        <AppHeader back="/dashboard" backLabel="Back to Today" />
+        <AppHeader back="/dashboard" backLabel="Back to Today" top />
       </div>
       <RoutinePage />
     </main>

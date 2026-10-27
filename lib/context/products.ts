@@ -125,6 +125,25 @@ export function cardsFor<T extends { productId: string; reason?: string }>(produ
 }
 
 /**
+ * Dry skin (owner, 2026-10-26): a product with an exfoliating acid (a BHA or
+ * AHA in its catalogue ingredient classes) can feel drying, and the store
+ * describes these for oily, breakout-prone skin. When the user's own answer is
+ * Dry or Ultra Dry, its card carries a fixed caution, drawn by our code from
+ * the catalogue (never by Gemini), so the product is never shown to dry skin
+ * as if it suited it. The card stays: the cleanser is the only Cleanse step.
+ * The caution text is a DRAFT for the dermatology team's review (E16).
+ */
+export const DRY_SKIN_TYPES: ReadonlySet<string> = new Set(["dry", "ultra_dry"]);
+export const DRY_SKIN_CAUTION =
+  "You said your skin is dry. This has exfoliating acids, which can feel drying: start once a day, use moisturiser after it, and stop if your skin stings or feels tight.";
+/** The catalogue's own data decides: exfoliating acids (BHA, AHA). */
+export const hasExfoliatingAcid = (productId: string): boolean =>
+  CATALOGUE.products.find((p) => p.id === productId)?.ingredientClasses.some((c) => c === "bha" || c === "aha") ?? false;
+/** True when this card needs the dry-skin caution for this user's own skin-type answer. */
+export const needsDryCaution = (productId: string, skinType: unknown): boolean =>
+  typeof skinType === "string" && DRY_SKIN_TYPES.has(skinType) && hasExfoliatingAcid(productId);
+
+/**
  * TD-34 (advisor review of the live run): a question whether a product works,
  * fixes, suits, is good or safe for a concern. A card beside such a
  * question reads as "yes", so the app shows no product for it (a stricter
