@@ -93,9 +93,7 @@ export const SECTIONS: SectionConfig[] = [
         // (blemishes/redness/pigment/texture/pores/hydration/oiliness) —
         // that vocabulary is shared with BandableMetric/METRIC_LABELS
         // (lib/skin-check-rules.ts, lib/skin-check-skus.ts), so only the
-        // labels and the multi-select shape changed here. See
-        // lib/skin-check-skus.ts's resolveStatedConcern for how the first
-        // selected concern becomes "the" stated concern.
+        // labels and the multi-select shape changed here.
         id: "primary_concerns",
         type: "multi-select-cards",
         prompt: "What are your main skin concerns?",

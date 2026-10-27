@@ -45,7 +45,7 @@ for (const s of dashStates) {
   test(`dashboard ${s}`, async ({ page }) => {
     await signIn(page, U[s]!.phoneNumber);
     await page.goto("/dashboard");
-    await expect(page.getByRole("heading", { name: C.title })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: /^Good (morning|afternoon|evening)/ })).toBeVisible();
     await page.waitForTimeout(1500);
     await shots(page, `dashboard-${s}`);
   });
@@ -191,7 +191,7 @@ test("check flow: a dark photo asks for a retake", async ({ page }) => {
 
 test("account: delete confirmation open (not submitted)", async ({ page }) => {
   await signIn(page, U.withdraw!.phoneNumber);
-  await page.goto("/account");
+  await page.goto("/account#delete-account");
   await page.getByRole("button", { name: "Delete my account and data" }).click();
   await expect(page.getByLabel(/to confirm/)).toBeVisible();
   await shots(page, "account-delete-confirm");
