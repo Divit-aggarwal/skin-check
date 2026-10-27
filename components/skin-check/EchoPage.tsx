@@ -446,7 +446,8 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
           >
             <ChevronLeft aria-hidden size={22} />
           </Link>
-          <Wordmark centred />
+          {/* One wordmark on screen (G41): the shell's top bar has it signed out, the side bar from 1024px. */}
+          <Wordmark centred className="invisible group-data-[nav]/shell:visible lg:group-data-[nav]/shell:invisible" />
           <AccountButton />
         </header>
 

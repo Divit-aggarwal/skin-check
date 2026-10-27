@@ -65,6 +65,7 @@ describe("app shell", () => {
   it("one wordmark on screen: the page header's only on a signed-in phone or tablet (polish lane)", () => {
     // Signed out, the shell's top bar has the wordmark; signed in from 1024px, the side bar. The shell marks signed in with data-nav.
     expect(readFileSync("components/shell/AppShell.tsx", "utf8")).toMatch(/data-nav=\{user \? "" : undefined\} className="group\/shell /);
-    expect(readFileSync("components/ui/kit.tsx", "utf8")).toContain('<Wordmark centred className="invisible group-data-[nav]/shell:visible lg:group-data-[nav]/shell:invisible" />');
+    for (const f of ["components/ui/kit.tsx", "components/skin-check/SkinCheckFlow.tsx", "components/skin-check/EchoPage.tsx"])
+      expect(readFileSync(f, "utf8"), f).toContain('<Wordmark centred className="invisible group-data-[nav]/shell:visible lg:group-data-[nav]/shell:invisible" />');
   });
 });
