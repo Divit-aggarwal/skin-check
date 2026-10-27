@@ -390,3 +390,28 @@ describe("F28 and F29 (owner, 2026-10-11)", () => {
     expect(hidesProductsAfter({ role: "user", redFlag: true, text: "what medicine should i take" })).toBe(false);
   });
 });
+
+// Dry skin (owner, 2026-10-26): drying products carry a fixed caution on their card for a Dry or Ultra Dry answer.
+describe("dry skin: a caution on products with exfoliating acids", () => {
+  it("the catalogue's own ingredient classes decide which products get it", async () => {
+    const { hasExfoliatingAcid } = await import("@/lib/context/products");
+    expect(CATALOGUE.products.filter((p) => hasExfoliatingAcid(p.id)).map((p) => p.id).sort()).toEqual(["active-boba-cream", "clear-seal", "refreshing-cleanser"]);
+  });
+
+  it("only for the user's own Dry or Ultra Dry answer", async () => {
+    const { needsDryCaution } = await import("@/lib/context/products");
+    for (const t of ["dry", "ultra_dry"]) expect(needsDryCaution("refreshing-cleanser", t), t).toBe(true);
+    for (const t of ["normal", "oily", "combination", undefined, null, ["dry"]]) expect(needsDryCaution("refreshing-cleanser", t), String(t)).toBe(false);
+    for (const id of ["niacinamide-serum", "calming-moisturiser", "protecting-sunscreen"]) expect(needsDryCaution(id, "dry"), id).toBe(false);
+  });
+
+  it("the caution passes the D-12 word check and is drawn by our code on the card, never otherwise", async () => {
+    const { DRY_SKIN_CAUTION } = await import("@/lib/context/products");
+    expect(bannedWordsIn(DRY_SKIN_CAUTION)).toEqual([]);
+    const cards = (skinType?: string) => renderToStaticMarkup(createElement(ProductCards, { products: [{ productId: "refreshing-cleanser" }, { productId: "calming-moisturiser" }], store: null, skinType }));
+    const dry = cards("dry");
+    expect(dry.split(escapeHtml(DRY_SKIN_CAUTION)).length - 1).toBe(1);
+    expect(dry).toContain('role="note"');
+    for (const t of ["oily", "normal", undefined]) expect(cards(t)).not.toContain(escapeHtml(DRY_SKIN_CAUTION));
+  });
+});

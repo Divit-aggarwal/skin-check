@@ -559,7 +559,7 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
                   {withPhoneLinks(splitDoctorLine(splitRedFlagNote(shownOpening.reply).text).text)}
                 </ChatBubble>
                 <div className="pl-10">
-                  <ProductCards products={shownOpening.products} doctorLine={splitDoctorLine(shownOpening.reply).doctorLine} />
+                  <ProductCards products={shownOpening.products} doctorLine={splitDoctorLine(shownOpening.reply).doctorLine} skinType={session.answers?.skin_type} />
                 </div>
               </div>
             )}
@@ -585,7 +585,7 @@ export function EchoPage({ echoOn = true, productsOn = true }: { echoOn?: boolea
                   </ChatBubble>
                   {m.products && (
                     <div className="pl-10">
-                      <ProductCards products={m.products} doctorLine={splitDoctorLine(m.text).doctorLine} />
+                      <ProductCards products={m.products} doctorLine={splitDoctorLine(m.text).doctorLine} skinType={session.answers?.skin_type} />
                     </div>
                   )}
                 </div>

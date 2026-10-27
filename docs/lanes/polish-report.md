@@ -123,3 +123,13 @@ Before and after on desktop (1280): [5-desktop-today](../design/polish/5-desktop
 - Full browser suite (parallel, fresh stacks): home-v3, mesh and every other spec passed. dashboard, flows, home-v2 and questionnaire were re-run after their ports on a fresh stack: 78 passed, 1 failed.
 - flows.spec.ts "a normal scan finishes and shows on the dashboard": the failure was not the redesign. The test leaves the flow after the photo, so the reading exists but the check record does not; opening it from Home showed "You have no skin checks yet." The test now checks Home's Skin Twin row (date and level words) and no longer opens the check. Coverage note: the "Photo checks on your phone: passed." line it used to see on Home v2 is not shown by the phone Home.
 - `npm run test:all` on 9768e25 (2026-10-26): exit 0. Typecheck and lint clean; unit 2555 passed; stack 101/101; browser shard 1 72 passed, shard 2 50 passed, none failed; production build compiled.
+
+## 8. Echo: a caution on drying products for dry skin (owner, 2026-10-26)
+
+Owner: Echo "shall not recommend that same products to someone with dry skin as it's not suitable for that, or it shall give a warning."
+
+- Rule, in code (CLAUDE.md: deterministic recommendation rules; Gemini explains only): a product whose catalogue `ingredientClasses` include an exfoliating acid (BHA or AHA) gets a fixed caution on its Echo card when the user's own skin-type answer is Dry or Ultra Dry. Today: Refreshing Cleanser (salicylic acid 2%), Clear Seal, Active Boba (out of stock). `lib/context/products.ts`: `hasExfoliatingAcid`, `needsDryCaution`, `DRY_SKIN_CAUTION`.
+- A warning, not a removal: the cleanser is the only Cleanse product, so removing it would leave a dry-skin routine with no cleanser. The serum has no acid, so no caution (its store description says "for oily … skin"; the dermatology team may want one).
+- What Gemini receives is unchanged (no privacy-inventory change). The card is drawn by our code; the caution sits under the price as a note.
+- **The caution text is a DRAFT for the dermatology team (E16):** "You said your skin is dry. This has exfoliating acids, which can feel drying: start once a day, use moisturiser after it, and stop if your skin stings or feels tight." It passes the D-12 word check.
+- Tests: tests/echo-products.test.ts, add-only (which products, which answers, the word check, drawn once and only for dry skin); unit 2558 passed; echo-products.spec.ts 9/9 on the lane stack; seen on screen with a test user set to Dry (one caution, on the cleanser only).
