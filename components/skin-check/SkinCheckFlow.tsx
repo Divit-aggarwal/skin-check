@@ -177,7 +177,8 @@ export function SkinCheckFlow() {
           >
             <ChevronLeft className="h-[22px] w-[22px]" />
           </button>
-          <Wordmark centred />
+          {/* One wordmark on screen (G41): the shell's top bar has it signed out, the side bar from 1024px. */}
+          <Wordmark centred className="invisible group-data-[nav]/shell:visible lg:group-data-[nav]/shell:invisible" />
           <div className="justify-self-end">
             {/* O-D3: the signed-in start page links to /dashboard. */}
             {isFirst && !complete && (
